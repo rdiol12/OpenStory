@@ -71,7 +71,8 @@ namespace Net
 
 		bool init()
 		{
-			// Connect to a localhost server's login port.
+			// solstice: 127.0.0.1
+			// oasis: 127.0.0.1
 			static const string HOST = "127.0.0.1";
 			static const string PORT = "8484";
 
