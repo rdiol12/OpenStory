@@ -58,6 +58,7 @@ namespace ms
 			BT_IDLOST,
 			BT_SAVEID,
 			BT_QUIT,
+			BT_GUEST_LOGIN,
 			NUM_BUTTONS
 		};
 
