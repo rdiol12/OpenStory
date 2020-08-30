@@ -176,21 +176,21 @@ namespace ms
 		glfwSetScrollCallback(glwnd, scroll_callback);
 		glfwSetWindowCloseCallback(glwnd, close_callback);
 
-		// char buf[256];
-		// GetCurrentDirectoryA(256, buf);
-		// strcat_s(buf, sizeof(buf), "\\Icon.png");
+		char buf[256];
+		GetCurrentDirectoryA(256, buf);
+		strcat_s(buf, sizeof(buf), "\\Icon.png");
 
-		// GLFWimage images[1];
+		GLFWimage images[1];
 
-		// auto stbi = stbi_load(buf, &images[0].width, &images[0].height, 0, 4);
+		auto stbi = stbi_load(buf, &images[0].width, &images[0].height, 0, 4);
 
-		// if (stbi == NULL)
-		// 	return Error(Error::Code::MISSING_ICON, stbi_failure_reason());
+		if (stbi == NULL)
+			return Error(Error::Code::MISSING_ICON, stbi_failure_reason());
 
-		// images[0].pixels = stbi;
+		images[0].pixels = stbi;
 
-		// glfwSetWindowIcon(glwnd, 1, images);
-		// stbi_image_free(images[0].pixels);
+		glfwSetWindowIcon(glwnd, 1, images);
+		stbi_image_free(images[0].pixels);
 
 		GraphicsGL::get().reinit();
 
