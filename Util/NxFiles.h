@@ -23,16 +23,17 @@
 #include "../Error.h"
 
 #include <array>
+#include <stdint.h>
 
 namespace ms
 {
 	namespace NxFiles
 	{
 		// Number of needed files
-		constexpr uint8_t NUM_FILES = 19;
+		const constexpr uint8_t NUM_FILES = 19;
 
 		// Names of the needed game files
-		constexpr std::array<const char*, NUM_FILES> filenames =
+		const constexpr std::array<const char*, NUM_FILES> filenames =
 		{
 			"Base.nx",
 			"Character.nx",

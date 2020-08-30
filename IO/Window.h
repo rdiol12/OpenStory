@@ -26,6 +26,7 @@
 #include <glfw3.h>
 
 #include <functional>
+#include <string>
 
 namespace ms
 {

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cmath>
+
 #include "../../Constants.h"
 
 #include "../../Template/Interpolated.h"
