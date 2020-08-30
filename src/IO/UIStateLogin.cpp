@@ -33,14 +33,14 @@ namespace ms
 
 		bool start_shown = Configuration::get().get_start_shown();
 
-		if (!start_shown)
+		if (start_shown)
 			emplace<UILogo>();
 		else
 			emplace<UILogin>();
 	}
 
 	void UIStateLogin::draw(float inter, Point<int16_t> cursor) const
-	{
+	{	
 		for (auto iter : elements)
 		{
 			UIElement* element = iter.second.get();
