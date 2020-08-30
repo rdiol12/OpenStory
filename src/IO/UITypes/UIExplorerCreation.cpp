@@ -50,7 +50,7 @@ namespace ms
 		nl::node Login = nl::nx::ui["Login.img"];
 		nl::node Common = Login["Common"];
 		nl::node CustomizeChar = Login["CustomizeChar"]["000"];
-		nl::node back = nl::nx::map001["Back"]["login.img"]["back"];
+		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
 		nl::node signboard = nl::nx::mapLatest["Obj"]["login.img"]["NewChar"]["signboard"];
 		nl::node board = CustomizeChar["board"];
 		nl::node genderSelect = CustomizeChar["genderSelect"];
