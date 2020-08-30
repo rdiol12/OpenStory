@@ -18,9 +18,5 @@ Settings
 
 /includes/WzLib
 
-/wz
-
-/Debug
-/CMakeFiles
 /.vscode
-/OpenStory.dir
+/build
