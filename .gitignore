@@ -5,10 +5,22 @@
 *.aps
 *.log
 *.tlog
+*.sln
 *.vcxproj.user
+*.vcxproj
+*.filters
+*.cmake
+CMakeCache.txt
 
 *.nx
 *.wz
 Settings
 
 /includes/WzLib
+
+/wz
+
+/Debug
+/CMakeFiles
+/.vscode
+/OpenStory.dir
