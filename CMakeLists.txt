@@ -11,6 +11,16 @@ file(GLOB_RECURSE SOURCE_FILES
     )
 add_executable(OpenStory ${SOURCE_FILES})
 
+set_target_properties(OpenStory PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/wz
+                      RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/wz
+)
+
+# ADD_CUSTOM_COMMAND(TARGET OpenStory POST_BUILD
+#                 COMMAND copy \"${CMAKE_SOURCE_DIR}\vendor\bass24\x64\bass.dll\"  \"${RUNTIME_OUTPUT_DIRECTORY_DEBUG}/\"
+#                 COMMENT "copying dlls …"
+#                 )
+
 
 find_package(OpenGL REQUIRED)
 TARGET_INCLUDE_DIRECTORIES(OpenStory PUBLIC ${OPENGL_INCLUDE_DIRS})
