@@ -58,7 +58,7 @@ namespace ms
 		nl::node logo = Login["Title"]["logo"]["0"];
 		nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
 
-		sprites.emplace_back(back["11"], Point<int16_t>(400, 300));
+		sprites.emplace_back(back["11"], Point<int16_t>(400,300));
 		sprites.emplace_back(logo, Point<int16_t>(409, 144));
 		sprites.emplace_back(signboard, signboard_pos);
 		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50));
@@ -111,7 +111,7 @@ namespace ms
 #pragma endregion
 
 #pragma region Password
-		textbox_pos.shift_y(26);
+		textbox_pos.shift_y(30);
 
 		password = Textfield(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, Color::Name::PRUSSIANBLUE, 0.85f, Rectangle<int16_t>(textbox_pos, textbox_pos + textbox_dim), textbox_limit);
 
@@ -147,35 +147,37 @@ namespace ms
 			account.set_state(Textfield::State::FOCUSED);
 		}
 
-		if (Configuration::get().get_auto_login())
-		{
-			UI::get().emplace<UILoginWait>([]() {});
-
-			auto loginwait = UI::get().get_element<UILoginWait>();
-
-			if (loginwait && loginwait->is_active())
-				LoginPacket(
-					Configuration::get().get_auto_acc(),
-					Configuration::get().get_auto_pass()
-				).dispatch();
-		}
+		
 	}
 
 	void UILogin::draw(float alpha) const
 	{
-		background.draw(position + Point<int16_t>(0, 7));
+		background.draw(position);
 
 		UIElement::draw(alpha);
 
-		version.draw(position + Point<int16_t>(707, 4));
-		account.draw(position + Point<int16_t>(1, 0));
-		password.draw(position + Point<int16_t>(1, 3));
-
+		version.draw(position + Point<int16_t>(680, 10));
+		account.draw(position);
+		password.draw(position);
 		checkbox[saveid].draw(position + signboard_pos + Point<int16_t>(-120, -25));
 	}
 
 	void UILogin::update()
 	{
+		// if (Configuration::get().get_auto_login())
+		// if (true)
+		// {
+		// 	UI::get().emplace<UILoginWait>([]() {});
+
+		// 	auto loginwait = UI::get().get_element<UILoginWait>();
+
+		// 	if (loginwait && loginwait->is_active())
+		// 		LoginPacket(
+		// 			Configuration::get().get_auto_acc(),
+		// 			Configuration::get().get_auto_pass()
+		// 		).dispatch();
+		// }
+		
 		UIElement::update();
 
 		account.update(position);
@@ -189,6 +191,11 @@ namespace ms
 
 		std::string account_text = account.get_text();
 		std::string password_text = password.get_text();
+
+		if(Configuration::get().get_auto_login()){
+			account_text = Configuration::get().get_auto_acc();
+			password_text = Configuration::get().get_auto_pass();
+		}
 
 		std::function<void()> okhandler = [&, password_text]()
 		{

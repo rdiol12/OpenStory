@@ -32,6 +32,8 @@
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UIWorldMap.h"
+#include "UITypes/UILogin.h"
+#include "../Net/Packets/LoginPackets.h"
 
 namespace ms
 {
@@ -45,6 +47,9 @@ namespace ms
 	{
 		cursor.init();
 		change_state(State::LOGIN);
+		if(Configuration::get().get_auto_login()){
+			UI::get().get_element<UILogin>().get()->login();
+		}
 	}
 
 	void UI::draw(float alpha) const
