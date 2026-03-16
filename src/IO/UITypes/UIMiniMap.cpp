@@ -34,6 +34,7 @@ namespace ms
 	UIMiniMap::UIMiniMap(const CharStats& stats) : UIDragElement<PosMINIMAP>(Point<int16_t>(128, 20)), stats(stats)
 	{
 		big_map = true;
+		scroll_locked = false;
 		has_map = false;
 		listNpc_enabled = false;
 		listNpc_dimensions = Point<int16_t>(150, 170);
@@ -54,6 +55,11 @@ namespace ms
 		buttons[Buttons::BT_BIG] = std::make_unique<MapleButton>(MiniMap["BtBig"], Point<int16_t>(223, -6));
 		buttons[Buttons::BT_MAP] = std::make_unique<MapleButton>(MiniMap["BtMap"], Point<int16_t>(237, -6));
 		buttons[Buttons::BT_NPC] = std::make_unique<MapleButton>(MiniMap["BtNpc"], Point<int16_t>(276, -6));
+
+		// Scroll lock toggle reuses BtBig/BtSmall sprites as a toggle indicator
+		// BtBig = unlocked (map scrolls to follow player), BtSmall = locked (map stays fixed)
+		buttons[Buttons::BT_SCROLL_LOCK] = std::make_unique<MapleButton>(MiniMap["BtBig"], Point<int16_t>(260, -6));
+		buttons[Buttons::BT_SCROLL_LOCK]->set_active(false);
 
 		region_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
 		town_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
@@ -81,12 +87,13 @@ namespace ms
 
 			if (has_map)
 			{
+				Point<int16_t> scroll_off = get_scroll_offset(normal_dimensions, 0);
 				Animation portal_marker = Animation(marker["portal"]);
 
 				for (auto sprite : static_marker_info)
-					portal_marker.draw(position + sprite.second, alpha);
+					portal_marker.draw(position + sprite.second + scroll_off, alpha);
 
-				draw_movable_markers(position, alpha);
+				draw_movable_markers(position + scroll_off, alpha);
 
 				if (listNpc_enabled)
 					draw_npclist(normal_dimensions, alpha);
@@ -102,12 +109,13 @@ namespace ms
 
 			if (has_map)
 			{
+				Point<int16_t> scroll_off = get_scroll_offset(max_dimensions, MAX_ADJ);
 				Animation portal_marker(marker["portal"]);
 
 				for (auto sprite : static_marker_info)
-					portal_marker.draw(position + sprite.second + Point<int16_t>(0, MAX_ADJ), alpha);
+					portal_marker.draw(position + sprite.second + Point<int16_t>(0, MAX_ADJ) + scroll_off, alpha);
 
-				draw_movable_markers(position + Point<int16_t>(0, MAX_ADJ), alpha);
+				draw_movable_markers(position + Point<int16_t>(0, MAX_ADJ) + scroll_off, alpha);
 
 				if (listNpc_enabled)
 					draw_npclist(max_dimensions, alpha);
@@ -311,7 +319,10 @@ namespace ms
 		case BT_SMALL:
 		case BT_BIG:
 			big_map = !big_map;
-			// Map scrolling toggle not implemented
+			toggle_buttons();
+			break;
+		case BT_SCROLL_LOCK:
+			scroll_locked = !scroll_locked;
 			toggle_buttons();
 			break;
 		case BT_MAP:
@@ -352,6 +363,7 @@ namespace ms
 			buttons[Buttons::BT_NPC]->set_active(false);
 			buttons[Buttons::BT_SMALL]->set_active(false);
 			buttons[Buttons::BT_BIG]->set_active(false);
+			buttons[Buttons::BT_SCROLL_LOCK]->set_active(false);
 
 			buttons[Buttons::BT_MIN]->set_state(Button::State::DISABLED);
 
@@ -388,6 +400,7 @@ namespace ms
 			buttons[Buttons::BT_MAX]->set_active(true);
 			buttons[Buttons::BT_MIN]->set_active(true);
 			buttons[Buttons::BT_NPC]->set_active(has_npcs);
+			buttons[Buttons::BT_SCROLL_LOCK]->set_active(true);
 
 			if (big_map)
 			{
@@ -400,9 +413,13 @@ namespace ms
 				buttons[Buttons::BT_SMALL]->set_active(false);
 			}
 
+			// Show scroll lock state: PRESSED = locked (fixed), NORMAL = unlocked (follows player)
+			buttons[Buttons::BT_SCROLL_LOCK]->set_state(scroll_locked ? Button::State::PRESSED : Button::State::NORMAL);
+
 			buttons[Buttons::BT_MIN]->set_state(Button::State::NORMAL);
 
-			bt_min_x = middle_right_x - (bt_min_width + buttons[Buttons::BT_SMALL]->width() + 1 + bt_max_width + bt_map_width + (has_npcs ? buttons[Buttons::BT_NPC]->width() : 0));
+			int16_t scroll_btn_width = buttons[Buttons::BT_SCROLL_LOCK]->width() + 1;
+			bt_min_x = middle_right_x - (bt_min_width + buttons[Buttons::BT_SMALL]->width() + 1 + bt_max_width + bt_map_width + scroll_btn_width + (has_npcs ? buttons[Buttons::BT_NPC]->width() : 0));
 
 			buttons[Buttons::BT_MIN]->set_position(Point<int16_t>(bt_min_x, BTN_MIN_Y));
 
@@ -416,6 +433,10 @@ namespace ms
 			buttons[Buttons::BT_BIG]->set_position(Point<int16_t>(bt_min_x, BTN_MIN_Y));
 
 			bt_min_x += bt_max_width;
+
+			buttons[Buttons::BT_SCROLL_LOCK]->set_position(Point<int16_t>(bt_min_x, BTN_MIN_Y));
+
+			bt_min_x += scroll_btn_width;
 
 			buttons[Buttons::BT_MAP]->set_position(Point<int16_t>(bt_min_x, BTN_MIN_Y));
 
@@ -590,6 +611,37 @@ namespace ms
 		Point<int16_t> player_pos = Stage::get().get_player().get_position();
 		sprite_offset = player_marker.get_dimensions() / Point<int16_t>(2, 0);
 		player_marker.draw((player_pos + center_offset) / scale - sprite_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y) + init_pos, alpha);
+	}
+
+	Point<int16_t> UIMiniMap::get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const
+	{
+		if (scroll_locked || !has_map)
+			return Point<int16_t>(0, 0);
+
+		// Calculate where the player would be drawn on the minimap
+		Point<int16_t> player_pos = Stage::get().get_player().get_position();
+		Point<int16_t> player_on_map = (player_pos + center_offset) / scale + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
+
+		// The visible area center (approximate center of the minimap view)
+		int16_t view_center_x = view_dims.x() / 2;
+		int16_t view_center_y = (view_dims.y() + y_adj) / 2;
+
+		// Offset to center the player in the view
+		Point<int16_t> offset = Point<int16_t>(view_center_x - player_on_map.x(), view_center_y - player_on_map.y());
+
+		// Clamp so the map doesn't scroll past its edges
+		Point<int16_t> map_dims = map_sprite.get_dimensions();
+		int16_t max_offset_x = 0;
+		int16_t min_offset_x = std::min(0, (int)view_dims.x() - map_dims.x() - map_draw_origin_x * 2);
+		int16_t max_offset_y = 0;
+		int16_t min_offset_y = std::min(0, (int)(view_dims.y() - y_adj) - map_dims.y() - map_draw_origin_y);
+
+		offset = Point<int16_t>(
+			static_cast<int16_t>(std::max((int)min_offset_x, std::min((int)max_offset_x, (int)offset.x()))),
+			static_cast<int16_t>(std::max((int)min_offset_y, std::min((int)max_offset_y, (int)offset.y())))
+		);
+
+		return offset;
 	}
 
 	void UIMiniMap::update_static_markers()

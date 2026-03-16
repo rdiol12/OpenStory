@@ -130,6 +130,10 @@ namespace ms
 		bool is_twohanded() const;
 		// Return the type of the currently equipped weapon
 		Weapon::Type get_weapontype() const;
+		// Return whether the character has an active pet
+		bool has_pet() const;
+		// Return whether the character has a mount (taming mob) equipped
+		bool has_mount() const;
 
 		// Obtain a reference to this character's look
 		CharLook& get_look();

@@ -354,6 +354,20 @@ namespace ms
 		return WeaponData::get(weapon_id).get_type();
 	}
 
+	bool Char::has_pet() const
+	{
+		for (int i = 0; i < 3; i++)
+			if (pets[i].get_itemid() != 0)
+				return true;
+
+		return false;
+	}
+
+	bool Char::has_mount() const
+	{
+		return look.get_equips().get_equip(EquipSlot::TAMEDMOB) != 0;
+	}
+
 	bool Char::getflip() const
 	{
 		return facing_right;

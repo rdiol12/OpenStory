@@ -669,9 +669,15 @@ namespace ms
 			case Buttons::BT_CHARC_HAIRC6:
 			case Buttons::BT_CHARC_HAIRC7:
 			{
-				// Color selection cycles through series on click
-				haircolor = (haircolor > 0) ? haircolor - 1 : haircolors[female].size() - 1;
-				newchar.set_hair(hairs[female][hair] + haircolors[female][haircolor]);
+				// Direct color selection: button index maps to color index
+				size_t colorindex = buttonid - Buttons::BT_CHARC_HAIRC0;
+
+				if (colorindex < haircolors[female].size())
+				{
+					haircolor = colorindex;
+					newchar.set_hair(hairs[female][hair] + haircolors[female][haircolor]);
+					hairname.change_text(newchar.get_hair()->get_name());
+				}
 
 				return Button::State::NORMAL;
 			}

@@ -45,6 +45,7 @@ namespace ms
 		void change_world(World selectedWorld);
 		void remove_selected();
 		void set_region(uint8_t value);
+		void refresh_worlds();
 		uint16_t get_worldbyid(uint16_t worldid);
 
 	protected:
@@ -64,6 +65,7 @@ namespace ms
 		uint8_t worldid;
 		uint8_t channelid;
 		uint8_t worldcount;
+		uint8_t region;
 
 		std::vector<World> worlds;
 
