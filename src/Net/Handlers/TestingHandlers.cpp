@@ -21,7 +21,12 @@
 #include "../../Gameplay/MapleMap/Npc.h"
 #include "../../IO/UI.h"
 
+#include "../../Character/BuddyList.h"
+#include "../../Character/Party.h"
 #include "../../IO/UITypes/UILoginNotice.h"
+
+#include <iomanip>
+#include <sstream>
 
 namespace ms
 {
@@ -179,19 +184,26 @@ namespace ms
 			int8_t count = recv.read_byte();
 			std::cout << "[BuddyListHandler]: Buddy list update, count: [" << (int)count << "]" << std::endl;
 
+			std::map<int32_t, BuddyEntry> entries;
+
 			for (int8_t i = 0; i < count; i++)
 			{
 				if (recv.length() < 4)
 					break;
 
-				int32_t buddy_cid = recv.read_int();
-				std::string buddy_name = recv.read_padded_string(13);
-				int8_t buddy_status = recv.read_byte();
-				int32_t buddy_channel = recv.read_int();
-				std::string buddy_group = recv.read_padded_string(17);
+				BuddyEntry entry;
+				entry.cid = recv.read_int();
+				entry.name = recv.read_padded_string(13);
+				entry.status = recv.read_byte();
+				entry.channel = recv.read_int();
+				entry.group = recv.read_padded_string(17);
 
-				std::cout << "  Buddy: [" << buddy_name << "] cid: [" << buddy_cid << "] status: [" << (int)buddy_status << "] ch: [" << buddy_channel << "]" << std::endl;
+				std::cout << "  Buddy: [" << entry.name << "] cid: [" << entry.cid << "] status: [" << (int)entry.status << "] ch: [" << entry.channel << "] online: [" << entry.online() << "]" << std::endl;
+
+				entries[entry.cid] = entry;
 			}
+
+			Stage::get().get_player().get_buddylist().update(entries);
 			break;
 		}
 		case 14:
@@ -200,6 +212,7 @@ namespace ms
 			if (recv.available())
 			{
 				int8_t capacity = recv.read_byte();
+				Stage::get().get_player().get_buddylist().set_capacity(capacity);
 				std::cout << "[BuddyListHandler]: Buddy capacity: [" << (int)capacity << "]" << std::endl;
 			}
 			break;
@@ -240,20 +253,62 @@ namespace ms
 				break;
 
 			int32_t partyid = recv.read_int();
-			std::cout << "[PartyOperationHandler]: Party update, id: [" << partyid << "] remaining bytes: [" << recv.length() << "]" << std::endl;
 
-			// v83 party packet contains up to 6 members with:
-			// 6x int cid, 6x padded_string(13) name, 6x int job, 6x int level,
-			// 6x int channel, 6x int mapid, int leader_cid, ...
-			// For now log the data, full parsing needs a Party data structure
+			// Read 6x member character IDs
+			int32_t cids[6];
+			for (int i = 0; i < 6; i++)
+				cids[i] = recv.read_int();
+
+			// Read 6x padded_string(13) names
+			std::string names[6];
+			for (int i = 0; i < 6; i++)
+				names[i] = recv.read_padded_string(13);
+
+			// Read 6x int jobs
+			int32_t jobs[6];
+			for (int i = 0; i < 6; i++)
+				jobs[i] = recv.read_int();
+
+			// Read 6x int levels
+			int32_t levels[6];
+			for (int i = 0; i < 6; i++)
+				levels[i] = recv.read_int();
+
+			// Read 6x int channels
+			int32_t channels[6];
+			for (int i = 0; i < 6; i++)
+				channels[i] = recv.read_int();
+
+			// Read 6x int mapids
+			int32_t mapids[6];
+			for (int i = 0; i < 6; i++)
+				mapids[i] = recv.read_int();
+
+			// Read leader character ID
+			int32_t leader_cid = recv.read_int();
+
+			// Build PartyMember vector, skip empty slots
+			std::vector<PartyMember> members;
+
 			for (int i = 0; i < 6; i++)
 			{
-				if (recv.length() < 4)
-					break;
-				int32_t member_cid = recv.read_int();
-				if (member_cid != 0)
-					std::cout << "  Party member cid: [" << member_cid << "]" << std::endl;
+				if (cids[i] == 0)
+					continue;
+
+				PartyMember member;
+				member.cid = cids[i];
+				member.name = names[i];
+				member.job = static_cast<int16_t>(jobs[i]);
+				member.level = static_cast<int16_t>(levels[i]);
+				member.channel = channels[i];
+				member.mapid = mapids[i];
+				member.online = channels[i] >= 0;
+				members.push_back(member);
 			}
+
+			Stage::get().get_player().get_party().update(partyid, members, leader_cid);
+
+			std::cout << "[PartyOperationHandler]: Party update, id: [" << partyid << "] members: [" << members.size() << "] leader: [" << leader_cid << "]" << std::endl;
 			break;
 		}
 		case 12:
@@ -272,6 +327,9 @@ namespace ms
 			// Party disbanded or member left
 			int32_t partyid = recv.read_int();
 			int32_t target_cid = recv.read_int();
+
+			Stage::get().get_player().get_party().clear();
+
 			std::cout << "[PartyOperationHandler]: Member left/expelled, party: [" << partyid << "] cid: [" << target_cid << "]" << std::endl;
 			break;
 		}
@@ -303,7 +361,14 @@ namespace ms
 			int8_t hour = recv.read_byte();
 			int8_t min = recv.read_byte();
 			int8_t sec = recv.read_byte();
-			std::cout << "[ClockHandler]: World clock: " << (int)hour << ":" << (int)min << ":" << (int)sec << std::endl;
+
+			std::ostringstream oss;
+			oss << "Server Time: "
+				<< std::setfill('0') << std::setw(2) << (int)hour << ":"
+				<< std::setfill('0') << std::setw(2) << (int)min << ":"
+				<< std::setfill('0') << std::setw(2) << (int)sec;
+
+			std::cout << "[ClockHandler]: " << oss.str() << std::endl;
 			break;
 		}
 		case 2:
@@ -313,7 +378,11 @@ namespace ms
 				break;
 
 			int32_t seconds = recv.read_int();
-			std::cout << "[ClockHandler]: Countdown timer: " << seconds << " seconds" << std::endl;
+
+			std::ostringstream oss;
+			oss << "Time remaining: " << seconds << " seconds";
+
+			std::cout << "[ClockHandler]: " << oss.str() << std::endl;
 			break;
 		}
 		default:

@@ -17,53 +17,35 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "MapObject.h"
-
-#include "../../Audio/Audio.h"
-#include "../../Graphics/Animation.h"
-
+#include <string>
+#include <cstdint>
 #include <map>
 
 namespace ms
 {
-	class Reactor : public MapObject
+	struct BuddyEntry
+	{
+		int32_t cid = 0;
+		std::string name;
+		int8_t status = 0;
+		int32_t channel = -1;
+		std::string group;
+
+		bool online() const { return channel >= 0; }
+	};
+
+	class BuddyList
 	{
 	public:
-		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position);
+		void update(const std::map<int32_t, BuddyEntry>& entries);
+		void set_capacity(int8_t cap);
+		void clear();
 
-		void draw(double viewx, double viewy, float alpha) const override;
-		int8_t update(const Physics& physics);
-
-		void set_state(int8_t state);
-		void destroy(int8_t state, Point<int16_t> position);
-
-		bool is_hittable() const;
-
-		// Check if this mob collides with the specified rectangle
-		bool is_in_range(const Rectangle<int16_t>& range) const;
+		const std::map<int32_t, BuddyEntry>& get_entries() const;
+		int8_t get_capacity() const;
 
 	private:
-		int32_t oid;
-		int32_t rid;
-		int8_t state;
-		// Reactor state tracking
-		//int8_t stance; // ??
-		// GMS client reactor fields
-		//bool movable; // Snowball?
-		//int32_t questid;
-		//bool activates_by_touch;
-
-		nl::node src;
-		std::map<int8_t, Animation> animations;
-		bool animation_ended;
-
-		bool active;
-		bool hittable;
-		bool dead;
-
-		Animation normal;
-
-		Sound hitsound;
-		Sound diesound;
+		std::map<int32_t, BuddyEntry> buddies;
+		int8_t capacity = 50;
 	};
 }

@@ -19,6 +19,8 @@
 
 #include "../OutPacket.h"
 
+#include "../../Gameplay/Movement.h"
+
 namespace ms
 {
 	// Base class for packets which update object movements with the server

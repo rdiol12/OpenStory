@@ -17,53 +17,36 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "MapObject.h"
-
-#include "../../Audio/Audio.h"
-#include "../../Graphics/Animation.h"
-
-#include <map>
+#include <string>
+#include <cstdint>
+#include <vector>
 
 namespace ms
 {
-	class Reactor : public MapObject
+	struct PartyMember
+	{
+		int32_t cid = 0;
+		std::string name;
+		int16_t job = 0;
+		int16_t level = 0;
+		int32_t channel = -1;
+		int32_t mapid = 0;
+		bool online = false;
+	};
+
+	class Party
 	{
 	public:
-		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position);
-
-		void draw(double viewx, double viewy, float alpha) const override;
-		int8_t update(const Physics& physics);
-
-		void set_state(int8_t state);
-		void destroy(int8_t state, Point<int16_t> position);
-
-		bool is_hittable() const;
-
-		// Check if this mob collides with the specified rectangle
-		bool is_in_range(const Rectangle<int16_t>& range) const;
+		void update(int32_t partyid, const std::vector<PartyMember>& members, int32_t leader_cid);
+		void clear();
+		bool is_in_party() const;
+		int32_t get_id() const;
+		int32_t get_leader() const;
+		const std::vector<PartyMember>& get_members() const;
 
 	private:
-		int32_t oid;
-		int32_t rid;
-		int8_t state;
-		// Reactor state tracking
-		//int8_t stance; // ??
-		// GMS client reactor fields
-		//bool movable; // Snowball?
-		//int32_t questid;
-		//bool activates_by_touch;
-
-		nl::node src;
-		std::map<int8_t, Animation> animations;
-		bool animation_ended;
-
-		bool active;
-		bool hittable;
-		bool dead;
-
-		Animation normal;
-
-		Sound hitsound;
-		Sound diesound;
+		int32_t id = 0;
+		int32_t leader = 0;
+		std::vector<PartyMember> members;
 	};
 }

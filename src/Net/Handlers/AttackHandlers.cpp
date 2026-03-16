@@ -64,7 +64,11 @@ namespace ms
 			for (uint8_t j = 0; j < length; j++)
 			{
 				int32_t damage = recv.read_int();
-				bool critical = false;
+				bool critical = (damage & 0x80000000) != 0;
+
+				if (critical)
+					damage &= ~0x80000000; // Clear the flag to get real damage
+
 				auto singledamage = std::make_pair(damage, critical);
 				attack.damagelines[oid].push_back(singledamage);
 			}
