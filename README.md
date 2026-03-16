@@ -27,7 +27,6 @@ A v83 MapleStory client built for cosmic/private servers. Forked from [HeavenCli
 ### Quest Log
 - Detail panel showing quest name, level requirement, NPC sprite, rewards with item icons, requirements, and quest description
 - Proper text formatting (color code stripping, line break handling)
-- Quest forfeit support via `QuestLog::forfeit()`
 
 ### Soft Keyboard (PIC Entry)
 - Clean 3-column number grid layout (1-9, 0, Del)
@@ -39,18 +38,14 @@ A v83 MapleStory client built for cosmic/private servers. Forked from [HeavenCli
 - Characters centered on screen
 - Proper name tag positioning
 - Start button repositioned
-- Create/Delete character functionality verified
 
 ### UI Improvements
 - Removed key press logging (packet logging retained for debugging)
 - World select draw order fixed
 - UIChannel uses actual world/channel from Configuration instead of hardcoded values
-- Lost items/fame status messages implemented
 
-### Code Quality
-- All TODO comments resolved across 27+ files
-- Descriptive comments replacing placeholder notes
-- PIC validation: repetitive character check (no 3 in a row)
+
+
 
 ## What's Left To Do
 
@@ -65,12 +60,7 @@ A v83 MapleStory client built for cosmic/private servers. Forked from [HeavenCli
 - **Joypad combo boxes** — controller settings UI incomplete
 - **Character creation color picker** — cycles through series instead of direct selection
 
-### Known Issues
-- NPC interaction fallback when dialog not found
-- Reactor hit/break sounds not played
-- Pet/mount button state not checked in character info
-- Hurricane/piercing arrow/rapidfire attack packets may need additional 4 bytes
-- Critical hit flag placeholder in attack packets
+
 
 ## Building
 
@@ -101,9 +91,7 @@ Key settings:
 - **VSync** — vertical sync toggle
 - **SaveLogin** — remember last account name
 
-## Required NX Files
 
-*Check `NxFiles.h` for the full list*
 
 All NX files should be v83 GMS conversions placed in the `wz/` directory.
 
