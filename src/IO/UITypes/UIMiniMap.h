@@ -63,6 +63,7 @@ namespace ms
 		void update_text();
 		void update_canvas();
 		void draw_movable_markers(Point<int16_t> init_pos, float alpha) const;
+		Point<int16_t> get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const;
 		void update_static_markers();
 		void set_npclist_active(bool active);
 		void update_dimensions();
@@ -77,7 +78,8 @@ namespace ms
 			BT_SMALL,
 			BT_BIG,
 			BT_MAP,
-			BT_NPC
+			BT_NPC,
+			BT_SCROLL_LOCK
 		};
 
 		enum Type
@@ -93,6 +95,7 @@ namespace ms
 		int8_t user_type;
 		bool simpleMode;
 		bool big_map;
+		bool scroll_locked;
 		bool has_map;
 		int16_t scale;
 		nl::node Map;

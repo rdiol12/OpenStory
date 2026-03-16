@@ -17,24 +17,30 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../PacketHandler.h"
+#include "../OutPacket.h"
 
 namespace ms
 {
-	// Handler for entering the Cash Shop
-	class SetCashShopHandler : public PacketHandler
+	// Opcode: BUY_CS_ITEM(215)
+	class BuyCashItemPacket : public OutPacket
 	{
 	public:
-		void handle(InPacket& recv) const override;
-
-	private:
-		void transition() const;
+		// Request the server to purchase a cash shop item
+		BuyCashItemPacket(int8_t currency, int32_t sn_item_id) : OutPacket(OutPacket::Opcode::BUY_CS_ITEM)
+		{
+			write_byte(currency);
+			write_int(sn_item_id);
+		}
 	};
 
-	// Handler for Cash Shop operation responses (buy, coupon, etc.)
-	class CashShopOperationHandler : public PacketHandler
+	// Opcode: COUPON_CODE(216)
+	class CouponCodePacket : public OutPacket
 	{
 	public:
-		void handle(InPacket& recv) const override;
+		// Redeem a coupon code in the cash shop
+		CouponCodePacket(const std::string& code) : OutPacket(OutPacket::Opcode::COUPON_CODE)
+		{
+			write_string(code);
+		}
 	};
 }

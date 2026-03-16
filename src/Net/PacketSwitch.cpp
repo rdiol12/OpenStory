@@ -143,6 +143,7 @@ namespace ms
 
 		/// Cash Shop
 		SET_CASH_SHOP = 127,
+		CS_OPERATION = 228,
 
 		/// Misc
 		YELLOW_TIP = 336,
@@ -226,6 +227,7 @@ namespace ms
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
+		emplace<CS_OPERATION, CashShopOperationHandler>();
 
 		// Additional v83 handlers
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();

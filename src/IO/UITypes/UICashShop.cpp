@@ -24,6 +24,7 @@
 
 #include "../../Gameplay/Stage.h"
 
+#include "../../Net/Packets/CashShopPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
 
@@ -129,22 +130,22 @@ namespace ms
 		for (nl::node item_label : CSEffect)
 			item_labels.emplace_back(item_label);
 
-		items.push_back({ 5220000, Item::Label::HOT,	34000,	11 });
-		items.push_back({ 5220000, Item::Label::HOT,	34000,	11 });
-		items.push_back({ 5220000, Item::Label::HOT,	0,		0 });
-		items.push_back({ 5220000, Item::Label::HOT,	0,		0 });
-		items.push_back({ 5220000, Item::Label::HOT,	10000,	11 });
-		items.push_back({ 5220000, Item::Label::NEW,	0,		0 });
-		items.push_back({ 5220000, Item::Label::SALE,	7000,	0 });
-		items.push_back({ 5220000, Item::Label::NEW,	13440,	0 });
-		items.push_back({ 5220000, Item::Label::NEW,	7480,	0 });
-		items.push_back({ 5220000, Item::Label::NEW,	7480,	0 });
-		items.push_back({ 5220000, Item::Label::NEW,	7480,	0 });
-		items.push_back({ 5220000, Item::Label::NONE,	12000,	11 });
-		items.push_back({ 5220000, Item::Label::NONE,	22000,	11 });
-		items.push_back({ 5220000, Item::Label::NONE,	0,		0 });
-		items.push_back({ 5220000, Item::Label::NONE,	0,		0 });
-		items.push_back({ 5220000, Item::Label::MASTER,	0,		15 });
+		items.push_back({ 5220000, 20000001, Item::Label::HOT,		34000,	11 });
+		items.push_back({ 5220000, 20000002, Item::Label::HOT,		34000,	11 });
+		items.push_back({ 5220000, 20000003, Item::Label::HOT,		0,		0 });
+		items.push_back({ 5220000, 20000004, Item::Label::HOT,		0,		0 });
+		items.push_back({ 5220000, 20000005, Item::Label::HOT,		10000,	11 });
+		items.push_back({ 5220000, 20000006, Item::Label::NEW,		0,		0 });
+		items.push_back({ 5220000, 20000007, Item::Label::SALE,	7000,	0 });
+		items.push_back({ 5220000, 20000008, Item::Label::NEW,		13440,	0 });
+		items.push_back({ 5220000, 20000009, Item::Label::NEW,		7480,	0 });
+		items.push_back({ 5220000, 20000010, Item::Label::NEW,		7480,	0 });
+		items.push_back({ 5220000, 20000011, Item::Label::NEW,		7480,	0 });
+		items.push_back({ 5220000, 20000012, Item::Label::NONE,	12000,	11 });
+		items.push_back({ 5220000, 20000013, Item::Label::NONE,	22000,	11 });
+		items.push_back({ 5220000, 20000014, Item::Label::NONE,	0,		0 });
+		items.push_back({ 5220000, 20000015, Item::Label::NONE,	0,		0 });
+		items.push_back({ 5220000, 20000016, Item::Label::MASTER,	0,		15 });
 
 		for (size_t i = 0; i < MAX_ITEMS; i++)
 		{
@@ -335,9 +336,14 @@ namespace ms
 		{
 			int16_t index = buttonid - Buttons::BtBuy + list_offset;
 
-			Item item = items[index];
+			if (index >= 0 && index < items.size())
+			{
+				Item item = items[index];
 
-			// Cash shop purchase not implemented
+				// Currency type 1 = NX Credit (standard purchase)
+				int8_t currency = 1;
+				BuyCashItemPacket(currency, item.sn).dispatch();
+			}
 
 			return Button::State::NORMAL;
 		}

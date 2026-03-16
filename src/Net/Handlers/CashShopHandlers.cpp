@@ -67,6 +67,42 @@ namespace ms
 		UI::get().change_state(UI::State::CASHSHOP);
 	}
 
+	void CashShopOperationHandler::handle(InPacket& recv) const
+	{
+		int8_t operation = recv.read_byte();
+
+		switch (operation)
+		{
+		case 0x4A:
+		{
+			// Buy item success - the server sends the purchased cash item info
+			// TODO: Parse the cash item data and add it to the CS inventory
+			break;
+		}
+		case 0x4C:
+		{
+			// Buy item failure
+			int8_t reason = recv.read_byte();
+			// TODO: Display error message to user based on reason code
+			break;
+		}
+		case 0x59:
+		{
+			// Coupon code success
+			break;
+		}
+		case 0x5C:
+		{
+			// Coupon code failure
+			int8_t reason = recv.read_byte();
+			// TODO: Display coupon error to user based on reason code
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
 	void SetCashShopHandler::transition() const
 	{
 		Constants::Constants::get().set_viewwidth(1024);

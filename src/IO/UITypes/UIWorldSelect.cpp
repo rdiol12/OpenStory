@@ -38,6 +38,7 @@ namespace ms
 	{
 		worldid = Setting<DefaultWorld>::get().load();
 		channelid = Setting<DefaultChannel>::get().load();
+		region = Setting<DefaultRegion>::get().load();
 		worldcount = 0;
 		world_selected = false;
 
@@ -236,9 +237,40 @@ namespace ms
 		clear_selected_world();
 	}
 
-	void UIWorldSelect::set_region(uint8_t)
+	void UIWorldSelect::set_region(uint8_t value)
 	{
-		// Not used in v83
+		if (region != value)
+		{
+			region = value;
+			Setting<DefaultRegion>::get().save(region);
+			refresh_worlds();
+		}
+	}
+
+	void UIWorldSelect::refresh_worlds()
+	{
+		// Clear existing world state
+		clear_selected_world();
+		world_selected = false;
+
+		// Remove world buttons
+		for (auto& w : worlds)
+		{
+			uint16_t btn_id = BT_WORLD0 + w.wid;
+
+			if (buttons.count(btn_id))
+			{
+				buttons[btn_id]->set_active(false);
+				buttons.erase(btn_id);
+			}
+		}
+
+		worlds.clear();
+		world_textures.clear();
+		worldcount = 0;
+
+		// Re-request the server list from the server
+		ServerRequestPacket().dispatch();
 	}
 
 	uint16_t UIWorldSelect::get_worldbyid(uint16_t wid)

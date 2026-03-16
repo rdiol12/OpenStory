@@ -96,7 +96,11 @@ namespace ms
 			PICKUP_ITEM = 202,
 			DAMAGE_REACTOR = 205,
 			PLAYER_MAP_TRANSFER = 207,
-			PLAYER_UPDATE = 223
+			PLAYER_UPDATE = 223,
+
+			/// Cash Shop
+			BUY_CS_ITEM = 215,
+			COUPON_CODE = 216
 		};
 
 	protected:

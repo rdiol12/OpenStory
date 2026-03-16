@@ -356,6 +356,18 @@ namespace ms
 		guild.change_text((g == "" ? "-" : g));
 		alliance.change_text(a);
 
+		// Enable pet button if the character has an active pet
+		if (target_character && target_character->has_pet())
+			buttons[Buttons::BtPet]->set_state(Button::State::NORMAL);
+		else
+			buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
+
+		// Enable mount button if the character has a taming mob equipped
+		if (target_character && target_character->has_mount())
+			buttons[Buttons::BtRide]->set_state(Button::State::NORMAL);
+		else
+			buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
+
 		farm_name.change_text("");
 		farm_level_text = "1";
 	}

@@ -82,8 +82,9 @@ namespace ms
 				NONE
 			};
 
-			Item(int32_t itemid, Label label, int32_t discount, uint16_t count) : label(label), discount_price(discount), count(count), data(ItemData::get(itemid)) {}
+			Item(int32_t itemid, int32_t sn, Label label, int32_t discount, uint16_t count) : sn(sn), label(label), discount_price(discount), count(count), data(ItemData::get(itemid)) {}
 
+			int32_t sn;
 			Label label;
 			int32_t discount_price;
 			uint16_t count;
