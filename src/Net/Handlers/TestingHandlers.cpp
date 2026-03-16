@@ -23,6 +23,7 @@
 
 #include "../../Character/BuddyList.h"
 #include "../../Character/Party.h"
+#include "../../IO/UITypes/UIClock.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 
 #include <iomanip>
@@ -362,13 +363,15 @@ namespace ms
 			int8_t min = recv.read_byte();
 			int8_t sec = recv.read_byte();
 
-			std::ostringstream oss;
-			oss << "Server Time: "
+			Stage::get().set_clock(hour, min, sec);
+
+			// Emplace the clock UI if not already present
+			UI::get().emplace<UIClock>();
+
+			std::cout << "[ClockHandler]: Server Time: "
 				<< std::setfill('0') << std::setw(2) << (int)hour << ":"
 				<< std::setfill('0') << std::setw(2) << (int)min << ":"
-				<< std::setfill('0') << std::setw(2) << (int)sec;
-
-			std::cout << "[ClockHandler]: " << oss.str() << std::endl;
+				<< std::setfill('0') << std::setw(2) << (int)sec << std::endl;
 			break;
 		}
 		case 2:
@@ -379,10 +382,12 @@ namespace ms
 
 			int32_t seconds = recv.read_int();
 
-			std::ostringstream oss;
-			oss << "Time remaining: " << seconds << " seconds";
+			Stage::get().set_countdown(seconds);
 
-			std::cout << "[ClockHandler]: " << oss.str() << std::endl;
+			// Emplace the clock UI if not already present
+			UI::get().emplace<UIClock>();
+
+			std::cout << "[ClockHandler]: Time remaining: " << seconds << " seconds" << std::endl;
 			break;
 		}
 		default:

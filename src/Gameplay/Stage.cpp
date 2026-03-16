@@ -368,4 +368,56 @@ namespace ms
 		if (Configuration::get().get_admin())
 			AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
 	}
+
+	void Stage::set_clock(int8_t hour, int8_t min, int8_t sec)
+	{
+		clock_hour = hour;
+		clock_min = min;
+		clock_sec = sec;
+		clock_active = true;
+		countdown_active = false;
+	}
+
+	void Stage::set_countdown(int32_t seconds)
+	{
+		countdown_seconds = seconds;
+		countdown_active = true;
+		clock_active = false;
+	}
+
+	void Stage::clear_clock()
+	{
+		clock_active = false;
+		countdown_active = false;
+	}
+
+	bool Stage::is_clock_active() const
+	{
+		return clock_active;
+	}
+
+	bool Stage::is_countdown_active() const
+	{
+		return countdown_active;
+	}
+
+	int8_t Stage::get_clock_hour() const
+	{
+		return clock_hour;
+	}
+
+	int8_t Stage::get_clock_min() const
+	{
+		return clock_min;
+	}
+
+	int8_t Stage::get_clock_sec() const
+	{
+		return clock_sec;
+	}
+
+	int32_t Stage::get_countdown_seconds() const
+	{
+		return countdown_seconds;
+	}
 }

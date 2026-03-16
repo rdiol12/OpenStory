@@ -21,7 +21,9 @@
 
 #include "UI.h"
 
+#include "UITypes/UIBuddyList.h"
 #include "UITypes/UIBuffList.h"
+#include "UITypes/UIClock.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
 #include "UITypes/UIChat.h"

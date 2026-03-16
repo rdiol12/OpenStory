@@ -22,6 +22,8 @@
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
 
+#include "../../Character/Party.h"
+
 namespace ms
 {
 	class UIUserList : public UIDragElement<PosUSERLIST>
@@ -112,6 +114,16 @@ namespace ms
 		Texture party_search_grid[3];
 		Text party_mine_name;
 		Slider party_slider;
+
+		// Party member display
+		static const size_t MAX_PARTY_MEMBERS = 6;
+		Texture party_member_row[MAX_PARTY_MEMBERS];
+		Texture party_icon_online;
+		Texture party_icon_offline;
+		std::vector<PartyMember> party_members;
+		Text party_member_names[MAX_PARTY_MEMBERS];
+		Text party_member_levels[MAX_PARTY_MEMBERS];
+		Text party_member_jobs[MAX_PARTY_MEMBERS];
 
 		// Buddy tab
 		uint16_t friend_tab;

@@ -18,6 +18,8 @@
 #include "UIUserList.h"
 
 #include "../../IO/Components/MapleButton.h"
+#include "../../Gameplay/Stage.h"
+#include "../../Character/Job.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -85,6 +87,18 @@ namespace ms
 		int16_t party_unitrows = 6;
 		int16_t party_rowmax = 6;
 		party_slider = Slider(Slider::Type::DEFAULT_SILVER, Range<int16_t>(party_y, party_height), party_x, party_unitrows, party_rowmax, [](bool) {});
+
+		// Party member row backgrounds and icons
+		for (size_t i = 0; i < MAX_PARTY_MEMBERS; i++)
+		{
+			party_member_row[i] = Party["party" + std::to_string(i)];
+			party_member_names[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "", 0);
+			party_member_levels[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "", 0);
+			party_member_jobs[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "", 0);
+		}
+
+		party_icon_online = Party["icon0"];
+		party_icon_offline = Party["icon1"];
 
 		// Buddy Tab
 		nl::node Friend = Main["Friend"];
@@ -193,9 +207,41 @@ namespace ms
 
 			if (party_tab == Buttons::BT_TAB_PARTY_MINE)
 			{
-				party_mine_grid[0].draw(position + Point<int16_t>(10, 115));
-				party_mine_grid[4].draw(position + Point<int16_t>(10, 133));
-				party_mine_name.draw(position + Point<int16_t>(27, 130));
+				if (party_members.empty())
+				{
+					// No party - show default empty grid
+					party_mine_grid[0].draw(position + Point<int16_t>(10, 115));
+					party_mine_grid[4].draw(position + Point<int16_t>(10, 133));
+					party_mine_name.draw(position + Point<int16_t>(27, 130));
+				}
+				else
+				{
+					// Draw each party member row
+					for (size_t i = 0; i < party_members.size() && i < MAX_PARTY_MEMBERS; i++)
+					{
+						int16_t row_y = 115 + static_cast<int16_t>(i) * 28;
+						Point<int16_t> row_pos = position + Point<int16_t>(10, row_y);
+
+						party_member_row[i].draw(row_pos);
+
+						// Online/offline icon
+						Point<int16_t> icon_pos = row_pos + Point<int16_t>(2, 2);
+
+						if (party_members[i].online)
+							party_icon_online.draw(icon_pos);
+						else
+							party_icon_offline.draw(icon_pos);
+
+						// Member name
+						party_member_names[i].draw(row_pos + Point<int16_t>(17, 2));
+
+						// Level
+						party_member_levels[i].draw(row_pos + Point<int16_t>(120, 2));
+
+						// Job
+						party_member_jobs[i].draw(row_pos + Point<int16_t>(155, 2));
+					}
+				}
 			}
 			else if (party_tab == Buttons::BT_TAB_PARTY_SEARCH)
 			{
@@ -244,6 +290,49 @@ namespace ms
 		if (tab == Buttons::BT_TAB_BOSS)
 			for each (auto sprite in boss_sprites)
 				sprite.update();
+
+		// Refresh party member data
+		if (tab == Buttons::BT_TAB_PARTY && party_tab == Buttons::BT_TAB_PARTY_MINE)
+		{
+			Party& party = Stage::get().get_player().get_party();
+			const auto& members = party.get_members();
+
+			party_members.clear();
+			party_members.assign(members.begin(), members.end());
+
+			for (size_t i = 0; i < MAX_PARTY_MEMBERS; i++)
+			{
+				if (i < party_members.size())
+				{
+					const PartyMember& member = party_members[i];
+					party_member_names[i].change_text(member.name);
+					party_member_levels[i].change_text("Lv." + std::to_string(member.level));
+					party_member_jobs[i].change_text(Job(member.job).get_name());
+				}
+				else
+				{
+					party_member_names[i].change_text("");
+					party_member_levels[i].change_text("");
+					party_member_jobs[i].change_text("");
+				}
+			}
+
+			// Update party button states based on whether we're in a party
+			if (party.is_in_party())
+			{
+				buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::DISABLED);
+				buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::NORMAL);
+				buttons[Buttons::BT_PARTY_LEAVE]->set_active(true);
+				buttons[Buttons::BT_PARTY_SETTINGS]->set_active(true);
+			}
+			else
+			{
+				buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::NORMAL);
+				buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::DISABLED);
+				buttons[Buttons::BT_PARTY_LEAVE]->set_active(false);
+				buttons[Buttons::BT_PARTY_SETTINGS]->set_active(false);
+			}
+		}
 	}
 
 	void UIUserList::send_key(int32_t keycode, bool pressed, bool escape)
