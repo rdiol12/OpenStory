@@ -19,6 +19,7 @@
 
 #include "Combat/Combat.h"
 #include "MapleMap/MapBackgrounds.h"
+#include "MapleMap/MapEnvironments.h"
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapEffect.h"
 #include "MapleMap/MapNpcs.h"
@@ -85,6 +86,9 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// Toggle a map environment object (gates, platforms in PQs)
+		void toggle_environment(const std::string& name, int32_t mode);
+
 		// Clock state management
 		void set_clock(int8_t hour, int8_t min, int8_t sec);
 		void set_countdown(int32_t seconds);
@@ -132,6 +136,7 @@ namespace ms
 		MapInfo mapinfo;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
+		MapEnvironments environments;
 		MapPortals portals;
 		MapReactors reactors;
 		MapNpcs npcs;

@@ -31,7 +31,7 @@
 
 namespace ms
 {
-	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false), formatted_text(""), formatted_text_pos(0), timestep(0)
+	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false), formatted_text(""), formatted_text_pos(0), timestep(0), selection_top(0)
 	{
 		nl::node UtilDlgEx = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
 
@@ -265,6 +265,37 @@ namespace ms
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
+		// Handle SENDSIMPLE text option clicks
+		if (type == TalkType::SENDSIMPLE && !selections.empty())
+		{
+			// Text area starts at position + (166, 48 - y_adj) for non-slider
+			int16_t y_adj = height - min_height;
+			int16_t text_x = position.x() + 130;
+			int16_t text_y = position.y() + 48 - y_adj;
+			int16_t text_w = 320;
+			int16_t line_h = 16; // approximate line height for A12M font
+
+			for (auto& sel : selections)
+			{
+				int16_t opt_y = text_y + sel.line * line_h;
+
+				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
+					cursorpos.y() >= opt_y && cursorpos.y() <= opt_y + line_h)
+				{
+					if (clicked)
+					{
+						deactivate();
+						NpcTalkMorePacket(sel.index).dispatch();
+						return Cursor::State::IDLE;
+					}
+					else
+					{
+						return Cursor::State::CANCLICK;
+					}
+				}
+			}
+		}
+
 		Cursor::State estate = UIElement::send_cursor(clicked, cursorpos);
 
 		if (estate == Cursor::State::CLICKING && clicked && draw_text)
@@ -348,6 +379,103 @@ namespace ms
 		return formatted_text;
 	}
 
+	std::string UINpcTalk::parse_simple_selections(const std::string& tx)
+	{
+		selections.clear();
+
+		std::string result;
+		int16_t line = 0;
+		size_t pos = 0;
+
+		// Count lines before the selections start (intro text)
+		// by scanning for #L which marks the first selection
+		size_t first_link = tx.find("#L");
+		if (first_link != std::string::npos && first_link > 0)
+		{
+			std::string intro = tx.substr(0, first_link);
+
+			// Strip color codes from intro
+			std::string clean_intro;
+			for (size_t i = 0; i < intro.size(); i++)
+			{
+				if (intro[i] == '#' && i + 1 < intro.size())
+				{
+					char next = intro[i + 1];
+					if (next == 'b' || next == 'k' || next == 'r' || next == 'c')
+					{
+						i++; // skip the code
+						continue;
+					}
+				}
+				clean_intro += intro[i];
+			}
+
+			result = clean_intro;
+
+			// Count newlines in intro to track line position
+			for (char c : clean_intro)
+			{
+				if (c == '\n')
+					line++;
+			}
+		}
+
+		// Parse #L<n>#text#l entries
+		pos = 0;
+		while (pos < tx.size())
+		{
+			size_t link_start = tx.find("#L", pos);
+			if (link_start == std::string::npos)
+				break;
+
+			// Read the selection index
+			size_t idx_start = link_start + 2;
+			size_t idx_end = tx.find('#', idx_start);
+			if (idx_end == std::string::npos)
+				break;
+
+			int32_t sel_index = 0;
+			try { sel_index = std::stoi(tx.substr(idx_start, idx_end - idx_start)); }
+			catch (...) { break; }
+
+			// Read the option text until #l
+			size_t text_start = idx_end + 1;
+			size_t text_end = tx.find("#l", text_start);
+			if (text_end == std::string::npos)
+				text_end = tx.size();
+
+			std::string option_text = tx.substr(text_start, text_end - text_start);
+
+			// Strip any color codes from option text
+			std::string clean_option;
+			for (size_t i = 0; i < option_text.size(); i++)
+			{
+				if (option_text[i] == '#' && i + 1 < option_text.size())
+				{
+					char next = option_text[i + 1];
+					if (next == 'b' || next == 'k' || next == 'r' || next == 'c')
+					{
+						i++;
+						continue;
+					}
+				}
+				clean_option += option_text[i];
+			}
+
+			selections.push_back({ sel_index, clean_option, line });
+
+			// Add to display text as blue clickable-looking text
+			if (!result.empty() && result.back() != '\n')
+				result += "\\r\\n";
+			result += "#b" + clean_option + "#k";
+			line++;
+
+			pos = text_end + 2; // skip past #l
+		}
+
+		return result;
+	}
+
 	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t, int8_t speakerbyte, const std::string& tx)
 	{
 		type = get_by_value(msgtype);
@@ -355,13 +483,23 @@ namespace ms
 		timestep = 0;
 		draw_text = true;
 		formatted_text_pos = 0;
-		formatted_text = format_text(tx, npcid);
+
+		if (type == TalkType::SENDSIMPLE)
+		{
+			formatted_text = parse_simple_selections(format_text(tx, npcid));
+			draw_text = false; // Show all text immediately for selection menus
+		}
+		else
+		{
+			formatted_text = format_text(tx, npcid);
+		}
 
 		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, 320);
 
 		int16_t text_height = text.height();
 
-		text.change_text("");
+		if (type != TalkType::SENDSIMPLE)
+			text.change_text("");
 
 		if (speakerbyte == 0)
 		{
@@ -432,11 +570,40 @@ namespace ms
 				break;
 			}
 			case TalkType::SENDNEXT:
+			{
+				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::NEXT]->set_active(true);
+				break;
+			}
 			case TalkType::SENDNEXTPREV:
+			{
+				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::NEXT]->set_active(true);
+
+				buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
+				buttons[Buttons::PREV]->set_active(true);
+				break;
+			}
 			case TalkType::SENDACCEPTDECLINE:
-			case TalkType::SENDGETTEXT:
+			{
+				buttons[Buttons::QYES]->set_position(Point<int16_t>(389, y_cord));
+				buttons[Buttons::QYES]->set_active(true);
+
+				buttons[Buttons::QNO]->set_position(Point<int16_t>(389 + 65, y_cord));
+				buttons[Buttons::QNO]->set_active(true);
+				break;
+			}
 			case TalkType::SENDGETNUMBER:
+			{
+				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::OK]->set_active(true);
+				break;
+			}
 			case TalkType::SENDSIMPLE:
+			{
+				// Only close button — options are clicked in the text area
+				break;
+			}
 			default:
 			{
 				break;

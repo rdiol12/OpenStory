@@ -22,6 +22,7 @@
 #include "../Spawn.h"
 
 #include "../../Character/OtherChar.h"
+#include "../../IO/Cursor.h"
 
 namespace ms
 {
@@ -43,6 +44,9 @@ namespace ms
 
 		// Returns a reference to the MapObjects` object
 		MapObjects* get_chars();
+
+		// Handle cursor interaction with characters
+		Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);
 
 		// Update a character's movement
 		void send_movement(int32_t cid, const std::vector<Movement>& movements);

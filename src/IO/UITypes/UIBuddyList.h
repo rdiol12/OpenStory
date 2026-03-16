@@ -38,6 +38,7 @@ namespace ms
 
 		Button::State button_pressed(uint16_t buttonid) override;
 
+		Cursor::State send_cursor(bool pressed, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -69,6 +70,7 @@ namespace ms
 		// Cached buddy entries for rendering
 		struct BuddyDisplay
 		{
+			int32_t cid;
 			std::string name;
 			std::string group;
 			int32_t channel;
@@ -88,6 +90,9 @@ namespace ms
 
 		// Row height in pixels
 		static constexpr int16_t ROW_HEIGHT = 24;
+
+		// Selected buddy index (-1 = none)
+		int16_t selected_buddy;
 
 		// Scroll offset
 		int16_t scroll_offset;

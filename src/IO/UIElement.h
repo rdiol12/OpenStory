@@ -73,6 +73,9 @@ namespace ms
 			CASHSHOP,
 			CLOCK,
 			BUDDYLIST,
+			STORAGE,
+			TRADE,
+			MTS,
 			NUM_TYPES
 		};
 

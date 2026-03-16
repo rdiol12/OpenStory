@@ -41,26 +41,48 @@ namespace ms
 		region = Setting<DefaultRegion>::get().load();
 		worldcount = 0;
 		world_selected = false;
+		show_alert = false;
+		hovered_world = -1;
+		active_channelcount = 0;
 
 		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
-		nl::node worldsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtWorld"]["release"];
-		nl::node channelsrc = nl::nx::ui["Login.img"]["WorldSelect"]["BtChannel"];
-		nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
+		nl::node ws = nl::nx::ui["Login.img"]["WorldSelect"];
+		nl::node worldsrc = ws["BtWorld"]["release"];
+		nl::node channelsrc = ws["BtChannel"];
 
-
+		// === Background sprites ===
 		sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
 		sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
-		sprites.emplace_back(frame, Point<int16_t>(400, 290));
 
+		// === Enter world button ===
 		buttons[BT_ENTERWORLD] = std::make_unique<MapleButton>(
 			channelsrc["button:GoWorld"],
 			Point<int16_t>(200, 170)
 		);
 		buttons[BT_ENTERWORLD]->set_active(false);
 
+		// === Channel background and gauge ===
 		channels_background = channelsrc["layer:bg"];
+		channel_gauge = Texture(channelsrc["gauge"]);
 
-		// Pre-create channel buttons (up to 20 channels)
+		// === Alternative channel background ===
+		ch_backgrn = Texture(ws["chBackgrn"]);
+
+		// === Channel labels (0-19) ===
+		nl::node channel_node = ws["channel"];
+		for (uint8_t i = 0; i < 20; ++i)
+		{
+			nl::node ch_label = channel_node[std::to_string(i)];
+			if (ch_label)
+				channel_labels.emplace_back(ch_label);
+		}
+
+		// Channel decorations
+		ch_event = Texture(channel_node["chEvent"]);
+		ch_select = Texture(channel_node["chSelect"]);
+		ch_gauge_bar = Texture(channel_node["chgauge"]);
+
+		// === Channel buttons (up to 20 channels) ===
 		for (uint8_t i = 0; i < 20; ++i)
 		{
 			nl::node chnode = channelsrc["button:" + std::to_string(i)];
@@ -73,6 +95,60 @@ namespace ms
 				buttons[BT_CHANNEL0 + i]->set_active(false);
 			}
 		}
+
+		// === BtGoworld (standalone go-to-world button) ===
+		buttons[BT_GOWORLD] = std::make_unique<MapleButton>(ws["BtGoworld"]);
+		buttons[BT_GOWORLD]->set_active(false);
+
+		// === BtViewAll / BtViewChoice (world list view toggles) ===
+		buttons[BT_VIEWALL] = std::make_unique<MapleButton>(ws["BtViewAll"]);
+		buttons[BT_VIEWCHOICE] = std::make_unique<MapleButton>(ws["BtViewChoice"]);
+		buttons[BT_VIEWALL]->set_active(true);
+		buttons[BT_VIEWCHOICE]->set_active(true);
+
+		// === Scroll buttons ===
+		nl::node scroll_node = ws["scroll"];
+		buttons[BT_SCROLLUP] = std::make_unique<MapleButton>(scroll_node["0"]);
+		buttons[BT_SCROLLDOWN] = std::make_unique<MapleButton>(scroll_node["1"]);
+
+		// === Alert panel buttons ===
+		nl::node alert_node = ws["alert"];
+		alert_backgrd = Texture(alert_node["backgrd"]);
+		buttons[BT_ALERT_ARROWL] = std::make_unique<MapleButton>(alert_node["BtArrowL"]);
+		buttons[BT_ALERT_ARROWR] = std::make_unique<MapleButton>(alert_node["BtArrowR"]);
+		buttons[BT_ALERT_CHOICE] = std::make_unique<MapleButton>(alert_node["BtChoice"]);
+		buttons[BT_ALERT_CLOSE] = std::make_unique<MapleButton>(alert_node["BtClose"]);
+		buttons[BT_ALERT_ARROWL]->set_active(false);
+		buttons[BT_ALERT_ARROWR]->set_active(false);
+		buttons[BT_ALERT_CHOICE]->set_active(false);
+		buttons[BT_ALERT_CLOSE]->set_active(false);
+
+		// === Tooltip textures ===
+		nl::node tooltip_node = ws["tooltip"];
+		for (int i = 0; i < 3; ++i)
+		{
+			nl::node tt = tooltip_node[std::to_string(i)];
+			if (tt)
+				tooltip_textures.emplace_back(tt);
+		}
+		// Also load release tooltip
+		nl::node tt_release = tooltip_node["release"];
+		if (tt_release)
+			tooltip_textures.emplace_back(tt_release);
+
+		// === World name label bitmaps ===
+		nl::node world_label_node = ws["world"];
+		for (int i = 0; i < 44; ++i)
+		{
+			nl::node wl = world_label_node[std::to_string(i)];
+			if (wl)
+				world_labels.emplace_back(wl);
+			else
+				world_labels.emplace_back(Texture());
+		}
+
+		// === World notice ===
+		world_notice = Texture(ws["worldNotice"]["0"]);
 	}
 
 	void UIWorldSelect::draw(float alpha) const
@@ -80,27 +156,89 @@ namespace ms
 		// Draw sprites (backgrounds) first
 		UIElement::draw_sprites(alpha);
 
+		// Draw world notice (NX origin positions it)
+		if (world_notice.is_valid())
+			world_notice.draw(DrawArgument(position));
+
 		// Draw channel panel AFTER sprites but BEFORE buttons
 		if (world_selected)
 		{
+			// Channel background (NX origin positions it)
+			if (ch_backgrn.is_valid())
+				ch_backgrn.draw(DrawArgument(position));
+
 			channels_background.draw(position + Point<int16_t>(200, 170));
 
+			// World texture layer
 			if (worldid < world_textures.size())
 				world_textures[worldid].draw(position + Point<int16_t>(200, 170));
+
+			// World name label (NX origin positions it)
+			if (worldid < world_labels.size() && world_labels[worldid].is_valid())
+				world_labels[worldid].draw(DrawArgument(position));
+
+			// Channel selection highlight (NX origin positions it relative to channel area)
+			if (ch_select.is_valid() && channelid < 20)
+				ch_select.draw(DrawArgument(position));
+
+			// Channel labels (only draw for active channels)
+			for (size_t i = 0; i < active_channelcount && i < channel_labels.size(); ++i)
+			{
+				if (channel_labels[i].is_valid())
+					channel_labels[i].draw(DrawArgument(position));
+			}
+
+			// Channel gauge (load indicator - NX origin)
+			if (channel_gauge.is_valid())
+				channel_gauge.draw(DrawArgument(position));
+
+			// Channel load gauge bars (NX origin)
+			if (ch_gauge_bar.is_valid())
+				ch_gauge_bar.draw(DrawArgument(position));
+
+			// Channel event marker (NX origin)
+			if (ch_event.is_valid())
+				ch_event.draw(DrawArgument(position));
+		}
+
+		// Draw alert panel (NX origin positions it)
+		if (show_alert)
+		{
+			if (alert_backgrd.is_valid())
+				alert_backgrd.draw(DrawArgument(position));
 		}
 
 		// Draw buttons last (on top of everything)
 		UIElement::draw_buttons(alpha);
+
+		// Draw tooltip over hovered world button
+		if (hovered_world >= 0 && hovered_world < static_cast<int16_t>(tooltip_textures.size()))
+		{
+			auto btn_it = buttons.find(BT_WORLD0 + hovered_world);
+
+			if (btn_it != buttons.end() && btn_it->second->is_active())
+			{
+				// Draw tooltip at the world button's position (NX origin handles offset)
+				tooltip_textures[hovered_world].draw(DrawArgument(position));
+			}
+		}
 	}
 
 	Cursor::State UIWorldSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
 
+		// Track world button hover for tooltips
+		hovered_world = -1;
+
 		for (auto& btit : buttons)
 		{
 			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
 			{
+				// Track which world button is hovered
+				if (btit.first >= BT_WORLD0 && btit.first < BT_CHANNEL0)
+					hovered_world = static_cast<int16_t>(btit.first - BT_WORLD0);
+
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{
 					Sound(Sound::Name::BUTTONOVER).play();
@@ -149,7 +287,14 @@ namespace ms
 		{
 			if (escape)
 			{
-				// Do nothing on escape for now
+				if (show_alert)
+				{
+					show_alert = false;
+					buttons[BT_ALERT_ARROWL]->set_active(false);
+					buttons[BT_ALERT_ARROWR]->set_active(false);
+					buttons[BT_ALERT_CHOICE]->set_active(false);
+					buttons[BT_ALERT_CLOSE]->set_active(false);
+				}
 			}
 			else if (keycode == KeyAction::Id::RETURN)
 			{
@@ -185,6 +330,9 @@ namespace ms
 			}
 		}
 
+		// Show GoWorld button when worlds are available
+		buttons[BT_GOWORLD]->set_active(true);
+
 		// Auto-select first world
 		if (!worlds.empty())
 		{
@@ -214,6 +362,7 @@ namespace ms
 	void UIWorldSelect::change_world(World selectedWorld)
 	{
 		clear_selected_world();
+		active_channelcount = selectedWorld.channelcount;
 
 		for (size_t i = 0; i < selectedWorld.channelcount; ++i)
 		{
@@ -269,6 +418,8 @@ namespace ms
 		world_textures.clear();
 		worldcount = 0;
 
+		buttons[BT_GOWORLD]->set_active(false);
+
 		// Re-request the server list from the server
 		ServerRequestPacket().dispatch();
 	}
@@ -280,10 +431,54 @@ namespace ms
 
 	Button::State UIWorldSelect::button_pressed(uint16_t id)
 	{
-		if (id == BT_ENTERWORLD)
+		if (id == BT_ENTERWORLD || id == BT_GOWORLD)
 		{
 			enter_world();
 			return Button::State::PRESSED;
+		}
+		else if (id == BT_VIEWALL)
+		{
+			// Show all worlds - already default behavior
+			return Button::State::PRESSED;
+		}
+		else if (id == BT_VIEWCHOICE)
+		{
+			// Show selected/favorite worlds
+			return Button::State::PRESSED;
+		}
+		else if (id == BT_SCROLLUP)
+		{
+			// Scroll world list up (for many worlds)
+			return Button::State::NORMAL;
+		}
+		else if (id == BT_SCROLLDOWN)
+		{
+			// Scroll world list down
+			return Button::State::NORMAL;
+		}
+		else if (id == BT_ALERT_CLOSE)
+		{
+			show_alert = false;
+			buttons[BT_ALERT_ARROWL]->set_active(false);
+			buttons[BT_ALERT_ARROWR]->set_active(false);
+			buttons[BT_ALERT_CHOICE]->set_active(false);
+			buttons[BT_ALERT_CLOSE]->set_active(false);
+			return Button::State::NORMAL;
+		}
+		else if (id == BT_ALERT_ARROWL || id == BT_ALERT_ARROWR)
+		{
+			// Navigate alert pages
+			return Button::State::NORMAL;
+		}
+		else if (id == BT_ALERT_CHOICE)
+		{
+			// Accept alert choice
+			show_alert = false;
+			buttons[BT_ALERT_ARROWL]->set_active(false);
+			buttons[BT_ALERT_ARROWR]->set_active(false);
+			buttons[BT_ALERT_CHOICE]->set_active(false);
+			buttons[BT_ALERT_CLOSE]->set_active(false);
+			return Button::State::NORMAL;
 		}
 		else if (id >= BT_WORLD0 && id < BT_CHANNEL0)
 		{
@@ -306,7 +501,7 @@ namespace ms
 
 			return Button::State::PRESSED;
 		}
-		else if (id >= BT_CHANNEL0)
+		else if (id >= BT_CHANNEL0 && id < BT_GOWORLD)
 		{
 			uint8_t selectedch = static_cast<uint8_t>(id - BT_CHANNEL0);
 
@@ -351,7 +546,7 @@ namespace ms
 
 		for (auto& btit : buttons)
 		{
-			if (btit.first >= BT_CHANNEL0)
+			if (btit.first >= BT_CHANNEL0 && btit.first < BT_GOWORLD)
 			{
 				btit.second->set_state(Button::State::NORMAL);
 				btit.second->set_active(false);

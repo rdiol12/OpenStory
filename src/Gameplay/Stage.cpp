@@ -94,6 +94,7 @@ namespace ms
 		physics = Physics(src["foothold"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
+		environments = MapEnvironments(src["env"]);
 	}
 
 	void Stage::respawn(int8_t portalid)
@@ -133,6 +134,7 @@ namespace ms
 		combat.draw(viewx, viewy, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		environments.draw(viewx, viewy, alpha);
 		effect.draw();
 	}
 
@@ -143,6 +145,7 @@ namespace ms
 
 		combat.update();
 		backgrounds.update();
+		environments.update();
 		effect.update();
 		tilesobjs.update();
 
@@ -285,6 +288,11 @@ namespace ms
 				return statusbar->send_cursor(pressed, position);
 		}
 
+		// Check characters first, then NPCs
+		Cursor::State char_state = chars.send_cursor(pressed, position, camera.position());
+		if (char_state != Cursor::State::IDLE)
+			return char_state;
+
 		return npcs.send_cursor(pressed, position, camera.position());
 	}
 
@@ -344,6 +352,11 @@ namespace ms
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
+	}
+
+	void Stage::toggle_environment(const std::string& name, int32_t mode)
+	{
+		environments.toggle(name, mode);
 	}
 
 	int64_t Stage::get_uptime()

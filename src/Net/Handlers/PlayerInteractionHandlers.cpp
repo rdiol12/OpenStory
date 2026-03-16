@@ -80,7 +80,9 @@ namespace ms
 		for (int16_t s = 0; s < medal_quests_size; s++)
 			recv.skip_short(); // medal_quest
 
-		// Update the character information window
+		// Create (or re-create) the character information window, then update its stats
+		UI::get().emplace<UICharInfo>(character_id);
+
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
 	}

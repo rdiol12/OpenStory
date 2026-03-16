@@ -17,39 +17,84 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../Physics/PhysicsObject.h"
+#include "../../Graphics/Animation.h"
+
 #include <string>
-#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace ms
 {
-	struct PartyMember
-	{
-		int32_t cid = 0;
-		std::string name;
-		int16_t job = 0;
-		int16_t level = 0;
-		int32_t channel = -1;
-		int32_t mapid = 0;
-		bool online = false;
-		int32_t hp = 0;
-		int32_t maxhp = 0;
-	};
-
-	class Party
+	class MapEnvironment
 	{
 	public:
-		void update(int32_t partyid, const std::vector<PartyMember>& members, int32_t leader_cid);
-		void update_member_hp(int32_t cid, int32_t hp, int32_t maxhp);
-		void clear();
-		bool is_in_party() const;
-		int32_t get_id() const;
-		int32_t get_leader() const;
-		const std::vector<PartyMember>& get_members() const;
+		MapEnvironment(nl::node src, const std::string& name);
+
+		void draw(double viewx, double viewy, float alpha) const;
+		void update();
+
+		void set_mode(int32_t mode);
+		const std::string& get_name() const;
+		bool is_active() const;
 
 	private:
-		int32_t id = 0;
-		int32_t leader = 0;
-		std::vector<PartyMember> members;
+		enum Type
+		{
+			NORMAL,
+			HTILED,
+			VTILED,
+			TILED,
+			HMOVEA,
+			VMOVEA,
+			HMOVEB,
+			VMOVEB
+		};
+
+		static Type typebyid(int32_t id)
+		{
+			if (id >= NORMAL && id <= VMOVEB)
+				return static_cast<Type>(id);
+
+			return NORMAL;
+		}
+
+		void settype(Type type);
+
+		int16_t VWIDTH;
+		int16_t VHEIGHT;
+		int16_t WOFFSET;
+		int16_t HOFFSET;
+
+		std::string name;
+		Animation animation;
+		bool animated;
+		int16_t cx;
+		int16_t cy;
+		double rx;
+		double ry;
+		int16_t htile;
+		int16_t vtile;
+		float opacity;
+		bool flipped;
+		bool active;
+
+		MovingObject moveobj;
+	};
+
+	class MapEnvironments
+	{
+	public:
+		MapEnvironments(nl::node src);
+		MapEnvironments();
+
+		void draw(double viewx, double viewy, float alpha) const;
+		void update();
+
+		void toggle(const std::string& name, int32_t mode);
+		void reset_all();
+
+	private:
+		std::vector<MapEnvironment> environments;
 	};
 }

@@ -15,54 +15,48 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#include "Party.h"
+#pragma once
+
+#include "../OutPacket.h"
 
 namespace ms
 {
-	void Party::update(int32_t partyid, const std::vector<PartyMember>& new_members, int32_t leader_cid)
+	// Opcode: QUEST_ACTION(107)
+	// Action 1: Start quest
+	class StartQuestPacket : public OutPacket
 	{
-		id = partyid;
-		leader = leader_cid;
-		members = new_members;
-	}
-
-	void Party::update_member_hp(int32_t cid, int32_t hp, int32_t maxhp)
-	{
-		for (auto& member : members)
+	public:
+		StartQuestPacket(int16_t questid, int32_t npcid) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
 		{
-			if (member.cid == cid)
-			{
-				member.hp = hp;
-				member.maxhp = maxhp;
-				return;
-			}
+			write_byte(1);
+			write_short(questid);
+			write_int(npcid);
 		}
-	}
+	};
 
-	void Party::clear()
+	// Action 2: Complete quest
+	class CompleteQuestPacket : public OutPacket
 	{
-		id = 0;
-		leader = 0;
-		members.clear();
-	}
+	public:
+		CompleteQuestPacket(int16_t questid, int32_t npcid, int16_t selection = -1) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(2);
+			write_short(questid);
+			write_int(npcid);
 
-	bool Party::is_in_party() const
-	{
-		return id != 0;
-	}
+			if (selection >= 0)
+				write_short(selection);
+		}
+	};
 
-	int32_t Party::get_id() const
+	// Action 3: Forfeit quest
+	class ForfeitQuestPacket : public OutPacket
 	{
-		return id;
-	}
-
-	int32_t Party::get_leader() const
-	{
-		return leader;
-	}
-
-	const std::vector<PartyMember>& Party::get_members() const
-	{
-		return members;
-	}
+	public:
+		ForfeitQuestPacket(int16_t questid) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(3);
+			write_short(questid);
+		}
+	};
 }

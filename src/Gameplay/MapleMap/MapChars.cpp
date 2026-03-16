@@ -17,8 +17,48 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapChars.h"
 
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UICharInfo.h"
+#include "../../Net/Packets/PlayerInteractionPackets.h"
+
 namespace ms
 {
+	Cursor::State MapChars::send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos)
+	{
+		for (auto& map_object : chars)
+		{
+			OtherChar* ochar = static_cast<OtherChar*>(map_object.second.get());
+			if (!ochar)
+				continue;
+
+			Point<int16_t> absp = ochar->get_position() + viewpos;
+
+			// Use a reasonable hitbox for character sprites (~60 wide, ~80 tall)
+			Rectangle<int16_t> bounds(
+				absp.x() - 30,
+				absp.x() + 30,
+				absp.y() - 70,
+				absp.y()
+			);
+
+			if (bounds.contains(position))
+			{
+				if (pressed)
+				{
+					// Request character info from the server
+					CharInfoRequestPacket(ochar->get_oid()).dispatch();
+					return Cursor::State::IDLE;
+				}
+				else
+				{
+					return Cursor::State::CANCLICK;
+				}
+			}
+		}
+
+		return Cursor::State::IDLE;
+	}
+
 	void MapChars::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
 		chars.draw(layer, viewx, viewy, alpha);

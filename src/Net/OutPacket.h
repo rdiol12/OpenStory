@@ -70,9 +70,11 @@ namespace ms
 			TALK_TO_NPC = 58,
 			NPC_TALK_MORE = 60,
 			NPC_SHOP_ACTION = 61,
+			STORAGE_ACTION = 62,
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,
+			PLAYER_INTERACTION = 123,
 
 			/// Inventory
 			GATHER_ITEMS = 69,
@@ -98,9 +100,19 @@ namespace ms
 			PLAYER_MAP_TRANSFER = 207,
 			PLAYER_UPDATE = 223,
 
+			/// Social
+			GIVE_FAME = 95,
+			QUEST_ACTION = 107,
+			WHISPER = 120,
+			BUDDYLIST_MODIFY = 130,
+
 			/// Cash Shop
-			BUY_CS_ITEM = 215,
-			COUPON_CODE = 216
+			BUY_CS_ITEM = 229,
+			COUPON_CODE = 230,
+
+			/// MTS (Maple Trading System)
+			ENTER_MTS = 156,
+			MTS_OPERATION = 253
 		};
 
 	protected:

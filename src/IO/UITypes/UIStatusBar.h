@@ -24,6 +24,7 @@
 
 #include "../../Character/CharStats.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Animation.h"
 
 namespace ms
 {
@@ -59,6 +60,7 @@ namespace ms
 
 		enum Buttons : uint16_t
 		{
+			// Main bar buttons
 			BT_WHISPER,
 			BT_CALLGM,
 			BT_CASHSHOP,
@@ -70,17 +72,132 @@ namespace ms
 			BT_QUEST,
 			BT_INVENTORY,
 			BT_EQUIPS,
-			BT_SKILL
+			BT_SKILL,
+			BT_CHANNEL,
+			BT_KEYSETTING,
+			BT_NOTICE,
+			BT_FARM,
+			BT_EXITDUNGEON,
+			BF_BT_CASHSHOP,
+			BT_CHATCLOSE,
+			BT_CHATOPEN,
+			BT_SCROLLUP,
+			BT_SCROLLDOWN,
+			// Quick slot
+			BT_QS_OPEN,
+			BT_QS_CLOSE,
+			// Menu sub-panel
+			BT_MENU_STAT,
+			BT_MENU_SKILL,
+			BT_MENU_QUEST,
+			BT_MENU_ITEM,
+			BT_MENU_EQUIP,
+			BT_MENU_COMMUNITY,
+			BT_MENU_EVENT,
+			BT_MENU_RANK,
+			BT_MENU_EPISODBOOK,
+			BT_MENU_MONSTERBATTLE,
+			BT_MENU_MONSTERLIFE,
+			BT_MENU_MSN,
+			BT_MENU_AFREECATV,
+			// System sub-panel
+			BT_SYS_CHANNEL,
+			BT_SYS_GAMEOPTION,
+			BT_SYS_GAMEQUIT,
+			BT_SYS_JOYPAD,
+			BT_SYS_KEYSETTING,
+			BT_SYS_MONSTERLIFE,
+			BT_SYS_OPTION,
+			BT_SYS_ROOMCHANGE,
+			BT_SYS_SYSTEMOPTION,
+			// Chat tabs
+			BT_TAP_ALL,
+			BT_TAP_PARTY,
+			BT_TAP_GUILD,
+			BT_TAP_FRIEND,
+			BT_TAP_EXPEDITION,
+			BT_TAP_ASSOCIATION,
+			BT_TAP_AFREECATV
 		};
 
 		const CharStats& stats;
 
+		// Main gauges
 		Gauge expbar;
 		Gauge hpbar;
 		Gauge mpbar;
+
+		// Extra gauges
+		Gauge barrier_bar;
+		Gauge df_bar;
+		Gauge relax_exp_bar;
+		Gauge tf_bar;
+
 		Charset statset;
 		Charset levelset;
 		Text namelabel;
 		Text joblabel;
+
+		// Gauge cover (overlay on top of gauges)
+		Texture gauge_cover;
+
+		// Class-variant gauge backgrounds
+		Texture gauge_backgrd_ab;
+		Texture gauge_backgrd_demon;
+		Texture gauge_backgrd_kanna;
+		Texture gauge_backgrd_zero;
+		Texture gauge_cover_ab;
+		Texture lv_backtrnd_sao;
+
+		// Gauge animations (low HP/MP flash)
+		Animation ani_hp_gauge;
+		Animation ani_hp_gauge_ab;
+		Animation ani_mp_gauge;
+
+		// Notification animations
+		Animation ap_notify;
+		Animation sp_notify;
+		Animation noncombat_notify;
+		Texture cooltime_return;
+
+		// Chat area
+		Texture chat_cover;
+		Texture chat_enter;
+		Texture chat_space;
+		Texture chat_space2;
+		bool chat_open;
+
+		// Chat target
+		Texture chat_target_base;
+		Texture chat_target_all;
+		Texture chat_target_party;
+		Texture chat_target_guild;
+		Texture chat_target_friend;
+		Texture chat_target_expedition;
+		Texture chat_target_association;
+		Texture chat_target_afctv;
+		uint8_t chat_target_id;
+
+		// Chat tab bar
+		Texture tap_bar;
+		Texture tap_bar_over;
+		Texture chat_scroll_normal;
+		Texture chat_scroll_over;
+
+		// Menu sub-panel
+		Texture menu_backgrnd;
+		bool show_menu;
+
+		// System sub-panel
+		Texture system_backgrnd;
+		bool show_system;
+
+		// Quick slot
+		Texture quickslot_bg;
+		bool show_quickslot;
+
+		// readyZero
+		Texture ready_zero_backgrnd;
+		Texture ready_zero_gauge_backgrnd;
 	};
 }

@@ -60,9 +60,23 @@ namespace ms
 			TAB1,
 			TAB2,
 			CLOSE,
-			SEARCH,
 			ALL_LEVEL,
-			MY_LOCATION
+			MY_LEVEL,
+			BT_SEARCH,
+			BT_NEXT,
+			BT_PREV,
+			BT_ALLLOCN,
+			BT_MYLOCATION,
+			BT_ICONINFO,
+			GIVEUP,
+			DETAIL,
+			MARK_NPC,
+			BT_ACCEPT,
+			BT_FINISH,
+			BT_DETAIL_CLOSE,
+			BT_ARLIM,
+			BT_DELIVERY_ACCEPT,
+			BT_DELIVERY_COMPLETE
 		};
 
 		static constexpr int16_t ROWS = 10;
@@ -84,14 +98,48 @@ namespace ms
 		Texture drop_texture;
 		Animation quest_icon_anim;
 
+		// Quest root icons
+		Texture icon0;
+		Texture icon1;
+		Texture icon4;
+		Texture icon10;
+		Animation icon2_anim;
+		Animation icon5_anim;
+		Animation icon6_anim;
+		Animation icon7_anim;
+		Animation icon8_anim;
+		Animation icon9_anim;
+		Animation iconQM0_anim;
+		Animation iconQM1_anim;
+
+		// Gauge2 - quest progress bar (root level)
+		Texture gauge2_frame;
+		Texture gauge2_bar;
+
+		// TimeQuest
+		Animation time_alarm_clock;
+		Animation time_bar;
+
+		// icon_info panel
+		Texture icon_info_backgrnd;
+		Texture icon_info_backgrnd2;
+		bool show_icon_info;
+
+		// List extras
+		Texture complete_count;
+		Texture recommend_title;
+		Texture recommend_focus;
+
 		struct QuestEntry
 		{
 			int16_t id;
 			Text name;
 		};
 
+		std::vector<QuestEntry> available_entries;
 		std::vector<QuestEntry> active_entries;
 		std::vector<QuestEntry> completed_entries;
+		bool filter_my_level;
 
 		int16_t selected_entry;
 		int16_t hover_entry;
@@ -102,6 +150,7 @@ namespace ms
 		Texture detail_backgrnd2;
 		Texture detail_backgrnd3;
 		Texture detail_summary;
+		Texture detail_summary_pattern;
 		Texture detail_tip;
 		Texture detail_reward_icon;
 		Text detail_quest_name;
@@ -109,9 +158,15 @@ namespace ms
 		Text detail_quest_summary;
 		Text detail_level_req;
 
+		// Detail panel gauge (quest progress)
+		Texture detail_gauge_frame;
+		Texture detail_gauge_bar;
+		float detail_progress;
+
 		// NPC sprite
 		Texture detail_npc_sprite;
 		Text detail_npc_name;
+		int32_t detail_npcid;
 
 		// Reward/requirement items
 		struct QuestItem
@@ -122,5 +177,33 @@ namespace ms
 		};
 		std::vector<QuestItem> detail_rewards;
 		std::vector<QuestItem> detail_requirements;
+
+		// Quest job requirement text
+		Text detail_job_req;
+
+		// Prerequisite quest names
+		std::vector<Text> detail_prereq_quests;
+
+		// Say.img NPC dialog lines
+		struct SayEntry
+		{
+			std::string text;
+			bool has_yes_no;
+		};
+		std::vector<SayEntry> detail_say_lines;
+
+		// PQuest.img data
+		std::string detail_pquest_name;
+		std::string detail_pquest_mark;
+
+		// Exclusive.img medal
+		std::string detail_medal;
+
+		// QuestInfo.img extras
+		int32_t detail_area;
+		std::string detail_parent;
+		int32_t detail_order;
+		bool detail_auto_start;
+		bool detail_auto_complete;
 	};
 }

@@ -44,6 +44,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Select and highlight an NPC on the minimap by its data ID
+		void set_quest_npc(int32_t npcid);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 

@@ -73,6 +73,7 @@ namespace ms
 			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::TOP, interframe, args);
 			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::MAIL, interframe, args);
 			equips.draw(EquipSlot::Id::CAPE, interstance, Clothing::Layer::CAPE, interframe, args);
+			hair->draw(interstance, Hair::Layer::OVERCAPE, interframe, args);
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
 
@@ -101,6 +102,7 @@ namespace ms
 		{
 			hair->draw(interstance, Hair::Layer::BELOWBODY, interframe, args);
 			equips.draw(EquipSlot::Id::CAPE, interstance, Clothing::Layer::CAPE, interframe, args);
+			hair->draw(interstance, Hair::Layer::OVERCAPE, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_BELOW_BODY, interframe, args);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::WEAPON_BELOW_BODY, interframe, args);
 			equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP_BELOW_BODY, interframe, args);

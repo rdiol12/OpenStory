@@ -25,7 +25,7 @@
 
 namespace ms
 {
-	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)) {}
+	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE)) {}
 
 	void Char::draw(double viewx, double viewy, float alpha) const
 	{
@@ -66,6 +66,11 @@ namespace ms
 
 		// If ever changing code for namelabel confirm placements with map 10000
 		namelabel.draw(absp + Point<int16_t>(0, -4));
+
+		// Draw guild name below character name
+		if (!guildlabel.get_text().empty())
+			guildlabel.draw(absp + Point<int16_t>(0, 8));
+
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 
 		effects.drawabove(absp, alpha);
@@ -203,6 +208,17 @@ namespace ms
 	void Char::speak(const std::string& line)
 	{
 		chatballoon.change_text(line);
+	}
+
+	void Char::set_guild(const std::string& name)
+	{
+		guildlabel.change_text(name);
+	}
+
+	void Char::set_guild_mark(int16_t, int8_t, int16_t, int8_t)
+	{
+		// Guild mark rendering requires loading guild emblem sprites
+		// from GuildMark.img — stored for future use
 	}
 
 	void Char::change_look(MapleStat::Id stat, int32_t id)
