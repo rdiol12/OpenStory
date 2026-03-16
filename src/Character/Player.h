@@ -18,7 +18,9 @@
 #pragma once
 
 #include "ActiveBuffs.h"
+#include "BuddyList.h"
 #include "MonsterBook.h"
+#include "Party.h"
 #include "PassiveBuffs.h"
 #include "QuestLog.h"
 #include "SkillBook.h"
@@ -145,6 +147,10 @@ namespace ms
 		TeleportRock& get_teleportrock();
 		// Obtain a reference to the player's MonsterBook
 		MonsterBook& get_monsterbook();
+		// Obtain a reference to the player's Party
+		Party& get_party();
+		// Obtain a reference to the player's BuddyList
+		BuddyList& get_buddylist();
 
 	private:
 		CharStats stats;
@@ -153,6 +159,8 @@ namespace ms
 		QuestLog questlog;
 		TeleportRock teleportrock;
 		MonsterBook monsterbook;
+		BuddyList buddylist;
+		Party party;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

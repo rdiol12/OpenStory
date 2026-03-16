@@ -21,6 +21,7 @@
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
+#include <nlnx/audio.hpp>
 #endif
 
 namespace ms
@@ -39,6 +40,10 @@ namespace ms
 			if (sub.name() == "event")
 				if (sub["0"]["type"].get_integer() == 0)
 					hittable = true;
+
+		nl::node sndsrc = nl::nx::sound["Reactor.img"][strid];
+		hitsound = sndsrc["hit"];
+		diesound = sndsrc["break"];
 	}
 
 	void Reactor::draw(double viewx, double viewy, float alpha) const
@@ -72,7 +77,8 @@ namespace ms
 
 	void Reactor::set_state(int8_t state)
 	{
-		// Note: hit/break sounds are not yet played here
+		hitsound.play();
+
 		if (hittable)
 		{
 			animations[this->state] = src[this->state]["hit"];
@@ -84,6 +90,7 @@ namespace ms
 
 	void Reactor::destroy(int8_t, Point<int16_t>)
 	{
+		diesound.play();
 		animations[this->state] = src[this->state]["hit"];
 		state++;
 		dead = true;

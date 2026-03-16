@@ -15,55 +15,32 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include "MapObject.h"
-
-#include "../../Audio/Audio.h"
-#include "../../Graphics/Animation.h"
-
-#include <map>
+#include "BuddyList.h"
 
 namespace ms
 {
-	class Reactor : public MapObject
+	void BuddyList::update(const std::map<int32_t, BuddyEntry>& entries)
 	{
-	public:
-		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position);
+		buddies = entries;
+	}
 
-		void draw(double viewx, double viewy, float alpha) const override;
-		int8_t update(const Physics& physics);
+	void BuddyList::set_capacity(int8_t cap)
+	{
+		capacity = cap;
+	}
 
-		void set_state(int8_t state);
-		void destroy(int8_t state, Point<int16_t> position);
+	void BuddyList::clear()
+	{
+		buddies.clear();
+	}
 
-		bool is_hittable() const;
+	const std::map<int32_t, BuddyEntry>& BuddyList::get_entries() const
+	{
+		return buddies;
+	}
 
-		// Check if this mob collides with the specified rectangle
-		bool is_in_range(const Rectangle<int16_t>& range) const;
-
-	private:
-		int32_t oid;
-		int32_t rid;
-		int8_t state;
-		// Reactor state tracking
-		//int8_t stance; // ??
-		// GMS client reactor fields
-		//bool movable; // Snowball?
-		//int32_t questid;
-		//bool activates_by_touch;
-
-		nl::node src;
-		std::map<int8_t, Animation> animations;
-		bool animation_ended;
-
-		bool active;
-		bool hittable;
-		bool dead;
-
-		Animation normal;
-
-		Sound hitsound;
-		Sound diesound;
-	};
+	int8_t BuddyList::get_capacity() const
+	{
+		return capacity;
+	}
 }

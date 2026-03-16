@@ -15,55 +15,41 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include "MapObject.h"
-
-#include "../../Audio/Audio.h"
-#include "../../Graphics/Animation.h"
-
-#include <map>
+#include "Party.h"
 
 namespace ms
 {
-	class Reactor : public MapObject
+	void Party::update(int32_t partyid, const std::vector<PartyMember>& new_members, int32_t leader_cid)
 	{
-	public:
-		Reactor(int32_t oid, int32_t rid, int8_t state, Point<int16_t> position);
+		id = partyid;
+		leader = leader_cid;
+		members = new_members;
+	}
 
-		void draw(double viewx, double viewy, float alpha) const override;
-		int8_t update(const Physics& physics);
+	void Party::clear()
+	{
+		id = 0;
+		leader = 0;
+		members.clear();
+	}
 
-		void set_state(int8_t state);
-		void destroy(int8_t state, Point<int16_t> position);
+	bool Party::is_in_party() const
+	{
+		return id != 0;
+	}
 
-		bool is_hittable() const;
+	int32_t Party::get_id() const
+	{
+		return id;
+	}
 
-		// Check if this mob collides with the specified rectangle
-		bool is_in_range(const Rectangle<int16_t>& range) const;
+	int32_t Party::get_leader() const
+	{
+		return leader;
+	}
 
-	private:
-		int32_t oid;
-		int32_t rid;
-		int8_t state;
-		// Reactor state tracking
-		//int8_t stance; // ??
-		// GMS client reactor fields
-		//bool movable; // Snowball?
-		//int32_t questid;
-		//bool activates_by_touch;
-
-		nl::node src;
-		std::map<int8_t, Animation> animations;
-		bool animation_ended;
-
-		bool active;
-		bool hittable;
-		bool dead;
-
-		Animation normal;
-
-		Sound hitsound;
-		Sound diesound;
-	};
+	const std::vector<PartyMember>& Party::get_members() const
+	{
+		return members;
+	}
 }

@@ -54,7 +54,10 @@ namespace ms
 				skip(1);
 				write_byte(attack.toleft);
 				skip(7);
+
 				// Hurricane/piercing arrow/rapidfire require additional 4 bytes
+				if (attack.skill == 5221004 || attack.skill == 5721001 || attack.skill == 4341002 || attack.skill == 4341003)
+					skip(4);
 			}
 			else
 			{

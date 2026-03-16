@@ -24,6 +24,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Configuration.h"
+#include "../../Net/Packets/GameplayPackets.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -314,7 +315,7 @@ namespace ms
 
 	void UIChannel::change_channel()
 	{
-		// No ChangeChannelPacket available yet
+		ChangeChannelPacket(selected_channel).dispatch();
 		cancel();
 	}
 

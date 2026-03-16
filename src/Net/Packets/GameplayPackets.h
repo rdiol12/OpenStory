@@ -39,6 +39,17 @@ namespace ms
 		ChangeMapPacket() : OutPacket(OutPacket::Opcode::CHANGEMAP) {}
 	};
 
+	// Opcode: CHANGE_CHANNEL(39)
+	class ChangeChannelPacket : public OutPacket
+	{
+	public:
+		ChangeChannelPacket(uint8_t channel) : OutPacket(OutPacket::Opcode::CHANGE_CHANNEL)
+		{
+			write_byte(channel);
+			write_int(0); // current time
+		}
+	};
+
 	// Opcode: ENTER_CASHSHOP(40)
 	class EnterCashShopPacket : public OutPacket
 	{

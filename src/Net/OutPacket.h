@@ -55,6 +55,7 @@ namespace ms
 
 			/// Gameplay 1
 			CHANGEMAP = 38,
+			CHANGE_CHANNEL = 39,
 			ENTER_CASHSHOP = 40,
 			MOVE_PLAYER = 41,
 			CLOSE_ATTACK = 44,
