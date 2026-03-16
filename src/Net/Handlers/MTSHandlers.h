@@ -15,54 +15,21 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#include "Party.h"
+#pragma once
+
+#include "../PacketHandler.h"
 
 namespace ms
 {
-	void Party::update(int32_t partyid, const std::vector<PartyMember>& new_members, int32_t leader_cid)
+	// Handles MTS_OPERATION (0x15C) — item listings, confirmations, etc.
+	class MTSOperationHandler : public PacketHandler
 	{
-		id = partyid;
-		leader = leader_cid;
-		members = new_members;
-	}
+		void handle(InPacket& recv) const override;
+	};
 
-	void Party::update_member_hp(int32_t cid, int32_t hp, int32_t maxhp)
+	// Handles MTS_OPERATION2 (0x15B) — cash balance update
+	class MTSCashHandler : public PacketHandler
 	{
-		for (auto& member : members)
-		{
-			if (member.cid == cid)
-			{
-				member.hp = hp;
-				member.maxhp = maxhp;
-				return;
-			}
-		}
-	}
-
-	void Party::clear()
-	{
-		id = 0;
-		leader = 0;
-		members.clear();
-	}
-
-	bool Party::is_in_party() const
-	{
-		return id != 0;
-	}
-
-	int32_t Party::get_id() const
-	{
-		return id;
-	}
-
-	int32_t Party::get_leader() const
-	{
-		return leader;
-	}
-
-	const std::vector<PartyMember>& Party::get_members() const
-	{
-		return members;
-	}
+		void handle(InPacket& recv) const override;
+	};
 }

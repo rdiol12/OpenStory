@@ -59,7 +59,16 @@ namespace ms
 		{
 			BT_ENTERWORLD = 0,
 			BT_WORLD0 = 1,
-			BT_CHANNEL0 = 17
+			BT_CHANNEL0 = 17,
+			BT_GOWORLD = 37,
+			BT_VIEWALL = 38,
+			BT_VIEWCHOICE = 39,
+			BT_SCROLLUP = 40,
+			BT_SCROLLDOWN = 41,
+			BT_ALERT_ARROWL = 42,
+			BT_ALERT_ARROWR = 43,
+			BT_ALERT_CHOICE = 44,
+			BT_ALERT_CLOSE = 45
 		};
 
 		uint8_t worldid;
@@ -70,8 +79,39 @@ namespace ms
 		std::vector<World> worlds;
 
 		bool world_selected;
+		bool show_alert;
 
 		Texture channels_background;
 		std::vector<Texture> world_textures;
+
+		// Channel gauge (load indicator)
+		Texture channel_gauge;
+
+		// Channel background (alternative)
+		Texture ch_backgrn;
+
+		// Channel labels and decorations
+		std::vector<Texture> channel_labels;
+		Texture ch_event;
+		Texture ch_select;
+		Texture ch_gauge_bar;
+
+		// World name label bitmaps
+		std::vector<Texture> world_labels;
+
+		// World notice
+		Texture world_notice;
+
+		// Tooltip textures
+		std::vector<Texture> tooltip_textures;
+
+		// Alert panel
+		Texture alert_backgrd;
+
+		// Hover tracking for world button tooltips
+		int16_t hovered_world;
+
+		// Active channel count for the selected world
+		uint8_t active_channelcount;
 	};
 }

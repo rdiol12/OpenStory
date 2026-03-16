@@ -832,4 +832,26 @@ namespace ms
 				listNpc_names[selected].change_color(Color::Name::BLACK);
 		}
 	}
+
+	void UIMiniMap::set_quest_npc(int32_t npcid)
+	{
+		if (npcid <= 0)
+			return;
+
+		// Enable NPC list if not already showing
+		if (!listNpc_enabled)
+			set_npclist_active(true);
+
+		// Find the NPC in the list by its data ID
+		for (size_t i = 0; i < listNpc_list.size(); i++)
+		{
+			auto npc = static_cast<Npc*>(listNpc_list[i]);
+
+			if (npc && npc->get_npcid() == npcid)
+			{
+				select_npclist(static_cast<int16_t>(i));
+				return;
+			}
+		}
+	}
 }

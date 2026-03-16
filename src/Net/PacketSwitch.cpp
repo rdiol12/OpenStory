@@ -29,125 +29,156 @@
 #include "Handlers/PlayerInteractionHandlers.h"
 #include "Handlers/SetFieldHandlers.h"
 #include "Handlers/TestingHandlers.h"
+#include "Handlers/MTSHandlers.h"
 
 #include "../Configuration.h"
 
 namespace ms
 {
-	// Opcodes for InPackets
+	// Opcodes for InPackets — aligned with Cosmic (P0nk/Cosmic) SendOpcodes
 	enum Opcode : uint16_t
 	{
-		/// Login 1
-		LOGIN_RESULT = 0,
-		SERVERSTATUS = 3,
-		SERVERLIST = 10,
-		CHARLIST = 11,
-		SERVER_IP = 12,
-		CHARNAME_RESPONSE = 13,
-		ADD_NEWCHAR_ENTRY = 14,
-		DELCHAR_RESPONSE = 15,
-		PING = 17,
+		/// Login
+		LOGIN_RESULT = 0,       // 0x00
+		SERVERSTATUS = 3,       // 0x03
+		SERVERLIST = 10,        // 0x0A
+		CHARLIST = 11,          // 0x0B
+		SERVER_IP = 12,         // 0x0C
+		CHARNAME_RESPONSE = 13, // 0x0D
+		ADD_NEWCHAR_ENTRY = 14, // 0x0E
+		DELCHAR_RESPONSE = 15,  // 0x0F
+		CHANGE_CHANNEL = 16,    // 0x10
+		PING = 17,              // 0x11
+		RELOG_RESPONSE = 22,    // 0x16
+		LAST_CONNECTED_WORLD = 26, // 0x1A
+		RECOMMENDED_WORLDS = 27,// 0x1B
+		CHECK_SPW_RESULT = 28,  // 0x1C
 
-		/// Login 2
-		RELOG_RESPONSE = 26,
-		RECOMMENDED_WORLDS = 27,
-		CHECK_SPW_RESULT = 28,
-
-		/// Inventory 1
-		MODIFY_INVENTORY = 29,
-
-		/// Player 2
-		CHANGE_CHANNEL = 16,
-		CHANGE_STATS = 31,
-		GIVE_BUFF = 32,
-		CANCEL_BUFF = 33,
-		RECALCULATE_STATS = 35,
-		UPDATE_SKILL = 36,
-
-		/// Messaging 1
-		SHOW_STATUS_INFO = 39,
-		UPDATE_QUEST_INFO = 47,
-		FAME_RESPONSE = 58,
-		BUDDY_LIST = 63,
-
-		/// Inventory 2
-		GATHER_RESULT = 52,
-		SORT_RESULT = 53,
-
-		/// Social
-		FAMILY = 95,
-		PARTY_OPERATION = 100,
-
-		/// Player 3
-
-		/// Messaging 2
-		SERVER_MESSAGE = 68,
-		WEEK_EVENT_MESSAGE = 77,
-
-		CLOCK = 122,
-		SKILL_MACROS = 124,
-		SET_FIELD = 125,
-		FIELD_EFFECT = 138,
-		BLOW_WEATHER = 140,
-		FORCED_STAT_SET = 144,
-		SET_TRACTION = 159,
-
-		/// MapObject
-		SPAWN_CHAR = 160,
-		REMOVE_CHAR = 161,
-
-		/// Messaging
-		CHAT_RECEIVED = 162,
-		SCROLL_RESULT = 167,
-
-		/// MapObject
-		SPAWN_PET = 168,
-		CHAR_MOVED = 185,
-
-		/// Attack
-		ATTACKED_CLOSE = 186,
-		ATTACKED_RANGED = 187,
-		ATTACKED_MAGIC = 188,
-
-		UPDATE_CHARLOOK = 197,
-		SHOW_FOREIGN_EFFECT = 198,
-		SHOW_ITEM_GAIN_INCHAT = 206,
+		/// Inventory
+		MODIFY_INVENTORY = 29,  // 0x1D
+		GATHER_RESULT = 52,     // 0x34
+		SORT_RESULT = 53,       // 0x35
 
 		/// Player
-		ADD_COOLDOWN = 234,
+		CHANGE_STATS = 31,      // 0x1F
+		GIVE_BUFF = 32,         // 0x20
+		CANCEL_BUFF = 33,       // 0x21
+		FORCED_STAT_SET = 34,   // 0x22
+		RECALCULATE_STATS = 35, // 0x23
+		UPDATE_SKILL = 36,      // 0x24
+		FAME_RESPONSE = 38,     // 0x26
+		SHOW_STATUS_INFO = 39,  // 0x27
+		CLAIM_STATUS_CHANGED = 47, // 0x2F
 
-		/// MapObject
-		SPAWN_MOB = 236,
-		KILL_MOB = 237,
-		SPAWN_MOB_C = 238,
-		MOB_MOVED = 239,
-		SHOW_MOB_HP = 250,
-		SPAWN_NPC = 257,
-		SPAWN_NPC_C = 259,
-		DROP_LOOT = 268,
-		REMOVE_LOOT = 269,
-		HIT_REACTOR = 277,
-		SPAWN_REACTOR = 279,
-		REMOVE_REACTOR = 280,
-
-		NPC_ACTION = 263,
-
-		/// NPC Interaction
-		NPC_DIALOGUE = 304,
-		OPEN_NPC_SHOP = 305,
-		CONFIRM_SHOP_TRANSACTION = 306,
-		KEYMAP = 335,
+		SET_GENDER = 58,        // 0x3A
 
 		/// Player Interaction
-		CHAR_INFO = 61,
+		CHAR_INFO = 61,         // 0x3D
+
+		/// Social
+		PARTY_OPERATION = 62,   // 0x3E
+		BUDDY_LIST = 63,        // 0x3F
+
+		/// Messaging
+		SERVER_MESSAGE = 68,    // 0x44
+		WEEK_EVENT_MESSAGE = 77,// 0x4D
+
+		/// Family
+		FAMILY = 95,            // 0x5F
+		FAMILY_PRIVILEGE_LIST = 100, // 0x64
+
+		/// Map / Field
+		SCRIPT_PROGRESS_MESSAGE = 122, // 0x7A
+		SKILL_MACROS = 124,     // 0x7C
+		SET_FIELD = 125,        // 0x7D
+		SET_ITC = 126,          // 0x7E — MTS/CS transition (ignored)
+		SET_CASH_SHOP = 127,    // 0x7F
+		FIELD_EFFECT = 138,     // 0x8A
+		FIELD_OBSTACLE_ONOFF = 140, // 0x8C
+		ADMIN_RESULT = 144,     // 0x90
+		BLOW_WEATHER = 142,     // 0x8E
+		CLOCK = 147,            // 0x93
+		QUICKSLOT_INIT = 159,   // 0x9F
+
+		/// MapObject — Characters
+		SPAWN_CHAR = 160,       // 0xA0
+		REMOVE_CHAR = 161,      // 0xA1
+		CHAT_RECEIVED = 162,    // 0xA2
+		SCROLL_RESULT = 167,    // 0xA7
+		SPAWN_PET = 168,        // 0xA8
+		CHAR_MOVED = 185,       // 0xB9
+
+		/// Attack
+		ATTACKED_CLOSE = 186,   // 0xBA
+		SKILL_EFFECT = 190,     // 0xBE
+		ATTACKED_RANGED = 187,  // 0xBB
+		ATTACKED_MAGIC = 188,   // 0xBC
+
+		/// Foreign character visuals
+		DAMAGE_PLAYER = 192,    // 0xC0
+		FACIAL_EXPRESSION = 193,// 0xC1
+		SHOW_ITEM_EFFECT = 194, // 0xC2
+		UPDATE_CHARLOOK = 197,  // 0xC5
+		SHOW_FOREIGN_EFFECT = 198, // 0xC6
+		GIVE_FOREIGN_BUFF = 199,   // 0xC7
+		CANCEL_FOREIGN_BUFF = 200, // 0xC8
+		UPDATE_PARTYMEMBER_HP = 201, // 0xC9
+		GUILD_NAME_CHANGED = 202,  // 0xCA
+		GUILD_MARK_CHANGED = 203,  // 0xCB
+		CANCEL_CHAIR = 205,     // 0xCD
+		SHOW_ITEM_GAIN_INCHAT = 206, // 0xCE
+
+		/// Quest
+		UPDATE_QUEST_INFO = 211, // 0xD3
+		PLAYER_HINT = 214,      // 0xD6
+
+		/// Player
+		ADD_COOLDOWN = 234,     // 0xEA
+
+		/// MapObject — Mobs
+		SPAWN_MOB = 236,        // 0xEC
+		KILL_MOB = 237,         // 0xED
+		SPAWN_MOB_C = 238,      // 0xEE
+		MOB_MOVED = 239,        // 0xEF
+		SHOW_MOB_HP = 250,      // 0xFA
+		CATCH_MONSTER = 251,    // 0xFB
+
+		/// MapObject — NPCs
+		SPAWN_NPC = 257,        // 0x101
+		SPAWN_NPC_C = 259,      // 0x103
+		NPC_ACTION = 260,       // 0x104
+		SET_NPC_SCRIPTABLE = 263, // 0x107
+
+		/// MapObject — Drops / Reactors
+		DROP_LOOT = 268,        // 0x10C
+		REMOVE_LOOT = 269,      // 0x10D
+		HIT_REACTOR = 277,      // 0x115
+		SPAWN_REACTOR = 279,    // 0x117
+		REMOVE_REACTOR = 280,   // 0x118
+
+		/// Storage
+		STORAGE = 309,          // 0x135
+
+		/// Player Interaction (Trade, etc.)
+		PLAYER_INTERACTION = 314, // 0x13A
+
+		/// NPC Interaction
+		NPC_DIALOGUE = 304,     // 0x130
+		OPEN_NPC_SHOP = 305,    // 0x131
+		CONFIRM_SHOP_TRANSACTION = 306, // 0x132
 
 		/// Cash Shop
-		SET_CASH_SHOP = 127,
-		CS_OPERATION = 228,
+		QUERY_CASH_RESULT = 324, // 0x144
+		CS_OPERATION = 325,     // 0x145
 
-		/// Misc
-		YELLOW_TIP = 336,
-		CATCH_MONSTER = 337
+		/// Keymap
+		KEYMAP = 335,           // 0x14F
+		AUTO_HP_POT = 336,      // 0x150
+		AUTO_MP_POT = 337,      // 0x151
+
+		/// MTS (Maple Trading System)
+		MTS_OPERATION = 348,    // 0x15C
+		MTS_OPERATION2 = 347    // 0x15B
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -168,6 +199,7 @@ namespace ms
 
 		// SetField handlers
 		emplace<SET_FIELD, SetFieldHandler>();
+		emplace<SET_ITC, SetITCHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
@@ -227,6 +259,7 @@ namespace ms
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
+		emplace<QUERY_CASH_RESULT, QueryCashResultHandler>();
 		emplace<CS_OPERATION, CashShopOperationHandler>();
 
 		// Additional v83 handlers
@@ -241,12 +274,40 @@ namespace ms
 		emplace<BUDDY_LIST, BuddyListHandler>();
 		emplace<FAMILY, FamilyHandler>();
 		emplace<PARTY_OPERATION, PartyOperationHandler>();
+		emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
 		emplace<CLOCK, ClockHandler>();
 		emplace<FORCED_STAT_SET, ForcedStatSetHandler>();
-		emplace<SET_TRACTION, SetTractionHandler>();
 		emplace<NPC_ACTION, NpcActionHandler>();
-		emplace<YELLOW_TIP, YellowTipHandler>();
+		emplace<PLAYER_HINT, YellowTipHandler>();
 		emplace<CATCH_MONSTER, CatchMonsterHandler>();
+		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();
+		emplace<LAST_CONNECTED_WORLD, LastConnectedWorldHandler>();
+		emplace<CLAIM_STATUS_CHANGED, ClaimStatusChangedHandler>();
+		emplace<SET_GENDER, SetGenderHandler>();
+		emplace<FAMILY_PRIVILEGE_LIST, FamilyPrivilegeListHandler>();
+		emplace<ADMIN_RESULT, AdminResultHandler>();
+		emplace<SKILL_EFFECT, SkillEffectHandler>();
+		emplace<SET_NPC_SCRIPTABLE, SetNpcScriptableHandler>();
+		emplace<AUTO_HP_POT, AutoHpPotHandler>();
+		emplace<AUTO_MP_POT, AutoMpPotHandler>();
+		emplace<FIELD_OBSTACLE_ONOFF, FieldObstacleOnOffHandler>();
+
+		// Foreign character effect handlers
+		emplace<DAMAGE_PLAYER, DamagePlayerHandler>();
+		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
+		emplace<GIVE_FOREIGN_BUFF, GiveForeignBuffHandler>();
+		emplace<CANCEL_FOREIGN_BUFF, CancelForeignBuffHandler>();
+		emplace<UPDATE_PARTYMEMBER_HP, UpdatePartyMemberHPHandler>();
+		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
+		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
+		emplace<CANCEL_CHAIR, CancelChairHandler>();
+		emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();
+		emplace<STORAGE, StorageHandler>();
+		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
+
+		// MTS (Maple Trading System)
+		emplace<MTS_OPERATION, MTSOperationHandler>();
+		emplace<MTS_OPERATION2, MTSCashHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const

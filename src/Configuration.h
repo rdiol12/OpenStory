@@ -121,6 +121,12 @@ namespace ms
 		// Check whether the current account is an admin account
 		void set_admin(bool value);
 
+		// Auto potion settings
+		int32_t get_auto_hp_pot() const { return auto_hp_pot; }
+		void set_auto_hp_pot(int32_t itemid) { auto_hp_pot = itemid; }
+		int32_t get_auto_mp_pot() const { return auto_mp_pot; }
+		void set_auto_mp_pot(int32_t itemid) { auto_mp_pot = itemid; }
+
 		// Base class for an entry in the settings file
 		class Entry
 		{
@@ -255,6 +261,8 @@ namespace ms
 		uint8_t worldid;
 		uint8_t channelid;
 		bool admin;
+		int32_t auto_hp_pot = 0;
+		int32_t auto_mp_pot = 0;
 		TypeMap<Entry> settings;
 	};
 
@@ -474,6 +482,18 @@ namespace ms
 	struct PosBUDDYLIST : public Configuration::PointEntry
 	{
 		PosBUDDYLIST() : PointEntry("PosBUDDYLIST", "(120, 120)") {}
+	};
+
+	// The default position of UIStorage
+	struct PosSTORAGE : public Configuration::PointEntry
+	{
+		PosSTORAGE() : PointEntry("PosSTORAGE", "(100, 48)") {}
+	};
+
+	// The default position of UITrade
+	struct PosTRADE : public Configuration::PointEntry
+	{
+		PosTRADE() : PointEntry("PosTRADE", "(200, 100)") {}
 	};
 
 	// The default type of UIMiniMap

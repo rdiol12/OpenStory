@@ -161,4 +161,9 @@ namespace ms
 	{
 		return func;
 	}
+
+	int32_t Npc::get_npcid() const
+	{
+		return npcid;
+	}
 }

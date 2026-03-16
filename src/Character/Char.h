@@ -80,6 +80,11 @@ namespace ms
 		// Return the delay until applying an attack
 		uint16_t get_attackdelay(size_t no) const;
 
+		// Set the guild name displayed below the character name
+		void set_guild(const std::string& name);
+		// Set the guild mark parameters
+		void set_guild_mark(int16_t bg, int8_t bgcolor, int16_t logo, int8_t logocolor);
+
 		// Set if the character sprite is mirrored (true = facing right)
 		virtual void set_direction(bool flipped);
 		// Change the character's state
@@ -163,6 +168,7 @@ namespace ms
 
 	private:
 		Text namelabel;
+		Text guildlabel;
 		ChatBalloon chatballoon;
 		EffectLayer effects;
 		Afterimage afterimage;

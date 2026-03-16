@@ -87,7 +87,8 @@ namespace ms
 				else if (slopef < -0.5)
 					slopef = -0.5;
 
-				phobj.hacc -= (FRICTION + SLOPEFACTOR * (1.0 + slopef * -inertia)) * inertia;
+				double friction = FRICTION * phobj.traction;
+				phobj.hacc -= (friction + SLOPEFACTOR * (1.0 + slopef * -inertia)) * inertia;
 			}
 		}
 		else if (phobj.is_flag_not_set(PhysicsObject::Flag::NOGRAVITY))

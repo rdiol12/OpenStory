@@ -64,6 +64,12 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Script progress message shown during NPC scripts/events
+	class ScriptProgressMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class ClockHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
@@ -95,6 +101,143 @@ namespace ms
 	};
 
 	class BlowWeatherHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Damage shown on another player (mob hit, environment, etc.)
+	class DamagePlayerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Facial expression / emote shown on another player
+	class FacialExpressionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Foreign buff applied to another player on the map
+	class GiveForeignBuffHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Foreign buff removed from another player on the map
+	class CancelForeignBuffHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Party member HP update
+	class UpdatePartyMemberHPHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guild name changed for a player on the map
+	class GuildNameChangedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guild mark/emblem changed for a player on the map
+	class GuildMarkChangedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Chair visual cancelled for a player
+	class CancelChairHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Item effect shown on a player
+	class ShowItemEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Quick slot key configuration
+	class QuickSlotInitHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cash shop cash query result
+	class QueryCashResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Last connected world notification
+	class LastConnectedWorldHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Claim/event status changed
+	class ClaimStatusChangedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Set gender packet
+	class SetGenderHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family privilege list
+	class FamilyPrivilegeListHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Admin/GM command result
+	class AdminResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Skill effect shown on another player
+	class SkillEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Mark NPCs as scriptable (quest NPCs etc)
+	class SetNpcScriptableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Auto HP/MP potion setting
+	class AutoHpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class AutoMpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// NPC Storage/Warehouse UI
+	class StorageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Field obstacle on/off list (gates, platforms in PQs)
+	class FieldObstacleOnOffHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Player interaction: trade, miniroom, player shop
+	class PlayerInteractionHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};

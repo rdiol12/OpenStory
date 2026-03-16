@@ -21,6 +21,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UIMTS.h"
 #include "../../IO/Window.h"
 
 namespace ms
@@ -101,6 +102,21 @@ namespace ms
 		default:
 			break;
 		}
+	}
+
+	void SetITCHandler::handle(InPacket& recv) const
+	{
+		// SET_ITC — MTS transition
+		// Same as SET_CASH_SHOP but with MTS trailing data instead of CS items
+		CashShopParser::parseCharacterInfo(recv);
+
+		recv.skip_string();	// account_name
+
+		// MTS config bytes (hardcoded by Cosmic)
+		recv.skip(28);
+
+		// Open the MTS UI
+		UI::get().emplace<UIMTS>();
 	}
 
 	void SetCashShopHandler::transition() const

@@ -37,6 +37,7 @@ namespace ms
 			BELOWCAP,
 			BELOWCAPNARROW,
 			BELOWCAPWIDE,
+			OVERCAPE,
 			NUM_LAYERS
 		};
 

@@ -20,8 +20,11 @@
 #include <algorithm>
 
 #include "../Components/MapleButton.h"
+#include "../UI.h"
+#include "UINotice.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../Net/Packets/BuddyPackets.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -29,7 +32,7 @@
 
 namespace ms
 {
-	UIBuddyList::UIBuddyList() : UIDragElement<PosBUDDYLIST>(Point<int16_t>(260, 20)), scroll_offset(0)
+	UIBuddyList::UIBuddyList() : UIDragElement<PosBUDDYLIST>(Point<int16_t>(260, 20)), selected_buddy(-1), scroll_offset(0)
 	{
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
 		nl::node UserList = nl::nx::ui["UIWindow2.img"]["UserList"];
@@ -112,7 +115,8 @@ namespace ms
 			Point<int16_t> row_pos = position + Point<int16_t>(10, row_y);
 
 			// Draw row background (cycle through friend0-friend6)
-			int16_t tex_idx = i % 7;
+			// Use a different texture index for selected buddy
+			int16_t tex_idx = (idx == selected_buddy) ? 0 : (i % 7);
 			row_textures[tex_idx].draw(row_pos);
 
 			// Draw the separator line between rows
@@ -152,6 +156,30 @@ namespace ms
 		refresh_buddies();
 	}
 
+	Cursor::State UIBuddyList::send_cursor(bool pressed, Point<int16_t> cursorpos)
+	{
+		if (UIDragElement::send_cursor(pressed, cursorpos) == Cursor::State::CLICKING)
+			return Cursor::State::CLICKING;
+
+		Point<int16_t> cursoroffset = cursorpos - position;
+
+		if (pressed)
+		{
+			int16_t row_start_y = 115;
+			int16_t row_y = cursoroffset.y() - row_start_y;
+
+			if (row_y >= 0 && cursoroffset.x() >= 10 && cursoroffset.x() <= dimension.x() - 10)
+			{
+				int16_t row_index = row_y / ROW_HEIGHT + scroll_offset;
+
+				if (row_index >= 0 && row_index < static_cast<int16_t>(cached_buddies.size()))
+					selected_buddy = row_index;
+			}
+		}
+
+		return UIElement::send_cursor(pressed, cursorpos);
+	}
+
 	Button::State UIBuddyList::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
@@ -160,14 +188,46 @@ namespace ms
 			deactivate();
 			return Button::State::NORMAL;
 		case Buttons::BT_ADD:
-			// TODO: Open add buddy dialog
+		{
+			// Add buddy using the last chat target or the selected character
+			// In v83, the Add button opens a name input — use chat /buddy <name> for now
+			// If a character is targeted (via clicking their name in-game), add them directly
+			int32_t target_cid = Stage::get().get_player().get_oid();
+
+			// Show instruction message
+			UI::get().emplace<UIOk>("Use the chat command to add a buddy:\n/buddy <character name>",
+				[](bool) {});
+
 			return Button::State::NORMAL;
+		}
 		case Buttons::BT_DELETE:
-			// TODO: Open delete buddy dialog
+		{
+			if (selected_buddy >= 0 && (size_t)selected_buddy < cached_buddies.size())
+			{
+				const auto& buddy = cached_buddies[selected_buddy];
+				int32_t cid = buddy.cid;
+				std::string name = buddy.name;
+
+				UI::get().emplace<UIYesNo>("Remove " + name + " from your buddy list?",
+					[cid](bool yes)
+					{
+						if (yes)
+							DeleteBuddyPacket(cid).dispatch();
+					});
+			}
 			return Button::State::NORMAL;
+		}
 		case Buttons::BT_WHISPER:
-			// TODO: Open whisper dialog
+		{
+			if (selected_buddy >= 0 && (size_t)selected_buddy < cached_buddies.size())
+			{
+				const auto& buddy = cached_buddies[selected_buddy];
+
+				if (buddy.is_online)
+					FindPlayerPacket(buddy.name).dispatch();
+			}
 			return Button::State::NORMAL;
+		}
 		default:
 			break;
 		}
@@ -195,6 +255,7 @@ namespace ms
 		for (const auto& [cid, entry] : entries)
 		{
 			BuddyDisplay display;
+			display.cid = cid;
 			display.name = entry.name;
 			display.group = entry.group;
 			display.channel = entry.channel;

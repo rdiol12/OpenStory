@@ -65,6 +65,7 @@ namespace ms
 	private:
 		TalkType get_by_value(int8_t value);
 		std::string format_text(const std::string& tx, const int32_t& npcid);
+		std::string parse_simple_selections(const std::string& tx);
 
 		static constexpr int16_t MAX_HEIGHT = 248;
 
@@ -85,6 +86,13 @@ namespace ms
 			QSTART,
 			QYES,
 			YES
+		};
+
+		struct Selection
+		{
+			int32_t index;
+			std::string text;
+			int16_t line;
 		};
 
 		Texture top;
@@ -109,6 +117,9 @@ namespace ms
 		std::string formatted_text;
 		size_t formatted_text_pos;
 		uint16_t timestep;
+
+		std::vector<Selection> selections;
+		int16_t selection_top;
 
 		std::function<void(bool)> onmoved;
 	};

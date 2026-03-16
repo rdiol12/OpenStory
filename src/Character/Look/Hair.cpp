@@ -106,6 +106,7 @@ namespace ms
 		{ "backHair",				Hair::Layer::BACK			},
 		{ "backHairBelowCap",		Hair::Layer::BELOWCAP		},
 		{ "backHairBelowCapNarrow",	Hair::Layer::BELOWCAPNARROW },
-		{ "backHairBelowCapWide",	Hair::Layer::BELOWCAPWIDE	}
+		{ "backHairBelowCapWide",	Hair::Layer::BELOWCAPWIDE	},
+		{ "backHairOverCape",		Hair::Layer::OVERCAPE		}
 	};
 }

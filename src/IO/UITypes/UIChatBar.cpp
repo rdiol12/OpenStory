@@ -60,7 +60,9 @@ namespace ms
 		// Chat background box
 		chat_background = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
 
-		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(65, -58), Point<int16_t>(460, -35)), 0);
+		// Textfield bounds are relative to the draw position (512, screen_h)
+		// The chat input area is at screen coordinates ~(65, 738) to (460, 755)
+		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(65 - 512, -30), Point<int16_t>(460 - 512, -13)), 0);
 		chatfield.set_state(chatopen ? Textfield::State::NORMAL : Textfield::State::DISABLED);
 
 		chatfield.set_enter_callback(
@@ -127,18 +129,18 @@ namespace ms
 
 		send_chatline("[Welcome] Welcome to MapleStory!!", LineType::YELLOW);
 
-		// Position at bottom of screen, above status bar
+		// Position at StatusBar anchor point so NX textures draw correctly
 		int16_t screen_h = Constants::Constants::get().get_viewheight();
-		position = Point<int16_t>(0, screen_h - 37);
-		dimension = Point<int16_t>(500, 60);
+		position = Point<int16_t>(512, screen_h);
+		dimension = Point<int16_t>(1366, 84);
 	}
 
 	void UIChatBar::draw(float inter) const
 	{
 		bool show_background = chatfieldopen || chat_fade_timer > 0;
 
-		// Draw NX bar textures first (like wasm maple)
-		chatspace[chatopen ? 0 : 0].draw(position);
+		// Draw NX bar textures at StatusBar anchor (position = (512, screen_h))
+		chatspace[0].draw(position);
 		chatspace[1].draw(position);
 
 		UIElement::draw_buttons(inter);
@@ -150,7 +152,7 @@ namespace ms
 
 			if (show_background)
 			{
-				// Chat background box
+				// Chat background box — draw at left side of screen
 				float opacity = 0.6f;
 				if (!chatfieldopen && chat_fade_timer < 1000)
 					opacity = 0.6f * (chat_fade_timer / 1000.0f);
@@ -182,19 +184,22 @@ namespace ms
 				}
 			}
 
-			// Draw chatcover and chatfield (like wasm maple)
+			// Draw chatcover and chatfield at StatusBar anchor
 			chatspace[3].draw(position);
 			chatfield.draw(position);
 		}
 		else if (rowtexts.count(rowmax))
 		{
-			rowtexts.at(rowmax).draw(position + Point<int16_t>(-500, -60));
+			// Show last message line when chat is closed
+			rowtexts.at(rowmax).draw(Point<int16_t>(4, position.y() - 60));
 		}
 	}
 
 	void UIChatBar::update()
 	{
 		UIElement::update();
+
+		chatfield.update(position);
 
 		if (chat_fade_timer > 0 && !chatfieldopen)
 			chat_fade_timer -= Constants::TIMESTEP;
@@ -214,9 +219,10 @@ namespace ms
 	bool UIChatBar::is_in_range(Point<int16_t> cursorpos) const
 	{
 		int16_t chattop = getchattop(chatopen);
+		// Chat area: x=0 to 500, y=chattop-16 to screen bottom
 		Point<int16_t> absp(0, chattop - 16);
-		Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + 80);
-		return Rectangle<int16_t>(absp, absp + dim).contains(cursorpos);
+		Point<int16_t> rb(500, position.y());
+		return Rectangle<int16_t>(absp, rb).contains(cursorpos);
 	}
 
 	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)

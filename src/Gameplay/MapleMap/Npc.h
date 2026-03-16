@@ -50,6 +50,8 @@ namespace ms
 		std::string get_name();
 		// Returns the NPC's function description or title
 		std::string get_func();
+		// Returns the NPC's data ID
+		int32_t get_npcid() const;
 
 	private:
 		std::map<std::string, Animation> animations;

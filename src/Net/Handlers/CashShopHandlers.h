@@ -37,4 +37,11 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// Handler for entering MTS (SET_ITC, opcode 126)
+	class SetITCHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

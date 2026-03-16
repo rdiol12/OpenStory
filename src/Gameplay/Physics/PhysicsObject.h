@@ -202,6 +202,7 @@ namespace ms
 		double groundbelow = 0.0;
 		bool onground = true;
 		bool enablejd = false;
+		double traction = 1.0;
 
 		double hforce = 0.0;
 		double vforce = 0.0;
