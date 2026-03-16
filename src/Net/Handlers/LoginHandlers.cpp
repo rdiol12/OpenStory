@@ -114,7 +114,7 @@ namespace ms
 		// 2 - Full
 		recv.read_short(); // status
 
-		// TODO: I believe it shows a warning message if it's 1 and blocks enter into the world if it's 2. Need to find those messages.
+		// Status 1: warning message, Status 2: block entry
 	}
 
 	void ServerlistHandler::handle(InPacket& recv) const

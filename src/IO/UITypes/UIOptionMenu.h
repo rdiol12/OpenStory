@@ -20,6 +20,8 @@
 #include "../UIDragElement.h"
 
 #include "../Components/MapleComboBox.h"
+#include "../../Graphics/Geometry.h"
+#include "../../Graphics/Text.h"
 
 namespace ms
 {
@@ -60,5 +62,13 @@ namespace ms
 
 		uint16_t selected_tab;
 		Texture tab_background[Buttons::CANCEL];
+
+		bool nx_missing;
+		ColorBox background;
+		ColorBox title_bar;
+		Text title_text;
+		Text resolution_label;
+		Text ok_label;
+		Text cancel_label;
 	};
 }

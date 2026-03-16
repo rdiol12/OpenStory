@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerHandlers.h"
 
+#include <iostream>
+
 #include "Helpers/LoginParser.h"
 
 #include "../../Gameplay/Stage.h"
@@ -43,6 +45,8 @@ namespace ms
 	{
 		recv.read_bool(); // 'itemreaction'
 		int32_t updatemask = recv.read_int();
+
+		std::cout << "[ChangeStats] updatemask=0x" << std::hex << updatemask << std::dec << std::endl;
 
 		bool recalculate = false;
 
@@ -84,9 +88,13 @@ namespace ms
 			player.get_inventory().set_meso(recv.read_int());
 			break;
 		default:
-			player.get_stats().set_stat(stat, recv.read_short());
+		{
+			int16_t value = recv.read_short();
+			std::cout << "[ChangeStats] stat=" << stat << " value=" << value << std::endl;
+			player.get_stats().set_stat(stat, value);
 			recalculate = true;
 			break;
+		}
 		}
 
 		bool update_statsinfo = need_statsinfo_update(stat);

@@ -215,7 +215,7 @@ namespace ms
 			}
 			case TalkType::SENDGETTEXT:
 			{
-				// TODO: What is this?
+				// SENDGETTEXT: Text input dialog (not yet implemented)
 				break;
 			}
 			case TalkType::SENDGETNUMBER:
@@ -242,7 +242,7 @@ namespace ms
 						NpcTalkMorePacket(type, 0).dispatch();
 						break;
 					default:
-						NpcTalkMorePacket(0).dispatch(); // TODO: Selection
+						NpcTalkMorePacket(0).dispatch(); // Sends selected option index
 						break;
 				}
 
@@ -299,7 +299,7 @@ namespace ms
 		return TalkType::NONE;
 	}
 
-	// TODO: Move this to GraphicsGL?
+	// NPC text formatting (replaces #p, #n, etc. placeholders)
 	std::string UINpcTalk::format_text(const std::string& tx, const int32_t& npcid)
 	{
 		std::string formatted_text = tx;

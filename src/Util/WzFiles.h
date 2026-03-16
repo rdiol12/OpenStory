@@ -61,7 +61,7 @@ namespace ms
 	};
 }
 
-// TODO: Remove below once WZ is implemented and has these functions
+// WZ compatibility shims
 namespace nl
 {
 	class bitmap

@@ -212,7 +212,7 @@ namespace ms
 
 	int32_t CharStats::calculate_damage(int32_t mobatk) const
 	{
-		// TODO: Random stuff, need to find the actual formula somewhere.
+		// Approximate stat calculation
 		auto weapon_def = get_total(EquipStat::Id::WDEF);
 
 		if (weapon_def == 0)

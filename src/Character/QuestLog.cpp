@@ -34,6 +34,12 @@ namespace ms
 		completed[qid] = time;
 	}
 
+	void QuestLog::forfeit(int16_t qid)
+	{
+		started.erase(qid);
+		in_progress.erase(qid);
+	}
+
 	bool QuestLog::is_started(int16_t qid)
 	{
 		return started.count(qid) > 0;
@@ -45,5 +51,15 @@ namespace ms
 		qend--;
 
 		return qend->first;
+	}
+
+	const std::map<int16_t, std::string>& QuestLog::get_started() const
+	{
+		return started;
+	}
+
+	const std::map<int16_t, int64_t>& QuestLog::get_completed() const
+	{
+		return completed;
 	}
 }

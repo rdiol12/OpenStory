@@ -43,7 +43,7 @@ namespace ms
 			"Magic Attack",
 			"Defense",
 
-			// TODO: Does current GMS use these anymore?
+			// Legacy equip stats
 			"MAGIC DEFENSE",
 			"ACCURACY",
 			"AVOID",

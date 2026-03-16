@@ -35,6 +35,8 @@
 #include "UITypes/UILogin.h"
 #include "../Net/Packets/LoginPackets.h"
 
+#include <iostream>
+
 namespace ms
 {
 	UI::UI()
@@ -197,6 +199,8 @@ namespace ms
 
 		if (focusedtextfield)
 		{
+			if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER)
+				std::cout << "[UI::send_key] Enter pressed but focusedtextfield is set, sending to textfield" << std::endl;
 			bool ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];
 
 			if (ctrl && pressed)
@@ -355,6 +359,8 @@ namespace ms
 
 					if (element && element != nullptr)
 					{
+						if (enter)
+							std::cout << "[UI::send_key] Enter key intercepted by element type=" << element->get_type() << std::endl;
 						element->send_key(mapping.action, pressed, escape);
 						sent = true;
 					}
@@ -364,6 +370,9 @@ namespace ms
 			if (!sent)
 			{
 				auto chatbar = UI::get().get_element<UIChatBar>();
+
+				if (enter)
+					std::cout << "[UI::send_key] Enter key !sent path, chatbar=" << (chatbar ? "found" : "NULL") << " pressed=" << pressed << std::endl;
 
 				if (escape)
 				{

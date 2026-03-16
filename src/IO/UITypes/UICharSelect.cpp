@@ -54,7 +54,7 @@ namespace ms
 		worldpos = Point<int16_t>(586, 46);
 		charinfopos = Point<int16_t>(671, 339);
 
-		Point<int16_t> character_sel_pos = Point<int16_t>(601, 393);
+		Point<int16_t> character_sel_pos = Point<int16_t>(601, 420);
 		Point<int16_t> character_new_pos = Point<int16_t>(200, 495);
 		Point<int16_t> character_del_pos = Point<int16_t>(316, 495);
 
@@ -102,17 +102,22 @@ namespace ms
 		world_sprites.emplace_back(selectedWorld["ch"][channel_id], worldpos - Point<int16_t>(0, 1));
 
 		nl::node map_login = nl::nx::map["Back"]["login.img"];
-		nl::node ani = map_login["ani"];
 
-		nl::node frame = nl::nx::mapLatest["Obj"]["login.img"]["Common"]["frame"]["2"]["0"];
+		// Use v83-compatible background
+		nl::node back_node = map_login["back"]["11"];
+		if (!back_node)
+			back_node = map_login["back"]["13"];
+		if (!back_node)
+			back_node = map_login["back"]["0"];
 
-		sprites.emplace_back(map_login["back"]["13"], Point<int16_t>(392, 297));
-		sprites.emplace_back(ani["17"], Point<int16_t>(151, 283));
-		sprites.emplace_back(ani["18"], Point<int16_t>(365, 252));
-		sprites.emplace_back(ani["19"], Point<int16_t>(191, 208));
-		sprites.emplace_back(frame, Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["frame"], Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["step"]["2"], Point<int16_t>(40, 0));
+		if (back_node)
+			sprites.emplace_back(back_node, Point<int16_t>(370, 300));
+
+		if (Common["frame"])
+			sprites.emplace_back(Common["frame"], Point<int16_t>(400, 290));
+
+		if (Common["step"]["2"])
+			sprites.emplace_back(Common["step"]["2"], Point<int16_t>(40, 0));
 
 		burning_notice = Common["Burning"]["BurningNotice"];
 		burning_count = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::CREAM, "1");
@@ -137,10 +142,10 @@ namespace ms
 		buttons[Buttons::CHANGEPIC] = std::make_unique<MapleButton>(Common["BtChangePIC"], Point<int16_t>(0, 80));
 		buttons[Buttons::RESETPIC] = std::make_unique<MapleButton>(Login["WorldSelect"]["BtResetPIC"], Point<int16_t>(0, 115));
 		buttons[Buttons::EDITCHARLIST] = std::make_unique<MapleButton>(CharSelect["EditCharList"]["BtCharacter"], Point<int16_t>(-1, 47));
-		buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(0, 515));
+		buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(-20, 565));
 
 		for (size_t i = 0; i < PAGESIZE; i++)
-			buttons[Buttons::CHARACTER_SLOT0 + i] = std::make_unique<AreaButton>(get_character_slot_pos(i, 105, 144), Point<int16_t>(50, 90));
+			buttons[Buttons::CHARACTER_SLOT0 + i] = std::make_unique<AreaButton>(get_character_slot_pos(i, 305, 144), Point<int16_t>(50, 90));
 
 		if (require_pic == 0)
 		{
@@ -215,10 +220,10 @@ namespace ms
 
 			if (index < characters_count)
 			{
-				Point<int16_t> charpos = get_character_slot_pos(i, 130, 234);
+				Point<int16_t> charpos = get_character_slot_pos(i, 330, 214);
 				DrawArgument chararg = DrawArgument(charpos, flip_character);
 
-				nametags[index].draw(charpos + Point<int16_t>(2, 1));
+				nametags[index].draw(charpos + Point<int16_t>(2, 25));
 
 				const StatsEntry& character_stats = characters[index].stats;
 
@@ -264,7 +269,7 @@ namespace ms
 			}
 			else if (i < slots)
 			{
-				Point<int16_t> emptyslotpos = get_character_slot_pos(i, 130, 234);
+				Point<int16_t> emptyslotpos = get_character_slot_pos(i, 330, 214);
 
 				emptyslot_effect.draw(emptyslotpos, inter);
 				emptyslot.draw(DrawArgument(emptyslotpos, flip_character));

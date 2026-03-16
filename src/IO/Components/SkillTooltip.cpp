@@ -92,7 +92,7 @@ namespace ms
 
 		if (expiration > 0)
 		{
-			// TODO: Blank
+			// No tooltip data
 		}
 		else
 		{

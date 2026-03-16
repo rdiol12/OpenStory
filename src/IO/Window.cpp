@@ -50,6 +50,9 @@ namespace ms
 
 	void key_callback(GLFWwindow*, int key, int, int action, int)
 	{
+		if (action == GLFW_REPEAT && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_ENTER))
+			return;
+
 		UI::get().send_key(key, action != GLFW_RELEASE);
 	}
 

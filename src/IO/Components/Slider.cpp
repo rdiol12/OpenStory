@@ -34,7 +34,7 @@ namespace ms
 
 		if (type == Type::CHATBAR)
 		{
-			src = nl::nx::ui["StatusBar3.img"]["chat"]["common"]["scroll"];
+			src = nl::nx::ui["StatusBar2.img"]["chat"]["common"]["scroll"];
 			base_str += "_c";
 		}
 		else

@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	// TODO: Add blue dot next to name
+	// Blue dot indicator not implemented
 	ItemTooltip::ItemTooltip()
 	{
 		nl::node Item = nl::nx::ui["UIToolTip.img"]["Item"];

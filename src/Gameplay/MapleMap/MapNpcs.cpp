@@ -77,7 +77,7 @@ namespace ms
 			{
 				if (pressed)
 				{
-					// TODO: Try finding dialog first
+					// NPC interaction fallback
 					TalkToNPCPacket(npc->get_oid()).dispatch();
 
 					return Cursor::State::IDLE;

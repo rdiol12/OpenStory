@@ -54,7 +54,7 @@ namespace ms
 				skip(1);
 				write_byte(attack.toleft);
 				skip(7);
-				// TODO: skip(4); If hurricane, piercing arrow or rapidfire.
+				// Hurricane/piercing arrow/rapidfire require additional 4 bytes
 			}
 			else
 			{
@@ -70,7 +70,7 @@ namespace ms
 				for (auto& singledamage : damagetomob.second)
 				{
 					write_int(singledamage.first);
-					// TODO: Add critical here
+					// Critical hit flag placeholder
 				}
 
 				if (attack.skill != 5221004)
@@ -132,9 +132,9 @@ namespace ms
 			// If monster magnet : some more bytes
 
 			if (skillid % 10000000 == 1004)
-				skip(2); // TODO: No idea what this could be
+				skip(2); // Unknown 2 bytes
 
-			// TODO: A point (4 bytes) could be added at the end
+			// Optional position data (4 bytes) may follow
 		}
 	};
 }

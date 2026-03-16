@@ -337,7 +337,7 @@ namespace ms
 
 			Item item = items[index];
 
-			// TODO: Purchase item
+			// Cash shop purchase not implemented
 
 			return Button::State::NORMAL;
 		}

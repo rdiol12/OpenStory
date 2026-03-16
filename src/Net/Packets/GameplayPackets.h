@@ -187,7 +187,6 @@ namespace ms
 
 			write_point(startpos);
 
-			write_byte(1);
 			writemovement(movement);
 		}
 	};

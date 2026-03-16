@@ -26,6 +26,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 
+#include "../../Constants.h"
 #include "../../Net/Packets/PlayerPackets.h"
 
 #ifdef USE_NX
@@ -39,29 +40,35 @@ namespace ms
 		keyboard = &UI::get().get_keyboard();
 		staged_mappings = keyboard->get_maplekeys();
 
-		nl::node KeyConfig = nl::nx::ui["StatusBar3.img"]["KeyConfig"];
+		nl::node KeyConfig = nl::nx::ui["UIWindow.img"]["KeyConfig"];
 
 		icon = KeyConfig["icon"];
 		key = KeyConfig["key"];
 
-		nl::node backgrnd = KeyConfig["backgrnd"];
-		Texture bg = backgrnd;
-		Point<int16_t> bg_dimensions = bg.get_dimensions();
+		Texture bg1 = Texture(KeyConfig["backgrnd"]);
+		Texture bg2 = Texture(KeyConfig["backgrnd2"]);
+		Texture bg3 = Texture(KeyConfig["backgrnd3"]);
+		Point<int16_t> bg_dimensions = bg1.get_dimensions();
 
-		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(KeyConfig["backgrnd2"]);
-		sprites.emplace_back(KeyConfig["backgrnd3"]);
+		sprites.emplace_back(KeyConfig["backgrnd"], DrawArgument(bg1.get_origin()));
+		sprites.emplace_back(KeyConfig["backgrnd2"], DrawArgument(bg2.get_origin()));
+		sprites.emplace_back(KeyConfig["backgrnd3"], DrawArgument(bg3.get_origin()));
 
-		nl::node BtClose3 = nl::nx::ui["Basic.img"]["BtClose3"];
-		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(BtClose3, Point<int16_t>(bg_dimensions.x() - 18, 3));
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(KeyConfig["button:Cancel"]);
-		buttons[Buttons::DEFAULT] = std::make_unique<MapleButton>(KeyConfig["button:Default"]);
-		buttons[Buttons::DELETE] = std::make_unique<MapleButton>(KeyConfig["button:Delete"]);
-		buttons[Buttons::KEYSETTING] = std::make_unique<MapleButton>(KeyConfig["button:keySetting"]);
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(KeyConfig["button:OK"]);
+		nl::node BtClose = nl::nx::ui["Basic.img"]["BtClose"];
+		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(BtClose, Point<int16_t>(bg_dimensions.x() - 12, 9));
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(KeyConfig["BtCancel"]);
+		buttons[Buttons::DEFAULT] = std::make_unique<MapleButton>(KeyConfig["BtDefault"]);
+		buttons[Buttons::DELETE] = std::make_unique<MapleButton>(KeyConfig["BtDelete"]);
+		buttons[Buttons::KEYSETTING] = std::make_unique<MapleButton>(KeyConfig["BtQuickSlot"]);
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(KeyConfig["BtOK"]);
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(bg_dimensions.x(), 20);
+
+		// Center on screen
+		int16_t screen_w = Constants::Constants::get().get_viewwidth();
+		int16_t screen_h = Constants::Constants::get().get_viewheight();
+		position = Point<int16_t>((screen_w - bg_dimensions.x()) / 2, (screen_h - bg_dimensions.y()) / 2);
 
 		load_keys_pos();
 		load_unbound_actions_pos();
@@ -180,6 +187,12 @@ namespace ms
 		keys_pos[KeyConfig::Key::DELETE] = Point<int16_t>(row_quickslot_x + (slot_width * 0), row_y + (slot_height * 1));
 		keys_pos[KeyConfig::Key::END] = Point<int16_t>(row_quickslot_x + (slot_width * 1), row_y + (slot_height * 1));
 		keys_pos[KeyConfig::Key::PAGE_DOWN] = Point<int16_t>(row_quickslot_x + (slot_width * 2), row_y + (slot_height * 1));
+
+		// Apply offset to align key positions with the NX background
+		Point<int16_t> key_offset = Point<int16_t>(-15, -60);
+
+		for (auto& [key, pos] : keys_pos)
+			pos += key_offset;
 	}
 
 	void UIKeyConfig::load_unbound_actions_pos()
@@ -206,14 +219,14 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::ATTACK] = Point<int16_t>(row_x + (slot_width * 13), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::JUMP] = Point<int16_t>(row_x + (slot_width * 14), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::INTERACT_HARVEST] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 0));
-		unbound_actions_pos[KeyAction::Id::SOULWEAPON] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 0));
+		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 0));
 
 		unbound_actions_pos[KeyAction::Id::SAY] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::PARTYCHAT] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::FRIENDSCHAT] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::ITEMPOT] = Point<int16_t>(row_x + (slot_width * 3), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::EVENT] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 1));
-		unbound_actions_pos[KeyAction::Id::SILENTCRUSADE] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 1));
+		unbound_actions_pos[KeyAction::Id::SOULWEAPON] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::STATS] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::SKILLS] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::QUESTLOG] = Point<int16_t>(row_x + (slot_width * 8), row_y + (slot_height * 1));
@@ -228,21 +241,12 @@ namespace ms
 
 		unbound_actions_pos[KeyAction::Id::GUILDCHAT] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 2));
 		unbound_actions_pos[KeyAction::Id::ALLIANCECHAT] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::BATTLEANALYSIS] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::GUIDE] = Point<int16_t>(row_x + (slot_width * 3), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::ENHANCEEQUIP] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MONSTERCOLLECTION] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MANAGELEGION] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 2));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MAPLENEWS] = Point<int16_t>(row_x + (slot_width * 8), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::CASHSHOP] = Point<int16_t>(row_x + (slot_width * 9), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MAINMENU] = Point<int16_t>(row_x + (slot_width * 10), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::SCREENSHOT] = Point<int16_t>(row_x + (slot_width * 11), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::PICTUREMODE] = Point<int16_t>(row_x + (slot_width * 12), row_y + (slot_height * 2));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 13), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MUTE] = Point<int16_t>(row_x + (slot_width * 14), row_y + (slot_height * 2));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 2));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::CASHSHOP] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MAINMENU] = Point<int16_t>(row_x + (slot_width * 3), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::SCREENSHOT] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MEDALS] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::BOSSPARTY] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 2));
 
 		unbound_actions_pos[KeyAction::Id::FACE1] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE2] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 3));
@@ -251,16 +255,12 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::FACE5] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE6] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE7] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 3));
-		unbound_actions_pos[KeyAction::Id::MAPLEACHIEVEMENT] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 3));
-		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 8), row_y + (slot_height * 3));
-		unbound_actions_pos[KeyAction::Id::TOSPOUSE] = Point<int16_t>(row_x + (slot_width * 9), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 10), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 11), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 12), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 13), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 14), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 3));
-		//unbound_actions_pos[KeyAction::Id::LENGTH] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 3));
+
+		// Apply same offset as keys to align with NX background
+		Point<int16_t> action_offset = Point<int16_t>(-15, -60);
+
+		for (auto& [action, pos] : unbound_actions_pos)
+			pos += action_offset;
 	}
 
 	void UIKeyConfig::load_key_textures()
@@ -355,6 +355,7 @@ namespace ms
 
 	void UIKeyConfig::load_action_mappings()
 	{
+		// Menu actions (type 4)
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::EQUIPMENT), KeyAction::Id::EQUIPMENT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ITEMS), KeyAction::Id::ITEMS));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::STATS), KeyAction::Id::STATS));
@@ -376,34 +377,33 @@ namespace ms
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::GUILDCHAT), KeyAction::Id::GUILDCHAT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::PARTY), KeyAction::Id::PARTY));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::NOTIFIER), KeyAction::Id::NOTIFIER));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAPLENEWS), KeyAction::Id::MAPLENEWS));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::CHARINFO), KeyAction::Id::CHARINFO));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MONSTERBOOK), KeyAction::Id::MONSTERBOOK));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::CASHSHOP), KeyAction::Id::CASHSHOP));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ALLIANCECHAT), KeyAction::Id::ALLIANCECHAT));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MANAGELEGION), KeyAction::Id::MANAGELEGION));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::CHANGECHANNEL), KeyAction::Id::CHANGECHANNEL));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MEDALS), KeyAction::Id::MEDALS));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::BOSSPARTY), KeyAction::Id::BOSSPARTY));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAINMENU), KeyAction::Id::MAINMENU));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SCREENSHOT), KeyAction::Id::SCREENSHOT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::PROFESSION), KeyAction::Id::PROFESSION));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ITEMPOT), KeyAction::Id::ITEMPOT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::EVENT), KeyAction::Id::EVENT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SILENTCRUSADE), KeyAction::Id::SILENTCRUSADE));
-		//action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::BITS), KeyAction::Id::BITS));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MANAGELEGION), KeyAction::Id::MANAGELEGION));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::BATTLEANALYSIS), KeyAction::Id::BATTLEANALYSIS));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::GUIDE), KeyAction::Id::GUIDE));
-		//action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::VIEWERSCHAT), KeyAction::Id::VIEWERSCHAT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ENHANCEEQUIP), KeyAction::Id::ENHANCEEQUIP));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MONSTERCOLLECTION), KeyAction::Id::MONSTERCOLLECTION));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SOULWEAPON), KeyAction::Id::SOULWEAPON));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::CHARINFO), KeyAction::Id::CHARINFO));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::CHANGECHANNEL), KeyAction::Id::CHANGECHANNEL));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAINMENU), KeyAction::Id::MAINMENU));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SCREENSHOT), KeyAction::Id::SCREENSHOT));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::PICTUREMODE), KeyAction::Id::PICTUREMODE));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAPLEACHIEVEMENT), KeyAction::Id::MAPLEACHIEVEMENT));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAPLENEWS), KeyAction::Id::MAPLENEWS));
+		// Game actions (type 5)
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::PICKUP), KeyAction::Id::PICKUP));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SIT), KeyAction::Id::SIT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ATTACK), KeyAction::Id::ATTACK));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::JUMP), KeyAction::Id::JUMP));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::INTERACT_HARVEST), KeyAction::Id::INTERACT_HARVEST));
+		// Face actions (type 6)
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE1), KeyAction::Id::FACE1));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE2), KeyAction::Id::FACE2));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE3), KeyAction::Id::FACE3));
@@ -411,76 +411,84 @@ namespace ms
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE5), KeyAction::Id::FACE5));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE6), KeyAction::Id::FACE6));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE7), KeyAction::Id::FACE7));
-		//action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAPLESTORAGE), KeyAction::Id::MAPLESTORAGE));
-		//action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SAFEMODE), KeyAction::Id::SAFEMODE));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MUTE), KeyAction::Id::MUTE));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MONSTERBOOK), KeyAction::Id::MONSTERBOOK));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::TOSPOUSE), KeyAction::Id::TOSPOUSE));
 	}
 
 	void UIKeyConfig::load_action_icons()
 	{
-		action_icons[KeyAction::Id::EQUIPMENT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::EQUIPMENT), icon[0], -1);
-		action_icons[KeyAction::Id::ITEMS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::ITEMS), icon[1], -1);
-		action_icons[KeyAction::Id::STATS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::STATS), icon[2], -1);
-		action_icons[KeyAction::Id::SKILLS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SKILLS), icon[3], -1);
-		action_icons[KeyAction::Id::FRIENDS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FRIENDS), icon[4], -1);
-		action_icons[KeyAction::Id::WORLDMAP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::WORLDMAP), icon[5], -1);
-		action_icons[KeyAction::Id::MAPLECHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MAPLECHAT), icon[6], -1);
-		action_icons[KeyAction::Id::MINIMAP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MINIMAP), icon[7], -1);
-		action_icons[KeyAction::Id::QUESTLOG] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::QUESTLOG), icon[8], -1);
-		action_icons[KeyAction::Id::KEYBINDINGS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::KEYBINDINGS), icon[9], -1);
-		action_icons[KeyAction::Id::SAY] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SAY), icon[10], -1);
-		action_icons[KeyAction::Id::WHISPER] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::WHISPER), icon[11], -1);
-		action_icons[KeyAction::Id::PARTYCHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::PARTYCHAT), icon[12], -1);
-		action_icons[KeyAction::Id::FRIENDSCHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FRIENDSCHAT), icon[13], -1);
-		action_icons[KeyAction::Id::MENU] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MENU), icon[14], -1);
-		action_icons[KeyAction::Id::QUICKSLOTS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::QUICKSLOTS), icon[15], -1);
-		action_icons[KeyAction::Id::TOGGLECHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::TOGGLECHAT), icon[16], -1);
-		action_icons[KeyAction::Id::GUILD] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::GUILD), icon[17], -1);
-		action_icons[KeyAction::Id::GUILDCHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::GUILDCHAT), icon[18], -1);
-		action_icons[KeyAction::Id::PARTY] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::PARTY), icon[19], -1);
-		action_icons[KeyAction::Id::NOTIFIER] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::NOTIFIER), icon[20], -1);
-		action_icons[KeyAction::Id::MAPLENEWS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MAPLENEWS), icon[21], -1);
-		action_icons[KeyAction::Id::CASHSHOP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::CASHSHOP), icon[22], -1);
-		action_icons[KeyAction::Id::ALLIANCECHAT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::ALLIANCECHAT), icon[23], -1);
-		action_icons[KeyAction::Id::MANAGELEGION] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MANAGELEGION), icon[25], -1);
-		action_icons[KeyAction::Id::MEDALS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MEDALS), icon[26], -1);
-		action_icons[KeyAction::Id::BOSSPARTY] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::BOSSPARTY), icon[27], -1);
-		action_icons[KeyAction::Id::PROFESSION] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::PROFESSION), icon[29], -1);
-		action_icons[KeyAction::Id::ITEMPOT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::ITEMPOT), icon[30], -1);
-		action_icons[KeyAction::Id::EVENT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::EVENT), icon[31], -1);
-		action_icons[KeyAction::Id::SILENTCRUSADE] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SILENTCRUSADE), icon[33], -1);
-		//action_icons[KeyAction::Id::BITS] = std::make_unique<Icon>(std::make_unique<KeyMapIcon>(KeyAction::Id::BITS), icon[34], -1);
-		action_icons[KeyAction::Id::BATTLEANALYSIS] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::BATTLEANALYSIS), icon[35], -1);
-		action_icons[KeyAction::Id::GUIDE] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::GUIDE), icon[39], -1);
-		//action_icons[KeyAction::Id::VIEWERSCHAT] = std::make_unique<Icon>(std::make_unique<KeyMapIcon>(KeyAction::Id::VIEWERSCHAT), icon[40], -1);
-		action_icons[KeyAction::Id::ENHANCEEQUIP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::ENHANCEEQUIP), icon[41], -1);
-		action_icons[KeyAction::Id::MONSTERCOLLECTION] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MONSTERCOLLECTION), icon[42], -1);
-		action_icons[KeyAction::Id::SOULWEAPON] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SOULWEAPON), icon[43], -1);
-		action_icons[KeyAction::Id::CHARINFO] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::CHARINFO), icon[44], -1);
-		action_icons[KeyAction::Id::CHANGECHANNEL] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::CHANGECHANNEL), icon[45], -1);
-		action_icons[KeyAction::Id::MAINMENU] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MAINMENU), icon[46], -1);
-		action_icons[KeyAction::Id::SCREENSHOT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SCREENSHOT), icon[47], -1);
-		action_icons[KeyAction::Id::PICTUREMODE] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::PICTUREMODE), icon[48], -1);
-		action_icons[KeyAction::Id::MAPLEACHIEVEMENT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MAPLEACHIEVEMENT), icon[49], -1);
-		action_icons[KeyAction::Id::PICKUP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::PICKUP), icon[50], -1);
-		action_icons[KeyAction::Id::SIT] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::SIT), icon[51], -1);
-		action_icons[KeyAction::Id::ATTACK] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::ATTACK), icon[52], -1);
-		action_icons[KeyAction::Id::JUMP] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::JUMP), icon[53], -1);
-		action_icons[KeyAction::Id::INTERACT_HARVEST] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::INTERACT_HARVEST), icon[54], -1);
-		action_icons[KeyAction::Id::FACE1] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE1), icon[100], -1);
-		action_icons[KeyAction::Id::FACE2] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE2), icon[101], -1);
-		action_icons[KeyAction::Id::FACE3] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE3), icon[102], -1);
-		action_icons[KeyAction::Id::FACE4] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE4), icon[103], -1);
-		action_icons[KeyAction::Id::FACE5] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE5), icon[104], -1);
-		action_icons[KeyAction::Id::FACE6] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE6), icon[105], -1);
-		action_icons[KeyAction::Id::FACE7] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::FACE7), icon[106], -1);
-		//action_icons[KeyAction::Id::MAPLESTORAGE] = std::make_unique<Icon>(std::make_unique<KeyMapIcon>(KeyAction::Id::MAPLESTORAGE), icon[200], -1);
-		//action_icons[KeyAction::Id::SAFEMODE] = std::make_unique<Icon>(std::make_unique<KeyMapIcon>(KeyAction::Id::SAFEMODE), icon[201], -1);
-		action_icons[KeyAction::Id::MUTE] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MUTE), icon[202], -1);
-		action_icons[KeyAction::Id::MONSTERBOOK] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::MONSTERBOOK), icon[1000], -1);
-		action_icons[KeyAction::Id::TOSPOUSE] = std::make_unique<Icon>(std::make_unique<MappingIcon>(KeyAction::Id::TOSPOUSE), icon[1001], -1);
+		// v83 icon indices match action IDs in UIWindow.img/KeyConfig/icon
+		// Menu actions (0-41)
+		std::vector<std::pair<KeyAction::Id, int32_t>> menu_actions = {
+			{ KeyAction::Id::EQUIPMENT, 0 },
+			{ KeyAction::Id::ITEMS, 1 },
+			{ KeyAction::Id::STATS, 2 },
+			{ KeyAction::Id::SKILLS, 3 },
+			{ KeyAction::Id::FRIENDS, 4 },
+			{ KeyAction::Id::WORLDMAP, 5 },
+			{ KeyAction::Id::MAPLECHAT, 6 },
+			{ KeyAction::Id::MINIMAP, 7 },
+			{ KeyAction::Id::QUESTLOG, 8 },
+			{ KeyAction::Id::KEYBINDINGS, 9 },
+			{ KeyAction::Id::SAY, 10 },
+			{ KeyAction::Id::WHISPER, 11 },
+			{ KeyAction::Id::PARTYCHAT, 12 },
+			{ KeyAction::Id::FRIENDSCHAT, 13 },
+			{ KeyAction::Id::MENU, 14 },
+			{ KeyAction::Id::QUICKSLOTS, 15 },
+			{ KeyAction::Id::TOGGLECHAT, 16 },
+			{ KeyAction::Id::GUILD, 17 },
+			{ KeyAction::Id::GUILDCHAT, 18 },
+			{ KeyAction::Id::PARTY, 19 },
+			{ KeyAction::Id::NOTIFIER, 20 },
+			{ KeyAction::Id::CHARINFO, 21 },
+			{ KeyAction::Id::MONSTERBOOK, 22 },
+			{ KeyAction::Id::CASHSHOP, 23 },
+			{ KeyAction::Id::ALLIANCECHAT, 24 },
+			{ KeyAction::Id::CHANGECHANNEL, 25 },
+			{ KeyAction::Id::MEDALS, 26 },
+			{ KeyAction::Id::BOSSPARTY, 27 },
+			{ KeyAction::Id::MAINMENU, 28 },
+			{ KeyAction::Id::SCREENSHOT, 29 },
+			{ KeyAction::Id::PROFESSION, 30 },
+			{ KeyAction::Id::ITEMPOT, 31 },
+			{ KeyAction::Id::EVENT, 32 },
+			{ KeyAction::Id::SILENTCRUSADE, 33 },
+			{ KeyAction::Id::MANAGELEGION, 34 },
+			{ KeyAction::Id::BATTLEANALYSIS, 35 },
+			{ KeyAction::Id::GUIDE, 37 },
+			{ KeyAction::Id::ENHANCEEQUIP, 38 },
+			{ KeyAction::Id::MONSTERCOLLECTION, 39 },
+			{ KeyAction::Id::SOULWEAPON, 40 },
+			{ KeyAction::Id::MAPLENEWS, 41 },
+		};
+
+		for (auto& [action, idx] : menu_actions)
+		{
+			if (icon[idx])
+				action_icons[action] = std::make_unique<Icon>(std::make_unique<MappingIcon>(action), icon[idx], -1);
+		}
+
+		// Game actions (50-54)
+		std::vector<std::pair<KeyAction::Id, int32_t>> action_actions = {
+			{ KeyAction::Id::PICKUP, 50 },
+			{ KeyAction::Id::SIT, 51 },
+			{ KeyAction::Id::ATTACK, 52 },
+			{ KeyAction::Id::JUMP, 53 },
+			{ KeyAction::Id::INTERACT_HARVEST, 54 },
+		};
+
+		for (auto& [action, idx] : action_actions)
+		{
+			if (icon[idx])
+				action_icons[action] = std::make_unique<Icon>(std::make_unique<MappingIcon>(action), icon[idx], -1);
+		}
+
+		// Face actions (100-106)
+		for (int32_t i = 0; i < 7; i++)
+		{
+			KeyAction::Id face = static_cast<KeyAction::Id>(static_cast<int32_t>(KeyAction::Id::FACE1) + i);
+			if (icon[100 + i])
+				action_icons[face] = std::make_unique<Icon>(std::make_unique<MappingIcon>(face), icon[100 + i], -1);
+		}
 	}
 
 	void UIKeyConfig::load_item_icons()
@@ -556,7 +564,7 @@ namespace ms
 			}
 			else
 			{
-				std::cout << "Invalid key mapping: (" << mapping.type << ", " << mapping.action << ")" << std::endl;
+				continue;
 			}
 
 			if (ficon)
@@ -567,7 +575,7 @@ namespace ms
 
 					if (maplekey == KeyConfig::Key::SPACE)
 					{
-						ficon->draw(position + keys_pos[fkey] - Point<int16_t>(0, 3));
+						ficon->draw(position + keys_pos[fkey] - Point<int16_t>(2, 3));
 					}
 					else
 					{
@@ -739,7 +747,7 @@ namespace ms
 				}
 				else
 				{
-					std::cout << "Invalid icon type for key mapping: (" << mapping.type << ", " << mapping.action << ")" << std::endl;
+					// Unknown mapping type, skip
 				}
 
 				if (ficon)
@@ -1183,7 +1191,6 @@ namespace ms
 		case KeyAction::Id::SILENTCRUSADE:
 		case KeyAction::Id::BATTLEANALYSIS:
 		case KeyAction::Id::GUIDE:
-		case KeyAction::Id::VIEWERSCHAT:
 		case KeyAction::Id::ENHANCEEQUIP:
 		case KeyAction::Id::MONSTERCOLLECTION:
 		case KeyAction::Id::SOULWEAPON:
@@ -1191,21 +1198,14 @@ namespace ms
 		case KeyAction::Id::CHANGECHANNEL:
 		case KeyAction::Id::MAINMENU:
 		case KeyAction::Id::SCREENSHOT:
-		case KeyAction::Id::PICTUREMODE:
-		case KeyAction::Id::MAPLEACHIEVEMENT:
+		case KeyAction::Id::MONSTERBOOK:
 			return KeyType::Id::MENU;
 		case KeyAction::Id::PICKUP:
 		case KeyAction::Id::SIT:
 		case KeyAction::Id::ATTACK:
 		case KeyAction::Id::JUMP:
-			return KeyType::Id::ACTION;
 		case KeyAction::Id::INTERACT_HARVEST:
-		case KeyAction::Id::MAPLESTORAGE:
-		case KeyAction::Id::SAFEMODE:
-		case KeyAction::Id::MUTE:
-		case KeyAction::Id::MONSTERBOOK:
-		case KeyAction::Id::TOSPOUSE:
-			return KeyType::Id::MENU;
+			return KeyType::Id::ACTION;
 		case KeyAction::Id::FACE1:
 		case KeyAction::Id::FACE2:
 		case KeyAction::Id::FACE3:

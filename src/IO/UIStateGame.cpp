@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateGame.h"
 
+#include <iostream>
+
 #include "UI.h"
 
 #include "UITypes/UIBuffList.h"
@@ -30,6 +32,8 @@
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMiniMap.h"
 #include "UITypes/UIQuestLog.h"
+#include "UITypes/UINotice.h"
+#include "UITypes/UIOptionMenu.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UISkillBook.h"
@@ -40,6 +44,8 @@
 #include "UITypes/UIWorldMap.h"
 
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Session.h"
+#include "Window.h"
 
 namespace ms
 {
@@ -51,12 +57,19 @@ namespace ms
 		const CharLook& look = Stage::get().get_player().get_look();
 		const Inventory& inventory = Stage::get().get_player().get_inventory();
 
+		std::cout << "[UIStateGame] Creating UI elements..." << std::endl;
 		emplace<UIStatusMessenger>();
+		std::cout << "[UIStateGame] StatusMessenger OK" << std::endl;
 		emplace<UIStatusBar>(stats);
+		std::cout << "[UIStateGame] StatusBar OK" << std::endl;
 		emplace<UIChatBar>();
+		std::cout << "[UIStateGame] ChatBar OK" << std::endl;
 		emplace<UIMiniMap>(stats);
+		std::cout << "[UIStateGame] MiniMap OK" << std::endl;
 		emplace<UIBuffList>();
+		std::cout << "[UIStateGame] BuffList OK" << std::endl;
 		emplace<UIShop>(look, inventory);
+		std::cout << "[UIStateGame] Shop OK" << std::endl;
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -178,6 +191,40 @@ namespace ms
 		}
 		else
 		{
+			// ESC key opens the quit dialog when no other dialog is open
+			if (escape && pressed)
+			{
+				UI::get().emplace<UIYesNo>(
+					"Do you want to quit?",
+					[](bool yes)
+					{
+						if (yes)
+						{
+							float fadestep = 0.025f;
+
+							Window::get().fadeout(
+								fadestep,
+								[]()
+								{
+									GraphicsGL::get().clear();
+									UI::get().change_state(UI::State::LOGIN);
+									UI::get().set_scrollnotice("");
+									Session::get().reconnect();
+									UI::get().enable();
+									Timer::get().start();
+									GraphicsGL::get().unlock();
+								}
+							);
+
+							GraphicsGL::get().lock();
+							Stage::get().clear();
+							Timer::get().start();
+						}
+					}
+				);
+				return;
+			}
+
 			switch (type)
 			{
 				case KeyType::Id::MENU:
@@ -348,9 +395,7 @@ namespace ms
 							}
 							case KeyAction::Id::MAINMENU:
 							{
-								if (auto statusbar = UI::get().get_element<UIStatusBar>())
-									statusbar->send_key(action, pressed, escape);
-
+								UI::get().emplace<UIOptionMenu>();
 								break;
 							}
 							default:
@@ -481,7 +526,34 @@ namespace ms
 
 	void UIStateGame::send_close()
 	{
-		UI::get().emplace<UIQuit>(stats);
+		UI::get().emplace<UIYesNo>(
+			"Do you want to quit?",
+			[](bool yes)
+			{
+				if (yes)
+				{
+					float fadestep = 0.025f;
+
+					Window::get().fadeout(
+						fadestep,
+						[]()
+						{
+							GraphicsGL::get().clear();
+							UI::get().change_state(UI::State::LOGIN);
+							UI::get().set_scrollnotice("");
+							Session::get().reconnect();
+							UI::get().enable();
+							Timer::get().start();
+							GraphicsGL::get().unlock();
+						}
+					);
+
+					GraphicsGL::get().lock();
+					Stage::get().clear();
+					Timer::get().start();
+				}
+			}
+		);
 	}
 
 	void UIStateGame::drag_icon(Icon* drgic)

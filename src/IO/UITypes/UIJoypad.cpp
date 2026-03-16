@@ -25,10 +25,10 @@
 
 namespace ms
 {
-	// TODO: Add combo boxes nl::nx::ui["Basic.img"]["ComboBox"] / ["ComboBox5"];
+	// Combo box UI not implemented
 	UIJoypad::UIJoypad() : UIDragElement<PosJOYPAD>()
 	{
-		alternative_settings = false; // TODO: Get user's key settings type
+		alternative_settings = false;
 
 		nl::node JoyPad = nl::nx::ui["UIWindow.img"]["JoyPad"];
 		nl::node Basic = nl::nx::ui["Basic.img"];
