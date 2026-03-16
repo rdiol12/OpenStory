@@ -42,20 +42,35 @@ namespace ms
 		rowmax = -1;
 		dragchattop = false;
 		chat_fade_timer = CHAT_FADE_DURATION;
+		current_target = TARGET_ALL;
 
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 
 		// Load textures from mainBar (v83 compatible paths)
 		buttons[Buttons::BT_OPENCHAT] = std::make_unique<MapleButton>(mainbar["chatOpen"]);
 		buttons[Buttons::BT_CLOSECHAT] = std::make_unique<MapleButton>(mainbar["chatClose"]);
+		buttons[Buttons::BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
+		buttons[Buttons::BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
 
 		chatspace[0] = mainbar["chatSpace"];
 		chatspace[1] = mainbar["chatEnter"];
 		chatspace[2] = mainbar["chatSpace2"];
 		chatspace[3] = mainbar["chatCover"];
 
+		// Load chat target channel indicator textures
+		nl::node target_node = mainbar["chatTarget"];
+		chattarget_textures[TARGET_ALL] = target_node["all"];
+		chattarget_textures[TARGET_PARTY] = target_node["party"];
+		chattarget_textures[TARGET_GUILD] = target_node["guild"];
+		chattarget_textures[TARGET_FRIEND] = target_node["friend"];
+		chattarget_textures[TARGET_EXPEDITION] = target_node["expedition"];
+		chattarget_textures[TARGET_ASSOCIATION] = target_node["association"];
+		chattarget_textures[TARGET_AFCTV] = target_node["afctv"];
+
 		buttons[BT_OPENCHAT]->set_active(!chatopen);
 		buttons[BT_CLOSECHAT]->set_active(chatopen);
+		buttons[BT_SCROLLUP]->set_active(chatopen);
+		buttons[BT_SCROLLDOWN]->set_active(chatopen);
 
 		// Chat background box
 		chat_background = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
@@ -140,8 +155,14 @@ namespace ms
 		bool show_background = chatfieldopen || chat_fade_timer > 0;
 
 		// Draw NX bar textures at StatusBar anchor (position = (512, screen_h))
+		// z-order: chatSpace(0) → chatSpace2(1)/chatEnter(1) → chatCover(3)
 		chatspace[0].draw(position);
-		chatspace[1].draw(position);
+
+		if (chatopen)
+		{
+			chatspace[2].draw(position);	// chatSpace2 — expanded chat area (z=1)
+			chatspace[1].draw(position);	// chatEnter — input area background (z=1)
+		}
 
 		UIElement::draw_buttons(inter);
 
@@ -186,6 +207,10 @@ namespace ms
 
 			// Draw chatcover and chatfield at StatusBar anchor
 			chatspace[3].draw(position);
+
+			// Draw chat target indicator (shows current channel: all/party/guild/etc.)
+			chattarget_textures[current_target].draw(position);
+
 			chatfield.draw(position);
 		}
 		else if (rowtexts.count(rowmax))
@@ -306,6 +331,8 @@ namespace ms
 
 		buttons[Buttons::BT_OPENCHAT]->set_active(!chat_open);
 		buttons[Buttons::BT_CLOSECHAT]->set_active(chat_open);
+		buttons[Buttons::BT_SCROLLUP]->set_active(chat_open);
+		buttons[Buttons::BT_SCROLLDOWN]->set_active(chat_open);
 	}
 
 	void UIChatBar::toggle_chatfield()
@@ -350,6 +377,17 @@ namespace ms
 		case Buttons::BT_OPENCHAT:
 		case Buttons::BT_CLOSECHAT:
 			toggle_chat();
+			break;
+		case Buttons::BT_SCROLLUP:
+			if (rowpos < rowmax)
+				rowpos++;
+			break;
+		case Buttons::BT_SCROLLDOWN:
+			if (rowpos > 0)
+				rowpos--;
+			break;
+		case Buttons::BT_CHAT_TARGET:
+			current_target = static_cast<ChatTarget>((current_target + 1) % NUM_TARGETS);
 			break;
 		default:
 			break;

@@ -85,6 +85,8 @@ namespace ms
 		{
 			BT_OPENCHAT,
 			BT_CLOSECHAT,
+			BT_SCROLLUP,
+			BT_SCROLLDOWN,
 			BT_CHAT,
 			BT_HELP,
 			BT_LINK,
@@ -109,12 +111,26 @@ namespace ms
 			NUM_CHATTAB
 		};
 
+		enum ChatTarget : uint8_t
+		{
+			TARGET_ALL,
+			TARGET_PARTY,
+			TARGET_GUILD,
+			TARGET_FRIEND,
+			TARGET_EXPEDITION,
+			TARGET_ASSOCIATION,
+			TARGET_AFCTV,
+			NUM_TARGETS
+		};
+
 		bool chatopen;
 		bool chatopen_persist;
 		bool chatfieldopen;
 		Texture chatspace[4];
 		Texture chatenter;
 		Texture chatcover;
+		Texture chattarget_textures[NUM_TARGETS];
+		ChatTarget current_target;
 		Textfield chatfield;
 
 		Slider slider;
