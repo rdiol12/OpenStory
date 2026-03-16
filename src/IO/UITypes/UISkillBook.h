@@ -133,23 +133,14 @@ namespace ms
 			BT_SPUP0,
 			BT_SPUP1,
 			BT_SPUP2,
-			BT_SPUP3,
-			BT_SPUP4,
-			BT_SPUP5,
-			BT_SPUP6,
-			BT_SPUP7,
-			BT_SPUP8,
-			BT_SPUP9,
-			BT_SPUP10,
-			BT_SPUP11
+			BT_SPUP3
 		};
 
-		static constexpr int16_t ROWS = 12;
+		static constexpr int16_t ROWS = 4;
 		static constexpr int16_t ROW_HEIGHT = 40;
-		static constexpr int16_t ROW_WIDTH = 143;
 		static constexpr Point<int16_t> SKILL_OFFSET = Point<int16_t>(11, 93);
-		static constexpr Point<int16_t> SKILL_META_OFFSET = Point<int16_t>(2, 2);
-		static constexpr Point<int16_t> LINE_OFFSET = Point<int16_t>(0, 37);
+		static constexpr Point<int16_t> ICON_OFFSET = Point<int16_t>(2, 2);
+		static constexpr Point<int16_t> LINE_OFFSET = Point<int16_t>(2, 37);
 
 		const CharStats& stats;
 		const SkillBook& skillbook;

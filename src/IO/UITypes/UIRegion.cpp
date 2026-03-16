@@ -83,7 +83,7 @@ namespace ms
 			case Buttons::NA:
 			case Buttons::EU:
 			{
-				// TODO: Update UIWorldSelect after selecting new region
+				// World select refresh after region change not implemented
 				//uint8_t region = (buttonid == Buttons::NA) ? 5 : 6;
 
 				if (auto worldselect = UI::get().get_element<UIWorldSelect>())

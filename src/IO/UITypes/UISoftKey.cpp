@@ -30,64 +30,39 @@
 
 namespace ms
 {
-	UISoftKey::UISoftKey(OkCallback ok_callback, CancelCallback cancel_callback, std::string tooltip_text, Point<int16_t> tooltip_pos) : UIElement(Point<int16_t>(104, 140), Point<int16_t>(0, 0)), ok_callback(ok_callback), cancel_callback(cancel_callback), tooltip_pos(tooltip_pos), highCase(false)
+	UISoftKey::UISoftKey(OkCallback ok_callback, CancelCallback cancel_callback, std::string tooltip_text, Point<int16_t> tooltip_pos) : UIElement(Point<int16_t>(104, 140), Point<int16_t>(0, 0)), ok_callback(ok_callback), cancel_callback(cancel_callback), tooltip_pos(tooltip_pos), highCase(false), dragged(false)
 	{
 		nl::node SoftKey = nl::nx::ui["Login.img"]["Common"]["SoftKey"];
 		nl::node backgrnd = SoftKey["backgrnd"];
+		dragarea = Point<int16_t>(140, 30);
 
 		sprites.emplace_back(backgrnd);
 
-		Point<int16_t> button_adj = Point<int16_t>(1, 0);
+		// Also add other background layers
+		sprites.emplace_back(SoftKey["backgrnd2"]);
+		sprites.emplace_back(SoftKey["backgrnd3"]);
 
-		buttons[Buttons::BtCancel] = std::make_unique<MapleButton>(SoftKey["BtCancel"], button_adj);
-		buttons[Buttons::BtDel] = std::make_unique<MapleButton>(SoftKey["BtDel"], button_adj);
-		buttons[Buttons::BtOK] = std::make_unique<MapleButton>(SoftKey["BtOK"], button_adj);
-		buttons[Buttons::BtShift] = std::make_unique<MapleButton>(SoftKey["BtShift"], button_adj);
+		// Cancel and OK below the number grid
+		buttons[Buttons::BtCancel] = std::make_unique<MapleButton>(SoftKey["BtCancel"], Point<int16_t>(8, 245));
+		buttons[Buttons::BtOK] = std::make_unique<MapleButton>(SoftKey["BtOK"], Point<int16_t>(75, 245));
 
 #pragma region BtNum
-#pragma region Row 1
-		std::string row1KeysMap[ROW1_KEYS];
+		// Clean 3-column grid: 1-9 in rows 1-3, then 0 + Del in row 4
+		std::string numKeys[10] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" };
 
-		row1KeysMap[0] = "1";
-		row1KeysMap[1] = "2";
-		row1KeysMap[2] = "3";
-		row1KeysMap[3] = "4";
-		row1KeysMap[4] = "5";
-		row1KeysMap[5] = "6";
-		row1KeysMap[6] = "7";
-		row1KeysMap[7] = "8";
-		row1KeysMap[8] = "9";
-		row1KeysMap[9] = "0";
-
-		uint16_t row1r1 = random.next_int(ROW_MAX);
-		uint16_t row1r2 = random.next_int(ROW_MAX);
-
-		while (row1r1 == row1r2)
-			row1r2 = random.next_int(ROW_MAX);
-
-		row1keys[row1r1] = "Blank";
-		row1keys[row1r2] = "Blank";
-
-		uint16_t keyIndex = 0;
-
-		for (std::string& key : row1keys)
+		for (uint16_t i = 0; i < 10; i++)
 		{
-			if (key != "Blank" && keyIndex < ROW1_KEYS)
-			{
-				key = row1KeysMap[keyIndex];
-				keyIndex++;
-			}
+			row1keys[i] = numKeys[i];
+			buttons[Buttons::BtNum0 + i] = std::make_unique<MapleButton>(SoftKey["BtNum"][numKeys[i]], keypos(i, 0));
 		}
 
-		for (uint16_t i = 0; i < ROW_MAX; i++)
-		{
-			const std::string& key = row1keys[i];
+		// Mark remaining slots as blank
+		for (uint16_t i = 10; i < ROW_MAX; i++)
+			row1keys[i] = "Blank";
 
-			if (key == "Blank")
-				buttons[Buttons::BtNum0 + i] = std::make_unique<MapleButton>(SoftKey["BtblankNum"], keypos(i, 0));
-			else
-				buttons[Buttons::BtNum0 + i] = std::make_unique<MapleButton>(SoftKey["BtNum"][key], keypos(i, 0));
-		}
+		// Place Del button next to 0 in row 4
+		// BtDel has a large NX origin (~51,199) so we use raw position to compensate
+		buttons[Buttons::BtDel] = std::make_unique<MapleButton>(SoftKey["BtDel"], Point<int16_t>(-3, 8));
 #pragma endregion
 #pragma endregion
 
@@ -115,7 +90,7 @@ namespace ms
 		row2keys[row2r1] = "Blank";
 		row2keys[row2r2] = "Blank";
 
-		keyIndex = 0;
+		uint16_t keyIndex = 0;
 
 		for (std::string& key : row2keys)
 		{
@@ -126,123 +101,11 @@ namespace ms
 			}
 		}
 
+		// v83 NX SoftKey only has 10 letter buttons that don't fit the 140x280 keyboard
+		// Letter case buttons are not created — PIC uses numbers only in this layout
+		// The key arrays are still populated for case_pressed() to work if ever needed
 		uint16_t caseKeyIndex = 0;
-
-		for (uint16_t i = 0; i < ROW_MAX; i++, caseKeyIndex++)
-		{
-			const std::string& key = row2keys[i];
-
-			if (key == "Blank")
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 1));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 1));
-			}
-			else
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtHighCase"][key], keypos(i, 1));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtLowCase"][key], keypos(i, 1));
-			}
-		}
-#pragma endregion
-
-#pragma region Row 3
-		std::string row3KeysMap[ROW3_KEYS];
-
-		row3KeysMap[0] = get_key_map_index("A");
-		row3KeysMap[1] = get_key_map_index("S");
-		row3KeysMap[2] = get_key_map_index("D");
-		row3KeysMap[3] = get_key_map_index("F");
-		row3KeysMap[4] = get_key_map_index("G");
-		row3KeysMap[5] = get_key_map_index("H");
-		row3KeysMap[6] = get_key_map_index("J");
-		row3KeysMap[7] = get_key_map_index("K");
-		row3KeysMap[8] = get_key_map_index("L");
-
-		uint16_t row3r1 = random.next_int(ROW_MAX);
-		uint16_t row3r2 = random.next_int(ROW_MAX);
-
-		while (row3r1 == row3r2)
-			row3r2 = random.next_int(ROW_MAX);
-
-		uint16_t row3r3 = random.next_int(ROW_MAX);
-
-		while (row3r1 == row3r3 || row3r2 == row3r3)
-			row3r3 = random.next_int(ROW_MAX);
-
-		row3keys[row3r1] = "Blank";
-		row3keys[row3r2] = "Blank";
-		row3keys[row3r3] = "Blank";
-
-		keyIndex = 0;
-
-		for (std::string& key : row3keys)
-		{
-			if (key != "Blank" && keyIndex < ROW3_KEYS)
-			{
-				key = row3KeysMap[keyIndex];
-				keyIndex++;
-			}
-		}
-
-		for (uint16_t i = 0; i < ROW_MAX; i++, caseKeyIndex++)
-		{
-			const std::string& key = row3keys[i];
-
-			if (key == "Blank")
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 2));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 2));
-			}
-			else
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtHighCase"][key], keypos(i, 2));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtLowCase"][key], keypos(i, 2));
-			}
-		}
-#pragma endregion
-
-#pragma region Row 4
-		std::string row4KeysMap[ROW4_KEYS];
-
-		row4KeysMap[0] = get_key_map_index("Z");
-		row4KeysMap[1] = get_key_map_index("X");
-		row4KeysMap[2] = get_key_map_index("C");
-		row4KeysMap[3] = get_key_map_index("V");
-		row4KeysMap[4] = get_key_map_index("B");
-		row4KeysMap[5] = get_key_map_index("N");
-		row4KeysMap[6] = get_key_map_index("M");
-
-		uint16_t row4r1 = random.next_int(ROW4_MAX);
-
-		row4keys[row4r1] = "Blank";
-
-		keyIndex = 0;
-
-		for (std::string& key : row4keys)
-		{
-			if (key != "Blank" && keyIndex < ROW4_KEYS)
-			{
-				key = row4KeysMap[keyIndex];
-				keyIndex++;
-			}
-		}
-
-		for (uint16_t i = 0; i < ROW4_MAX; i++, caseKeyIndex++)
-		{
-			const std::string& key = row4keys[i];
-
-			if (key == "Blank")
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 3));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtblankCase"], keypos(i, 3));
-			}
-			else
-			{
-				BtCaseKeys[caseKeyIndex][true] = std::make_unique<MapleButton>(SoftKey["BtHighCase"][key], keypos(i, 3));
-				BtCaseKeys[caseKeyIndex][false] = std::make_unique<MapleButton>(SoftKey["BtLowCase"][key], keypos(i, 3));
-			}
-		}
-#pragma endregion
+		(void)caseKeyIndex;
 #pragma endregion
 
 		Point<int16_t> textfield_tl = Point<int16_t>(350, 205);
@@ -290,7 +153,8 @@ namespace ms
 		for (uint16_t i = 0; i < CASE_KEYS; i++)
 		{
 			const Button* btn = BtCaseKeys[i][highCase].get();
-			btn->draw(position);
+			if (btn)
+				btn->draw(position);
 		}
 
 		textfield.draw(textfield_pos, Point<int16_t>(1, 0));
@@ -322,12 +186,39 @@ namespace ms
 
 	Cursor::State UISoftKey::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		if (clicked)
+		{
+			if (dragged)
+			{
+				position = cursorpos - cursoroffset;
+				return Cursor::State::CLICKING;
+			}
+			else
+			{
+				auto bounds = Rectangle<int16_t>(position, position + dragarea);
+				if (bounds.contains(cursorpos))
+				{
+					cursoroffset = cursorpos - position;
+					dragged = true;
+					return Cursor::State::CLICKING;
+				}
+			}
+		}
+		else
+		{
+			if (dragged)
+				dragged = false;
+		}
+
 		if (Cursor::State new_state = textfield.send_cursor(cursorpos, clicked))
 			return new_state;
 
 		for (uint16_t i = 0; i < CASE_KEYS; i++)
 		{
 			auto& btn = BtCaseKeys[i][highCase];
+
+			if (!btn)
+				continue;
 
 			if (btn->is_active() && btn->bounds(position).contains(cursorpos))
 			{
@@ -476,14 +367,22 @@ namespace ms
 
 	Point<int16_t> UISoftKey::keypos(uint16_t index, uint16_t row) const
 	{
-		int16_t x = index * 45;
-		int16_t y = row * 43;
+		// Background is 140x280. Buttons are 40x35.
+		// 3-column grid layout
+		static constexpr int16_t COLS = 3;
+		static constexpr int16_t COL_W = 44;  // 40px button + 4px gap
+		static constexpr int16_t ROW_H = 37;  // 35px button + 2px gap
+		static constexpr int16_t X0 = 8;
+		static constexpr int16_t Y0 = 95;
 
-		// Third row starts at the third character position
-		if (row == 3)
-			x += 45 * 2;
+		int16_t col = index % COLS;
+		int16_t sub_row = index / COLS;
 
-		return Point<int16_t>(27 + x, 95 + y);
+		// row 0 = numbers (12 slots = 4 rows, y: 8-119)
+		// row 1-3 = letters (hidden below, y: 156+)
+		int16_t base_y = Y0 + row * 4 * ROW_H;
+
+		return Point<int16_t>(X0 + col * COL_W, base_y + sub_row * ROW_H);
 	}
 
 	Button::State UISoftKey::case_pressed(uint16_t buttonid)
@@ -604,17 +503,7 @@ namespace ms
 			return false;
 		}
 
-		bool requirements = false;
-
-		// TODO: Add check for required amount of characters
-
-		if (requirements)
-		{
-			clear_tooltip();
-			show_text("Your 2nd password must have at least two of the following: uppercase letters, lowercase letters, numbers, and special characters.", 242, true, 1);
-
-			return false;
-		}
+		// No category requirement — numbers-only PIC is allowed
 
 		return true;
 	}

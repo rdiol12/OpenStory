@@ -171,28 +171,18 @@ namespace ms
 			buttons[i] = std::make_unique<TwoSpriteButton>(disabled[tabid], enabled[tabid]);
 		}
 
-		uint16_t y_adj = 0;
-
-		for (uint16_t i = Buttons::BT_SPUP0; i <= Buttons::BT_SPUP11; ++i)
+		for (uint16_t i = Buttons::BT_SPUP0; i <= Buttons::BT_SPUP3; ++i)
 		{
-			uint16_t x_adj = 0;
-			uint16_t spupid = i - Buttons::BT_SPUP0;
-
-			if (spupid % 2)
-				x_adj = ROW_WIDTH;
-
-			Point<int16_t> spup_position = SKILL_OFFSET + Point<int16_t>(124 + x_adj, 20 + y_adj);
+			uint16_t row = i - Buttons::BT_SPUP0;
+			Point<int16_t> spup_position = SKILL_OFFSET + Point<int16_t>(124, 20 + row * ROW_HEIGHT);
 			buttons[i] = std::make_unique<MapleButton>(main["BtSpUp"], spup_position);
-
-			if (spupid % 2)
-				y_adj += ROW_HEIGHT;
 		}
 
 		booktext = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "", 150);
-		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
+		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::WHITE);
 
 		slider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(93, 317), 295, ROWS, 1,
+			Slider::Type::DEFAULT_SILVER, Range<int16_t>(92, 236), 154, ROWS, 1,
 			[&](bool upwards)
 			{
 				int16_t shift = upwards ? -1 : 1;
@@ -218,46 +208,38 @@ namespace ms
 		UIElement::draw_sprites(alpha);
 
 		bookicon.draw(position + Point<int16_t>(11, 85));
-		booktext.draw(position + Point<int16_t>(173, 59));
+		booktext.draw(position + Point<int16_t>(95, 59));
 		splabel.draw(position + Point<int16_t>(304, 23));
 
-		Point<int16_t> skill_position_l = position + SKILL_OFFSET + Point<int16_t>(-1, 0);
-		Point<int16_t> skill_position_r = position + SKILL_OFFSET + Point<int16_t>(-1 + ROW_WIDTH, 0);
+		Point<int16_t> skill_position = position + SKILL_OFFSET;
 
 		for (size_t i = 0; i < ROWS; i++)
 		{
-			Point<int16_t> pos = skill_position_l;
+			size_t idx = offset + i;
 
-			if (i % 2)
-				pos = skill_position_r;
-
-			if (i < skills.size())
+			if (idx < skills.size())
 			{
-				if (check_required(skills[i].get_id()))
+				if (check_required(skills[idx].get_id()))
 				{
-					skille.draw(pos);
+					skille.draw(skill_position);
 				}
 				else
 				{
-					skilld.draw(pos);
-					skills[i].get_icon()->set_state(StatefulIcon::State::DISABLED);
+					skilld.draw(skill_position);
+					skills[idx].get_icon()->set_state(StatefulIcon::State::DISABLED);
 				}
 
-				skills[i].draw(pos + SKILL_META_OFFSET);
+				skills[idx].draw(skill_position + ICON_OFFSET);
 			}
 			else
 			{
-				skillb.draw(pos);
+				skillb.draw(skill_position);
 			}
 
-			if (i < ROWS - 2)
-				line.draw(pos + LINE_OFFSET);
+			if (i < ROWS - 1)
+				line.draw(skill_position + LINE_OFFSET);
 
-			if (i % 2)
-			{
-				skill_position_l.shift_y(ROW_HEIGHT);
-				skill_position_r.shift_y(ROW_HEIGHT);
-			}
+			skill_position.shift_y(ROW_HEIGHT);
 		}
 
 		slider.draw(position);
@@ -395,14 +377,6 @@ namespace ms
 		case Buttons::BT_SPUP1:
 		case Buttons::BT_SPUP2:
 		case Buttons::BT_SPUP3:
-		case Buttons::BT_SPUP4:
-		case Buttons::BT_SPUP5:
-		case Buttons::BT_SPUP6:
-		case Buttons::BT_SPUP7:
-		case Buttons::BT_SPUP8:
-		case Buttons::BT_SPUP9:
-		case Buttons::BT_SPUP10:
-		case Buttons::BT_SPUP11:
 			send_spup(id - Buttons::BT_SPUP0 + offset);
 			break;
 		case Buttons::BT_HYPER:
@@ -466,19 +440,19 @@ namespace ms
 			}
 		}
 
-		Point<int16_t> skill_position_l = position + SKILL_OFFSET + Point<int16_t>(-1, 0);
-		Point<int16_t> skill_position_r = position + SKILL_OFFSET + Point<int16_t>(-1 + ROW_WIDTH, 0);
+		Point<int16_t> skill_position = position + SKILL_OFFSET;
 
 		if (!grabbing)
 		{
-			for (size_t i = 0; i < skills.size(); i++)
+			for (size_t i = 0; i < ROWS; i++)
 			{
-				Point<int16_t> skill_position = skill_position_l;
+				size_t idx = offset + i;
 
-				if (i % 2)
-					skill_position = skill_position_r;
+				if (idx >= skills.size())
+					break;
 
-				constexpr Rectangle<int16_t> bounds = Rectangle<int16_t>(0, 32, 0, 32);
+				constexpr Rectangle<int16_t> bounds = Rectangle<int16_t>(0, 148, 0, 32);
+				Point<int16_t> icon_pos = skill_position + ICON_OFFSET;
 				bool inrange = bounds.contains(cursorpos - skill_position);
 
 				if (inrange)
@@ -488,13 +462,13 @@ namespace ms
 						clear_tooltip();
 						grabbing = true;
 
-						int32_t skill_id = skills[i].get_id();
+						int32_t skill_id = skills[idx].get_id();
 						int32_t skill_level = skillbook.get_level(skill_id);
 
 						if (skill_level > 0 && !SkillData::get(skill_id).is_passive())
 						{
-							skills[i].get_icon()->start_drag(cursorpos - skill_position);
-							UI::get().drag_icon(skills[i].get_icon());
+							skills[idx].get_icon()->start_drag(cursorpos - icon_pos);
+							UI::get().drag_icon(skills[idx].get_icon());
 
 							return Cursor::State::GRABBING;
 						}
@@ -505,18 +479,14 @@ namespace ms
 					}
 					else
 					{
-						skills[i].get_icon()->set_state(StatefulIcon::State::MOUSEOVER);
-						show_skill(skills[i].get_id());
+						skills[idx].get_icon()->set_state(StatefulIcon::State::MOUSEOVER);
+						show_skill(skills[idx].get_id());
 
 						return Cursor::State::IDLE;
 					}
 				}
 
-				if (i % 2)
-				{
-					skill_position_l.shift_y(ROW_HEIGHT);
-					skill_position_r.shift_y(ROW_HEIGHT);
-				}
+				skill_position.shift_y(ROW_HEIGHT);
 			}
 
 			for (size_t i = 0; i < skills.size(); i++)
@@ -804,7 +774,7 @@ namespace ms
 	{
 		int16_t x = cursorpos.x();
 
-		if (x < SKILL_OFFSET.x() || x > SKILL_OFFSET.x() + 2 * ROW_WIDTH)
+		if (x < SKILL_OFFSET.x() || x > 148)
 			return nullptr;
 
 		int16_t y = cursorpos.y();
@@ -814,24 +784,15 @@ namespace ms
 
 		uint16_t row = (y - SKILL_OFFSET.y()) / ROW_HEIGHT;
 
-		if (row < 0 || row >= ROWS)
+		if (row >= ROWS)
 			return nullptr;
 
-		uint16_t offset_row = offset + row;
-
-		if (offset_row >= ROWS)
-			return nullptr;
-
-		uint16_t col = (x - SKILL_OFFSET.x()) / ROW_WIDTH;
-
-		uint16_t skill_idx = 2 * offset_row + col;
+		uint16_t skill_idx = offset + row;
 
 		if (skill_idx >= skills.size())
 			return nullptr;
 
-		auto iter = skills.data() + skill_idx;
-
-		return iter;
+		return skills.data() + skill_idx;
 	}
 
 	void UISkillBook::close()

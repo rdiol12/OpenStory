@@ -48,7 +48,7 @@ namespace ms
 
 		if (animation_ended)
 		{
-			// TODO: Handle 'default' animations (horntail reactor floating)
+			// Default/idle animation (e.g. horntail reactor floating)
 			normal.draw(absp - shift, alpha);
 		}
 		else
@@ -72,7 +72,7 @@ namespace ms
 
 	void Reactor::set_state(int8_t state)
 	{
-		// TODO: hit/break sounds
+		// Note: hit/break sounds are not yet played here
 		if (hittable)
 		{
 			animations[this->state] = src[this->state]["hit"];

@@ -236,7 +236,7 @@ namespace ms
 		const char* RESETPIC = "https://www.nexon.com/account/en/login";
 		const char* CHARGENX = "https://billing.nexon.net/PurchaseNX";
 		const bool SHOW_FPS = false;
-		const bool SHOW_PACKETS = false;
+		const bool SHOW_PACKETS = true;
 		const bool AUTO_LOGIN = false;
 		const uint8_t auto_world = 0;
 		const uint8_t auto_channel = 0;
@@ -261,7 +261,7 @@ namespace ms
 	// IP Address which the client will connect to
 	struct ServerIP : public Configuration::StringEntry
 	{
-		ServerIP() : StringEntry("ServerIP", "127.0.0.1") {}
+		ServerIP() : StringEntry("ServerIP", "100.115.197.11") {}
 	};
 
 	// Port which the client will connect to
@@ -279,13 +279,13 @@ namespace ms
 	// The width of the screen
 	struct Width : public Configuration::ShortEntry
 	{
-		Width() : ShortEntry("Width", "800") {}
+		Width() : ShortEntry("Width", "1024") {}
 	};
 
 	// The height of the screen
 	struct Height : public Configuration::ShortEntry
 	{
-		Height() : ShortEntry("Height", "600") {}
+		Height() : ShortEntry("Height", "768") {}
 	};
 
 	// Whether to use VSync
@@ -455,7 +455,7 @@ namespace ms
 	// The default position of UIKeyConfig
 	struct PosKEYCONFIG : public Configuration::PointEntry
 	{
-		PosKEYCONFIG() : PointEntry("PosKEYCONFIG", "(65, 50)") {}
+		PosKEYCONFIG() : PointEntry("PosKEYCONFIG", "(65, 10)") {}
 	};
 
 	// The default position of UIOptionMenu

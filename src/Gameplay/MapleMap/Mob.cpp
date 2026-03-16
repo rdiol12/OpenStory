@@ -360,18 +360,18 @@ namespace ms
 		if (control)
 			return;
 
-		set_position(start);
-
 		movements = std::forward<decltype(in_movements)>(in_movements);
 
 		if (movements.empty())
 			return;
 
-		const Movement& lastmove = movements.front();
+		const Movement& lastmove = movements.back();
 
 		uint8_t laststance = lastmove.newstate;
 		set_stance(laststance);
 
+		phobj.set_x(lastmove.xpos);
+		phobj.set_y(lastmove.ypos);
 		phobj.fhid = lastmove.fh;
 	}
 

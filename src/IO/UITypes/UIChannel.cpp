@@ -23,6 +23,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Configuration.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -32,10 +33,10 @@ namespace ms
 {
 	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>()
 	{
-		uint8_t selected_world = 1; // TODO: Need to get current world user is on
-		current_channel = 9; // TODO: Need to get current channel user is on
+		uint8_t selected_world = Configuration::get().get_worldid();
+		current_channel = Configuration::get().get_channelid();
 		selected_channel = current_channel;
-		channel_count = 20; // TODO: Need to get total number of channels on world
+		channel_count = 20;
 
 		nl::node Channel = nl::nx::ui["UIWindow2.img"]["Channel"];
 
@@ -305,7 +306,7 @@ namespace ms
 	{
 		deactivate();
 
-		current_channel = 9; // TODO: Need to get current channel user is on
+		current_channel = Configuration::get().get_channelid();
 		selected_channel = current_channel;
 		selected_channel_x = current_channel_x;
 		selected_channel_y = current_channel_y;
@@ -313,7 +314,7 @@ namespace ms
 
 	void UIChannel::change_channel()
 	{
-		// TODO: Send packet to change channel?
+		// No ChangeChannelPacket available yet
 		cancel();
 	}
 

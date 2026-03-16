@@ -20,7 +20,6 @@
 #ifndef USE_ASIO
 #include <ws2tcpip.h>
 
-// TODO: Can this be moved?
 #pragma comment (lib, "Ws2_32.lib")
 
 namespace ms

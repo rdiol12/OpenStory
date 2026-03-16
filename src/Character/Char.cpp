@@ -320,7 +320,7 @@ namespace ms
 
 		if (hunger)
 		{
-			// TODO: Empty
+			// No action for this case
 		}
 	}
 

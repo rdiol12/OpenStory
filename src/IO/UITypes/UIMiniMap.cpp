@@ -311,7 +311,7 @@ namespace ms
 		case BT_SMALL:
 		case BT_BIG:
 			big_map = !big_map;
-			// TODO: Toggle scrolling map
+			// Map scrolling toggle not implemented
 			toggle_buttons();
 			break;
 		case BT_MAP:

@@ -62,6 +62,10 @@ namespace ms
 		void clear_tooltip();
 		void append_key(std::string key);
 
+		bool dragged = false;
+		Point<int16_t> cursoroffset;
+		Point<int16_t> dragarea;
+
 		Point<int16_t> keypos(uint16_t index, uint16_t row) const;
 		Button::State case_pressed(uint16_t buttonid);
 		std::string get_key_map_index(std::string key);

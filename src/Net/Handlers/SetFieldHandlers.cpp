@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SetFieldHandlers.h"
 
+#include <iostream>
+
 #include "Helpers/CharacterParser.h"
 #include "Helpers/LoginParser.h"
 
@@ -28,6 +30,9 @@
 #include "../../IO/UI.h"
 #include "../../IO/Window.h"
 
+#include "../../Character/Inventory/InventoryType.h"
+#include "../../Character/Look/EquipSlot.h"
+#include "../../Character/MapleStat.h"
 #include "../../IO/UITypes/UICharSelect.h"
 
 namespace ms
@@ -65,6 +70,8 @@ namespace ms
 		int8_t mode1 = recv.read_byte();
 		int8_t mode2 = recv.read_byte();
 
+		std::cout << "[SetField] handle: channel=" << channel << " mode1=" << (int)mode1 << " mode2=" << (int)mode2 << std::endl;
+
 		if (mode1 == 0 && mode2 == 0)
 			change_map(recv, channel);
 		else
@@ -86,19 +93,56 @@ namespace ms
 		recv.skip(23);
 
 		int32_t cid = recv.read_int();
-		auto charselect = UI::get().get_element<UICharSelect>();
 
-		if (!charselect)
-			return;
+		std::cout << "[SetField] set_field called, cid=" << cid << std::endl;
 
-		const CharEntry& playerentry = charselect->get_character(cid);
+		// Parse stats directly from packet (same fields as LoginParser::parse_stats)
+		StatsEntry statsentry;
 
-		if (playerentry.id != cid)
-			return;
+		statsentry.name = recv.read_padded_string(13);
+		statsentry.female = recv.read_bool();
 
+		uint8_t skin = recv.read_byte();
+		int32_t faceid = recv.read_int();
+		int32_t hairid = recv.read_int();
+
+		for (size_t i = 0; i < 3; i++)
+			statsentry.petids.push_back(recv.read_long());
+
+		statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte();
+		statsentry.stats[MapleStat::Id::JOB] = recv.read_short();
+		statsentry.stats[MapleStat::Id::STR] = recv.read_short();
+		statsentry.stats[MapleStat::Id::DEX] = recv.read_short();
+		statsentry.stats[MapleStat::Id::INT] = recv.read_short();
+		statsentry.stats[MapleStat::Id::LUK] = recv.read_short();
+		statsentry.stats[MapleStat::Id::HP] = recv.read_short();
+		statsentry.stats[MapleStat::Id::MAXHP] = recv.read_short();
+		statsentry.stats[MapleStat::Id::MP] = recv.read_short();
+		statsentry.stats[MapleStat::Id::MAXMP] = recv.read_short();
+		statsentry.stats[MapleStat::Id::AP] = recv.read_short();
+		statsentry.stats[MapleStat::Id::SP] = recv.read_short();
+		statsentry.exp = recv.read_int();
+		statsentry.stats[MapleStat::Id::FAME] = recv.read_short();
+
+		recv.skip(4); // gachaexp
+
+		statsentry.mapid = recv.read_int();
+		statsentry.portal = recv.read_byte();
+
+		recv.skip(4); // timestamp
+
+		// Build minimal look entry with skin/face/hair
+		LookEntry look;
+		look.female = statsentry.female;
+		look.skin = skin;
+		look.faceid = faceid;
+		look.hairid = hairid;
+
+		// Create CharEntry and load the player
+		CharEntry playerentry = { statsentry, look, cid };
 		Stage::get().loadplayer(playerentry);
 
-		LoginParser::parse_stats(recv);
+		std::cout << "[SetField] Player loaded: " << statsentry.name << " mapid=" << statsentry.mapid << std::endl;
 
 		Player& player = Stage::get().get_player();
 
@@ -108,6 +152,14 @@ namespace ms
 			recv.read_string(); // 'linkedname'
 
 		CharacterParser::parse_inventory(recv, player.get_inventory());
+
+		// Update the player's visual look from equipped items in inventory
+		for (auto eqslot : EquipSlot::values)
+		{
+			if (int32_t itemid = player.get_inventory().get_item_id(InventoryType::Id::EQUIPPED, eqslot))
+				player.change_equip(eqslot);
+		}
+
 		CharacterParser::parse_skillbook(recv, player.get_skills());
 		CharacterParser::parse_cooldowns(recv, player);
 		CharacterParser::parse_questlog(recv, player.get_quests());

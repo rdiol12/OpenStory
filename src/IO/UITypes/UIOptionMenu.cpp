@@ -22,43 +22,92 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
+#include <iostream>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UIOptionMenu::UIOptionMenu() : UIDragElement<PosOPTIONMENU>(), selected_tab(0)
+	UIOptionMenu::UIOptionMenu() : UIDragElement<PosOPTIONMENU>(), selected_tab(0), nx_missing(false)
 	{
-		nl::node OptionMenu = nl::nx::ui["StatusBar3.img"]["OptionMenu"];
+		nl::node OptionMenu = nl::nx::ui["StatusBar2.img"]["OptionMenu"];
 		nl::node backgrnd = OptionMenu["backgrnd"];
 
-		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(OptionMenu["backgrnd2"]);
+		nx_missing = !OptionMenu;
 
-		nl::node graphic = OptionMenu["graphic"];
+		if (!nx_missing)
+		{
+			sprites.emplace_back(backgrnd);
+			sprites.emplace_back(OptionMenu["backgrnd2"]);
 
-		tab_background[Buttons::TAB0] = graphic["layer:backgrnd"];
-		tab_background[Buttons::TAB1] = OptionMenu["sound"]["layer:backgrnd"];
-		tab_background[Buttons::TAB2] = OptionMenu["game"]["layer:backgrnd"];
-		tab_background[Buttons::TAB3] = OptionMenu["invite"]["layer:backgrnd"];
-		tab_background[Buttons::TAB4] = OptionMenu["screenshot"]["layer:backgrnd"];
+			nl::node graphic = OptionMenu["graphic"];
 
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(OptionMenu["button:Cancel"]);
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(OptionMenu["button:OK"]);
-		buttons[Buttons::UIRESET] = std::make_unique<MapleButton>(OptionMenu["button:UIReset"]);
+			tab_background[Buttons::TAB0] = graphic["layer:backgrnd"];
+			tab_background[Buttons::TAB1] = OptionMenu["sound"]["layer:backgrnd"];
+			tab_background[Buttons::TAB2] = OptionMenu["game"]["layer:backgrnd"];
+			tab_background[Buttons::TAB3] = OptionMenu["invite"]["layer:backgrnd"];
+			tab_background[Buttons::TAB4] = OptionMenu["screenshot"]["layer:backgrnd"];
 
-		nl::node tab = OptionMenu["tab"];
-		nl::node tab_disabled = tab["disabled"];
-		nl::node tab_enabled = tab["enabled"];
+			buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(OptionMenu["button:Cancel"]);
+			buttons[Buttons::OK] = std::make_unique<MapleButton>(OptionMenu["button:OK"]);
+			buttons[Buttons::UIRESET] = std::make_unique<MapleButton>(OptionMenu["button:UIReset"]);
 
-		for (size_t i = Buttons::TAB0; i < Buttons::CANCEL; i++)
-			buttons[i] = std::make_unique<TwoSpriteButton>(tab_disabled[i], tab_enabled[i]);
+			nl::node tab = OptionMenu["tab"];
+			nl::node tab_disabled = tab["disabled"];
+			nl::node tab_enabled = tab["enabled"];
 
-		std::string sButtonUOL = graphic["combo:resolution"]["sButtonUOL"].get_string();
-		std::string ctype = std::string(1, sButtonUOL.back());
-		MapleComboBox::Type type = static_cast<MapleComboBox::Type>(std::stoi(ctype));
+			for (size_t i = Buttons::TAB0; i < Buttons::CANCEL; i++)
+				buttons[i] = std::make_unique<TwoSpriteButton>(tab_disabled[i], tab_enabled[i]);
 
+			std::string sButtonUOL = graphic["combo:resolution"]["sButtonUOL"].get_string();
+			MapleComboBox::Type type = MapleComboBox::Type::DEFAULT;
+
+			if (!sButtonUOL.empty())
+			{
+				std::string ctype = std::string(1, sButtonUOL.back());
+				type = static_cast<MapleComboBox::Type>(std::stoi(ctype));
+			}
+
+			int64_t combobox_width = graphic["combo:resolution"]["boxWidth"].get_integer();
+
+			if (combobox_width <= 0)
+				combobox_width = 150;
+
+			Point<int16_t> lt = Point<int16_t>(graphic["combo:resolution"]["lt"]);
+
+			Point<int16_t> bg_dimensions = Texture(backgrnd).get_dimensions();
+
+			if (bg_dimensions.x() <= 0 || bg_dimensions.y() <= 0)
+				bg_dimensions = Point<int16_t>(300, 300);
+
+			dimension = bg_dimensions;
+			dragarea = Point<int16_t>(bg_dimensions.x(), 20);
+		}
+		else
+		{
+			// Fallback UI when NX data is missing
+			int16_t menu_w = 280;
+			int16_t menu_h = 200;
+
+			background = ColorBox(menu_w, menu_h, Color::Name::BLACK, 0.85f);
+			title_bar = ColorBox(menu_w, 24, Color::Name::EMPEROR, 0.95f);
+			title_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "Game Settings");
+			resolution_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Resolution:");
+			ok_label = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "OK");
+			cancel_label = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "Cancel");
+
+			dimension = Point<int16_t>(menu_w, menu_h);
+			dragarea = Point<int16_t>(menu_w, 24);
+
+			// Center on screen
+			int16_t screen_w = Constants::Constants::get().get_viewwidth();
+			int16_t screen_h = Constants::Constants::get().get_viewheight();
+			position = Point<int16_t>((screen_w - menu_w) / 2, (screen_h - menu_h) / 2);
+		}
+
+		// Resolution options (shared)
 		std::vector<std::string> resolutions =
 		{
 			"800 x 600 ( 4 : 3 )",
@@ -106,26 +155,45 @@ namespace ms
 			break;
 		}
 
-		int64_t combobox_width = graphic["combo:resolution"]["boxWidth"].get_integer();
-		Point<int16_t> lt = Point<int16_t>(graphic["combo:resolution"]["lt"]);
+		MapleComboBox::Type ctype = MapleComboBox::Type::DEFAULT;
+		Point<int16_t> lt = nx_missing ? Point<int16_t>(10, 55) : Point<int16_t>(0, 0);
+		int64_t combobox_width = 150;
 
-		buttons[Buttons::SELECT_RES] = std::make_unique<MapleComboBox>(type, resolutions, default_option, position, lt, combobox_width);
+		buttons[Buttons::SELECT_RES] = std::make_unique<MapleComboBox>(ctype, resolutions, default_option, position, lt, combobox_width);
 
-		Point<int16_t> bg_dimensions = Texture(backgrnd).get_dimensions();
-
-		dimension = bg_dimensions;
-		dragarea = Point<int16_t>(bg_dimensions.x(), 20);
-
-		change_tab(Buttons::TAB2);
+		if (nx_missing)
+			selected_tab = Buttons::TAB0;
+		else
+			change_tab(Buttons::TAB2);
 	}
 
 	void UIOptionMenu::draw(float inter) const
 	{
-		UIElement::draw_sprites(inter);
+		if (nx_missing)
+		{
+			// Draw fallback UI
+			background.draw(DrawArgument(position));
+			title_bar.draw(DrawArgument(position));
+			title_text.draw(position + Point<int16_t>(140, 4));
+			resolution_label.draw(position + Point<int16_t>(15, 40));
 
-		tab_background[selected_tab].draw(position);
+			// Draw OK / Cancel button areas
+			ColorBox ok_bg(80, 26, Color::Name::EMPEROR, 0.9f);
+			ColorBox cancel_bg(80, 26, Color::Name::EMPEROR, 0.9f);
+			ok_bg.draw(DrawArgument(position + Point<int16_t>(50, 160)));
+			cancel_bg.draw(DrawArgument(position + Point<int16_t>(150, 160)));
+			ok_label.draw(position + Point<int16_t>(90, 164));
+			cancel_label.draw(position + Point<int16_t>(190, 164));
 
-		UIElement::draw_buttons(inter);
+			// Draw the combobox
+			UIElement::draw_buttons(inter);
+		}
+		else
+		{
+			UIElement::draw_sprites(inter);
+			tab_background[selected_tab].draw(position);
+			UIElement::draw_buttons(inter);
+		}
 	}
 
 	Button::State UIOptionMenu::button_pressed(uint16_t buttonid)
@@ -214,6 +282,27 @@ namespace ms
 		if (dragged)
 			return dstate;
 
+		if (nx_missing && clicked)
+		{
+			// Check OK button area
+			auto ok_pos = position + Point<int16_t>(50, 160);
+			if (cursorpos.x() >= ok_pos.x() && cursorpos.x() <= ok_pos.x() + 80 &&
+				cursorpos.y() >= ok_pos.y() && cursorpos.y() <= ok_pos.y() + 26)
+			{
+				button_pressed(Buttons::OK);
+				return Cursor::State::CLICKING;
+			}
+
+			// Check Cancel button area
+			auto cancel_pos = position + Point<int16_t>(150, 160);
+			if (cursorpos.x() >= cancel_pos.x() && cursorpos.x() <= cancel_pos.x() + 80 &&
+				cursorpos.y() >= cancel_pos.y() && cursorpos.y() <= cancel_pos.y() + 26)
+			{
+				button_pressed(Buttons::CANCEL);
+				return Cursor::State::CLICKING;
+			}
+		}
+
 		auto& button = buttons[Buttons::SELECT_RES];
 
 		if (button->is_pressed())
@@ -250,8 +339,11 @@ namespace ms
 
 	void UIOptionMenu::change_tab(uint16_t tabid)
 	{
-		buttons[selected_tab]->set_state(Button::State::NORMAL);
-		buttons[tabid]->set_state(Button::State::PRESSED);
+		if (!nx_missing)
+		{
+			buttons[selected_tab]->set_state(Button::State::NORMAL);
+			buttons[tabid]->set_state(Button::State::PRESSED);
+		}
 
 		selected_tab = tabid;
 

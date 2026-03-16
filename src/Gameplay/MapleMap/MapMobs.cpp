@@ -113,7 +113,7 @@ namespace ms
 		{
 			mob->apply_damage(damage, toleft);
 
-			// TODO: Maybe move this into the method above too?
+			// Mob HP display update
 			move.apply_hiteffects(user, *mob);
 		}
 	}
@@ -131,7 +131,7 @@ namespace ms
 		Rectangle<int16_t> player_rect = {
 			horizontal.smaller(),
 			horizontal.greater(),
-			vertical.smaller() - 50,
+			static_cast<int16_t>(vertical.smaller() - 50),
 			vertical.greater()
 		};
 

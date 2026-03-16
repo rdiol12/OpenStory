@@ -107,7 +107,7 @@ namespace ms
 
 		mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::BLACK);
 		maplepointslabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::BLACK);
-		maplepointslabel.change_text("0"); // TODO: Implement
+		maplepointslabel.change_text("0");
 
 		slotrange[InventoryType::Id::EQUIPPED] = { 1, 24 };
 		slotrange[InventoryType::Id::EQUIP] = { 1, 24 };

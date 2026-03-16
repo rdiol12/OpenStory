@@ -29,8 +29,12 @@ namespace ms
 		void add_started(int16_t, const std::string& quest_data);
 		void add_in_progress(int16_t, int16_t, const std::string& quest_data);
 		void add_completed(int16_t, int64_t);
+		void forfeit(int16_t);
 		bool is_started(int16_t);
 		int16_t get_last_started();
+
+		const std::map<int16_t, std::string>& get_started() const;
+		const std::map<int16_t, int64_t>& get_completed() const;
 
 	private:
 		std::map<int16_t, std::string> started;

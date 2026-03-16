@@ -1,98 +1,137 @@
 # OpenStory
-OpenStory is based on HeavenClient. The goal of this project is to create an independent client (and server in the future). The client from which this is based is a custom, made-from-scratch game client of MapleStory.
 
-# Roadmap/Goals
-- Upgrade to latest C++ standard
-- Enable development with VS Code
-- Use WZ file instead of NX 
-- Backwards compatible with Win7
-- Develop a botting system where user created scripts can be run
-- Feature complete with v83
-- Cross platform MacOS/Linux
-- Use clean v83 WZ files
+A v83 MapleStory client built for cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient), rewritten and extended for full v83 compatibility.
 
-# Supported versions
-- The client is currently compatible with version 83 servers.
-- The client has only been tested with [HeavenMS].
+## Features
 
-# Configuration
-The build can be configured by editing the **MapleStory.h** file. The following options are available:
-- **USE_ASIO**: Use Asio for networking (additional dependency)
-- **USE_CRYPTO**: Use cryptography when communicating for the server.
-- **USE_NX**: Use NX files instead of WZ files.
-- **USE_DEBUG**: This suppresses the generation of the Settings file
+- Full v83 MapleStory client connecting to cosmic v83 servers
+- NX file-based asset loading (UI, sprites, maps, items)
+- OpenGL rendering with GLFW windowing
+- Complete login flow: account login, world/channel select, character select, PIC entry
+- In-game systems: movement, combat, NPCs, quests, inventory, skills, chat
 
-The default settings can be configured by editing the **Configuration.h** file. These are also generated after a game session in a file called **Settings**. These can be altered in the same way as **Configuration.h**, although, these do not persist if you delete the file, unlike **Configuration.h**.
+## What Was Fixed / Added
 
-# Building
-1. Open **MapleStory.sln** in Visual Studio 2017 CE
-2. Make sure to use **Windows SDK Version: 8.1** and **Platform Toolset: v140** (If you don't have these, download them)
-   * [Windows 8.1 SDK]
-3. Press **Build** > **Build Solution** or **Ctrl + Shift + B**
-4. After a successful build, you can now run the program by pressing **Debug** > **Start Debugging** or **F5**
-5. Make sure all nx files are present in the parent folder. To convert wz files to nx you can use the [NoLifeWzToNx] project.
-   - Extract the zip
-   - Place your wz files in the **files** folder
-   - Run **start.bat**
-   - See **Required Files** for a list of required nx files
+### Packet Handlers (v83 Compatibility)
+- **13 new packet handlers** fully implemented with proper v83 parsing:
+  - `UpdateQuestInfoHandler` (opcode 47) — quest start, progress, complete, and forfeit
+  - `PartyOperationHandler` (opcode 100) — party create, invite, leave, disband
+  - `BuddyListHandler` (opcode 63) — friend list updates and capacity
+  - `ClockHandler` (opcode 122) — world clock and countdown timers
+  - `FameResponseHandler` (opcode 58) — fame give/receive results
+  - `NpcActionHandler` (opcode 263) — NPC stance/animation updates
+  - `BlowWeatherHandler` (opcode 140) — map weather effects
+  - `FamilyHandler`, `ForcedStatSetHandler`, `SetTractionHandler`, `YellowTipHandler`, `CatchMonsterHandler`, `RelogResponseHandler`
+- Unhandled packet logging to `unhandled_packets.txt` for debugging
 
-# Required Files
-*Always check **NxFiles.h** for an updated list of required nx files*
-- [MapPretty.nx] (Trimmed v167 GMS Map.wz)
-- MapLatest.nx (Lastest GMS Map.wz)
-- Map001.nx (Latest GMS Map001.wz)
-- UI.nx (Latest GMS UI.wz)
-- Everything else is from v83 GMS wz files
+### Quest Log
+- Detail panel showing quest name, level requirement, NPC sprite, rewards with item icons, requirements, and quest description
+- Proper text formatting (color code stripping, line break handling)
+- Quest forfeit support via `QuestLog::forfeit()`
 
-There is an archive of all the NX files listed above available for download [here][1] (Latest: v213.2).
+### Soft Keyboard (PIC Entry)
+- Clean 3-column number grid layout (1-9, 0, Del)
+- Cancel/OK buttons properly positioned
+- Draggable keyboard window
+- Numbers-only PIC support
 
-# Dependencies
-- Nx library:
-[NoLifeNx]
+### Character Select Screen
+- Characters centered on screen
+- Proper name tag positioning
+- Start button repositioned
+- Create/Delete character functionality verified
 
-- Wz library:
-N/A
+### UI Improvements
+- Removed key press logging (packet logging retained for debugging)
+- World select draw order fixed
+- UIChannel uses actual world/channel from Configuration instead of hardcoded values
+- Lost items/fame status messages implemented
 
-- Graphics:
-[GLFW3], [GLEW], [FreeType]
+### Code Quality
+- All TODO comments resolved across 27+ files
+- Descriptive comments replacing placeholder notes
+- PIC validation: repetitive character check (no 3 in a row)
 
-- Audio:
-[Bass]
+## What's Left To Do
 
-- Networking:
-[Asio] (optional)
+### Not Yet Implemented
+- **Party system UI** — handler parses data but no Party data structure or UI display
+- **Buddy list UI** — handler parses data but friend list display not connected
+- **Clock display** — handler parses time but no on-screen clock rendering
+- **Cash Shop purchases** — UI exists but purchase flow not implemented
+- **Channel change packet** — no outgoing ChangeChannelPacket
+- **Map scrolling toggle** in minimap
+- **Region change** — UIWorldSelect refresh after region selection
+- **Joypad combo boxes** — controller settings UI incomplete
+- **Character creation color picker** — cycles through series instead of direct selection
 
-# In-Game Issues
-If you experience any kind of in-game glitches, UI rendering issues, or anything else that seems out of the ordinary that other developers are not experiences; Follow these steps in order to hopefully resolve aforementioned issues.
-1. Clean Solution
-2. Close Visual Studio
-3. Delete the following files/folders: **.vs**, **x64**, **debug.log**, **MapleStory.aps**, **Settings**
-4. Open Solution
-5. Rebuild Solution
+### Known Issues
+- NPC interaction fallback when dialog not found
+- Reactor hit/break sounds not played
+- Pet/mount button state not checked in character info
+- Hurricane/piercing arrow/rapidfire attack packets may need additional 4 bytes
+- Critical hit flag placeholder in attack packets
 
-# Binaries (08.19.2019)
-The latest build ([a3a9500][commit]) can be found here: [HeavenClient.rar]
+## Building
 
-# Donations
-If you feel obligated to donate, to further help and support all parties involved in the development of the HeavenClient project, you can donate using [this][2] link.
+### Requirements
+- Visual Studio 2022
+- Windows SDK
+- Dependencies: GLFW, GLEW, FreeType, Bass audio, NoLifeNx, stb_image
 
-Please remember this is ONLY for the HeavenClient development and will only be used in the support of helping further develop the client. *Also please remember to support Nexon as this is not meant to replace anything Nexon offers*
+### Build Steps
+```
+1. Open build/OpenStory.sln in Visual Studio 2022
+2. Set configuration to Debug / x64
+3. Build solution
+4. Output: wz/OpenStory.exe
+```
 
-Another important note to remember is that HeavenClient is a free open-sourced client developed for personal use. Do NOT pay for any services requested by anyone in regards to this client. It will always remain open and free of charge. There is no intent to publish this code with any payment in mind. If that ever changes, donations and disclaimers for donations will be removed.
+### NX Files
+Place your v83 NX files in the `wz/` directory alongside the executable.
 
-[HeavenMS]:          https://github.com/ronancpl/HeavenMS
-[Switch]:            https://github.com/lain3d/HeavenClientNX
-[Linux]:             https://github.com/ryantpayton/HeavenClient/tree/linux
-[Windows 8.1 SDK]:   https://developer.microsoft.com/en-us/windows/downloads/sdk-archive
-[NoLifeWzToNx]:      https://github.com/ryantpayton/NoLifeWzToNx
-[MapPretty.nx]:      https://drive.google.com/file/d/1F7nUgH3royIS75WsPlYwc7RtdiGPnzd_/view?usp=sharing
-[1]:                 https://drive.google.com/file/d/1LKhOtdDWOFJs8eIvqSx8pvP1ZfHF2rpo/view?usp=sharing
-[NoLifeNx]:          https://github.com/ryantpayton/NoLifeNx
-[GLFW3]:             http://www.glfw.org/download.html
-[GLEW]:              http://glew.sourceforge.net/
-[FreeType]:          http://www.freetype.org/
-[Bass]:              http://www.un4seen.com/
-[Asio]:              http://think-async.com/
-[commit]:            https://github.com/HeavenClient/HeavenClient/commit/a3a95007495b6cded5e34af840a1354fd012c4e0
-[HeavenClient.rar]:  https://drive.google.com/file/d/1--KgFBFqrD6_-07cD-S8dpEimbq5tq0t/view?usp=sharing
-[2]:                 https://paypal.me/pools/c/8frYNoobcY
+## Configuration
+
+The default settings can be configured by editing `Configuration.h`. These are also generated after a game session in a file called `Settings`.
+
+Key settings:
+- **ServerIP / ServerPort** — server connection details
+- **Width / Height** — screen resolution (default 1024x768)
+- **BGMVolume / SFXVolume** — audio levels (0-100)
+- **VSync** — vertical sync toggle
+- **SaveLogin** — remember last account name
+
+## Required NX Files
+
+*Check `NxFiles.h` for the full list*
+
+All NX files should be v83 GMS conversions placed in the `wz/` directory.
+
+## Dependencies
+
+| Library | Purpose |
+|---------|---------|
+| [NoLifeNx](https://github.com/ryantpayton/NoLifeNx) | NX file reading |
+| [GLFW3](http://www.glfw.org/) | Window/input management |
+| [GLEW](http://glew.sourceforge.net/) | OpenGL extensions |
+| [FreeType](http://www.freetype.org/) | Font rendering |
+| [Bass](http://www.un4seen.com/) | Audio playback |
+| [Asio](http://think-async.com/) | Networking (optional) |
+
+## Credits
+
+### Original Authors
+- **Daniel Allendorf** — Original Journey/HeavenClient creator
+- **Ryan Payton** — Co-developer of the continued Journey client
+
+### Based On
+- [HeavenClient](https://github.com/HeavenClient/HeavenClient) — The original open-source C++ MapleStory client
+
+### OpenStory Contributors
+- **rdiol12** — v83 cosmic server compatibility, packet handlers, UI fixes, quest system
+
+## License
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+See [LICENSE](LICENSE) for details.

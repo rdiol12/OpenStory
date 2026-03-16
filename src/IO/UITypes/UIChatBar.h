@@ -22,6 +22,7 @@
 
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
@@ -74,10 +75,10 @@ namespace ms
 		int16_t getchatbarheight() const;
 		Rectangle<int16_t> getbounds(Point<int16_t> additional_area) const;
 
-		static constexpr int16_t CHATROWHEIGHT = 13;
+		static constexpr int16_t CHATROWHEIGHT = 16;
 		static constexpr int16_t MINCHATROWS = 1;
 		static constexpr int16_t MAXCHATROWS = 16;
-		static constexpr int16_t DIMENSION_Y = 17;
+		static constexpr int16_t DIMENSION_Y = 60;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
 
 		enum Buttons : uint16_t
@@ -108,16 +109,6 @@ namespace ms
 			NUM_CHATTAB
 		};
 
-		std::vector<std::string> ChatTabText =
-		{
-			"All",
-			"Battle",
-			"Party",
-			"Friend",
-			"Guild",
-			"Alliance"
-		};
-
 		bool chatopen;
 		bool chatopen_persist;
 		bool chatfieldopen;
@@ -125,12 +116,6 @@ namespace ms
 		Texture chatenter;
 		Texture chatcover;
 		Textfield chatfield;
-		Point<int16_t> closechat;
-
-		Text chattab_text[UIChatBar::ChatTab::NUM_CHATTAB];
-		int16_t chattab_x;
-		int16_t chattab_y;
-		int16_t chattab_span;
 
 		Slider slider;
 
@@ -144,5 +129,8 @@ namespace ms
 		std::unordered_map<int16_t, Text> rowtexts;
 
 		bool dragchattop;
+		ColorBox chat_background;
+		int32_t chat_fade_timer;
+		static constexpr int32_t CHAT_FADE_DURATION = 5000;
 	};
 }

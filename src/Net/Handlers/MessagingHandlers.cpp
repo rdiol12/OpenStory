@@ -18,6 +18,7 @@
 #include "MessagingHandlers.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Character/QuestLog.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
@@ -88,9 +89,9 @@ namespace ms
 					break;
 				}
 
-				// TODO: show_status(Color::Name::WHITE, "You have lost items in the " + tab + " tab (" + name + " " + std::to_string(qty) + ")");
-
-				if (qty < 0)
+				if (qty < -1)
+					show_status(Color::Name::WHITE, "You have lost items in the " + tab + " tab (" + name + " " + std::to_string(qty) + ")");
+				else if (qty == -1)
 					show_status(Color::Name::WHITE, "You have lost an item in the " + tab + " tab (" + name + ")");
 				else if (qty == 1)
 					show_status(Color::Name::WHITE, "You have gained an item in the " + tab + " tab (" + name + ")");
@@ -109,6 +110,26 @@ namespace ms
 			else
 			{
 				show_status(Color::Name::RED, "Mode: 0, Mode 2: " + std::to_string(mode2) + " is not handled.");
+			}
+		}
+		else if (mode == 1)
+		{
+			int16_t qid = recv.read_short();
+			int8_t status = recv.read_byte();
+
+			QuestLog& quests = Stage::get().get_player().get_quests();
+
+			if (status == 1)
+			{
+				std::string qdata = recv.read_string();
+				quests.add_started(qid, qdata);
+				show_status(Color::Name::WHITE, "Quest updated.");
+			}
+			else if (status == 2)
+			{
+				int64_t time = recv.read_long();
+				quests.add_completed(qid, time);
+				show_status(Color::Name::WHITE, "Quest completed!");
 			}
 		}
 		else if (mode == 3)
@@ -144,8 +165,11 @@ namespace ms
 			int32_t gain = recv.read_int();
 			std::string sign = (gain < 0) ? "-" : "+";
 
-			// TODO: Lose fame?
-			show_status(Color::Name::WHITE, "You have gained fame. (" + sign + std::to_string(gain) + ")");
+			// Negative gain values indicate fame loss
+			if (gain < 0)
+				show_status(Color::Name::WHITE, "You have lost fame. (" + sign + std::to_string(-gain) + ")");
+			else
+				show_status(Color::Name::WHITE, "You have gained fame. (" + sign + std::to_string(gain) + ")");
 		}
 		else
 		{
@@ -186,7 +210,7 @@ namespace ms
 
 	void WeekEventMessageHandler::handle(InPacket& recv) const
 	{
-		recv.read_byte(); // TODO: Always 0xFF, Check this!
+		recv.read_byte(); // Always 0xFF (padding byte)
 
 		std::string message = recv.read_string();
 

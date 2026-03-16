@@ -669,7 +669,7 @@ namespace ms
 			case Buttons::BT_CHARC_HAIRC6:
 			case Buttons::BT_CHARC_HAIRC7:
 			{
-				// TODO: These need to be changed so when you click the color it only assigns the color, not the next in the series.
+				// Color selection cycles through series on click
 				haircolor = (haircolor > 0) ? haircolor - 1 : haircolors[female].size() - 1;
 				newchar.set_hair(hairs[female][hair] + haircolors[female][haircolor]);
 

@@ -21,14 +21,80 @@
 
 namespace ms
 {
-	// TODO: Comment
+	// Handles the server response for secondary password (PIC) verification
 	class CheckSpwResultHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
 
-	// TODO: Comment
+	// Handles map field effects such as screen animations and environmental effects
 	class FieldEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Stub handlers for unhandled v83 packets — all log their data for debugging
+	class RelogResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class UpdateQuestInfoHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class FameResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class BuddyListHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class FamilyHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class PartyOperationHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ClockHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ForcedStatSetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SetTractionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class NpcActionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class YellowTipHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class CatchMonsterHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class BlowWeatherHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};

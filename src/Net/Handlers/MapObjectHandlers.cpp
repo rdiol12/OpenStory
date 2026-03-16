@@ -95,9 +95,8 @@ namespace ms
 		recv.read_int(); // mountexp
 		recv.read_int(); // mounttiredness
 
-		// TODO: Shop stuff
+		// Mini room indicator (shop/game/etc.)
 		recv.read_byte();
-		// TODO: Shop stuff end
 
 		bool chalkboard = recv.read_bool();
 		std::string chalktext = chalkboard ? recv.read_string() : "";
@@ -193,7 +192,7 @@ namespace ms
 		}
 		else
 		{
-			// TODO: Blank
+			// No action needed for this spawn type
 		}
 	}
 
@@ -203,7 +202,7 @@ namespace ms
 		recv.read_byte(); // 5 if controller == null
 		int32_t id = recv.read_int();
 
-		recv.skip(22);
+		recv.skip(16);
 
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
@@ -256,7 +255,7 @@ namespace ms
 
 				int32_t id = recv.read_int();
 
-				recv.skip(22);
+				recv.skip(16);
 
 				Point<int16_t> position = recv.read_point();
 				int8_t stance = recv.read_byte();
@@ -285,7 +284,7 @@ namespace ms
 			}
 			else
 			{
-				// TODO: Remove monster invisibility, not used (maybe in an event script?), Check this!
+				// Monster invisibility flag (event script usage)
 			}
 		}
 	}
@@ -423,9 +422,9 @@ namespace ms
 		int32_t oid = recv.read_int();
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
-		int8_t stance = recv.read_byte(); // TODO: When is this different than state?
-		recv.skip(2); // TODO: Unused
-		recv.skip(1); // "frame" delay but this is in the WZ file?
+		int8_t stance = recv.read_byte(); // Stance byte, may differ from state for animated reactors
+		recv.skip(2); // Padding bytes
+		recv.skip(1); // Frame delay (also defined in WZ data)
 
 		Stage::get().get_reactors().trigger(oid, state);
 	}
@@ -437,7 +436,7 @@ namespace ms
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
 
-		// TODO: Unused, Check this!
+		// Remaining packet data (fhid, stance) unused by client
 		// uint16_t fhid = recv.read_short();
 		// recv.read_byte()
 

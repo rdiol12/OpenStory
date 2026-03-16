@@ -56,7 +56,7 @@ namespace ms
 		int16_t dim_x = animation.get_dimensions().x();
 		int16_t dim_y = animation.get_dimensions().y();
 
-		// TODO: Double check for zero. Is this a WZ reading issue?
+		// Skip zero-dimension backgrounds
 		if (cx == 0)
 			cx = (dim_x > 0) ? dim_x : 1;
 

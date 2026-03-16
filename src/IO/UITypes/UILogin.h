@@ -45,8 +45,10 @@ namespace ms
 	protected:
 		Button::State button_pressed(uint16_t id) override;
 
-	private:
+	public:
 		void login();
+
+	private:
 		void open_url(uint16_t id);
 
 		enum Buttons

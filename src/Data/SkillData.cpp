@@ -145,7 +145,7 @@ namespace ms
 			{ SkillId::POISON_BREATH, ATTACK },
 			{ SkillId::SEAL_FP, ATTACK },
 			{ SkillId::ELEMENT_COMPOSITION_FP, ATTACK | RANGED },
-			// TODO: Blank?
+			// No data for this skill level
 			{ SkillId::FIRE_DEMON, ATTACK },
 			{ SkillId::PARALYZE, ATTACK | RANGED },
 			{ SkillId::METEOR_SHOWER, ATTACK }

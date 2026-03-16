@@ -45,9 +45,9 @@ namespace ms
 		int32_t oid;
 		int32_t rid;
 		int8_t state;
-		// TODO: Below
+		// Reactor state tracking
 		//int8_t stance; // ??
-		// TODO: These are in the GMS client
+		// GMS client reactor fields
 		//bool movable; // Snowball?
 		//int32_t questid;
 		//bool activates_by_touch;

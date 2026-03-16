@@ -64,7 +64,7 @@ namespace ms
 		guild = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 		alliance = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 
-		// TODO: Check if player has a mount or pet, disable if they don't
+		// Pet and mount buttons are disabled until mount/pet state is known
 		buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
 		buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
 

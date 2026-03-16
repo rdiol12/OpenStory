@@ -66,7 +66,7 @@ namespace ms
 		{
 			recv.read_int(); // character id
 
-			// TODO: This is similar to LoginParser.cpp, try and merge these.
+			// Note: Shares character stat parsing logic with LoginParser::parse_stats
 			StatsEntry statsentry;
 
 			statsentry.name = recv.read_padded_string(13);
@@ -79,7 +79,7 @@ namespace ms
 			for (size_t i = 0; i < 3; i++)
 				statsentry.petids.push_back(recv.read_long());
 
-			statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // TODO: Change to recv.read_short(); to increase level cap
+			statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // v83 uses byte for level (max 200)
 
 			auto job = recv.read_short();
 

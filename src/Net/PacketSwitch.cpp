@@ -49,6 +49,7 @@ namespace ms
 		PING = 17,
 
 		/// Login 2
+		RELOG_RESPONSE = 26,
 		RECOMMENDED_WORLDS = 27,
 		CHECK_SPW_RESULT = 28,
 
@@ -65,10 +66,17 @@ namespace ms
 
 		/// Messaging 1
 		SHOW_STATUS_INFO = 39,
+		UPDATE_QUEST_INFO = 47,
+		FAME_RESPONSE = 58,
+		BUDDY_LIST = 63,
 
 		/// Inventory 2
 		GATHER_RESULT = 52,
 		SORT_RESULT = 53,
+
+		/// Social
+		FAMILY = 95,
+		PARTY_OPERATION = 100,
 
 		/// Player 3
 
@@ -76,9 +84,13 @@ namespace ms
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
 
+		CLOCK = 122,
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
 		FIELD_EFFECT = 138,
+		BLOW_WEATHER = 140,
+		FORCED_STAT_SET = 144,
+		SET_TRACTION = 159,
 
 		/// MapObject
 		SPAWN_CHAR = 160,
@@ -99,7 +111,7 @@ namespace ms
 
 		UPDATE_CHARLOOK = 197,
 		SHOW_FOREIGN_EFFECT = 198,
-		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
+		SHOW_ITEM_GAIN_INCHAT = 206,
 
 		/// Player
 		ADD_COOLDOWN = 234,
@@ -118,6 +130,8 @@ namespace ms
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
 
+		NPC_ACTION = 263,
+
 		/// NPC Interaction
 		NPC_DIALOGUE = 304,
 		OPEN_NPC_SHOP = 305,
@@ -128,7 +142,11 @@ namespace ms
 		CHAR_INFO = 61,
 
 		/// Cash Shop
-		SET_CASH_SHOP = 127
+		SET_CASH_SHOP = 127,
+
+		/// Misc
+		YELLOW_TIP = 336,
+		CATCH_MONSTER = 337
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -209,9 +227,24 @@ namespace ms
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
 
-		// TODO: New handlers, they need coded and moved to a proper file.
+		// Additional v83 handlers
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();
 		emplace<FIELD_EFFECT, FieldEffectHandler>();
+		emplace<BLOW_WEATHER, BlowWeatherHandler>();
+
+		// Stub handlers for unhandled v83 packets
+		emplace<RELOG_RESPONSE, RelogResponseHandler>();
+		emplace<UPDATE_QUEST_INFO, UpdateQuestInfoHandler>();
+		emplace<FAME_RESPONSE, FameResponseHandler>();
+		emplace<BUDDY_LIST, BuddyListHandler>();
+		emplace<FAMILY, FamilyHandler>();
+		emplace<PARTY_OPERATION, PartyOperationHandler>();
+		emplace<CLOCK, ClockHandler>();
+		emplace<FORCED_STAT_SET, ForcedStatSetHandler>();
+		emplace<SET_TRACTION, SetTractionHandler>();
+		emplace<NPC_ACTION, NpcActionHandler>();
+		emplace<YELLOW_TIP, YellowTipHandler>();
+		emplace<CATCH_MONSTER, CatchMonsterHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const
@@ -262,5 +295,13 @@ namespace ms
 	void PacketSwitch::warn(const std::string& message, size_t opcode) const
 	{
 		std::cout << "Opcode [" << opcode << "] Error: " << message << std::endl;
+
+		// Also write to log file for debugging
+		static FILE* logfile = fopen("unhandled_packets.txt", "a");
+		if (logfile)
+		{
+			fprintf(logfile, "Opcode [%zu]: %s\n", opcode, message.c_str());
+			fflush(logfile);
+		}
 	}
 }

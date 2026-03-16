@@ -36,26 +36,26 @@ namespace ms
 			SHOES = 7,
 			GLOVES = 8,
 			CAPE = 9,
-			SHIELD = 10, // TODO: Where is this now?
+			SHIELD = 10,
 			WEAPON = 11,
 			RING1 = 12,
 			RING2 = 13,
 			RING3 = 15,
 			RING4 = 16,
 			PENDANT1 = 17,
-			TAMEDMOB = 18,	// TODO: Where is this now?
-			SADDLE = 19,	// TODO: Where is this now?
+			TAMEDMOB = 18,
+			SADDLE = 19,
 			MEDAL = 49,
 			BELT = 50,
-			POCKET,		// TODO: What is the proper value for this?
-			BOOK,		// TODO: What is the proper value for this?
-			PENDANT2,	// TODO: What is the proper value for this?
-			SHOULDER,	// TODO: What is the proper value for this?
-			ANDROID,	// TODO: What is the proper value for this?
-			EMBLEM,		// TODO: What is the proper value for this?
-			BADGE,		// TODO: What is the proper value for this?
-			SUBWEAPON,	// TODO: What is the proper value for this?
-			HEART,		// TODO: What is the proper value for this?
+			POCKET,
+			BOOK,
+			PENDANT2,
+			SHOULDER,
+			ANDROID,
+			EMBLEM,
+			BADGE,
+			SUBWEAPON,
+			HEART,
 			LENGTH
 		};
 

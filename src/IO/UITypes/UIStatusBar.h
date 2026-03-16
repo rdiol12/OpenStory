@@ -23,7 +23,7 @@
 #include "../Components/Gauge.h"
 
 #include "../../Character/CharStats.h"
-#include "../../Graphics/SpecialText.h"
+#include "../../Graphics/Text.h"
 
 namespace ms
 {
@@ -33,15 +33,6 @@ namespace ms
 		static constexpr Type TYPE = UIElement::Type::STATUSBAR;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
-
-		enum MenuType
-		{
-			MENU,
-			SETTING,
-			COMMUNITY,
-			CHARACTER,
-			EVENT
-		};
 
 		UIStatusBar(const CharStats& stats);
 
@@ -62,58 +53,24 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		static constexpr int16_t QUICKSLOT_MAX = 211;
-
 		float getexppercent() const;
 		float gethppercent() const;
 		float getmppercent() const;
 
-		void toggle_qs(bool quick_slot_active);
-		void toggle_setting();
-		void toggle_community();
-		void toggle_character();
-		void toggle_event();
-		void remove_active_menu(MenuType type);
-
-		Point<int16_t> get_quickslot_pos() const;
-
 		enum Buttons : uint16_t
 		{
+			BT_WHISPER,
+			BT_CALLGM,
 			BT_CASHSHOP,
+			BT_TRADE,
 			BT_MENU,
 			BT_OPTIONS,
 			BT_CHARACTER,
-			BT_COMMUNITY,
-			BT_EVENT,
-			BT_FOLD_QS,
-			BT_EXTEND_QS,
-			BT_MENU_QUEST,
-			BT_MENU_MEDAL,
-			BT_MENU_UNION,
-			BT_MENU_MONSTER_COLLECTION,
-			BT_MENU_AUCTION,
-			BT_MENU_MONSTER_LIFE,
-			BT_MENU_BATTLE,
-			BT_MENU_ACHIEVEMENT,
-			BT_MENU_FISHING,
-			BT_MENU_HELP,
-			BT_MENU_CLAIM,
-			BT_SETTING_CHANNEL,
-			BT_SETTING_OPTION,
-			BT_SETTING_KEYS,
-			BT_SETTING_JOYPAD,
-			BT_SETTING_QUIT,
-			BT_COMMUNITY_FRIENDS,
-			BT_COMMUNITY_PARTY,
-			BT_COMMUNITY_GUILD,
-			BT_COMMUNITY_MAPLECHAT,
-			BT_CHARACTER_INFO,
-			BT_CHARACTER_STAT,
-			BT_CHARACTER_SKILL,
-			BT_CHARACTER_EQUIP,
-			BT_CHARACTER_ITEM,
-			BT_EVENT_SCHEDULE,
-			BT_EVENT_DAILY
+			BT_STATS,
+			BT_QUEST,
+			BT_INVENTORY,
+			BT_EQUIPS,
+			BT_SKILL
 		};
 
 		const CharStats& stats;
@@ -122,41 +79,8 @@ namespace ms
 		Gauge hpbar;
 		Gauge mpbar;
 		Charset statset;
-		Charset hpmpset;
 		Charset levelset;
-		Texture quickslot[2];
-		Texture menutitle[5];
-		Texture menubackground[3];
-		OutlinedText namelabel;
-		std::vector<Sprite> hpmp_sprites;
-
-		Point<int16_t> exp_pos;
-		Point<int16_t> hpmp_pos;
-		Point<int16_t> hpset_pos;
-		Point<int16_t> mpset_pos;
-		Point<int16_t> statset_pos;
-		Point<int16_t> levelset_pos;
-		Point<int16_t> namelabel_pos;
-		Point<int16_t> quickslot_pos;
-		Point<int16_t> quickslot_adj;
-		Point<int16_t> quickslot_qs_adj;
-		Point<int16_t> menu_pos;
-		Point<int16_t> setting_pos;
-		Point<int16_t> community_pos;
-		Point<int16_t> character_pos;
-		Point<int16_t> event_pos;
-		int16_t quickslot_min;
-		int16_t position_x;
-		int16_t position_y;
-
-		bool quickslot_active;
-		int16_t VWIDTH;
-		int16_t VHEIGHT;
-
-		bool menu_active;
-		bool setting_active;
-		bool community_active;
-		bool character_active;
-		bool event_active;
+		Text namelabel;
+		Text joblabel;
 	};
 }
