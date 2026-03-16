@@ -470,6 +470,12 @@ namespace ms
 		PosCHARINFO() : PointEntry("PosCHARINFO", "(264, 264)") {}
 	};
 
+	// The default position of UIBuddyList
+	struct PosBUDDYLIST : public Configuration::PointEntry
+	{
+		PosBUDDYLIST() : PointEntry("PosBUDDYLIST", "(120, 120)") {}
+	};
+
 	// The default type of UIMiniMap
 	struct MiniMapType : public Configuration::ByteEntry
 	{

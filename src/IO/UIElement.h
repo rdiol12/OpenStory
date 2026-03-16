@@ -71,6 +71,8 @@ namespace ms
 			QUIT,
 			CHARINFO,
 			CASHSHOP,
+			CLOCK,
+			BUDDYLIST,
 			NUM_TYPES
 		};
 

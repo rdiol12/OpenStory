@@ -85,6 +85,17 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// Clock state management
+		void set_clock(int8_t hour, int8_t min, int8_t sec);
+		void set_countdown(int32_t seconds);
+		void clear_clock();
+		bool is_clock_active() const;
+		bool is_countdown_active() const;
+		int8_t get_clock_hour() const;
+		int8_t get_clock_min() const;
+		int8_t get_clock_sec() const;
+		int32_t get_countdown_seconds() const;
+
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -134,5 +145,13 @@ namespace ms
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;
 		int64_t expBefore;
+
+		// Clock state
+		int8_t clock_hour = 0;
+		int8_t clock_min = 0;
+		int8_t clock_sec = 0;
+		bool clock_active = false;
+		int32_t countdown_seconds = 0;
+		bool countdown_active = false;
 	};
 }
