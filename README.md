@@ -1,4 +1,6 @@
 # OpenStory
+support for 1920x1080 is wip
+
 
 A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient), rewritten and extended for full v83 compatibility.
 
