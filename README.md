@@ -91,7 +91,6 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 ## What's Left To Do
 
 ### Not Yet Implemented
-- **MTS server-side** — Cosmic has MTS support but it must be enabled (`USE_MTS: true` in config.yaml, run `019-mts.sql`)
 - **Cash Shop purchases** — UI exists but purchase flow incomplete
 - **Storage UI** — handler/UI stubbed but not fully wired
 - **Trade UI** — player-to-player trade stubbed
