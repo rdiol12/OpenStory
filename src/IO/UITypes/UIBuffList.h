@@ -30,6 +30,8 @@ namespace ms
 
 		void draw(Point<int16_t> position, float alpha) const;
 		bool update();
+		int32_t get_buffid() const;
+		bool contains(Point<int16_t> icon_pos, Point<int16_t> cursorpos) const;
 
 	private:
 		static const uint16_t FLASH_TIME = 3'000;

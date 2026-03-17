@@ -46,13 +46,19 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		void load_quests();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		void change_tab(uint16_t tabid);
-		void load_quests();
 		void select_quest(int16_t index);
+
+		// Safe button accessors (many buttons don't exist in v83)
+		void set_btn_active(uint16_t id, bool active);
+		void set_btn_state(uint16_t id, Button::State state);
+		void set_btn_position(uint16_t id, Point<int16_t> pos);
 
 		enum Buttons : uint16_t
 		{
@@ -76,7 +82,9 @@ namespace ms
 			BT_DETAIL_CLOSE,
 			BT_ARLIM,
 			BT_DELIVERY_ACCEPT,
-			BT_DELIVERY_COMPLETE
+			BT_DELIVERY_COMPLETE,
+			BT_NO,
+			BT_ALERT
 		};
 
 		static constexpr int16_t ROWS = 10;
@@ -115,6 +123,7 @@ namespace ms
 		// Gauge2 - quest progress bar (root level)
 		Texture gauge2_frame;
 		Texture gauge2_bar;
+		Texture gauge2_spot;
 
 		// TimeQuest
 		Animation time_alarm_clock;
@@ -123,6 +132,7 @@ namespace ms
 		// icon_info panel
 		Texture icon_info_backgrnd;
 		Texture icon_info_backgrnd2;
+		Texture icon_info_sheet;
 		bool show_icon_info;
 
 		// List extras
@@ -161,6 +171,7 @@ namespace ms
 		// Detail panel gauge (quest progress)
 		Texture detail_gauge_frame;
 		Texture detail_gauge_bar;
+		Texture detail_gauge_spot;
 		float detail_progress;
 
 		// NPC sprite
@@ -205,5 +216,30 @@ namespace ms
 		int32_t detail_order;
 		bool detail_auto_start;
 		bool detail_auto_complete;
+
+		// v83 root textures from UIWindow.img/Quest
+		Texture basic_texture;
+		Texture prob_texture;
+		Texture reward_texture;
+		Texture summary_texture;
+
+		// v83 overlay backgrounds from UIWindow.img/Quest
+		Texture v83_backgrnd3;
+		Texture v83_backgrnd4;
+		Texture v83_backgrnd5;
+
+		// notice animated set (0,1,2) from UIWindow.img/Quest/notice
+		std::vector<Texture> notice_set;
+
+		// QuestAlarm (UIWindow.img/QuestAlarm)
+		Texture quest_alarm_bg_bottom;
+		Texture quest_alarm_bg_center;
+		Texture quest_alarm_bg_max;
+		Texture quest_alarm_bg_min;
+		Animation quest_alarm_anim;
+		bool show_quest_alarm;
+
+		// QuestIcon (UIWindow.img/QuestIcon) — animated status icons 0-11
+		std::vector<Animation> quest_status_icons;
 	};
 }

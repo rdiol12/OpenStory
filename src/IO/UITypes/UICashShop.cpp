@@ -184,6 +184,19 @@ namespace ms
 
 		update_items();
 
+		// === Sub-panel backgrounds ===
+		nl::node csui = nl::nx::ui["CashShop.img"];
+		if (csui.size() > 0)
+		{
+			wishlist_bg = Texture(csui["CSWish"]["backgrnd"]);
+			gift_bg = Texture(csui["CSGift"]["backgrnd"]);
+			coupon_bg = Texture(csui["CSCoupon"]["backgrnd"]);
+			search_bg = Texture(csui["CSSearch"]["backgrnd"]);
+			cs_inventory_bg = Texture(csui["CSInventory"]["backgrnd"]);
+			purchase_bg = Texture(csui["CSPurchase"]["backgrnd"]);
+		}
+		active_subpanel = SUBPANEL_NONE;
+
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 
@@ -253,6 +266,37 @@ namespace ms
 		list_slider.draw(position);
 
 		UIElement::draw_buttons(inter);
+
+		// Draw active sub-panel
+		switch (active_subpanel)
+		{
+		case SUBPANEL_WISHLIST:
+			if (wishlist_bg.is_valid())
+				wishlist_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		case SUBPANEL_GIFT:
+			if (gift_bg.is_valid())
+				gift_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		case SUBPANEL_COUPON:
+			if (coupon_bg.is_valid())
+				coupon_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		case SUBPANEL_SEARCH:
+			if (search_bg.is_valid())
+				search_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		case SUBPANEL_INVENTORY:
+			if (cs_inventory_bg.is_valid())
+				cs_inventory_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		case SUBPANEL_PURCHASE:
+			if (purchase_bg.is_valid())
+				purchase_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+			break;
+		default:
+			break;
+		}
 	}
 
 	void UICashShop::update()
@@ -328,6 +372,15 @@ namespace ms
 
 			return Button::State::NORMAL;
 		}
+		case Buttons::BtWish:
+			active_subpanel = (active_subpanel == SUBPANEL_WISHLIST) ? SUBPANEL_NONE : SUBPANEL_WISHLIST;
+			return Button::State::NORMAL;
+		case Buttons::BtCoupon:
+			active_subpanel = (active_subpanel == SUBPANEL_COUPON) ? SUBPANEL_NONE : SUBPANEL_COUPON;
+			return Button::State::NORMAL;
+		case Buttons::BtInventory:
+			active_subpanel = (active_subpanel == SUBPANEL_INVENTORY) ? SUBPANEL_NONE : SUBPANEL_INVENTORY;
+			return Button::State::NORMAL;
 		default:
 			break;
 		}

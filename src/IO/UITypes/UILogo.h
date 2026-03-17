@@ -42,6 +42,7 @@ namespace ms
 		Animation Wizet;
 		Texture WizetEnd;
 
+		Point<int16_t> screen_adj;
 		bool nexon_ended;
 		bool wizet_ended;
 		bool user_clicked;

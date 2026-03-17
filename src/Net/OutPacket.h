@@ -65,6 +65,7 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			MULTI_CHAT = 119,
 
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
@@ -90,9 +91,11 @@ namespace ms
 
 			/// Skill
 			USE_SKILL = 91,
+			SKILL_MACRO_MODIFIED = 92,
 
 			/// Gameplay 2
 			PARTY_OPERATION = 124,
+			DENY_PARTY_REQUEST = 125,
 			ADMIN_COMMAND = 128,
 			MOVE_MONSTER = 188,
 			PICKUP_ITEM = 202,

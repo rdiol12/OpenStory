@@ -33,37 +33,62 @@ namespace ms
 		public:
 			Constants()
 			{
-				VIEWWIDTH = 800;
-				VIEWHEIGHT = 600;
+				PHYSWIDTH = 1920;
+				PHYSHEIGHT = 1080;
+				UI_SCALE = 1.5f;
 			};
 
 			~Constants() {};
 
+			// Logical dimensions (what game/UI code uses for positioning)
 			int16_t get_viewwidth()
 			{
-				return VIEWWIDTH;
-			}
-
-			void set_viewwidth(int16_t width)
-			{
-				VIEWWIDTH = width;
+				return static_cast<int16_t>(PHYSWIDTH / UI_SCALE);
 			}
 
 			int16_t get_viewheight()
 			{
-				return VIEWHEIGHT;
+				return static_cast<int16_t>(PHYSHEIGHT / UI_SCALE);
+			}
+
+			// Physical dimensions (actual window/viewport size)
+			int16_t get_physicalwidth()
+			{
+				return PHYSWIDTH;
+			}
+
+			int16_t get_physicalheight()
+			{
+				return PHYSHEIGHT;
+			}
+
+			void set_viewwidth(int16_t width)
+			{
+				PHYSWIDTH = width;
 			}
 
 			void set_viewheight(int16_t height)
 			{
-				VIEWHEIGHT = height;
+				PHYSHEIGHT = height;
+			}
+
+			float get_ui_scale()
+			{
+				return UI_SCALE;
+			}
+
+			void set_ui_scale(float scale)
+			{
+				if (scale >= 1.0f && scale <= 3.0f)
+					UI_SCALE = scale;
 			}
 
 		private:
-			// Window and screen width.
-			int16_t VIEWWIDTH;
-			// Window and screen height.
-			int16_t VIEWHEIGHT;
+			// Physical window dimensions
+			int16_t PHYSWIDTH;
+			int16_t PHYSHEIGHT;
+			// UI scale factor (physical / logical)
+			float UI_SCALE;
 		};
 	}
 }

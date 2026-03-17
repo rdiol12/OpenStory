@@ -25,6 +25,18 @@
 
 namespace ms
 {
+	// Quest mark type to display above an NPC
+	enum class QuestMarkType : uint8_t
+	{
+		NONE,
+		AVAILABLE,         // Normal quest available (yellow !)
+		IN_PROGRESS,       // Quest in progress (yellow ?)
+		COMPLETE,          // Quest ready to complete (yellow ? with light)
+		AVAILABLE_REPEAT,  // Repeat quest available
+		LOW_LEVEL,         // Available but low level
+		HIGH_LEVEL         // Available but high level
+	};
+
 	// Represents a NPC on the current map
 	// Implements the 'MapObject' interface to be used in a 'MapObjects' template
 	class Npc : public MapObject
@@ -53,6 +65,12 @@ namespace ms
 		// Returns the NPC's data ID
 		int32_t get_npcid() const;
 
+		// Recalculate quest mark for this NPC based on current quest state
+		void update_quest_mark();
+
+		// Initialize shared quest mark animations (call once at startup)
+		static void init_quest_marks();
+
 	private:
 		std::map<std::string, Animation> animations;
 		std::map<std::string, std::vector<std::string>> lines;
@@ -71,5 +89,18 @@ namespace ms
 		Randomizer random;
 		Text namelabel;
 		Text funclabel;
+
+		// Quest mark above NPC
+		QuestMarkType quest_mark_type;
+		mutable Animation quest_mark_anim;
+
+		// Shared quest mark animations (loaded once)
+		static bool marks_initialized;
+		static Animation mark_available;      // QuestMark (yellow !)
+		static Animation mark_in_progress;    // QuestIcon/2 or forNPC
+		static Animation mark_complete;       // QuestIcon/1
+		static Animation mark_repeat;         // RepeatQuestMark/forNPC
+		static Animation mark_low_level;      // LowLVQuestMark/forNPC
+		static Animation mark_high_level;     // HighLVQuestMark/forNPC
 	};
 }

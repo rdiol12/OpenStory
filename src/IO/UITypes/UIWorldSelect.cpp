@@ -25,6 +25,7 @@
 #include "../Components/TwoSpriteButton.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Constants.h"
 #include "../../Net/Packets/LoginPackets.h"
 
 
@@ -34,7 +35,7 @@
 
 namespace ms
 {
-	UIWorldSelect::UIWorldSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIWorldSelect::UIWorldSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
 		worldid = Setting<DefaultWorld>::get().load();
 		channelid = Setting<DefaultChannel>::get().load();
@@ -45,13 +46,18 @@ namespace ms
 		hovered_world = -1;
 		active_channelcount = 0;
 
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
 		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
 		nl::node ws = nl::nx::ui["Login.img"]["WorldSelect"];
 		nl::node worldsrc = ws["BtWorld"]["release"];
 		nl::node channelsrc = ws["BtChannel"];
 
 		// === Background sprites ===
-		sprites.emplace_back(back["11"], Point<int16_t>(370, 300));
+		sprites.emplace_back(back["11"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 		sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
 
 		// === Enter world button ===

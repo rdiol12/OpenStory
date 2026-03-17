@@ -26,6 +26,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
@@ -38,7 +39,7 @@
 
 namespace ms
 {
-	UIAranCreation::UIAranCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIAranCreation::UIAranCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
 		gender = false;
 		charSet = false;
@@ -58,8 +59,13 @@ namespace ms
 		sky = back["2"];
 		cloud = back["27"];
 
-		sprites.emplace_back(back["33"], Point<int16_t>(256, 299));
-		sprites.emplace_back(back["34"], Point<int16_t>(587, 157));
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
+		sprites.emplace_back(back["33"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(back["34"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 		sprites_gender_select.emplace_back(board["genderTop"], Point<int16_t>(491, 168));
 		sprites_gender_select.emplace_back(board["boardMid"], Point<int16_t>(491, 220));
 		sprites_gender_select.emplace_back(board["boardBottom"], Point<int16_t>(491, 313));
@@ -179,11 +185,14 @@ namespace ms
 
 	void UIAranCreation::draw(float inter) const
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+
 		for (size_t i = 0; i < 2; i++)
-			for (size_t k = 0; k < 800; k += sky.width())
+			for (int16_t k = 0; k < vw; k += sky.width())
 				sky.draw(Point<int16_t>(k, (400 * i) - 100));
 
-		int16_t cloudx = static_cast<int16_t>(cloudfx) % 800;
+		int16_t cloudx = static_cast<int16_t>(cloudfx) % vw;
 		cloud.draw(Point<int16_t>(cloudx - cloud.width(), 310));
 		cloud.draw(Point<int16_t>(cloudx, 310));
 		cloud.draw(Point<int16_t>(cloudx + cloud.width(), 310));

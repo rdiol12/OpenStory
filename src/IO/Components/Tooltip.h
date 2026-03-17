@@ -38,7 +38,8 @@ namespace ms
 			TEXT,
 			KEYCONFIG,
 			WORLDMAP,
-			MINIMAP
+			MINIMAP,
+			BUFFLIST
 		};
 
 		virtual ~Tooltip() {}

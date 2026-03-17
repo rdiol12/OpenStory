@@ -28,6 +28,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Job.h"
@@ -110,11 +111,16 @@ namespace ms
 		if (!back_node)
 			back_node = map_login["back"]["0"];
 
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
 		if (back_node)
-			sprites.emplace_back(back_node, Point<int16_t>(370, 300));
+			sprites.emplace_back(back_node, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 
 		if (Common["frame"])
-			sprites.emplace_back(Common["frame"], Point<int16_t>(400, 290));
+			sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 
 		if (Common["step"]["2"])
 			sprites.emplace_back(Common["step"]["2"], Point<int16_t>(40, 0));
@@ -192,7 +198,7 @@ namespace ms
 			).dispatch();
 		}
 
-		dimension = Point<int16_t>(800, 600);
+		dimension = Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 	}
 
 	void UICharSelect::draw(float inter) const

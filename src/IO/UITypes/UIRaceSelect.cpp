@@ -29,6 +29,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 
@@ -38,8 +39,13 @@
 
 namespace ms
 {
-	UIRaceSelect::UIRaceSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIRaceSelect::UIRaceSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
 		std::string version_text = Configuration::get().get_version();
 		version = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::LEMONGRASS, "Ver. " + version_text);
 
@@ -94,8 +100,8 @@ namespace ms
 		class_isdisabled[Classes::CYGNUSKNIGHTS] = false;
 		class_isdisabled[Classes::ARAN] = false;
 
-		sprites.emplace_back(frame, Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["frame"], Point<int16_t>(400, 300));
+		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 
 		back = RaceSelect["Back"]["1"]["0"];
 		backZero = RaceSelect["Back"]["2"]["0"];
@@ -144,12 +150,18 @@ namespace ms
 
 	void UIRaceSelect::draw(float inter) const
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+		DrawArgument bg_args = DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy);
+
 		uint16_t corrected_index = get_corrected_class_index(selected_class);
 
 		if (selected_class == Classes::ZERO)
-			backZero.draw(position);
+			backZero.draw(bg_args);
 		else
-			back.draw(position);
+			back.draw(bg_args);
 
 		UIElement::draw_sprites(inter);
 
@@ -158,24 +170,24 @@ namespace ms
 		if (selected_class == Classes::KANNA || selected_class == Classes::CHASE)
 		{
 			if (selected_class == Classes::ZERO)
-				class_details_backgroundZero.draw(position);
+				class_details_backgroundZero.draw(bg_args);
 			else
-				class_details_background.draw(position);
+				class_details_background.draw(bg_args);
 
-			class_background[corrected_index].draw(position);
+			class_background[corrected_index].draw(bg_args);
 		}
 		else
 		{
-			class_background[corrected_index].draw(position);
+			class_background[corrected_index].draw(bg_args);
 
 			if (selected_class == Classes::ZERO)
-				class_details_backgroundZero.draw(position);
+				class_details_backgroundZero.draw(bg_args);
 			else
-				class_details_background.draw(position);
+				class_details_background.draw(bg_args);
 		}
 
-		class_details[corrected_index].draw(position);
-		class_title[corrected_index].draw(position);
+		class_details[corrected_index].draw(bg_args);
+		class_title[corrected_index].draw(bg_args);
 
 		for (nl::node node : hotlist)
 		{

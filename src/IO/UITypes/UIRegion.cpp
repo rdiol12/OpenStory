@@ -23,31 +23,39 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Constants.h"
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UIRegion::UIRegion() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIRegion::UIRegion() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		Point<int16_t> screen_adj = Point<int16_t>((vw - 800) / 2, (vh - 600) / 2);
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
 		nl::node Common = nl::nx::ui["Login.img"]["Common"];
 		nl::node frame = nl::nx::mapLatest["Obj"]["login.img"]["Common"]["frame"]["2"]["0"];
 		nl::node Gateway = nl::nx::ui["Gateway.img"]["WorldSelect"];
 		nl::node na = Gateway["BtButton0"];
 		nl::node eu = Gateway["BtButton1"];
 
-		sprites.emplace_back(Gateway["backgrnd2"]);
-		sprites.emplace_back(frame, Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["frame"], Point<int16_t>(400, 300));
+		sprites.emplace_back(Gateway["backgrnd2"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 
-		int16_t pos_y = 84;
-		Point<int16_t> na_pos = Point<int16_t>(155, pos_y);
-		Point<int16_t> eu_pos = Point<int16_t>(424, pos_y);
+		int16_t pos_y = 84 + screen_adj.y();
+		Point<int16_t> na_pos = Point<int16_t>(155, pos_y) + Point<int16_t>(screen_adj.x(), 0);
+		Point<int16_t> eu_pos = Point<int16_t>(424, pos_y) + Point<int16_t>(screen_adj.x(), 0);
 
 		buttons[Buttons::NA] = std::make_unique<MapleButton>(na, na_pos);
 		buttons[Buttons::EU] = std::make_unique<MapleButton>(eu, eu_pos);
-		buttons[Buttons::EXIT] = std::make_unique<MapleButton>(Common["BtExit"], Point<int16_t>(0, 540));
+		buttons[Buttons::EXIT] = std::make_unique<MapleButton>(Common["BtExit"], Point<int16_t>(0, 540) + screen_adj);
 
 		Point<int16_t> na_dim = Texture(na["normal"]["0"]).get_dimensions();
 		Point<int16_t> eu_dim = Texture(eu["normal"]["0"]).get_dimensions();

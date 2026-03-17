@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIChat.h"
+#include "UISocialChat.h"
 
 #include "../UI.h"
 
@@ -99,10 +100,16 @@ namespace ms
 			close();
 			break;
 		case Buttons::CHAT_DUO:
+			UI::get().emplace<UISocialChat>();
+			close();
 			break;
 		case Buttons::CHAT_FRIEND:
+			UI::get().emplace<UISocialChat>();
+			close();
 			break;
 		case Buttons::CHAT_RANDOM:
+			UI::get().emplace<UISocialChat>();
+			close();
 			break;
 		default:
 			break;

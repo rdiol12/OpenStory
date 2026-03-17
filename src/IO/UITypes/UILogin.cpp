@@ -25,6 +25,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Constants.h"
 
 #include "../../Net/Packets/LoginPackets.h"
 
@@ -36,8 +37,16 @@
 
 namespace ms
 {
-	UILogin::UILogin() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600)), signboard_pos(Point<int16_t>(510, 330))
+	UILogin::UILogin() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		Point<int16_t> screen_adj = Point<int16_t>((vw - 800) / 2, (vh - 600) / 2);
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
+		signboard_pos = Point<int16_t>(510, 330) + screen_adj;
+
 		LoginStartPacket().dispatch();
 
 		std::string loginMusic = Configuration::get().get_login_music();
@@ -58,16 +67,16 @@ namespace ms
 		nl::node logo = Login["Title"]["logo"]["0"];
 		nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
 
-		sprites.emplace_back(back["11"], Point<int16_t>(400,300));
-		sprites.emplace_back(logo, Point<int16_t>(409, 144));
+		sprites.emplace_back(back["11"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(logo, Point<int16_t>(409, 144) + screen_adj);
 		sprites.emplace_back(signboard, signboard_pos);
-		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(500, 50));
-		sprites.emplace_back(frame, Point<int16_t>(400, 300));
+		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(500, 50) + screen_adj);
+		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 
 
 		buttons[Buttons::BT_LOGIN] = std::make_unique<MapleButton>(loginUI["BtLogin"], signboard_pos + Point<int16_t>(85, -105));
@@ -156,7 +165,11 @@ namespace ms
 
 		UIElement::draw(alpha);
 
-		version.draw(position + Point<int16_t>(680, 10));
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		Point<int16_t> screen_adj = Point<int16_t>((vw - 800) / 2, (vh - 600) / 2);
+
+		version.draw(position + Point<int16_t>(680, 10) + screen_adj);
 		account.draw(position);
 		password.draw(position);
 		checkbox[saveid].draw(position + signboard_pos + Point<int16_t>(-120, -25));

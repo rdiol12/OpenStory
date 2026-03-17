@@ -20,6 +20,7 @@
 #include "UI.h"
 
 #include "../Configuration.h"
+#include "../Constants.h"
 #include "../Timer.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -34,8 +35,8 @@ namespace ms
 		glwnd = nullptr;
 		opacity = 1.0f;
 		opcstep = 0.0f;
-		width = Constants::Constants::get().get_viewwidth();
-		height = Constants::Constants::get().get_viewheight();
+		width = Constants::Constants::get().get_physicalwidth();
+		height = Constants::Constants::get().get_physicalheight();
 	}
 
 	Window::~Window()
@@ -96,8 +97,9 @@ namespace ms
 
 	void cursor_callback(GLFWwindow*, double xpos, double ypos)
 	{
-		int16_t x = static_cast<int16_t>(xpos);
-		int16_t y = static_cast<int16_t>(ypos);
+		float scale = Constants::Constants::get().get_ui_scale();
+		int16_t x = static_cast<int16_t>(xpos / scale);
+		int16_t y = static_cast<int16_t>(ypos / scale);
 		Point<int16_t> pos = Point<int16_t>(x, y);
 		UI::get().send_cursor(pos);
 	}
@@ -235,8 +237,8 @@ namespace ms
 	{
 		int16_t max_width = Configuration::get().get_max_width();
 		int16_t max_height = Configuration::get().get_max_height();
-		int16_t new_width = Constants::Constants::get().get_viewwidth();
-		int16_t new_height = Constants::Constants::get().get_viewheight();
+		int16_t new_width = Constants::Constants::get().get_physicalwidth();
+		int16_t new_height = Constants::Constants::get().get_physicalheight();
 
 		if (width != new_width || height != new_height)
 		{

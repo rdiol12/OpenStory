@@ -27,12 +27,13 @@ namespace ms
 {
 	Expression::Id Expression::byaction(size_t action)
 	{
+		if (action < 98)
+			return Expression::Id::DEFAULT;
+
 		action -= 98;
 
 		if (action < Expression::Id::LENGTH)
 			return static_cast<Id>(action);
-
-		std::cout << "Unknown Expression::Id action: [" << action << "]" << std::endl;
 
 		return Expression::Id::DEFAULT;
 	}

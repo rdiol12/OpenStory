@@ -31,16 +31,14 @@ namespace ms
 		enum TalkType : int8_t
 		{
 			NONE = -1,
-			SENDOK,
-			SENDYESNO,
-
-			SENDNEXT,
-			SENDNEXTPREV,
-			SENDACCEPTDECLINE,
-			SENDGETTEXT,
-			SENDGETNUMBER,
-			SENDSIMPLE,
-			LENGTH
+			SENDSAY = 0,		// 0 — OK/Next/Prev/NextPrev (determined by style bytes)
+			SENDYESNO = 1,		// 1 — Yes/No
+			SENDGETTEXT = 2,	// 2 — Text input
+			SENDGETNUMBER = 3,	// 3 — Number input
+			SENDSIMPLE = 4,		// 4 — Selection list (blue clickable text)
+			SENDSTYLE = 7,		// 7 — Style/cosmetic selection
+			SENDACCEPTDECLINE = 12,	// 12 (0x0C) — Accept/Decline
+			LENGTH = 13
 		};
 
 		static constexpr Type TYPE = UIElement::Type::NPCTALK;
@@ -63,7 +61,7 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		TalkType get_by_value(int8_t value);
+		bool is_valid_type(int8_t value);
 		std::string format_text(const std::string& tx, const int32_t& npcid);
 		std::string parse_simple_selections(const std::string& tx);
 
@@ -71,21 +69,19 @@ namespace ms
 
 		enum Buttons
 		{
-			ALLLEVEL,
 			CLOSE,
-			MYLEVEL,
 			NEXT,
 			NO,
 			OK,
 			PREV,
-			QAFTER,
-			QCNO,
-			QCYES,
-			QGIVEUP,
 			QNO,
-			QSTART,
 			QYES,
-			YES
+			YES,
+			QSTART,
+			QAFTER,
+			QCYES,
+			QCNO,
+			QGIVEUP
 		};
 
 		struct Selection
@@ -100,6 +96,10 @@ namespace ms
 		Texture bottom;
 		Texture nametag;
 		Texture speaker;
+		Texture dot_normal;
+		Texture dot_hovered;
+		Texture list_normal;
+		Texture list_hovered;
 
 		Text text;
 		Text name;
@@ -120,6 +120,7 @@ namespace ms
 
 		std::vector<Selection> selections;
 		int16_t selection_top;
+		int32_t hovered_selection;
 
 		std::function<void(bool)> onmoved;
 	};

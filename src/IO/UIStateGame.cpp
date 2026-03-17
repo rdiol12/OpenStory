@@ -20,6 +20,7 @@
 #include <iostream>
 
 #include "UI.h"
+#include "../Constants.h"
 
 #include "UITypes/UIBuddyList.h"
 #include "UITypes/UIBuffList.h"
@@ -28,11 +29,16 @@
 #include "UITypes/UICharInfo.h"
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
+#include "UITypes/UIChatWindow.h"
+#include "UITypes/UIFarmChat.h"
+#include "UITypes/UIMapleChat.h"
+#include "UITypes/UISocialChat.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIEvent.h"
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMiniMap.h"
+#include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UINotice.h"
 #include "UITypes/UIOptionMenu.h"
@@ -44,6 +50,23 @@
 #include "UITypes/UIStatusMessenger.h"
 #include "UITypes/UIUserList.h"
 #include "UITypes/UIWorldMap.h"
+#include "UITypes/UIGuild.h"
+#include "UITypes/UIGuildBBS.h"
+#include "UITypes/UIGuildMark.h"
+#include "UITypes/UIMessenger.h"
+#include "UITypes/UIPersonalShop.h"
+#include "UITypes/UIHiredMerchant.h"
+#include "UITypes/UIMinigame.h"
+#include "UITypes/UIMonsterBook.h"
+#include "UITypes/UIWedding.h"
+#include "UITypes/UIPartySearch.h"
+#include "UITypes/UIRanking.h"
+#include "UITypes/UISkillMacro.h"
+#include "UITypes/UIFamily.h"
+#include "UITypes/UIMapleTV.h"
+#include "UITypes/UIMonsterCarnival.h"
+#include "UITypes/UIRPSGame.h"
+#include "UITypes/UISystemOption.h"
 
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Session.h"
@@ -64,7 +87,8 @@ namespace ms
 		std::cout << "[UIStateGame] StatusMessenger OK" << std::endl;
 		emplace<UIStatusBar>(stats);
 		std::cout << "[UIStateGame] StatusBar OK" << std::endl;
-		emplace<UIChatBar>();
+		int16_t screen_h = Constants::Constants::get().get_viewheight();
+		emplace<UIChatBar>(Point<int16_t>(512, screen_h));
 		std::cout << "[UIStateGame] ChatBar OK" << std::endl;
 		emplace<UIMiniMap>(stats);
 		std::cout << "[UIStateGame] MiniMap OK" << std::endl;
@@ -72,6 +96,8 @@ namespace ms
 		std::cout << "[UIStateGame] BuffList OK" << std::endl;
 		emplace<UIShop>(look, inventory);
 		std::cout << "[UIStateGame] Shop OK" << std::endl;
+		emplace<UIQuestHelper>(Stage::get().get_player().get_quests());
+		std::cout << "[UIStateGame] QuestHelper OK" << std::endl;
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -390,6 +416,16 @@ namespace ms
 
 								break;
 							}
+							case KeyAction::Id::GUILD:
+							{
+								emplace<UIGuild>();
+								break;
+							}
+							case KeyAction::Id::MONSTERBOOK:
+							{
+								emplace<UIMonsterBook>();
+								break;
+							}
 							case KeyAction::Id::CHANGECHANNEL:
 							{
 								emplace<UIChannel>();
@@ -411,6 +447,20 @@ namespace ms
 					break;
 				}
 				case KeyType::Id::ACTION:
+				{
+					// Forward Enter key to chatbar to open/close chat input
+					if (action == KeyAction::Id::RETURN && pressed)
+					{
+						if (auto chatbar = UI::get().get_element<UIChatBar>())
+						{
+							chatbar->send_key(action, pressed, false);
+							break;
+						}
+					}
+
+					Stage::get().send_key(type, action, pressed);
+					break;
+				}
 				case KeyType::Id::FACE:
 				case KeyType::Id::ITEM:
 				case KeyType::Id::SKILL:

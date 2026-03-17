@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStatusBar.h"
 
+#include "../../Graphics/Geometry.h"
 #include "UIBuddyList.h"
 #include "UIChannel.h"
 #include "UIEquipInventory.h"
@@ -32,6 +33,12 @@
 #include "UISkillBook.h"
 #include "UIStatsInfo.h"
 #include "UIWorldMap.h"
+#include "UIGuild.h"
+#include "UIRanking.h"
+#include "UIMonsterBook.h"
+#include "UISystemOption.h"
+#include "UIChat.h"
+#include "UIFarmChat.h"
 
 #include "../../Net/OutPacket.h"
 #include "../../Net/Session.h"
@@ -60,7 +67,7 @@ namespace ms
 		int16_t VHEIGHT = Constants::Constants::get().get_viewheight();
 
 		position = Point<int16_t>(512, VHEIGHT);
-		dimension = Point<int16_t>(1366, 80);
+		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH), 84);
 
 		show_menu = false;
 		show_system = false;
@@ -71,8 +78,8 @@ namespace ms
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
 
-		// === Background sprites ===
-		sprites.emplace_back(mainbar["backgrnd"]);
+		// === Background ===
+		bar_backgrnd = Texture(mainbar["backgrnd"]);
 		sprites.emplace_back(mainbar["gaugeBackgrd"]);
 		sprites.emplace_back(mainbar["notice"]);
 		sprites.emplace_back(mainbar["lvBacktrnd"]);
@@ -335,10 +342,34 @@ namespace ms
 		// === readyZero ===
 		nl::node rz = mainbar["readyZero"];
 		ready_zero_backgrnd = Texture(rz["gaugeBackgrnd"]);
+
+		// === Buff tray background (StatusBar3.img) ===
+		nl::node statusbar3 = nl::nx::ui["StatusBar3.img"];
+		if (statusbar3.size() > 0)
+		{
+			nl::node buff = statusbar3["buff"];
+			buff_backgrnd = Texture(buff["backgrnd"]);
+
+			nl::node alarm = statusbar3["alarm"];
+			alarm_backgrnd = Texture(alarm["backgrnd"]);
+			alarm_anim = Animation(alarm["ani"]);
+
+			nl::node event = statusbar3["event"];
+			event_backgrnd = Texture(event["backgrnd"]);
+		}
 	}
 
 	void UIStatusBar::draw(float alpha) const
 	{
+		int16_t vwidth = Constants::Constants::get().get_viewwidth();
+
+		// Draw bar background stretched to fill full screen width
+		if (bar_backgrnd.is_valid())
+		{
+			int16_t bg_h = bar_backgrnd.height();
+			bar_backgrnd.draw(DrawArgument(position, Point<int16_t>(vwidth, bg_h)));
+		}
+
 		UIElement::draw_sprites(alpha);
 
 		// Draw class-variant gauge backgrounds based on job
@@ -488,14 +519,24 @@ namespace ms
 				quickslot_bg.draw(DrawArgument(position));
 		}
 
+		// Draw buff tray background
+		if (buff_backgrnd.is_valid())
+			buff_backgrnd.draw(DrawArgument(position + Point<int16_t>(184, -70)));
+
+		// Draw alarm area
+		if (alarm_backgrnd.is_valid())
+			alarm_backgrnd.draw(DrawArgument(position + Point<int16_t>(-512, -70)));
+
 		// Draw buttons on top
 		UIElement::draw_buttons(alpha);
 	}
 
 	void UIStatusBar::update()
 	{
+		int16_t VWIDTH = Constants::Constants::get().get_viewwidth();
 		int16_t VHEIGHT = Constants::Constants::get().get_viewheight();
 		position = Point<int16_t>(512, VHEIGHT);
+		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH), 84);
 
 		UIElement::update();
 
@@ -512,12 +553,21 @@ namespace ms
 		ap_notify.update();
 		sp_notify.update();
 		noncombat_notify.update();
+		alarm_anim.update();
 	}
 
 	Button::State UIStatusBar::button_pressed(uint16_t id)
 	{
 		switch (id)
 		{
+		case BT_WHISPER:
+			UI::get().emplace<UIChat>();
+			return Button::State::NORMAL;
+
+		case BT_FARM:
+			UI::get().emplace<UIFarmChat>();
+			return Button::State::NORMAL;
+
 		case BT_STATS:
 		case BT_MENU_STAT:
 			UI::get().emplace<UIStatsInfo>(
@@ -665,8 +715,12 @@ namespace ms
 
 		case BT_SYS_GAMEOPTION:
 		case BT_SYS_OPTION:
-		case BT_SYS_SYSTEMOPTION:
 			UI::get().emplace<UIOptionMenu>();
+			remove_menus();
+			return Button::State::NORMAL;
+
+		case BT_SYS_SYSTEMOPTION:
+			UI::get().emplace<UISystemOption>();
 			remove_menus();
 			return Button::State::NORMAL;
 
@@ -755,7 +809,15 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_MENU_RANK:
+			UI::get().emplace<UIRanking>();
+			remove_menus();
+			return Button::State::NORMAL;
+
 		case BT_MENU_EPISODBOOK:
+			UI::get().emplace<UIMonsterBook>();
+			remove_menus();
+			return Button::State::NORMAL;
+
 		case BT_MENU_MONSTERBATTLE:
 		case BT_MENU_MONSTERLIFE:
 		case BT_MENU_MSN:
@@ -770,14 +832,14 @@ namespace ms
 
 	bool UIStatusBar::is_in_range(Point<int16_t> cursorpos) const
 	{
+		int16_t vwidth = Constants::Constants::get().get_viewwidth();
+
 		// Extend upward when menu or system sub-panel is open
 		int16_t extra_height = (show_menu || show_system) ? 300 : 0;
 
-		// Top edge: 84px above bar position + extra for sub-panels
-		// Bottom edge: position.y() (screen bottom)
 		Rectangle<int16_t> bounds(
-			Point<int16_t>(position.x() - 512, position.y() - 84 - extra_height),
-			Point<int16_t>(position.x() - 512 + dimension.x(), position.y())
+			Point<int16_t>(0, position.y() - 84 - extra_height),
+			Point<int16_t>(vwidth, position.y())
 		);
 
 		return bounds.contains(cursorpos);

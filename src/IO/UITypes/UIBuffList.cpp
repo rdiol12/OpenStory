@@ -18,7 +18,9 @@
 #include "UIBuffList.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Data/SkillData.h"
 #include "../../Util/Misc.h"
+#include "../UI.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -71,6 +73,18 @@ namespace ms
 		return duration < Constants::TIMESTEP;
 	}
 
+	int32_t BuffIcon::get_buffid() const
+	{
+		return buffid;
+	}
+
+	bool BuffIcon::contains(Point<int16_t> icon_pos, Point<int16_t> cursorpos) const
+	{
+		auto absx = cursorpos.x() - icon_pos.x();
+		auto absy = cursorpos.y() - icon_pos.y();
+		return absx >= -1 && absx <= 31 && absy >= -31 && absy <= 1;
+	}
+
 	UIBuffList::UIBuffList()
 	{
 		int16_t height = Constants::Constants::get().get_viewheight();
@@ -111,6 +125,31 @@ namespace ms
 
 	Cursor::State UIBuffList::send_cursor(bool pressed, Point<int16_t> cursorposition)
 	{
+		Point<int16_t> icpos = position;
+
+		for (auto& icon : icons)
+		{
+			if (icon.second.contains(icpos, cursorposition))
+			{
+				int32_t bid = icon.second.get_buffid();
+				std::string name;
+
+				if (bid >= 0)
+					name = SkillData::get(bid).get_name();
+				else
+					name = ItemData::get(-bid).get_name();
+
+				if (!name.empty())
+					UI::get().show_text(Tooltip::Parent::BUFFLIST, name);
+
+				return Cursor::State::IDLE;
+			}
+
+			icpos.shift_x(-32);
+		}
+
+		UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
+
 		return UIElement::send_cursor(pressed, cursorposition);
 	}
 

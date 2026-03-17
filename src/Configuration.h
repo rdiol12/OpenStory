@@ -287,13 +287,13 @@ namespace ms
 	// The width of the screen
 	struct Width : public Configuration::ShortEntry
 	{
-		Width() : ShortEntry("Width", "1024") {}
+		Width() : ShortEntry("Width", "1920") {}
 	};
 
 	// The height of the screen
 	struct Height : public Configuration::ShortEntry
 	{
-		Height() : ShortEntry("Height", "768") {}
+		Height() : ShortEntry("Height", "1080") {}
 	};
 
 	// Whether to use VSync
@@ -400,6 +400,12 @@ namespace ms
 		PosQUEST() : PointEntry("PosQUEST", "(300,160)") {}
 	};
 
+	// The default position of UIQuestHelper
+	struct PosQUESTHELPER : public Configuration::PointEntry
+	{
+		PosQUESTHELPER() : PointEntry("PosQUESTHELPER", "(560,100)") {}
+	};
+
 	// The default position of UIWorldMap
 	struct PosMAP : public Configuration::PointEntry
 	{
@@ -415,7 +421,7 @@ namespace ms
 	// The default position of UIChatBar
 	struct PosCHAT : public Configuration::PointEntry
 	{
-		PosCHAT() : PointEntry("PosCHAT", "(0, 572)") {}
+		PosCHAT() : PointEntry("PosCHAT", "(0, 1052)") {}
 	};
 
 	// The default position of UIMiniMap
@@ -494,6 +500,108 @@ namespace ms
 	struct PosTRADE : public Configuration::PointEntry
 	{
 		PosTRADE() : PointEntry("PosTRADE", "(200, 100)") {}
+	};
+
+	// The default position of UIGuild
+	struct PosGUILD : public Configuration::PointEntry
+	{
+		PosGUILD() : PointEntry("PosGUILD", "(200, 80)") {}
+	};
+
+	// The default position of UIGuildBBS
+	struct PosGUILDBBS : public Configuration::PointEntry
+	{
+		PosGUILDBBS() : PointEntry("PosGUILDBBS", "(220, 100)") {}
+	};
+
+	// The default position of UIGuildMark
+	struct PosGUILDMARK : public Configuration::PointEntry
+	{
+		PosGUILDMARK() : PointEntry("PosGUILDMARK", "(300, 150)") {}
+	};
+
+	// The default position of UIMessenger
+	struct PosMESSENGER : public Configuration::PointEntry
+	{
+		PosMESSENGER() : PointEntry("PosMESSENGER", "(200, 100)") {}
+	};
+
+	// The default position of UIPersonalShop
+	struct PosPERSONALSHOP : public Configuration::PointEntry
+	{
+		PosPERSONALSHOP() : PointEntry("PosPERSONALSHOP", "(150, 80)") {}
+	};
+
+	// The default position of UIHiredMerchant
+	struct PosHIREDMERCHANT : public Configuration::PointEntry
+	{
+		PosHIREDMERCHANT() : PointEntry("PosHIREDMERCHANT", "(150, 80)") {}
+	};
+
+	// The default position of UIMinigame
+	struct PosMINIGAME : public Configuration::PointEntry
+	{
+		PosMINIGAME() : PointEntry("PosMINIGAME", "(200, 100)") {}
+	};
+
+	// The default position of UIMonsterBook
+	struct PosMONSTERBOOK : public Configuration::PointEntry
+	{
+		PosMONSTERBOOK() : PointEntry("PosMONSTERBOOK", "(100, 50)") {}
+	};
+
+	// The default position of UIPartySearch
+	struct PosPARTYSEARCH : public Configuration::PointEntry
+	{
+		PosPARTYSEARCH() : PointEntry("PosPARTYSEARCH", "(200, 100)") {}
+	};
+
+	// The default position of UIRanking
+	struct PosRANKING : public Configuration::PointEntry
+	{
+		PosRANKING() : PointEntry("PosRANKING", "(100, 50)") {}
+	};
+
+	// The default position of UISkillMacro
+	struct PosSKILLMACRO : public Configuration::PointEntry
+	{
+		PosSKILLMACRO() : PointEntry("PosSKILLMACRO", "(200, 150)") {}
+	};
+
+	// The default position of UIFamily
+	struct PosFAMILY : public Configuration::PointEntry
+	{
+		PosFAMILY() : PointEntry("PosFAMILY", "(200, 100)") {}
+	};
+
+	// The default position of UISystemOption
+	struct PosSYSTEMOPTION : public Configuration::PointEntry
+	{
+		PosSYSTEMOPTION() : PointEntry("PosSYSTEMOPTION", "(200, 100)") {}
+	};
+
+	// The default position of UIChatWindow
+	struct PosCHATWINDOW : public Configuration::PointEntry
+	{
+		PosCHATWINDOW() : PointEntry("PosCHATWINDOW", "(300, 200)") {}
+	};
+
+	// The default position of UIFarmChat
+	struct PosFARMCHAT : public Configuration::PointEntry
+	{
+		PosFARMCHAT() : PointEntry("PosFARMCHAT", "(200, 100)") {}
+	};
+
+	// The default position of UIMapleChat
+	struct PosMAPLECHAT1 : public Configuration::PointEntry
+	{
+		PosMAPLECHAT1() : PointEntry("PosMAPLECHAT1", "(100, 100)") {}
+	};
+
+	// The default position of UISocialChat
+	struct PosSOCIALCHAT : public Configuration::PointEntry
+	{
+		PosSOCIALCHAT() : PointEntry("PosSOCIALCHAT", "(200, 100)") {}
 	};
 
 	// The default type of UIMiniMap
