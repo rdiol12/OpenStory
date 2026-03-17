@@ -138,6 +138,9 @@ namespace ms
 		int16_t selected;
 		Animation selected_marker;
 
+		// Additional minimap marks
+		std::unordered_map<std::string, Texture> mark_textures;
+
 		const CharStats& stats;
 	};
 }

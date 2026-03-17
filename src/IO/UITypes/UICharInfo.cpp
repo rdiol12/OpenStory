@@ -37,6 +37,9 @@ namespace ms
 		nl::node character = UserInfo["character"];
 		nl::node backgrnd = character["backgrnd"];
 
+		// v83: button bitmaps are in UIWindow.img/UserInfo, not UIWindow2.img
+		nl::node UserInfoBtns = nl::nx::ui["UIWindow.img"]["UserInfo"];
+
 		/// Main Window
 		sprites.emplace_back(backgrnd);
 		sprites.emplace_back(character["backgrnd2"]);
@@ -47,23 +50,21 @@ namespace ms
 
 		buttons[Buttons::BtClose] = std::make_unique<MapleButton>(close, close_dimensions);
 
-		// Only create buttons if their NX nodes exist (many are post-BB features)
+		// Only create buttons if their NX nodes exist
 		auto add_button = [&](uint16_t id, nl::node src) {
 			if (src.size() > 0)
 				buttons[id] = std::make_unique<MapleButton>(src);
 		};
 
-		add_button(Buttons::BtCollect, character["BtCollect"]);
-		add_button(Buttons::BtDamage, character["BtDamage"]);
-		add_button(Buttons::BtFamily, character["BtFamily"]);
-		add_button(Buttons::BtItem, character["BtItem"]);
-		add_button(Buttons::BtParty, character["BtParty"]);
-		add_button(Buttons::BtPersonality, character["BtPersonality"]);
-		add_button(Buttons::BtPet, character["BtPet"]);
-		add_button(Buttons::BtPopDown, character["BtPopDown"]);
-		add_button(Buttons::BtPopUp, character["BtPopUp"]);
-		add_button(Buttons::BtRide, character["BtRide"]);
-		add_button(Buttons::BtTrad, character["BtTrad"]);
+		// v83 button names differ from post-BB names
+		add_button(Buttons::BtCollect, UserInfoBtns["BtCollectionShow"]);
+		add_button(Buttons::BtFamily, UserInfoBtns["BtFamily"]);
+		add_button(Buttons::BtItem, UserInfoBtns["BtItem"]);
+		add_button(Buttons::BtParty, UserInfoBtns["BtParty"]);
+		add_button(Buttons::BtPet, UserInfoBtns["BtPetShow"]);
+		add_button(Buttons::BtRide, UserInfoBtns["BtTamingShow"]);
+		add_button(Buttons::BtTrad, UserInfoBtns["BtTrade"]);
+		add_button(Buttons::BtWish, UserInfoBtns["BtWish"]);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		job = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
@@ -77,6 +78,8 @@ namespace ms
 			buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
 		if (buttons.count(Buttons::BtRide))
 			buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
+		if (buttons.count(Buttons::BtWish))
+			buttons[Buttons::BtWish]->set_state(Button::State::DISABLED);
 
 		/// Farm (post-BB, may not exist in v83)
 		nl::node farm = UserInfo["farm"];
@@ -309,10 +312,8 @@ namespace ms
 			show_right_window(buttonid);
 			return Button::State::NORMAL;
 		case Buttons::BtCollect:
-		case Buttons::BtPersonality:
 		case Buttons::BtRide:
 		case Buttons::BtPet:
-		case Buttons::BtDamage:
 			show_bottom_window(buttonid);
 			return Button::State::NORMAL;
 		case Buttons::BtTrad:
@@ -324,8 +325,7 @@ namespace ms
 			}
 			deactivate();
 			return Button::State::NORMAL;
-		case Buttons::BtPopDown:
-		case Buttons::BtPopUp:
+		case Buttons::BtWish:
 		case Buttons::BtFriend:
 		case Buttons::BtVisit:
 		default:
@@ -398,8 +398,6 @@ namespace ms
 		if (character_id == player_id)
 		{
 			disable_button(Buttons::BtParty);
-			disable_button(Buttons::BtPopDown);
-			disable_button(Buttons::BtPopUp);
 			disable_button(Buttons::BtFriend);
 		}
 
@@ -438,14 +436,8 @@ namespace ms
 
 		switch (buttonid)
 		{
-		case Buttons::BtPersonality:
-			personality_enabled = true;
-			break;
 		case Buttons::BtCollect:
 			collect_enabled = true;
-			break;
-		case Buttons::BtDamage:
-			damage_enabled = true;
 			break;
 		}
 	}

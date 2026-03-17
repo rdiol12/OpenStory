@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
 
+#include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 #include "../../Data/ItemData.h"
@@ -40,7 +41,8 @@ namespace ms
 		selected_entry(-1), hover_entry(-1), show_detail(false),
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),
 		detail_area(0), detail_order(0), detail_auto_start(false),
-		detail_auto_complete(false), filter_my_level(true)
+		detail_auto_complete(false), filter_my_level(true),
+		show_quest_alarm(false)
 	{
 		tab = Buttons::TAB0;
 
@@ -49,87 +51,135 @@ namespace ms
 		nl::node list = quest["list"];
 		nl::node quest_info_node = quest["quest_info"];
 
-		// === List panel backgrounds ===
-		nl::node backgrnd = list["backgrnd"];
-		sprites.emplace_back(backgrnd);
+		// v83: button bitmaps are in UIWindow.img/Quest (flat), not UIWindow2.img sub-nodes
+		nl::node questBtns = nl::nx::ui["UIWindow.img"]["Quest"];
+
+		// === Backgrounds from UIWindow2.img/Quest/list (consistent with button origins) ===
+		sprites.emplace_back(list["backgrnd"]);
 		sprites.emplace_back(list["backgrnd2"]);
 
-		// === Notice sprites (all 4) ===
-		notice_sprites.emplace_back(list["notice0"]);
-		notice_sprites.emplace_back(list["notice1"]);
-		notice_sprites.emplace_back(list["notice2"]);
-		notice_sprites.emplace_back(list["notice3"]);
+		// Not using v83 overlay backgrounds (different layout)
+		v83_backgrnd3 = Texture();
+		v83_backgrnd4 = Texture();
+		v83_backgrnd5 = Texture();
 
-		// === Tabs ===
-		nl::node taben = list["Tab"]["enabled"];
-		nl::node tabdis = list["Tab"]["disabled"];
+		// === Notice sprites from UIWindow2.img ===
+		for (int i = 0; i < 4; i++)
+		{
+			std::string nname = "notice" + std::to_string(i);
+			notice_sprites.emplace_back(list[nname]);
+		}
+
+		// === Tabs — UIWindow2.img/Quest/list/Tab has backgrnd bitmaps, use as TwoSpriteButton ===
+		// The Tab node under list has sub-nodes for tab states
+		nl::node list_tab = list["Tab"];
+		nl::node taben, tabdis;
+		if (list_tab["enabled"] && list_tab["enabled"].size() > 0)
+		{
+			taben = list_tab["enabled"];
+			tabdis = list_tab["disabled"];
+		}
+		else
+		{
+			// Fall back to UIWindow.img tabs
+			taben = questBtns["Tab"]["enabled"];
+			tabdis = questBtns["Tab"]["disabled"];
+		}
 
 		buttons[Buttons::TAB0] = std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"]);
 		buttons[Buttons::TAB1] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"]);
 		buttons[Buttons::TAB2] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"]);
-		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(275, 6));
 
-		// === List buttons ===
-		buttons[Buttons::ALL_LEVEL] = std::make_unique<MapleButton>(list["BtAllLevel"]);
-		buttons[Buttons::MY_LEVEL] = std::make_unique<MapleButton>(list["BtMyLevel"]);
-		buttons[Buttons::BT_SEARCH] = std::make_unique<MapleButton>(list["BtSearch"]);
-		buttons[Buttons::BT_NEXT] = std::make_unique<MapleButton>(list["BtNext"]);
-		buttons[Buttons::BT_PREV] = std::make_unique<MapleButton>(list["BtPrev"]);
-		buttons[Buttons::BT_ALLLOCN] = std::make_unique<MapleButton>(list["BtAllLocation"]);
-		buttons[Buttons::BT_MYLOCATION] = std::make_unique<MapleButton>(list["BtMyLocation"]);
-		buttons[Buttons::BT_ICONINFO] = std::make_unique<MapleButton>(list["BtIconInfo"]);
+		// Close button — position relative to background dimensions
+		Point<int16_t> bg_dim = Texture(list["backgrnd"]).get_dimensions();
+		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dim.x() - 19, 6));
 
-		// === Detail panel buttons from quest_info ===
-		buttons[Buttons::GIVEUP] = std::make_unique<MapleButton>(quest_info_node["BtGiveup"]);
-		buttons[Buttons::DETAIL] = std::make_unique<MapleButton>(quest_info_node["BtNavi"]);
-		buttons[Buttons::MARK_NPC] = std::make_unique<MapleButton>(quest_info_node["BtNPC"]);
-		buttons[Buttons::BT_ACCEPT] = std::make_unique<MapleButton>(quest_info_node["BtAccept"]);
-		buttons[Buttons::BT_FINISH] = std::make_unique<MapleButton>(quest_info_node["BtFinish"]);
-		buttons[Buttons::BT_DETAIL_CLOSE] = std::make_unique<MapleButton>(quest_info_node["BtClose"]);
-		buttons[Buttons::BT_ARLIM] = std::make_unique<MapleButton>(quest_info_node["BtArlim"]);
-		buttons[Buttons::BT_DELIVERY_ACCEPT] = std::make_unique<MapleButton>(quest_info_node["BtQuestDeliveryAccept"]);
-		buttons[Buttons::BT_DELIVERY_COMPLETE] = std::make_unique<MapleButton>(quest_info_node["BtQuestDeliveryComplete"]);
+		// Only create buttons if their NX nodes exist (many are post-BB)
+		auto add_button = [&](uint16_t id, nl::node src) {
+			if (src.size() > 0)
+				buttons[id] = std::make_unique<MapleButton>(src);
+		};
+
+		// === All list buttons from UIWindow2.img/Quest/list (matching background) ===
+		add_button(Buttons::ALL_LEVEL, list["BtAllLevel"]);
+		add_button(Buttons::MY_LEVEL, list["BtMyLevel"]);
+		add_button(Buttons::BT_SEARCH, list["BtSearch"]);
+		add_button(Buttons::BT_ICONINFO, list["BtIconInfo"]);
+		add_button(Buttons::BT_NEXT, list["BtNext"]);
+		add_button(Buttons::BT_PREV, list["BtPrev"]);
+		add_button(Buttons::BT_ALLLOCN, list["BtAllLocation"]);
+		add_button(Buttons::BT_MYLOCATION, list["BtMyLocation"]);
+
+		// === Detail panel buttons from UIWindow2.img/Quest/quest_info ===
+		add_button(Buttons::BT_ACCEPT, quest_info_node["BtAccept"]);
+		add_button(Buttons::BT_FINISH, quest_info_node["BtFinish"]);
+		add_button(Buttons::BT_DETAIL_CLOSE, quest_info_node["BtClose"]);
+		add_button(Buttons::BT_ARLIM, quest_info_node["BtArlim"]);
+		add_button(Buttons::BT_DELIVERY_ACCEPT, quest_info_node["BtQuestDeliveryAccept"]);
+		add_button(Buttons::BT_DELIVERY_COMPLETE, quest_info_node["BtQuestDeliveryComplete"]);
+		add_button(Buttons::MARK_NPC, quest_info_node["BtNPC"]);
+		if (!buttons.count(Buttons::MARK_NPC) || !buttons[Buttons::MARK_NPC])
+			add_button(Buttons::MARK_NPC, quest_info_node["BtNavi"]);
+		add_button(Buttons::GIVEUP, quest_info_node["BtGiveup"]);
+
+		// Fallback to v83 buttons if UIWindow2 didn't have them
+		if (!buttons.count(Buttons::BT_ACCEPT) || !buttons[Buttons::BT_ACCEPT])
+			add_button(Buttons::BT_ACCEPT, questBtns["BtOK"]);
+		if (!buttons.count(Buttons::GIVEUP) || !buttons[Buttons::GIVEUP])
+			add_button(Buttons::GIVEUP, questBtns["BtGiveup"]);
+		add_button(Buttons::DETAIL, questBtns["BtDetail"]);
+		add_button(Buttons::BT_NO, questBtns["BtNo"]);
+		add_button(Buttons::BT_ALERT, questBtns["BtAlert"]);
 
 		// Hide detail buttons until a quest is selected
-		buttons[Buttons::GIVEUP]->set_active(false);
-		buttons[Buttons::DETAIL]->set_active(false);
-		buttons[Buttons::MARK_NPC]->set_active(false);
-		buttons[Buttons::BT_ACCEPT]->set_active(false);
-		buttons[Buttons::BT_FINISH]->set_active(false);
-		buttons[Buttons::BT_DETAIL_CLOSE]->set_active(false);
-		buttons[Buttons::BT_ARLIM]->set_active(false);
-		buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(false);
-		buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(false);
+		set_btn_active(Buttons::GIVEUP, false);
+		set_btn_active(Buttons::DETAIL, false);
+		set_btn_active(Buttons::MARK_NPC, false);
+		set_btn_active(Buttons::BT_ACCEPT, false);
+		set_btn_active(Buttons::BT_FINISH, false);
+		set_btn_active(Buttons::BT_DETAIL_CLOSE, false);
+		set_btn_active(Buttons::BT_ARLIM, false);
+		set_btn_active(Buttons::BT_DELIVERY_ACCEPT, false);
+		set_btn_active(Buttons::BT_DELIVERY_COMPLETE, false);
+		set_btn_active(Buttons::BT_NO, false);
+		set_btn_active(Buttons::BT_ALERT, false);
 
 		// === Quest state icons ===
 		quest_state_started = Texture(list["questState"]["0"]);
 		quest_state_completed = Texture(list["questState"]["1"]);
 
-		// === Quest icon set (all icons from root) ===
-		nl::node icon_node = quest["icon"];
-		icon0 = Texture(icon_node["icon0"]);
-		icon1 = Texture(icon_node["icon1"]);
-		icon4 = Texture(icon_node["icon4"]);
-		icon10 = Texture(icon_node["icon10"]);
+		// === Quest icon set (all icons from UIWindow.img/Quest — flat) ===
+		icon0 = Texture(questBtns["icon0"]);
+		icon1 = Texture(questBtns["icon1"]);
+		icon4 = Texture(questBtns["icon4"]);
 
 		// Animated icons
-		quest_icon_anim = Animation(icon_node["icon3"]);
-		icon2_anim = Animation(icon_node["icon2"]);
-		icon5_anim = Animation(icon_node["icon5"]);
-		icon6_anim = Animation(icon_node["icon6"]);
-		icon7_anim = Animation(icon_node["icon7"]);
-		icon8_anim = Animation(icon_node["icon8"]);
-		icon9_anim = Animation(icon_node["icon9"]);
+		quest_icon_anim = Animation(questBtns["icon3"]);
+		icon2_anim = Animation(questBtns["icon2"]);
+		icon5_anim = Animation(questBtns["icon5"]);
+		icon6_anim = Animation(questBtns["icon6"]);
+		icon7_anim = Animation(questBtns["icon7"]);
+		icon8_anim = Animation(questBtns["icon8"]);
+		icon9_anim = Animation(questBtns["icon9"]);
+
+		// These may not exist in v83 UIWindow.img — try UIWindow2.img as fallback
+		nl::node icon_node = quest["icon"];
+		icon10 = Texture(icon_node["icon10"]);
 		iconQM0_anim = Animation(icon_node["iconQM0"]);
 		iconQM1_anim = Animation(icon_node["iconQM1"]);
 
-		// === Gauge2 - quest progress bar (root level) ===
+		// === Gauge2 - quest progress bar ===
 		nl::node gauge2_node = quest["Gauge2"];
+		if (!gauge2_node)
+			gauge2_node = questBtns["Gauge2"];
 		gauge2_frame = Texture(gauge2_node["frame"]);
 		gauge2_bar = Texture(gauge2_node["gauge"]);
+		gauge2_spot = Texture(gauge2_node["spot"]);
 
 		// === TimeQuest (timed quest UI) ===
 		nl::node time_quest = quest["TimeQuest"];
+		if (!time_quest)
+			time_quest = questBtns["TimeQuest"];
 		time_alarm_clock = Animation(time_quest["AlarmClock"]);
 		time_bar = Animation(time_quest["TimeBar"]);
 
@@ -137,10 +187,19 @@ namespace ms
 		nl::node icon_info = quest["icon_info"];
 		icon_info_backgrnd = Texture(icon_info["backgrnd"]);
 		icon_info_backgrnd2 = Texture(icon_info["backgrnd2"]);
+		icon_info_sheet = Texture(icon_info["Sheet"]);
 
-		// === Recommend textures ===
+		// === v83 root textures from UIWindow.img/Quest ===
+		basic_texture = Texture(questBtns["basic"]);
+		prob_texture = Texture(questBtns["prob"]);
+		reward_texture = Texture(questBtns["reward"]);
+		summary_texture = Texture(questBtns["summary"]);
+
+		// Selection highlight — use UIWindow2.img only (v83 select contains "OBTAIN SELECTIVELY" text)
+		select_texture = Texture(list["recommend"]["select"]);
+
+		// === Recommend textures (from UIWindow2.img list) ===
 		nl::node recommend = list["recommend"];
-		select_texture = Texture(recommend["select"]);
 		drop_texture = Texture(recommend["drop"]);
 		recommend_focus = Texture(recommend["focus"]);
 		recommend_title = Texture(list["recommendTitle"]);
@@ -172,12 +231,15 @@ namespace ms
 			detail_summary_pattern = Texture(quest_info_node["summary_pattern"]);
 			detail_tip = Texture(quest_info_node["tip"]);
 
-			// Detail gauge
+			// Detail gauge — try quest_info first, then UIWindow.img
 			nl::node detail_gauge = quest_info_node["Gauge"];
+			if (!detail_gauge)
+				detail_gauge = questBtns["Gauge"];
 			if (detail_gauge)
 			{
 				detail_gauge_frame = Texture(detail_gauge["frame"]);
 				detail_gauge_bar = Texture(detail_gauge["gauge"]);
+				detail_gauge_spot = Texture(detail_gauge["spot"]);
 			}
 
 			// Reward icon from summary_icon
@@ -186,16 +248,69 @@ namespace ms
 				detail_reward_icon = Texture(summary_icon["reward"]);
 		}
 
+		// v83 backgrnd extras from UIWindow.img/Quest
+		if (!detail_backgrnd.is_valid())
+		{
+			detail_backgrnd = Texture(questBtns["backgrnd3"]);
+			detail_backgrnd2 = Texture(questBtns["backgrnd4"]);
+			detail_backgrnd3 = Texture(questBtns["backgrnd5"]);
+			detail_summary = Texture(questBtns["summary"]);
+		}
+
+		// === QuestAlarm (UIWindow.img/QuestAlarm) ===
+		nl::node quest_alarm = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
+		if (quest_alarm)
+		{
+			quest_alarm_bg_bottom = Texture(quest_alarm["backgrndbottom"]);
+			quest_alarm_bg_center = Texture(quest_alarm["backgrndcenter"]);
+			quest_alarm_bg_max = Texture(quest_alarm["backgrndmax"]);
+			quest_alarm_bg_min = Texture(quest_alarm["backgrndmin"]);
+			quest_alarm_anim = Animation(quest_alarm["BtQ"]["ani"]);
+		}
+		show_quest_alarm = false;
+
+		// === QuestIcon (UIWindow.img/QuestIcon) — animated status icons 0-11 ===
+		nl::node quest_icon_src = nl::nx::ui["UIWindow.img"]["QuestIcon"];
+		if (quest_icon_src)
+		{
+			for (int i = 0; i <= 11; i++)
+			{
+				nl::node icon_n = quest_icon_src[std::to_string(i)];
+				if (icon_n)
+					quest_status_icons.push_back(Animation(icon_n));
+				else
+					quest_status_icons.push_back(Animation());
+			}
+		}
+
 		load_quests();
 
 		change_tab(tab);
 
-		dimension = Texture(backgrnd).get_dimensions();
+		dimension = Texture(list["backgrnd"]).get_dimensions();
 
 		if (dimension.x() == 0 || dimension.y() == 0)
 			dimension = Point<int16_t>(280, 400);
 
 		dragarea = Point<int16_t>(dimension.x(), 20);
+	}
+
+	void UIQuestLog::set_btn_active(uint16_t id, bool active)
+	{
+		if (buttons.count(id) && buttons[id])
+			buttons[id]->set_active(active);
+	}
+
+	void UIQuestLog::set_btn_state(uint16_t id, Button::State state)
+	{
+		if (buttons.count(id) && buttons[id])
+			buttons[id]->set_state(state);
+	}
+
+	void UIQuestLog::set_btn_position(uint16_t id, Point<int16_t> pos)
+	{
+		if (buttons.count(id) && buttons[id])
+			buttons[id]->set_position(pos);
 	}
 
 	void UIQuestLog::load_quests()
@@ -224,7 +339,7 @@ namespace ms
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
-			active_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, name, 220, false) });
+			active_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
 		}
 
 		// TAB2: Completed quests (from server)
@@ -257,10 +372,22 @@ namespace ms
 			if (qid_str.empty() || qid_str[0] < '0' || qid_str[0] > '9')
 				continue;
 
-			int16_t qid = static_cast<int16_t>(std::stoi(qid_str));
+			int32_t qid_full;
+			try { qid_full = std::stoi(qid_str); }
+			catch (...) { continue; }
+
+			// Skip quest IDs that overflow int16_t
+			if (qid_full > 32767 || qid_full < 0)
+				continue;
+
+			int16_t qid = static_cast<int16_t>(qid_full);
 
 			// Skip already started or completed quests
 			if (started.count(qid) || completed_map.count(qid))
+				continue;
+
+			// Skip auto-start quests (server triggers these, not the player)
+			if (qnode["autoStart"].get_integer() != 0)
 				continue;
 
 			// Check requirements from Check.img
@@ -270,6 +397,20 @@ namespace ms
 
 			nl::node start_check = check["0"];
 			if (!start_check)
+				continue;
+
+			// Skip quests with normalAutoStart
+			if (start_check["normalAutoStart"].get_integer() != 0)
+				continue;
+
+			// Skip expired event quests with start/end dates
+			std::string end_date = start_check["end"].get_string();
+			if (!end_date.empty())
+				continue;
+
+			// Must have an NPC to start (skip orphan quests)
+			int32_t start_npc = start_check["npc"].get_integer();
+			if (start_npc <= 0)
 				continue;
 
 			// Level check
@@ -352,7 +493,7 @@ namespace ms
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
-			available_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, name, 220, false) });
+			available_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
 		}
 
 		// Sort available entries by level requirement
@@ -395,6 +536,10 @@ namespace ms
 		iconQM1_anim.update();
 		time_alarm_clock.update();
 		time_bar.update();
+		quest_alarm_anim.update();
+
+		for (auto& anim : quest_status_icons)
+			anim.update();
 	}
 
 	void UIQuestLog::toggle_active()
@@ -463,15 +608,15 @@ namespace ms
 		{
 			show_detail = false;
 			selected_entry = -1;
-			buttons[Buttons::GIVEUP]->set_active(false);
-			buttons[Buttons::DETAIL]->set_active(false);
-			buttons[Buttons::MARK_NPC]->set_active(false);
-			buttons[Buttons::BT_ACCEPT]->set_active(false);
-			buttons[Buttons::BT_FINISH]->set_active(false);
-			buttons[Buttons::BT_DETAIL_CLOSE]->set_active(false);
-			buttons[Buttons::BT_ARLIM]->set_active(false);
-			buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(false);
-			buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(false);
+			set_btn_active(Buttons::GIVEUP, false);
+			set_btn_active(Buttons::DETAIL, false);
+			set_btn_active(Buttons::MARK_NPC, false);
+			set_btn_active(Buttons::BT_ACCEPT, false);
+			set_btn_active(Buttons::BT_FINISH, false);
+			set_btn_active(Buttons::BT_DETAIL_CLOSE, false);
+			set_btn_active(Buttons::BT_ARLIM, false);
+			set_btn_active(Buttons::BT_DELIVERY_ACCEPT, false);
+			set_btn_active(Buttons::BT_DELIVERY_COMPLETE, false);
 			return;
 		}
 
@@ -484,26 +629,26 @@ namespace ms
 		// Position detail buttons relative to detail panel
 		Point<int16_t> dp = Point<int16_t>(dimension.x() - 3, 0);
 
-		buttons[Buttons::GIVEUP]->set_position(dp + Point<int16_t>(20, 370));
-		buttons[Buttons::DETAIL]->set_position(dp + Point<int16_t>(100, 370));
-		buttons[Buttons::MARK_NPC]->set_position(dp + Point<int16_t>(180, 370));
-		buttons[Buttons::BT_ACCEPT]->set_position(dp + Point<int16_t>(60, 400));
-		buttons[Buttons::BT_FINISH]->set_position(dp + Point<int16_t>(160, 400));
-		buttons[Buttons::BT_DETAIL_CLOSE]->set_position(dp + Point<int16_t>(260, 6));
-		buttons[Buttons::BT_ARLIM]->set_position(dp + Point<int16_t>(20, 400));
-		buttons[Buttons::BT_DELIVERY_ACCEPT]->set_position(dp + Point<int16_t>(60, 430));
-		buttons[Buttons::BT_DELIVERY_COMPLETE]->set_position(dp + Point<int16_t>(160, 430));
+		set_btn_position(Buttons::GIVEUP, dp + Point<int16_t>(20, 370));
+		set_btn_position(Buttons::DETAIL, dp + Point<int16_t>(100, 370));
+		set_btn_position(Buttons::MARK_NPC, dp + Point<int16_t>(180, 370));
+		set_btn_position(Buttons::BT_ACCEPT, dp + Point<int16_t>(60, 400));
+		set_btn_position(Buttons::BT_FINISH, dp + Point<int16_t>(160, 400));
+		set_btn_position(Buttons::BT_DETAIL_CLOSE, dp + Point<int16_t>(260, 6));
+		set_btn_position(Buttons::BT_ARLIM, dp + Point<int16_t>(20, 400));
+		set_btn_position(Buttons::BT_DELIVERY_ACCEPT, dp + Point<int16_t>(60, 430));
+		set_btn_position(Buttons::BT_DELIVERY_COMPLETE, dp + Point<int16_t>(160, 430));
 
 		// Show/hide detail buttons based on quest state
-		buttons[Buttons::GIVEUP]->set_active(is_in_progress);
-		buttons[Buttons::DETAIL]->set_active(true);
-		buttons[Buttons::MARK_NPC]->set_active(true);
-		buttons[Buttons::BT_ACCEPT]->set_active(is_available);
-		buttons[Buttons::BT_FINISH]->set_active(is_in_progress);
-		buttons[Buttons::BT_DETAIL_CLOSE]->set_active(true);
-		buttons[Buttons::BT_ARLIM]->set_active(true);
-		buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(false);
-		buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(false);
+		set_btn_active(Buttons::GIVEUP, is_in_progress);
+		set_btn_active(Buttons::DETAIL, true);
+		set_btn_active(Buttons::MARK_NPC, true);
+		set_btn_active(Buttons::BT_ACCEPT, is_available);
+		set_btn_active(Buttons::BT_FINISH, is_in_progress);
+		set_btn_active(Buttons::BT_DETAIL_CLOSE, true);
+		set_btn_active(Buttons::BT_ARLIM, true);
+		set_btn_active(Buttons::BT_DELIVERY_ACCEPT, false);
+		set_btn_active(Buttons::BT_DELIVERY_COMPLETE, false);
 
 		int16_t qid = entries[index].id;
 		std::string name = entries[index].name.get_text();
@@ -703,7 +848,8 @@ namespace ms
 		if (detail_npcid > 0)
 		{
 			std::string strid = std::to_string(detail_npcid);
-			strid.insert(0, 7 - strid.size(), '0');
+			if (strid.size() < 7)
+				strid.insert(0, 7 - strid.size(), '0');
 			strid.append(".img");
 
 			nl::node npc_src = nl::nx::npc[strid];
@@ -887,29 +1033,23 @@ namespace ms
 			if (end_check && end_check["item"])
 				has_delivery = true;
 		}
-		buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(has_delivery && is_available);
-		buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(has_delivery && is_in_progress);
+		set_btn_active(Buttons::BT_DELIVERY_ACCEPT, has_delivery && is_available);
+		set_btn_active(Buttons::BT_DELIVERY_COMPLETE, has_delivery && is_in_progress);
 	}
 
 	void UIQuestLog::draw(float alpha) const
 	{
 		UIElement::draw_sprites(alpha);
 
-		// Draw tab notice
-		if (tab < notice_sprites.size())
+		// Tab notice — only when the list is empty
 		{
-			Point<int16_t> notice_position = Point<int16_t>(0, 26);
-
-			if (tab == Buttons::TAB0)
-				notice_sprites[tab].draw(position + notice_position + Point<int16_t>(9, 0), alpha);
-			else if (tab == Buttons::TAB1)
-				notice_sprites[tab].draw(position + notice_position + Point<int16_t>(0, 0), alpha);
-			else if (tab == Buttons::TAB2)
-				notice_sprites[tab].draw(position + notice_position + Point<int16_t>(-10, 0), alpha);
-			else if (tab == 3 && notice_sprites.size() > 3)
-				notice_sprites[3].draw(position + notice_position + Point<int16_t>(-20, 0), alpha);
+			const auto& cur_entries = (tab == Buttons::TAB0) ? available_entries :
+				(tab == Buttons::TAB1) ? active_entries : completed_entries;
+			if (cur_entries.empty() && tab < notice_sprites.size())
+				notice_sprites[tab].draw(position, alpha);
 		}
 
+		// Search area + textfield
 		if (tab != Buttons::TAB2)
 		{
 			search_area.draw(position);
@@ -919,16 +1059,16 @@ namespace ms
 				placeholder.draw(position + Point<int16_t>(39, 51));
 		}
 
-		// Draw completed count on completed tab
-		if (tab == Buttons::TAB2 && complete_count.is_valid())
-			complete_count.draw(DrawArgument(position + Point<int16_t>(10, 55)));
-
-		// Draw recommend title on active tab
+		// Recommend title on available tab
 		if (tab == Buttons::TAB0 && recommend_title.is_valid())
-			recommend_title.draw(DrawArgument(position + Point<int16_t>(10, 60)));
+			recommend_title.draw(DrawArgument(position));
 
-		// Draw slider and buttons
-		slider.draw(position + Point<int16_t>(126, 75));
+		// Completed count on completed tab
+		if (tab == Buttons::TAB2 && complete_count.is_valid())
+			complete_count.draw(DrawArgument(position));
+
+		// Slider and buttons
+		slider.draw(position + Point<int16_t>(dimension.x() - 25, LIST_Y));
 		UIElement::draw_buttons(alpha);
 
 		const auto& entries = (tab == Buttons::TAB0) ? available_entries :
@@ -953,7 +1093,7 @@ namespace ms
 						recommend_focus.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 					else
 					{
-						ColorBox hover_bg(250, ROW_HEIGHT, Color::Name::WHITE, 0.1f);
+						ColorBox hover_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::WHITE, 0.15f);
 						hover_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 					}
 				}
@@ -965,24 +1105,40 @@ namespace ms
 						select_texture.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 					else
 					{
-						ColorBox sel_bg(250, ROW_HEIGHT, Color::Name::MEDIUMBLUE, 0.3f);
+						ColorBox sel_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::MEDIUMBLUE, 0.15f);
 						sel_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 					}
 				}
 
-				// Draw quest state icon
-				if (is_active_tab)
-					quest_icon_anim.draw(DrawArgument(position + Point<int16_t>(15, entry_y + 3)), alpha);
-				else
+				// Draw quest state icon — only for in-progress and completed tabs
+				Point<int16_t> icon_pos = position + Point<int16_t>(14, entry_y + 4);
+				if (tab == Buttons::TAB1)
 				{
-					if (icon1.is_valid())
-						icon1.draw(DrawArgument(position + Point<int16_t>(15, entry_y + 5)));
+					// In-progress: show started icon or yellow dot
+					if (quest_state_started.is_valid())
+						quest_state_started.draw(DrawArgument(icon_pos));
 					else
-						quest_state_completed.draw(DrawArgument(position + Point<int16_t>(15, entry_y + 5)));
+					{
+						ColorBox dot(8, 8, Color::Name::MALIBU, 0.9f);
+						dot.draw(DrawArgument(icon_pos));
+					}
 				}
+				else if (tab == Buttons::TAB2)
+				{
+					// Completed: show completed icon or green dot
+					if (quest_state_completed.is_valid())
+						quest_state_completed.draw(DrawArgument(icon_pos));
+					else
+					{
+						ColorBox dot(8, 8, Color::Name::CHARTREUSE, 0.9f);
+						dot.draw(DrawArgument(icon_pos));
+					}
+				}
+				// TAB0 (available): no state icon — just show the name
 
-				// Draw quest name text
-				entries[idx].name.draw(position + Point<int16_t>(35, entry_y + 5));
+				// Draw quest name text — shift left for available tab (no icon)
+				int16_t text_x = (tab == Buttons::TAB0) ? 18 : 40;
+				entries[idx].name.draw(position + Point<int16_t>(text_x, entry_y + 5));
 			}
 		}
 
@@ -994,6 +1150,8 @@ namespace ms
 				icon_info_backgrnd.draw(info_pos);
 			if (icon_info_backgrnd2.is_valid())
 				icon_info_backgrnd2.draw(info_pos);
+			if (icon_info_sheet.is_valid())
+				icon_info_sheet.draw(info_pos);
 
 			// Draw icon legend entries
 			int16_t iy = 20;
@@ -1036,143 +1194,103 @@ namespace ms
 			iconQM1_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
 		}
 
-		// Draw TimeQuest elements (timed quest indicator)
-		time_alarm_clock.draw(DrawArgument(position + Point<int16_t>(240, 30)), alpha);
-		time_bar.draw(DrawArgument(position + Point<int16_t>(10, 395)), alpha);
+		// TimeQuest elements are only drawn when a timed quest is active (not implemented yet)
 
 		// === Detail panel (right of list) ===
 		if (show_detail && selected_entry >= 0)
 		{
 			Point<int16_t> detail_pos = position + Point<int16_t>(dimension.x() - 3, 0);
 
-			// Draw detail backgrounds
+			// Draw detail panel background — NX bitmaps or solid fallback
+			bool has_bg = false;
 			if (detail_backgrnd.is_valid())
+			{
 				detail_backgrnd.draw(detail_pos);
-
+				has_bg = true;
+			}
 			if (detail_backgrnd2.is_valid())
 				detail_backgrnd2.draw(detail_pos);
-
 			if (detail_backgrnd3.is_valid())
 				detail_backgrnd3.draw(detail_pos);
 
-			// Summary pattern and graphic
-			if (detail_summary_pattern.is_valid())
-				detail_summary_pattern.draw(detail_pos + Point<int16_t>(0, 10));
-
-			if (detail_summary.is_valid())
-				detail_summary.draw(detail_pos + Point<int16_t>(0, 5));
-
-			// Quest name at top
-			detail_quest_name.draw(detail_pos + Point<int16_t>(18, 15));
-
-			// Quest chain/area info
-			detail_quest_summary.draw(detail_pos + Point<int16_t>(18, 30));
-
-			// Level requirement
-			detail_level_req.draw(detail_pos + Point<int16_t>(18, 43));
-
-			// Job requirement
-			detail_job_req.draw(detail_pos + Point<int16_t>(18, 56));
-
-			// Auto-start/complete indicators
-			if (detail_auto_start)
+			if (!has_bg)
 			{
-				static Text auto_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MALIBU, "[Auto-Start]", 120, false);
-				auto_label.draw(detail_pos + Point<int16_t>(150, 43));
-			}
-			if (detail_auto_complete)
-			{
-				static Text auto_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MALIBU, "[Auto-Complete]", 120, false);
-				auto_label.draw(detail_pos + Point<int16_t>(150, 56));
+				// Solid fallback background for the detail panel
+				ColorBox detail_bg(290, dimension.y(), Color::Name::GALLERY, 1.0f);
+				detail_bg.draw(DrawArgument(detail_pos));
+
+				// Border
+				ColorBox border_left(1, dimension.y(), Color::Name::DUSTYGRAY, 0.6f);
+				border_left.draw(DrawArgument(detail_pos));
+				ColorBox border_right(1, dimension.y(), Color::Name::DUSTYGRAY, 0.6f);
+				border_right.draw(DrawArgument(detail_pos + Point<int16_t>(289, 0)));
+				ColorBox border_top(290, 1, Color::Name::DUSTYGRAY, 0.6f);
+				border_top.draw(DrawArgument(detail_pos));
+				ColorBox border_bottom(290, 1, Color::Name::DUSTYGRAY, 0.6f);
+				border_bottom.draw(DrawArgument(detail_pos + Point<int16_t>(0, dimension.y() - 1)));
 			}
 
-			// NPC sprite at top-right
+			// === Detail header: Quest name + summary info ===
+			static Text summary_label(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "Quest Summary", 200, false);
+			summary_label.draw(detail_pos + Point<int16_t>(15, 8));
+
+			// Quest name
+			detail_quest_name.draw(detail_pos + Point<int16_t>(18, 26));
+
+			// Quest chain/area + level info
+			int16_t y_offset = 42;
+			detail_quest_summary.draw(detail_pos + Point<int16_t>(18, y_offset));
+			if (!detail_quest_summary.get_text().empty())
+				y_offset += 14;
+
+			detail_level_req.draw(detail_pos + Point<int16_t>(18, y_offset));
+			if (!detail_level_req.get_text().empty())
+				y_offset += 14;
+
+			detail_job_req.draw(detail_pos + Point<int16_t>(18, y_offset));
+			if (!detail_job_req.get_text().empty())
+				y_offset += 14;
+
+			// NPC sprite + name in the right side of header area
 			if (detail_npc_sprite.is_valid())
-				detail_npc_sprite.draw(detail_pos + Point<int16_t>(230, 90));
-
-			// NPC name below sprite
-			detail_npc_name.draw(detail_pos + Point<int16_t>(230, 130));
-
-			// Tip graphic
-			if (detail_tip.is_valid())
-				detail_tip.draw(detail_pos + Point<int16_t>(10, 70));
-
-			// Progress gauge (for active quests with requirements)
-			if (detail_progress > 0.0f)
-			{
-				if (detail_gauge_frame.is_valid())
-				{
-					detail_gauge_frame.draw(detail_pos + Point<int16_t>(15, 85));
-
-					if (detail_gauge_bar.is_valid())
-						detail_gauge_bar.draw(DrawArgument(detail_pos + Point<int16_t>(15, 85)));
-				}
-				else if (gauge2_frame.is_valid())
-				{
-					gauge2_frame.draw(detail_pos + Point<int16_t>(15, 85));
-
-					if (gauge2_bar.is_valid())
-						gauge2_bar.draw(DrawArgument(detail_pos + Point<int16_t>(15, 85)));
-				}
-			}
+				detail_npc_sprite.draw(detail_pos + Point<int16_t>(230, 30));
+			detail_npc_name.draw(detail_pos + Point<int16_t>(230, 70));
 
 			// Separator after header
+			y_offset = std::max(y_offset, (int16_t)80);
 			ColorBox header_sep(260, 1, Color::Name::DUSTYGRAY, 0.4f);
-			header_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, 100)));
+			header_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, y_offset)));
+			y_offset += 8;
 
-			int16_t y_offset = 110;
-
-			// === NPC Dialog preview from Say.img ===
+			// === NPC Dialog preview (first line only, compact) ===
 			if (!detail_say_lines.empty())
 			{
-				static Text say_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "NPC Dialog:", 240, false);
-				say_header.draw(detail_pos + Point<int16_t>(15, y_offset));
-				y_offset += 18;
-
-				// Show first line as preview
-				Text say_preview(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, detail_say_lines[0].text, 240, true);
+				Text say_preview(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, detail_say_lines[0].text, 250, true);
 				say_preview.draw(detail_pos + Point<int16_t>(18, y_offset));
-				y_offset += std::max((int16_t)30, say_preview.height()) + 10;
+				int16_t say_h = std::min(say_preview.height(), (int16_t)48);
+				y_offset += say_h + 6;
 
 				ColorBox say_sep(260, 1, Color::Name::DUSTYGRAY, 0.3f);
 				say_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, y_offset)));
-				y_offset += 10;
-			}
-
-			// === Prerequisite quests ===
-			if (!detail_prereq_quests.empty())
-			{
-				static Text prereq_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Prerequisites", 240, false);
-				prereq_header.draw(detail_pos + Point<int16_t>(15, y_offset));
-				y_offset += 20;
-
-				for (auto& pq : detail_prereq_quests)
-				{
-					pq.draw(detail_pos + Point<int16_t>(25, y_offset));
-					y_offset += 16;
-				}
-				y_offset += 10;
+				y_offset += 6;
 			}
 
 			// === Rewards section ===
 			if (!detail_rewards.empty())
 			{
-				if (detail_reward_icon.is_valid())
-				{
-					detail_reward_icon.draw(detail_pos + Point<int16_t>(15, y_offset + 2));
-					static Text reward_label(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Reward!!", 200, false);
-					reward_label.draw(detail_pos + Point<int16_t>(35, y_offset));
-				}
+				// Use NX reward header bitmap, or fallback text
+				if (reward_texture.is_valid())
+					reward_texture.draw(detail_pos + Point<int16_t>(10, y_offset));
 				else
 				{
 					static Text reward_label(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Reward!!", 200, false);
 					reward_label.draw(detail_pos + Point<int16_t>(15, y_offset));
 				}
-				y_offset += 25;
+				y_offset += 20;
 
 				static Text receive_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "YOU WILL RECEIVE", 200, false);
 				receive_label.draw(detail_pos + Point<int16_t>(18, y_offset));
-				y_offset += 22;
+				y_offset += 18;
 
 				for (auto& rew : detail_rewards)
 				{
@@ -1181,15 +1299,16 @@ namespace ms
 						rew.icon.draw(detail_pos + Point<int16_t>(20, y_offset));
 						rew.name.draw(detail_pos + Point<int16_t>(55, y_offset + 8));
 						rew.count.draw(detail_pos + Point<int16_t>(180, y_offset + 8));
+						y_offset += 34;
 					}
 					else
 					{
-						rew.name.draw(detail_pos + Point<int16_t>(25, y_offset + 2));
-						rew.count.draw(detail_pos + Point<int16_t>(100, y_offset + 2));
+						rew.name.draw(detail_pos + Point<int16_t>(25, y_offset));
+						rew.count.draw(detail_pos + Point<int16_t>(180, y_offset));
+						y_offset += 16;
 					}
-					y_offset += 35;
 				}
-				y_offset += 10;
+				y_offset += 6;
 			}
 
 			// === Requirements section ===
@@ -1197,11 +1316,16 @@ namespace ms
 			{
 				ColorBox sep_line(260, 1, Color::Name::DUSTYGRAY, 0.4f);
 				sep_line.draw(DrawArgument(detail_pos + Point<int16_t>(15, y_offset)));
-				y_offset += 12;
+				y_offset += 8;
 
-				static Text req_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Requirements", 240, false);
-				req_header.draw(detail_pos + Point<int16_t>(15, y_offset));
-				y_offset += 25;
+				if (prob_texture.is_valid())
+					prob_texture.draw(detail_pos + Point<int16_t>(10, y_offset));
+				else
+				{
+					static Text req_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Requirements", 200, false);
+					req_header.draw(detail_pos + Point<int16_t>(15, y_offset));
+				}
+				y_offset += 20;
 
 				for (auto& req : detail_requirements)
 				{
@@ -1210,35 +1334,49 @@ namespace ms
 						req.icon.draw(detail_pos + Point<int16_t>(20, y_offset));
 						req.name.draw(detail_pos + Point<int16_t>(55, y_offset + 8));
 						req.count.draw(detail_pos + Point<int16_t>(220, y_offset + 8));
+						y_offset += 34;
 					}
 					else
 					{
-						req.name.draw(detail_pos + Point<int16_t>(25, y_offset + 2));
-						req.count.draw(detail_pos + Point<int16_t>(220, y_offset + 2));
+						req.name.draw(detail_pos + Point<int16_t>(25, y_offset));
+						req.count.draw(detail_pos + Point<int16_t>(220, y_offset));
+						y_offset += 16;
 					}
-					y_offset += 35;
 				}
-				y_offset += 10;
+				y_offset += 6;
 			}
 
-			// === Medal info ===
+			// === Medal ===
 			if (!detail_medal.empty())
 			{
-				static Text medal_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Medal", 240, false);
+				static Text medal_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Medal", 200, false);
 				medal_header.draw(detail_pos + Point<int16_t>(15, y_offset));
-				y_offset += 20;
+				y_offset += 16;
 
 				Text medal_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, detail_medal, 240, false);
 				medal_text.draw(detail_pos + Point<int16_t>(25, y_offset));
-				y_offset += 20;
+				y_offset += 16;
 			}
 
-			// === Quest description at bottom ===
+			// === Quest description ===
 			ColorBox sep2(260, 1, Color::Name::DUSTYGRAY, 0.4f);
 			sep2.draw(DrawArgument(detail_pos + Point<int16_t>(15, y_offset)));
-			y_offset += 12;
+			y_offset += 8;
 
 			detail_quest_desc.draw(detail_pos + Point<int16_t>(15, y_offset));
+		}
+
+		// === QuestAlarm popup ===
+		if (show_quest_alarm)
+		{
+			Point<int16_t> alarm_pos = position + Point<int16_t>(0, -60);
+			if (quest_alarm_bg_min.is_valid())
+				quest_alarm_bg_min.draw(alarm_pos);
+			if (quest_alarm_bg_center.is_valid())
+				quest_alarm_bg_center.draw(alarm_pos);
+			if (quest_alarm_bg_bottom.is_valid())
+				quest_alarm_bg_bottom.draw(alarm_pos);
+			quest_alarm_anim.draw(DrawArgument(alarm_pos + Point<int16_t>(10, 5)), alpha);
 		}
 	}
 
@@ -1339,15 +1477,15 @@ namespace ms
 		case Buttons::BT_DETAIL_CLOSE:
 			show_detail = false;
 			selected_entry = -1;
-			buttons[Buttons::GIVEUP]->set_active(false);
-			buttons[Buttons::DETAIL]->set_active(false);
-			buttons[Buttons::MARK_NPC]->set_active(false);
-			buttons[Buttons::BT_ACCEPT]->set_active(false);
-			buttons[Buttons::BT_FINISH]->set_active(false);
-			buttons[Buttons::BT_DETAIL_CLOSE]->set_active(false);
-			buttons[Buttons::BT_ARLIM]->set_active(false);
-			buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(false);
-			buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(false);
+			set_btn_active(Buttons::GIVEUP, false);
+			set_btn_active(Buttons::DETAIL, false);
+			set_btn_active(Buttons::MARK_NPC, false);
+			set_btn_active(Buttons::BT_ACCEPT, false);
+			set_btn_active(Buttons::BT_FINISH, false);
+			set_btn_active(Buttons::BT_DETAIL_CLOSE, false);
+			set_btn_active(Buttons::BT_ARLIM, false);
+			set_btn_active(Buttons::BT_DELIVERY_ACCEPT, false);
+			set_btn_active(Buttons::BT_DELIVERY_COMPLETE, false);
 			break;
 		case Buttons::GIVEUP:
 		{
@@ -1423,6 +1561,14 @@ namespace ms
 			}
 			break;
 		}
+		case Buttons::ALL_LEVEL:
+			filter_my_level = false;
+			load_quests();
+			return Button::State::IDENTITY;
+		case Buttons::MY_LEVEL:
+			filter_my_level = true;
+			load_quests();
+			return Button::State::IDENTITY;
 		case Buttons::BT_SEARCH:
 			break;
 		case Buttons::BT_NEXT:
@@ -1443,6 +1589,13 @@ namespace ms
 		case Buttons::BT_ICONINFO:
 			show_icon_info = !show_icon_info;
 			return Button::State::NORMAL;
+		case Buttons::BT_NO:
+			show_detail = false;
+			selected_entry = -1;
+			break;
+		case Buttons::BT_ALERT:
+			show_quest_alarm = !show_quest_alarm;
+			return Button::State::NORMAL;
 		default:
 			break;
 		}
@@ -1457,17 +1610,17 @@ namespace ms
 
 		if (oldtab != tab)
 		{
-			buttons[Buttons::TAB0 + oldtab]->set_state(Button::State::NORMAL);
+			set_btn_state(Buttons::TAB0 + oldtab, Button::State::NORMAL);
 
 			// Level/location filter buttons only on active tab
-			buttons[Buttons::ALL_LEVEL]->set_active(tab == Buttons::TAB0);
-			buttons[Buttons::MY_LEVEL]->set_active(tab == Buttons::TAB0);
-			buttons[Buttons::BT_ALLLOCN]->set_active(tab == Buttons::TAB0);
-			buttons[Buttons::BT_MYLOCATION]->set_active(tab == Buttons::TAB0);
+			set_btn_active(Buttons::ALL_LEVEL, tab == Buttons::TAB0);
+			set_btn_active(Buttons::MY_LEVEL, tab == Buttons::TAB0);
+			set_btn_active(Buttons::BT_ALLLOCN, tab == Buttons::TAB0);
+			set_btn_active(Buttons::BT_MYLOCATION, tab == Buttons::TAB0);
 
 			// Search on all except last tab
 			bool search_active = (tab != Buttons::TAB2);
-			buttons[Buttons::BT_SEARCH]->set_active(search_active);
+			set_btn_active(Buttons::BT_SEARCH, search_active);
 
 			if (tab == Buttons::TAB2)
 				search.set_state(Textfield::State::DISABLED);
@@ -1475,7 +1628,7 @@ namespace ms
 				search.set_state(Textfield::State::NORMAL);
 		}
 
-		buttons[Buttons::TAB0 + tab]->set_state(Button::State::PRESSED);
+		set_btn_state(Buttons::TAB0 + tab, Button::State::PRESSED);
 
 		offset = 0;
 		selected_entry = -1;
@@ -1484,15 +1637,15 @@ namespace ms
 		show_icon_info = false;
 
 		// Hide all detail buttons
-		buttons[Buttons::GIVEUP]->set_active(false);
-		buttons[Buttons::DETAIL]->set_active(false);
-		buttons[Buttons::MARK_NPC]->set_active(false);
-		buttons[Buttons::BT_ACCEPT]->set_active(false);
-		buttons[Buttons::BT_FINISH]->set_active(false);
-		buttons[Buttons::BT_DETAIL_CLOSE]->set_active(false);
-		buttons[Buttons::BT_ARLIM]->set_active(false);
-		buttons[Buttons::BT_DELIVERY_ACCEPT]->set_active(false);
-		buttons[Buttons::BT_DELIVERY_COMPLETE]->set_active(false);
+		set_btn_active(Buttons::GIVEUP, false);
+		set_btn_active(Buttons::DETAIL, false);
+		set_btn_active(Buttons::MARK_NPC, false);
+		set_btn_active(Buttons::BT_ACCEPT, false);
+		set_btn_active(Buttons::BT_FINISH, false);
+		set_btn_active(Buttons::BT_DETAIL_CLOSE, false);
+		set_btn_active(Buttons::BT_ARLIM, false);
+		set_btn_active(Buttons::BT_DELIVERY_ACCEPT, false);
+		set_btn_active(Buttons::BT_DELIVERY_COMPLETE, false);
 
 		uint16_t count = 0;
 

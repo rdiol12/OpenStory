@@ -197,10 +197,12 @@ namespace ms
 		if (is_key_down[keyboard.capslockcode()])
 			caps_lock_enabled = !caps_lock_enabled;
 
+		// Clear stale focusedtextfield if it's no longer in FOCUSED state
+		if (focusedtextfield && focusedtextfield->get_state() != Textfield::State::FOCUSED)
+			focusedtextfield = {};
+
 		if (focusedtextfield)
 		{
-			if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER)
-				std::cout << "[UI::send_key] Enter pressed but focusedtextfield is set, sending to textfield" << std::endl;
 			bool ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];
 
 			if (ctrl && pressed)
@@ -361,7 +363,10 @@ namespace ms
 					if (element && element != nullptr)
 					{
 						if (enter)
-							std::cout << "[UI::send_key] Enter key intercepted by element type=" << element->get_type() << std::endl;
+					{
+						static FILE* dbgfile3 = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
+						if (dbgfile3) { fprintf(dbgfile3, "[UI::send_key] Enter intercepted by element type=%d\n", (int)element->get_type()); fflush(dbgfile3); }
+					}
 						element->send_key(mapping.action, pressed, escape);
 						sent = true;
 					}
@@ -373,7 +378,10 @@ namespace ms
 				auto chatbar = UI::get().get_element<UIChatBar>();
 
 				if (enter)
-					std::cout << "[UI::send_key] Enter key !sent path, chatbar=" << (chatbar ? "found" : "NULL") << " pressed=" << pressed << std::endl;
+				{
+					static FILE* dbgfile2 = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
+					if (dbgfile2) { fprintf(dbgfile2, "[UI::send_key] Enter !sent path, chatbar=%s pressed=%d\n", chatbar ? "found" : "NULL", pressed); fflush(dbgfile2); }
+				}
 
 				if (escape)
 				{

@@ -17,16 +17,71 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Npc.h"
 
+#include "../Stage.h"
+#include "../../Character/QuestLog.h"
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) : MapObject(o)
+	// Static quest mark animations
+	bool Npc::marks_initialized = false;
+	Animation Npc::mark_available;
+	Animation Npc::mark_in_progress;
+	Animation Npc::mark_complete;
+	Animation Npc::mark_repeat;
+	Animation Npc::mark_low_level;
+	Animation Npc::mark_high_level;
+
+	void Npc::init_quest_marks()
+	{
+		if (marks_initialized)
+			return;
+
+		nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
+		nl::node quest_icon = nl::nx::ui["UIWindow.img"]["QuestIcon"];
+
+		// Available quest mark — try QuestGuide/QuestMark first (animated), then QuestIcon/0
+		nl::node qmark = guide["QuestMark"];
+		if (qmark && qmark.size() > 0)
+			mark_available = Animation(qmark);
+		else if (quest_icon["0"])
+			mark_available = Animation(quest_icon["0"]);
+
+		// In-progress — QuestIcon/2 (blue/yellow ?)
+		if (quest_icon["2"])
+			mark_in_progress = Animation(quest_icon["2"]);
+
+		// Complete — QuestIcon/1 (ready to turn in)
+		if (quest_icon["1"])
+			mark_complete = Animation(quest_icon["1"]);
+
+		// Repeat quest — RepeatQuestMark/forNPC
+		nl::node repeat_npc = guide["RepeatQuestMark"]["forNPC"];
+		if (repeat_npc && repeat_npc.size() > 0)
+			mark_repeat = Animation(repeat_npc);
+
+		// Low level — LowLVQuestMark/forNPC
+		nl::node low_npc = guide["LowLVQuestMark"]["forNPC"];
+		if (low_npc && low_npc.size() > 0)
+			mark_low_level = Animation(low_npc);
+
+		// High level — HighLVQuestMark/forNPC
+		nl::node high_npc = guide["HighLVQuestMark"]["forNPC"];
+		if (high_npc && high_npc.size() > 0)
+			mark_high_level = Animation(high_npc);
+
+		marks_initialized = true;
+	}
+
+	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) :
+		MapObject(o), quest_mark_type(QuestMarkType::NONE)
 	{
 		std::string strid = std::to_string(id);
-		strid.insert(0, 7 - strid.size(), '0');
+		if (strid.size() < 7)
+			strid.insert(0, 7 - strid.size(), '0');
 		strid.append(".img");
 
 		nl::node src = nl::nx::npc[strid];
@@ -73,6 +128,12 @@ namespace ms
 
 		phobj.fhid = f;
 		set_position(position);
+
+		// Initialize shared marks if needed
+		init_quest_marks();
+
+		// Determine quest mark for this NPC
+		update_quest_mark();
 	}
 
 	void Npc::draw(double viewx, double viewy, float alpha) const
@@ -87,6 +148,20 @@ namespace ms
 			// If ever changing code for namelabel confirm placements with map 10000
 			namelabel.draw(absp + Point<int16_t>(0, -4));
 			funclabel.draw(absp + Point<int16_t>(0, 18));
+		}
+
+		// Draw quest mark above NPC
+		if (quest_mark_type != QuestMarkType::NONE)
+		{
+			// Position well above the NPC sprite
+			Point<int16_t> dim =
+				animations.count(stance) ?
+				animations.at(stance).get_dimensions() :
+				Point<int16_t>(0, 60);
+
+			int16_t offset_y = dim.y() + 36;
+			Point<int16_t> mark_pos = absp + Point<int16_t>(0, -offset_y);
+			quest_mark_anim.draw(DrawArgument(mark_pos), alpha);
 		}
 	}
 
@@ -108,6 +183,9 @@ namespace ms
 				set_stance(new_stance);
 			}
 		}
+
+		if (quest_mark_type != QuestMarkType::NONE)
+			quest_mark_anim.update();
 
 		return phobj.fhlayer;
 	}
@@ -165,5 +243,158 @@ namespace ms
 	int32_t Npc::get_npcid() const
 	{
 		return npcid;
+	}
+
+	void Npc::update_quest_mark()
+	{
+		quest_mark_type = QuestMarkType::NONE;
+
+		const Player& player = Stage::get().get_player();
+		const QuestLog& quests = const_cast<Player&>(player).get_quests();
+		int16_t player_level = static_cast<int16_t>(player.get_stats().get_stat(MapleStat::Id::LEVEL));
+		int16_t player_job = static_cast<int16_t>(player.get_stats().get_stat(MapleStat::Id::JOB));
+
+		const auto& started = quests.get_started();
+		const auto& completed_map = quests.get_completed();
+
+		nl::node quest_check = nl::nx::quest["Check.img"];
+		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
+
+		// First check: does this NPC have an in-progress quest ready to complete?
+		for (auto& iter : started)
+		{
+			int16_t qid = iter.first;
+			nl::node check = quest_check[std::to_string(qid)];
+			if (!check) continue;
+
+			nl::node end_check = check["1"];
+			if (!end_check) continue;
+
+			int32_t end_npc = end_check["npc"].get_integer();
+			if (end_npc != npcid) continue;
+
+			// This NPC completes an in-progress quest — show complete mark
+			quest_mark_type = QuestMarkType::COMPLETE;
+			quest_mark_anim = mark_complete;
+			return;
+		}
+
+		// Second check: does this NPC have an in-progress quest (not yet completable)?
+		for (auto& iter : started)
+		{
+			int16_t qid = iter.first;
+			nl::node check = quest_check[std::to_string(qid)];
+			if (!check) continue;
+
+			nl::node start_check = check["0"];
+			if (!start_check) continue;
+
+			int32_t start_npc = start_check["npc"].get_integer();
+			if (start_npc != npcid) continue;
+
+			quest_mark_type = QuestMarkType::IN_PROGRESS;
+			quest_mark_anim = mark_in_progress;
+			return;
+		}
+
+		// Third check: does this NPC have an available quest the player qualifies for?
+		// Only show for quests within 5 levels of the player to avoid marking every NPC
+		for (auto qnode : quest_info)
+		{
+			std::string qid_str = qnode.name();
+			if (qid_str.empty() || qid_str[0] < '0' || qid_str[0] > '9')
+				continue;
+
+			int32_t qid_full;
+			try { qid_full = std::stoi(qid_str); }
+			catch (...) { continue; }
+			if (qid_full > 32767 || qid_full < 0) continue;
+			int16_t qid = static_cast<int16_t>(qid_full);
+
+			// Skip already started or completed
+			if (started.count(qid) || completed_map.count(qid))
+				continue;
+
+			nl::node check = quest_check[qid_str];
+			if (!check) continue;
+
+			nl::node start_check = check["0"];
+			if (!start_check) continue;
+
+			// Check if this NPC starts the quest
+			int32_t start_npc = start_check["npc"].get_integer();
+			if (start_npc <= 0 || start_npc != npcid)
+				continue;
+
+			// Level check — stricter: only show if quest is close to player level
+			int32_t lvmin = start_check["lvmin"].get_integer();
+			int32_t lvmax = start_check["lvmax"].get_integer();
+
+			if (lvmin > 0 && player_level < lvmin)
+				continue;
+
+			if (lvmax > 0 && player_level > lvmax)
+				continue;
+
+			// Skip quests that are way below player level
+			if (lvmin > 0 && (player_level - lvmin) > 10)
+				continue;
+
+			// Job check
+			nl::node job_node = start_check["job"];
+			if (job_node && job_node.size() > 0)
+			{
+				bool job_ok = false;
+				for (auto j : job_node)
+				{
+					int32_t required_job = j.get_integer();
+					if (required_job == 0 || required_job == player_job)
+					{
+						job_ok = true;
+						break;
+					}
+					if (required_job > 0 && (player_job / 100) == (required_job / 100) && player_job >= required_job)
+					{
+						job_ok = true;
+						break;
+					}
+				}
+				if (!job_ok)
+					continue;
+			}
+
+			// Prerequisite quest check
+			nl::node quest_prereq = start_check["quest"];
+			if (quest_prereq)
+			{
+				bool prereqs_met = true;
+				for (auto qp : quest_prereq)
+				{
+					int32_t prereq_id = qp["id"].get_integer();
+					int32_t prereq_state = qp["state"].get_integer();
+
+					if (prereq_id > 0)
+					{
+						if (prereq_state == 2 && !completed_map.count(static_cast<int16_t>(prereq_id)))
+						{
+							prereqs_met = false;
+							break;
+						}
+						if (prereq_state == 1 && !started.count(static_cast<int16_t>(prereq_id)))
+						{
+							prereqs_met = false;
+							break;
+						}
+					}
+				}
+				if (!prereqs_met)
+					continue;
+			}
+
+			// Player qualifies — show available mark
+			quest_mark_type = QuestMarkType::AVAILABLE;
+			quest_mark_anim = mark_available;
+			return;
+		}
 	}
 }

@@ -17,13 +17,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIChatBar.h"
 
-#include <iostream>
-
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
+#include "../../Audio/Audio.h"
 #include "../../Constants.h"
+
+#include <algorithm>
+#include <iostream>
+#include <cctype>
+#include <list>
+#include <sstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -31,82 +37,107 @@
 
 namespace ms
 {
-	UIChatBar::UIChatBar() : UIDragElement<PosCHAT>(Point<int16_t>(500, -5))
+	namespace
+	{
+		std::string trim(const std::string& value)
+		{
+			size_t first = value.find_first_not_of(' ');
+			if (first == std::string::npos)
+				return "";
+
+			size_t last = value.find_last_not_of(' ');
+			return value.substr(first, last - first + 1);
+		}
+
+		std::string lowercase(std::string value)
+		{
+			std::transform(value.begin(), value.end(), value.begin(),
+				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			return value;
+		}
+
+		bool parse_int32(const std::string& value, int32_t& out)
+		{
+			if (value.empty())
+				return false;
+
+			size_t start = 0;
+			if (value[0] == '+' || value[0] == '-')
+				start = 1;
+
+			for (size_t i = start; i < value.size(); i++)
+				if (!std::isdigit(static_cast<unsigned char>(value[i])))
+					return false;
+
+			try { out = std::stoi(value); }
+			catch (...) { return false; }
+			return true;
+		}
+	}
+
+	UIChatBar::UIChatBar(Point<int16_t> pos) : UIElement(pos, Point<int16_t>(500, 60))
 	{
 		chatopen = true;
-		chatopen_persist = true;
 		chatfieldopen = false;
+		chattarget = CHT_ALL;
+		party_id = -1;
+		party_leader_id = -1;
+		pending_party_invite_id = -1;
 		chatrows = 4;
-		lastpos = 0;
 		rowpos = 0;
 		rowmax = -1;
+		lastpos = 0;
 		dragchattop = false;
-		chat_fade_timer = CHAT_FADE_DURATION;
-		current_target = TARGET_ALL;
 
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 
-		// Load textures from mainBar (v83 compatible paths)
-		buttons[Buttons::BT_OPENCHAT] = std::make_unique<MapleButton>(mainbar["chatOpen"]);
-		buttons[Buttons::BT_CLOSECHAT] = std::make_unique<MapleButton>(mainbar["chatClose"]);
-		buttons[Buttons::BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
-		buttons[Buttons::BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
+		buttons[BT_OPENCHAT] = std::make_unique<MapleButton>(mainbar["chatOpen"]);
+		buttons[BT_CLOSECHAT] = std::make_unique<MapleButton>(mainbar["chatClose"]);
+		buttons[BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
+		buttons[BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
+		buttons[BT_CHATTARGETS] = std::make_unique<MapleButton>(mainbar["chatTarget"]["base"]);
 
 		chatspace[0] = mainbar["chatSpace"];
 		chatspace[1] = mainbar["chatEnter"];
-		chatspace[2] = mainbar["chatSpace2"];
-		chatspace[3] = mainbar["chatCover"];
+		chatenter = mainbar["chatSpace2"];
+		chatcover = mainbar["chatCover"];
 
-		// Load chat target channel indicator textures
-		nl::node target_node = mainbar["chatTarget"];
-		chattarget_textures[TARGET_ALL] = target_node["all"];
-		chattarget_textures[TARGET_PARTY] = target_node["party"];
-		chattarget_textures[TARGET_GUILD] = target_node["guild"];
-		chattarget_textures[TARGET_FRIEND] = target_node["friend"];
-		chattarget_textures[TARGET_EXPEDITION] = target_node["expedition"];
-		chattarget_textures[TARGET_ASSOCIATION] = target_node["association"];
-		chattarget_textures[TARGET_AFCTV] = target_node["afctv"];
+		std::cout << "[CHATBAR] position=(" << pos.x() << "," << pos.y() << ")" << std::endl;
+		std::cout << "[CHATBAR] chatSpace origin=(" << chatspace[0].get_origin().x() << "," << chatspace[0].get_origin().y() << ") dim=(" << chatspace[0].get_dimensions().x() << "," << chatspace[0].get_dimensions().y() << ")" << std::endl;
+		std::cout << "[CHATBAR] chatEnter origin=(" << chatspace[1].get_origin().x() << "," << chatspace[1].get_origin().y() << ") dim=(" << chatspace[1].get_dimensions().x() << "," << chatspace[1].get_dimensions().y() << ")" << std::endl;
+		std::cout << "[CHATBAR] chatSpace2 origin=(" << chatenter.get_origin().x() << "," << chatenter.get_origin().y() << ") dim=(" << chatenter.get_dimensions().x() << "," << chatenter.get_dimensions().y() << ")" << std::endl;
+		std::cout << "[CHATBAR] chatCover origin=(" << chatcover.get_origin().x() << "," << chatcover.get_origin().y() << ") dim=(" << chatcover.get_dimensions().x() << "," << chatcover.get_dimensions().y() << ")" << std::endl;
 
-		buttons[BT_OPENCHAT]->set_active(!chatopen);
-		buttons[BT_CLOSECHAT]->set_active(chatopen);
-		buttons[BT_SCROLLUP]->set_active(chatopen);
-		buttons[BT_SCROLLDOWN]->set_active(chatopen);
+		chattargets[CHT_ALL] = mainbar["chatTarget"]["all"];
+		chattargets[CHT_BUDDY] = mainbar["chatTarget"]["friend"];
+		chattargets[CHT_GUILD] = mainbar["chatTarget"]["guild"];
+		chattargets[CHT_ALLIANCE] = mainbar["chatTarget"]["association"];
+		chattargets[CHT_PARTY] = mainbar["chatTarget"]["party"];
+		chattargets[CHT_SQUAD] = mainbar["chatTarget"]["expedition"];
 
-		// Chat background box
-		chat_background = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
+		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
+		tapbar = chat["tapBar"];
+		tapbartop = chat["tapBarOver"];
 
-		// Textfield bounds are relative to the draw position (512, screen_h)
-		// The chat input area is at screen coordinates ~(65, 738) to (460, 755)
-		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(65 - 512, -30), Point<int16_t>(460 - 512, -13)), 0);
-		chatfield.set_state(chatopen ? Textfield::State::NORMAL : Textfield::State::DISABLED);
+		chatbox = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
+
+		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(-435, -58), Point<int16_t>(-40, -35)), 0);
+
+		set_chat_open(chatopen);
 
 		chatfield.set_enter_callback(
 			[&](std::string msg)
 			{
-				if (msg.size() > 0)
-				{
-					size_t last = msg.find_last_not_of(' ');
+				msg = trim(msg);
+				if (msg.empty())
+					return;
 
-					if (last != std::string::npos)
-					{
-						msg.erase(last + 1);
+				if (!handle_party_command(msg))
+					send_chat_message(msg);
 
-						GeneralChatPacket(msg, true).dispatch();
-
-						lastentered.push_back(msg);
-						lastpos = lastentered.size();
-					}
-					else
-					{
-						toggle_chatfield();
-					}
-
-					chatfield.change_text("");
-				}
-				else
-				{
-					toggle_chatfield();
-				}
+				lastentered.push_back(msg);
+				lastpos = lastentered.size();
+				chatfield.change_text("");
 			}
 		);
 
@@ -142,123 +173,133 @@ namespace ms
 			}
 		);
 
-		send_chatline("[Welcome] Welcome to MapleStory!!", LineType::YELLOW);
+		slider = Slider(11, Range<int16_t>(0, CHATROWHEIGHT * chatrows - 14), -22, chatrows, 1,
+			[&](bool up)
+			{
+				int16_t next = up ? rowpos - 1 : rowpos + 1;
+				if (next >= 0 && next <= rowmax)
+					rowpos = next;
+			}
+		);
 
-		// Position at StatusBar anchor point so NX textures draw correctly
-		int16_t screen_h = Constants::Constants::get().get_viewheight();
-		position = Point<int16_t>(512, screen_h);
-		dimension = Point<int16_t>(1366, 84);
+		send_line("[Welcome] Welcome to MapleStory!", YELLOW);
+	}
+
+	void UIChatBar::set_chat_open(bool open)
+	{
+		chatopen = open;
+		buttons[BT_OPENCHAT]->set_active(!open);
+		buttons[BT_CLOSECHAT]->set_active(open);
+		buttons[BT_CHATTARGETS]->set_active(open);
+		buttons[BT_SCROLLUP]->set_active(open);
+		buttons[BT_SCROLLDOWN]->set_active(open);
+
+		if (!open)
+		{
+			chatfieldopen = false;
+			chatfield.set_state(Textfield::State::DISABLED);
+		}
+		else
+		{
+			chatfield.set_state(Textfield::State::NORMAL);
+		}
+	}
+
+	void UIChatBar::focus_chatfield()
+	{
+		if (!chatopen)
+			set_chat_open(true);
+
+		chatfieldopen = true;
+		chatfield.set_state(Textfield::State::FOCUSED);
 	}
 
 	void UIChatBar::draw(float inter) const
 	{
-		bool show_background = chatfieldopen || chat_fade_timer > 0;
-
-		// Draw NX bar textures at StatusBar anchor (position = (512, screen_h))
-		// z-order: chatSpace(0) → chatSpace2(1)/chatEnter(1) → chatCover(3)
-		chatspace[0].draw(position);
-
-		if (chatopen)
-		{
-			chatspace[2].draw(position);	// chatSpace2 — expanded chat area (z=1)
-			chatspace[1].draw(position);	// chatEnter — input area background (z=1)
-		}
+		chatspace[chatopen ? 1 : 0].draw(position);
+		chatenter.draw(position);
 
 		UIElement::draw_buttons(inter);
 
 		if (chatopen)
 		{
-			int16_t chattop = getchattop(true);
-			int16_t chatheight = chatrows * CHATROWHEIGHT;
+			tapbartop.draw(Point<int16_t>(position.x() - 576, getchattop()));
 
-			if (show_background)
+			chatbox.draw(DrawArgument(Point<int16_t>(0, getchattop() + 2)));
+
+			int16_t chatheight = CHATROWHEIGHT * chatrows;
+			int16_t yshift = -chatheight;
+
+			for (int16_t i = 0; i < chatrows; i++)
 			{
-				// Chat background box — draw at left side of screen
-				float opacity = 0.6f;
-				if (!chatfieldopen && chat_fade_timer < 1000)
-					opacity = 0.6f * (chat_fade_timer / 1000.0f);
+				int16_t rowid = rowpos - i;
 
-				ColorBox bg(502, 1 + chatheight, Color::Name::BLACK, opacity);
-				bg.draw(DrawArgument(Point<int16_t>(0, chattop + 2)));
-			}
+				if (!rowtexts.count(rowid))
+					break;
 
-			// Draw chat messages
-			if (show_background)
-			{
-				int16_t yshift = -chatheight;
-				for (int16_t i = 0; i < chatrows; i++)
+				int16_t textheight = rowtexts.at(rowid).height() / CHATROWHEIGHT;
+
+				while (textheight > 0)
 				{
-					int16_t rowid = rowpos - i;
-
-					if (!rowtexts.count(rowid))
-						break;
-
-					int16_t textheight = rowtexts.at(rowid).height() / CHATROWHEIGHT;
-
-					while (textheight > 0)
-					{
-						yshift += CHATROWHEIGHT;
-						textheight--;
-					}
-
-					rowtexts.at(rowid).draw(Point<int16_t>(4, chattop - yshift - 1));
+					yshift += CHATROWHEIGHT;
+					textheight--;
 				}
+
+				rowtexts.at(rowid).draw(Point<int16_t>(4, getchattop() - yshift - 1));
 			}
 
-			// Draw chatcover and chatfield at StatusBar anchor
-			chatspace[3].draw(position);
+			slider.draw(Point<int16_t>(position.x(), getchattop() + 5));
 
-			// Draw chat target indicator (shows current channel: all/party/guild/etc.)
-			chattarget_textures[current_target].draw(position);
+			if (chattarget >= CHT_ALL && chattarget < NUM_TARGETS)
+				chattargets[chattarget].draw(DrawArgument(position + Point<int16_t>(0, 2)));
 
+			chatcover.draw(position);
 			chatfield.draw(position);
+
+			static int dbg_counter = 0;
+			if (dbg_counter++ % 300 == 0)
+			{
+				auto fb = chatfield.get_bounds();
+				std::cout << "[CHATFIELD] state=" << (int)chatfield.get_state()
+					<< " bounds=(" << fb.get_left_top().x() << "," << fb.get_left_top().y()
+					<< ")-(" << fb.get_right_bottom().x() << "," << fb.get_right_bottom().y() << ")"
+					<< " text=\"" << chatfield.get_text() << "\""
+					<< std::endl;
+			}
 		}
 		else if (rowtexts.count(rowmax))
 		{
-			// Show last message line when chat is closed
-			rowtexts.at(rowmax).draw(Point<int16_t>(4, position.y() - 60));
+			rowtexts.at(rowmax).draw(position + Point<int16_t>(-500, -60));
 		}
 	}
 
 	void UIChatBar::update()
 	{
 		UIElement::update();
-
 		chatfield.update(position);
+	}
 
-		if (chat_fade_timer > 0 && !chatfieldopen)
-			chat_fade_timer -= Constants::TIMESTEP;
+	void UIChatBar::set_position(Point<int16_t> pos)
+	{
+		position = pos;
 	}
 
 	void UIChatBar::send_key(int32_t keycode, bool pressed, bool escape)
 	{
+		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
+		if (dbg) { fprintf(dbg, "[UIChatBar::send_key] keycode=%d pressed=%d escape=%d RETURN=%d\n", keycode, pressed, escape, KeyAction::Id::RETURN); fflush(dbg); }
+
 		if (pressed)
 		{
 			if (keycode == KeyAction::Id::RETURN)
+			{
+				if (dbg) { fprintf(dbg, "[UIChatBar::send_key] calling toggle_chatfield, chatfieldopen=%d\n", chatfieldopen); fflush(dbg); }
 				toggle_chatfield();
+				if (dbg) { fprintf(dbg, "[UIChatBar::send_key] after toggle, chatfieldopen=%d state=%d\n", chatfieldopen, (int)chatfield.get_state()); fflush(dbg); }
+			}
 			else if (escape)
 				toggle_chatfield(false);
 		}
-	}
-
-	bool UIChatBar::is_in_range(Point<int16_t> cursorpos) const
-	{
-		int16_t chattop = getchattop(chatopen);
-		// Chat area: x=0 to 500, y=chattop-16 to screen bottom
-		Point<int16_t> absp(0, chattop - 16);
-		Point<int16_t> rb(500, position.y());
-		return Rectangle<int16_t>(absp, rb).contains(cursorpos);
-	}
-
-	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
-	{
-		if (chatopen)
-		{
-			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
-				return new_state;
-		}
-
-		return UIDragElement::send_cursor(clicking, cursorpos);
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -266,28 +307,161 @@ namespace ms
 		return TYPE;
 	}
 
-	Cursor::State UIChatBar::check_dragtop(bool clicking, Point<int16_t> cursorpos)
+	Button::State UIChatBar::button_pressed(uint16_t id)
 	{
+		switch (id)
+		{
+		case BT_OPENCHAT:
+			set_chat_open(true);
+			break;
+		case BT_CLOSECHAT:
+			set_chat_open(false);
+			break;
+		case BT_SCROLLUP:
+			if (rowpos < rowmax)
+				rowpos++;
+			break;
+		case BT_SCROLLDOWN:
+			if (rowpos > 0)
+				rowpos--;
+			break;
+		case BT_CHATTARGETS:
+			cycle_chat_target();
+			return Button::State::NORMAL;
+		}
+
+		return Button::State::NORMAL;
+	}
+
+	bool UIChatBar::is_in_range(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> absp(0, getchattop() - 16);
+		Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
+		return Rectangle<int16_t>(absp, absp + dim).contains(cursorpos);
+	}
+
+	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
+	{
+		// Custom button handling: break after a button press fires.
+		// UIElement::send_cursor iterates ALL buttons in one loop, so when
+		// BT_CLOSECHAT fires and activates BT_OPENCHAT, the loop immediately
+		// processes BT_OPENCHAT in the same frame, causing toggle bounce.
+		Cursor::State bstate = clicking ? Cursor::State::CLICKING : Cursor::State::IDLE;
+
+		for (auto& btit : buttons)
+		{
+			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
+			{
+				if (btit.second->get_state() == Button::State::NORMAL)
+				{
+					Sound(Sound::Name::BUTTONOVER).play();
+					btit.second->set_state(Button::State::MOUSEOVER);
+					bstate = Cursor::State::CANCLICK;
+				}
+				else if (btit.second->get_state() == Button::State::MOUSEOVER)
+				{
+					if (clicking)
+					{
+						Sound(Sound::Name::BUTTONCLICK).play();
+						btit.second->set_state(button_pressed(btit.first));
+						bstate = Cursor::State::IDLE;
+						break;  // Stop processing buttons after a press fires
+					}
+					else
+					{
+						bstate = Cursor::State::CANCLICK;
+					}
+				}
+			}
+			else if (btit.second->get_state() == Button::State::MOUSEOVER)
+			{
+				btit.second->set_state(Button::State::NORMAL);
+			}
+		}
+
+		if (bstate != Cursor::State::IDLE)
+			return bstate;
+
+		if (slider.isenabled())
+		{
+			auto cursoroffset = cursorpos - Point<int16_t>(position.x(), getchattop() + 5);
+			Cursor::State sstate = slider.send_cursor(cursoroffset, clicking);
+			if (sstate != Cursor::State::IDLE)
+				return sstate;
+		}
+
+		if (chatopen)
+		{
+			if (Cursor::State tstate = chatfield.send_cursor(cursorpos, clicking))
+				return tstate;
+		}
+
+		auto chattop_rect = Rectangle<int16_t>(0, 502, getchattop(), getchattop() + 6);
+		bool contains = chattop_rect.contains(cursorpos);
+
+		if (dragchattop)
+		{
+			if (clicking)
+			{
+				int16_t ydelta = cursorpos.y() - getchattop();
+
+				while (ydelta > 0 && chatrows > MINCHATROWS)
+				{
+					chatrows--;
+					ydelta -= CHATROWHEIGHT;
+				}
+
+				while (ydelta < 0 && chatrows < MAXCHATROWS)
+				{
+					chatrows++;
+					ydelta += CHATROWHEIGHT;
+				}
+
+				chatbox = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
+				slider.setrows(rowpos, chatrows, rowmax);
+				slider.setvertical(Range<int16_t>(0, CHATROWHEIGHT * chatrows - 14));
+
+				return Cursor::State::CLICKING;
+			}
+			else
+			{
+				dragchattop = false;
+			}
+		}
+		else if (contains)
+		{
+			if (clicking)
+			{
+				dragchattop = true;
+				return Cursor::State::CLICKING;
+			}
+			else
+			{
+				return Cursor::State::CANCLICK;
+			}
+		}
+
 		return Cursor::State::IDLE;
 	}
 
-	void UIChatBar::send_chatline(const std::string& line, LineType type)
+	void UIChatBar::send_line(const std::string& line, LineType type)
 	{
 		rowmax++;
 		rowpos = rowmax;
-		chat_fade_timer = CHAT_FADE_DURATION;
+
+		slider.setrows(rowpos, chatrows, rowmax);
 
 		Color::Name color;
 
 		switch (type)
 		{
-		case LineType::RED:
+		case RED:
 			color = Color::Name::RED;
 			break;
-		case LineType::BLUE:
+		case BLUE:
 			color = Color::Name::BLUE;
 			break;
-		case LineType::YELLOW:
+		case YELLOW:
 			color = Color::Name::YELLOW;
 			break;
 		default:
@@ -302,37 +476,25 @@ namespace ms
 		);
 	}
 
+	void UIChatBar::send_chatline(const std::string& line, LineType type)
+	{
+		send_line(line, type);
+	}
+
 	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
 	{
 		if (message_cooldowns[line] > 0)
 			return;
 
 		std::string message = Messages::messages[line];
-		send_chatline(message, type);
+		send_line(message, type);
 
 		message_cooldowns[line] = MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
 	{
-		chatopen_persist = !chatopen_persist;
-		toggle_chat(chatopen_persist);
-	}
-
-	void UIChatBar::toggle_chat(bool chat_open)
-	{
-		if (!chat_open && chatopen_persist)
-			return;
-
-		chatopen = chat_open;
-
-		if (!chatopen && chatfieldopen)
-			toggle_chatfield();
-
-		buttons[Buttons::BT_OPENCHAT]->set_active(!chat_open);
-		buttons[Buttons::BT_CLOSECHAT]->set_active(chat_open);
-		buttons[Buttons::BT_SCROLLUP]->set_active(chat_open);
-		buttons[Buttons::BT_SCROLLDOWN]->set_active(chat_open);
+		set_chat_open(!chatopen);
 	}
 
 	void UIChatBar::toggle_chatfield()
@@ -341,22 +503,23 @@ namespace ms
 		toggle_chatfield(chatfieldopen);
 	}
 
-	void UIChatBar::toggle_chatfield(bool chatfield_open)
+	void UIChatBar::toggle_chatfield(bool open)
 	{
-		chatfieldopen = chatfield_open;
-
-		toggle_chat(chatfieldopen);
+		chatfieldopen = open;
 
 		if (chatfieldopen)
 		{
-			chat_fade_timer = CHAT_FADE_DURATION;
+			if (!chatopen)
+				set_chat_open(true);
+
+			// set_state(FOCUSED) internally calls UI::get().focus_textfield()
+			// so we must NOT call focus_textfield again — the double call
+			// would reset the state back to NORMAL.
 			chatfield.set_state(Textfield::State::FOCUSED);
-			UI::get().focus_textfield(&chatfield);
 		}
 		else
 		{
-			chatfield.set_state(Textfield::State::NORMAL);
-			UI::get().remove_textfield();
+			chatfield.set_state(chatopen ? Textfield::State::NORMAL : Textfield::State::DISABLED);
 		}
 	}
 
@@ -370,62 +533,313 @@ namespace ms
 		return chatfieldopen;
 	}
 
-	Button::State UIChatBar::button_pressed(uint16_t buttonid)
+	void UIChatBar::set_chat_target(ChatTarget target)
 	{
-		switch (buttonid)
+		if (target >= CHT_ALL && target < NUM_TARGETS)
+			chattarget = target;
+	}
+
+	void UIChatBar::cycle_chat_target()
+	{
+		chattarget = static_cast<ChatTarget>((chattarget + 1) % NUM_TARGETS);
+	}
+
+	void UIChatBar::set_pending_party_invite(int32_t in_party_id, const std::string& inviter)
+	{
+		pending_party_invite_id = in_party_id;
+		pending_party_inviter = inviter;
+	}
+
+	void UIChatBar::clear_pending_party_invite()
+	{
+		pending_party_invite_id = -1;
+		pending_party_inviter.clear();
+	}
+
+	void UIChatBar::set_party_state(int32_t in_party_id, int32_t leader_id, const std::vector<PartyMember>& members)
+	{
+		party_id = in_party_id;
+		party_leader_id = leader_id;
+		party_members = members;
+
+		if (pending_party_invite_id == in_party_id)
+			clear_pending_party_invite();
+	}
+
+	void UIChatBar::clear_party_state()
+	{
+		party_id = -1;
+		party_leader_id = -1;
+		party_members.clear();
+	}
+
+	void UIChatBar::set_party_leader(int32_t leader_id)
+	{
+		party_leader_id = leader_id;
+	}
+
+	void UIChatBar::update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp)
+	{
+		for (PartyMember& member : party_members)
 		{
-		case Buttons::BT_OPENCHAT:
-		case Buttons::BT_CLOSECHAT:
-			toggle_chat();
-			break;
-		case Buttons::BT_SCROLLUP:
-			if (rowpos < rowmax)
-				rowpos++;
-			break;
-		case Buttons::BT_SCROLLDOWN:
-			if (rowpos > 0)
-				rowpos--;
-			break;
-		case Buttons::BT_CHAT_TARGET:
-			current_target = static_cast<ChatTarget>((current_target + 1) % NUM_TARGETS);
-			break;
-		default:
-			break;
+			if (member.id == cid)
+			{
+				member.hp = hp;
+				member.max_hp = max_hp;
+				return;
+			}
+		}
+	}
+
+	int32_t UIChatBar::get_party_id() const
+	{
+		return party_id;
+	}
+
+	int32_t UIChatBar::get_party_leader_id() const
+	{
+		return party_leader_id;
+	}
+
+	int32_t UIChatBar::get_pending_party_invite_id() const
+	{
+		return pending_party_invite_id;
+	}
+
+	const std::string& UIChatBar::get_pending_party_inviter() const
+	{
+		return pending_party_inviter;
+	}
+
+	const std::vector<UIChatBar::PartyMember>& UIChatBar::get_party_members() const
+	{
+		return party_members;
+	}
+
+	int32_t UIChatBar::resolve_party_member_id(const std::string& token) const
+	{
+		int32_t member_id = 0;
+		if (parse_int32(token, member_id))
+			return member_id;
+
+		std::string lowered = lowercase(token);
+		for (const PartyMember& member : party_members)
+		{
+			if (lowercase(member.name) == lowered)
+				return member.id;
 		}
 
-		Setting<Chatopen>::get().save(chatopen);
-
-		return Button::State::NORMAL;
+		return 0;
 	}
 
-	int16_t UIChatBar::getchattop(bool chat_open) const
+	bool UIChatBar::handle_party_command(const std::string& message)
 	{
-		if (chat_open)
-			return position.y() - chatrows * CHATROWHEIGHT - 65;
-		else
-			return position.y() - 1;
+		if (message.empty() || message[0] != '/')
+			return false;
+
+		std::istringstream whole(message);
+		std::string command;
+		whole >> command;
+		command = lowercase(command);
+
+		std::string argument_block;
+		std::getline(whole, argument_block);
+		argument_block = trim(argument_block);
+
+		if (command == "/pt")
+		{
+			if (argument_block.empty())
+			{
+				send_line("[Party] Usage: /pt <message>", YELLOW);
+				return true;
+			}
+
+			send_party_message(argument_block);
+			return true;
+		}
+
+		if (command != "/party" && command != "/p")
+			return false;
+
+		if (argument_block.empty())
+		{
+			send_line("[Party] /party create | leave | invite <name> | join <partyId>", YELLOW);
+			send_line("[Party] /party expel <name|id> | leader <name|id> | accept | deny | list", YELLOW);
+			return true;
+		}
+
+		std::istringstream args(argument_block);
+		std::string action;
+		args >> action;
+		action = lowercase(action);
+
+		std::string argument;
+		std::getline(args, argument);
+		argument = trim(argument);
+
+		if (action == "create")
+		{
+			CreatePartyPacket().dispatch();
+			send_line("[Party] Sent create request.", YELLOW);
+			return true;
+		}
+
+		if (action == "leave")
+		{
+			LeavePartyPacket().dispatch();
+			send_line("[Party] Sent leave request.", YELLOW);
+			return true;
+		}
+
+		if (action == "join")
+		{
+			int32_t join_party_id = 0;
+			if (!parse_int32(argument, join_party_id))
+			{
+				send_line("[Party] Usage: /party join <partyId>", YELLOW);
+				return true;
+			}
+
+			JoinPartyPacket(join_party_id).dispatch();
+			send_line("[Party] Sent join request.", YELLOW);
+			return true;
+		}
+
+		if (action == "invite")
+		{
+			if (argument.empty())
+			{
+				send_line("[Party] Usage: /party invite <name>", YELLOW);
+				return true;
+			}
+
+			InviteToPartyPacket(argument).dispatch();
+			send_line("[Party] Sent invite to " + argument + ".", YELLOW);
+			return true;
+		}
+
+		if (action == "expel" || action == "kick")
+		{
+			int32_t member_id = resolve_party_member_id(argument);
+			if (member_id <= 0)
+			{
+				send_line("[Party] Usage: /party expel <name|id>", YELLOW);
+				return true;
+			}
+
+			ExpelFromPartyPacket(member_id).dispatch();
+			send_line("[Party] Sent expel request.", YELLOW);
+			return true;
+		}
+
+		if (action == "leader" || action == "lead")
+		{
+			int32_t member_id = resolve_party_member_id(argument);
+			if (member_id <= 0)
+			{
+				send_line("[Party] Usage: /party leader <name|id>", YELLOW);
+				return true;
+			}
+
+			ChangePartyLeaderPacket(member_id).dispatch();
+			send_line("[Party] Sent leadership transfer request.", YELLOW);
+			return true;
+		}
+
+		if (action == "accept")
+		{
+			if (pending_party_invite_id <= 0)
+			{
+				send_line("[Party] There is no pending invitation.", YELLOW);
+				return true;
+			}
+
+			JoinPartyPacket(pending_party_invite_id).dispatch();
+			send_line("[Party] Sent invitation accept request.", YELLOW);
+			clear_pending_party_invite();
+			return true;
+		}
+
+		if (action == "deny")
+		{
+			if (pending_party_inviter.empty())
+			{
+				send_line("[Party] There is no pending invitation.", YELLOW);
+				return true;
+			}
+
+			DenyPartyInvitePacket(pending_party_inviter).dispatch();
+			send_line("[Party] Declined invitation from " + pending_party_inviter + ".", YELLOW);
+			clear_pending_party_invite();
+			return true;
+		}
+
+		if (action == "list")
+		{
+			if (party_members.empty())
+			{
+				send_line("[Party] No cached party members.", YELLOW);
+				return true;
+			}
+
+			send_line("[Party] Current members:", YELLOW);
+			for (const PartyMember& member : party_members)
+			{
+				std::string leader_tag = member.id == party_leader_id ? " (leader)" : "";
+				send_line(" - " + member.name + " Lv." + std::to_string(member.level) + leader_tag, WHITE);
+			}
+			return true;
+		}
+
+		send_line("[Party] Unknown command. Use /party for help.", YELLOW);
+		return true;
 	}
 
-	int16_t UIChatBar::getchatbarheight() const
+	void UIChatBar::send_targeted_message(const std::string& target, const std::string& message)
 	{
-		return 15 + chatrows * CHATROWHEIGHT;
+		send_line("[To " + target + "] " + message, WHITE);
 	}
 
-	Rectangle<int16_t> UIChatBar::getbounds(Point<int16_t> additional_area) const
+	void UIChatBar::send_party_message(const std::string& message)
 	{
-		int16_t screen_adj = (chatopen) ? 35 : 16;
-
-		auto absp = position + Point<int16_t>(0, getchattop(chatopen));
-		auto da = absp + additional_area;
-
-		absp = Point<int16_t>(absp.x(), absp.y() - screen_adj);
-		da = Point<int16_t>(da.x(), da.y());
-
-		return Rectangle<int16_t>(absp, da);
+		std::list<int32_t> recipients;
+		MultiChatPacket(MultiChatPacket::PARTY, recipients, message).dispatch();
+		send_targeted_message("Party", message);
 	}
 
-	bool UIChatBar::indragrange(Point<int16_t> cursorpos) const
+	void UIChatBar::send_chat_message(const std::string& message)
 	{
-		return false;
+		std::list<int32_t> recipients;
+
+		switch (chattarget)
+		{
+		case CHT_ALL:
+			GeneralChatPacket(message, true).dispatch();
+			break;
+		case CHT_BUDDY:
+			MultiChatPacket(MultiChatPacket::BUDDY, recipients, message).dispatch();
+			send_targeted_message("Buddy", message);
+			break;
+		case CHT_GUILD:
+			MultiChatPacket(MultiChatPacket::GUILD, recipients, message).dispatch();
+			send_targeted_message("Guild", message);
+			break;
+		case CHT_ALLIANCE:
+			MultiChatPacket(MultiChatPacket::ALLIANCE, recipients, message).dispatch();
+			send_targeted_message("Alliance", message);
+			break;
+		case CHT_SQUAD:
+			send_party_message(message);
+			break;
+		case CHT_PARTY:
+		default:
+			send_party_message(message);
+			break;
+		}
+	}
+
+	int16_t UIChatBar::getchattop() const
+	{
+		return position.y() - chatrows * CHATROWHEIGHT - CHATYOFFSET;
 	}
 }

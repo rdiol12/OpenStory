@@ -19,6 +19,8 @@
 
 #include "../OutPacket.h"
 
+#include <list>
+
 namespace ms
 {
 	// Packet which sends a message to general chat.
@@ -30,6 +32,31 @@ namespace ms
 		{
 			write_string(message);
 			write_byte(show);
+		}
+	};
+
+	// Packet which sends a message to a specific chat channel (buddy/guild/party/alliance).
+	// Opcode: MULTI_CHAT(119)
+	class MultiChatPacket : public OutPacket
+	{
+	public:
+		enum Type : int8_t
+		{
+			BUDDY = 0,
+			PARTY = 1,
+			GUILD = 2,
+			ALLIANCE = 3
+		};
+
+		MultiChatPacket(Type type, const std::list<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTI_CHAT)
+		{
+			write_byte(type);
+			write_byte(static_cast<int8_t>(recipients.size()));
+
+			for (int32_t r : recipients)
+				write_int(r);
+
+			write_string(message);
 		}
 	};
 }

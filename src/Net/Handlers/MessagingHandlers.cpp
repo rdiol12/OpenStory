@@ -119,9 +119,18 @@ namespace ms
 
 			QuestLog& quests = Stage::get().get_player().get_quests();
 
-			if (status == 1)
+			if (status == 0)
+			{
+				// Quest forfeited / removed
+				quests.forfeit(qid);
+				show_status(Color::Name::WHITE, "Quest forfeited.");
+			}
+			else if (status == 1)
 			{
 				std::string qdata = recv.read_string();
+				// Skip 5 trailing bytes (Cosmic sends 5 zero bytes after progress)
+				if (recv.available() && recv.length() >= 5)
+					recv.skip(5);
 				quests.add_started(qid, qdata);
 				show_status(Color::Name::WHITE, "Quest updated.");
 			}

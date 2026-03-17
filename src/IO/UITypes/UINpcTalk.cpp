@@ -25,13 +25,15 @@
 
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
+#include "../../Data/ItemData.h"
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false), formatted_text(""), formatted_text_pos(0), timestep(0), selection_top(0)
+	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false), formatted_text(""), formatted_text_pos(0), timestep(0), selection_top(0), hovered_selection(-1)
 	{
 		nl::node UtilDlgEx = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
 
@@ -40,23 +42,26 @@ namespace ms
 		bottom = UtilDlgEx["s"];
 		nametag = UtilDlgEx["bar"];
 
+		dot_normal = UtilDlgEx["dot0"];
+		dot_hovered = UtilDlgEx["dot1"];
+		list_normal = UtilDlgEx["list0"];
+		list_hovered = UtilDlgEx["list1"];
+
 		min_height = 8 * fill.height() + 14;
 
-		buttons[Buttons::ALLLEVEL] = std::make_unique<MapleButton>(UtilDlgEx["BtAllLevel"]);
 		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(UtilDlgEx["BtClose"]);
-		buttons[Buttons::MYLEVEL] = std::make_unique<MapleButton>(UtilDlgEx["BtMyLevel"]);
 		buttons[Buttons::NEXT] = std::make_unique<MapleButton>(UtilDlgEx["BtNext"]);
 		buttons[Buttons::NO] = std::make_unique<MapleButton>(UtilDlgEx["BtNo"]);
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(UtilDlgEx["BtOK"]);
 		buttons[Buttons::PREV] = std::make_unique<MapleButton>(UtilDlgEx["BtPrev"]);
-		buttons[Buttons::QAFTER] = std::make_unique<MapleButton>(UtilDlgEx["BtQAfter"]);
-		buttons[Buttons::QCNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQCNo"]);
-		buttons[Buttons::QCYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQCYes"]);
-		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(UtilDlgEx["BtQGiveup"]);
 		buttons[Buttons::QNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQNo"]);
-		buttons[Buttons::QSTART] = std::make_unique<MapleButton>(UtilDlgEx["BtQStart"]);
 		buttons[Buttons::QYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQYes"]);
 		buttons[Buttons::YES] = std::make_unique<MapleButton>(UtilDlgEx["BtYes"]);
+		buttons[Buttons::QSTART] = std::make_unique<MapleButton>(UtilDlgEx["BtQStart"]);
+		buttons[Buttons::QAFTER] = std::make_unique<MapleButton>(UtilDlgEx["BtQAfter"]);
+		buttons[Buttons::QCYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQCYes"]);
+		buttons[Buttons::QCNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQCNo"]);
+		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(UtilDlgEx["BtQGiveup"]);
 
 		name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
 
@@ -102,6 +107,36 @@ namespace ms
 		else
 		{
 			int16_t y_adj = height - min_height;
+			int16_t text_x = position.x() + 166;
+			int16_t text_y = position.y() + 48 - y_adj;
+			int16_t line_h = 16;
+
+			// Draw selection list backgrounds and dots for SENDSIMPLE
+			if (type == TalkType::SENDSIMPLE && !selections.empty())
+			{
+				for (size_t i = 0; i < selections.size(); i++)
+				{
+					auto& sel = selections[i];
+					int16_t row_y = text_y + sel.line * line_h;
+					Point<int16_t> row_pos(text_x - 36, row_y);
+					Point<int16_t> dot_pos(text_x - 14, row_y + 3);
+
+					bool is_hovered = (static_cast<int32_t>(i) == hovered_selection);
+
+					// Draw list row background
+					if (is_hovered)
+						list_hovered.draw(DrawArgument(row_pos));
+					else
+						list_normal.draw(DrawArgument(row_pos));
+
+					// Draw selection dot/bullet
+					if (is_hovered)
+						dot_hovered.draw(DrawArgument(dot_pos));
+					else
+						dot_normal.draw(DrawArgument(dot_pos));
+				}
+			}
+
 			text.draw(position + Point<int16_t>(166, 48 - y_adj));
 		}
 	}
@@ -142,31 +177,15 @@ namespace ms
 
 		switch (type)
 		{
-			case TalkType::SENDNEXT:
-			case TalkType::SENDOK:
+			case TalkType::SENDSAY:
 			{
-				// Type = 0
+				// msgtype 0 — OK/Next/Prev
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
 						NpcTalkMorePacket(type, -1).dispatch();
 						break;
-					case Buttons::NEXT:
 					case Buttons::OK:
-						NpcTalkMorePacket(type, 1).dispatch();
-						break;
-				}
-
-				break;
-			}
-			case TalkType::SENDNEXTPREV:
-			{
-				// Type = 0
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
-						break;
 					case Buttons::NEXT:
 						NpcTalkMorePacket(type, 1).dispatch();
 						break;
@@ -179,7 +198,7 @@ namespace ms
 			}
 			case TalkType::SENDYESNO:
 			{
-				// Type = 1
+				// msgtype 1
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -197,17 +216,24 @@ namespace ms
 			}
 			case TalkType::SENDACCEPTDECLINE:
 			{
-				// Type = 1
+				// msgtype 12 — quest accept/decline
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
+					case Buttons::QAFTER:
+					case Buttons::QCNO:
 						NpcTalkMorePacket(type, -1).dispatch();
 						break;
 					case Buttons::QNO:
 						NpcTalkMorePacket(type, 0).dispatch();
 						break;
 					case Buttons::QYES:
+					case Buttons::QSTART:
+					case Buttons::QCYES:
 						NpcTalkMorePacket(type, 1).dispatch();
+						break;
+					case Buttons::QGIVEUP:
+						NpcTalkMorePacket(type, 0).dispatch();
 						break;
 				}
 
@@ -215,12 +241,12 @@ namespace ms
 			}
 			case TalkType::SENDGETTEXT:
 			{
-				// SENDGETTEXT: Text input dialog (not yet implemented)
+				// msgtype 2 — text input (not yet implemented)
 				break;
 			}
 			case TalkType::SENDGETNUMBER:
 			{
-				// Type = 3
+				// msgtype 3
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -235,14 +261,11 @@ namespace ms
 			}
 			case TalkType::SENDSIMPLE:
 			{
-				// Type = 4
+				// msgtype 4 — close only; selections are handled in send_cursor
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
 						NpcTalkMorePacket(type, 0).dispatch();
-						break;
-					default:
-						NpcTalkMorePacket(0).dispatch(); // Sends selected option index
 						break;
 				}
 
@@ -275,15 +298,22 @@ namespace ms
 			int16_t text_w = 320;
 			int16_t line_h = 16; // approximate line height for A12M font
 
-			for (auto& sel : selections)
+			int32_t prev_hovered = hovered_selection;
+			hovered_selection = -1;
+
+			for (size_t i = 0; i < selections.size(); i++)
 			{
+				auto& sel = selections[i];
 				int16_t opt_y = text_y + sel.line * line_h;
 
 				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
 					cursorpos.y() >= opt_y && cursorpos.y() <= opt_y + line_h)
 				{
+					hovered_selection = static_cast<int32_t>(i);
+
 					if (clicked)
 					{
+						hovered_selection = -1;
 						deactivate();
 						NpcTalkMorePacket(sel.index).dispatch();
 						return Cursor::State::IDLE;
@@ -322,61 +352,161 @@ namespace ms
 		return TYPE;
 	}
 
-	UINpcTalk::TalkType UINpcTalk::get_by_value(int8_t value)
+	bool UINpcTalk::is_valid_type(int8_t value)
 	{
-		if (value > TalkType::NONE && value < TalkType::LENGTH)
-			return static_cast<TalkType>(value);
-
-		return TalkType::NONE;
+		switch (value)
+		{
+		case TalkType::SENDSAY:
+		case TalkType::SENDYESNO:
+		case TalkType::SENDGETTEXT:
+		case TalkType::SENDGETNUMBER:
+		case TalkType::SENDSIMPLE:
+		case TalkType::SENDSTYLE:
+		case TalkType::SENDACCEPTDECLINE:
+			return true;
+		default:
+			return false;
+		}
 	}
 
-	// NPC text formatting (replaces #p, #n, etc. placeholders)
+	// NPC text formatting — replaces all # macros with game data
+	// Handles: #h# (player name), #p<id># (NPC name), #m<id># (map name),
+	//          #o<id># (mob name), #t<id># / #z<id># (item name),
+	//          #e...#n (bold on/off), #b #k #r #d #c (color codes — stripped)
 	std::string UINpcTalk::format_text(const std::string& tx, const int32_t& npcid)
 	{
-		std::string formatted_text = tx;
-		size_t begin = formatted_text.find("#p");
+		std::string result;
+		result.reserve(tx.size());
 
-		if (begin != std::string::npos)
+		for (size_t i = 0; i < tx.size(); i++)
 		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
+			if (tx[i] != '#')
 			{
-				std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
-				formatted_text.replace(begin, end - begin, namestr);
+				result += tx[i];
+				continue;
 			}
+
+			if (i + 1 >= tx.size())
+			{
+				result += '#';
+				continue;
+			}
+
+			char code = tx[i + 1];
+
+			// Color/style codes: just skip the marker
+			if (code == 'b' || code == 'k' || code == 'r' || code == 'd' ||
+				code == 'c' || code == 'e' || code == 'n')
+			{
+				i++; // skip the code character
+				continue;
+			}
+
+			// #h# — player name (no ID between markers)
+			if (code == 'h')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					result += Stage::get().get_player().get_name();
+					i = end; // skip past closing #
+					continue;
+				}
+			}
+
+			// #p<id># — NPC name
+			if (code == 'p')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					std::string id_str = tx.substr(i + 2, end - i - 2);
+					if (!id_str.empty())
+					{
+						std::string name = nl::nx::string["Npc.img"][id_str]["name"];
+						result += name.empty() ? ("NPC " + id_str) : name;
+					}
+					i = end;
+					continue;
+				}
+			}
+
+			// #m<id># — map name
+			if (code == 'm')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					std::string id_str = tx.substr(i + 2, end - i - 2);
+					if (!id_str.empty())
+					{
+						// Map names: pad to 9 digits, look up in string.nx
+						std::string padded = id_str;
+						while (padded.size() < 9)
+							padded.insert(0, 1, '0');
+
+						std::string name = nl::nx::string["Map.img"][padded]["mapName"];
+						result += name.empty() ? ("Map " + id_str) : name;
+					}
+					i = end;
+					continue;
+				}
+			}
+
+			// #o<id># — mob name
+			if (code == 'o')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					std::string id_str = tx.substr(i + 2, end - i - 2);
+					if (!id_str.empty())
+					{
+						std::string name = nl::nx::string["Mob.img"][id_str]["name"];
+						result += name.empty() ? ("Mob " + id_str) : name;
+					}
+					i = end;
+					continue;
+				}
+			}
+
+			// #t<id># or #z<id># — item name
+			if (code == 't' || code == 'z')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					std::string id_str = tx.substr(i + 2, end - i - 2);
+					if (!id_str.empty())
+					{
+						try
+						{
+							int32_t itemid = std::stoi(id_str);
+							const ItemData& idata = ItemData::get(itemid);
+							result += idata.is_valid() ? idata.get_name() : ("Item " + id_str);
+						}
+						catch (...)
+						{
+							result += "Item " + id_str;
+						}
+					}
+					i = end;
+					continue;
+				}
+			}
+
+			// #L, #l — selection markers, keep them for parse_simple_selections
+			if (code == 'L' || code == 'l')
+			{
+				result += '#';
+				continue;
+			}
+
+			// Unknown code — pass through
+			result += '#';
 		}
 
-		begin = formatted_text.find("#h");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				std::string charstr = Stage::get().get_player().get_name();
-				formatted_text.replace(begin, end - begin, charstr);
-			}
-		}
-
-		begin = formatted_text.find("#t");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				size_t b = begin + 2;
-				int32_t itemid = std::stoi(formatted_text.substr(b, end - b));
-				std::string itemname = nl::nx::string["Consume.img"][itemid]["name"];
-
-				formatted_text.replace(begin, end - begin, itemname);
-			}
-		}
-
-		return formatted_text;
+		return result;
 	}
 
 	std::string UINpcTalk::parse_simple_selections(const std::string& tx)
@@ -476,9 +606,9 @@ namespace ms
 		return result;
 	}
 
-	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t, int8_t speakerbyte, const std::string& tx)
+	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string& tx)
 	{
-		type = get_by_value(msgtype);
+		type = is_valid_type(msgtype) ? static_cast<TalkType>(msgtype) : TalkType::NONE;
 
 		timestep = 0;
 		draw_text = true;
@@ -504,7 +634,8 @@ namespace ms
 		if (speakerbyte == 0)
 		{
 			std::string strid = std::to_string(npcid);
-			strid.insert(0, 7 - strid.size(), '0');
+			if (strid.size() < 7)
+				strid.insert(0, 7 - strid.size(), '0');
 			strid.append(".img");
 
 			speaker = nl::nx::npc[strid]["stand"]["0"];
@@ -552,10 +683,29 @@ namespace ms
 
 		switch (type)
 		{
-			case TalkType::SENDOK:
+			case TalkType::SENDSAY:
 			{
-				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
-				buttons[Buttons::OK]->set_active(true);
+				// Style bytes: high byte = prev, low byte = next
+				bool has_prev = (style >> 8) & 0xFF;
+				bool has_next = style & 0xFF;
+
+				if (has_prev && has_next)
+				{
+					buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+					buttons[Buttons::NEXT]->set_active(true);
+					buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
+					buttons[Buttons::PREV]->set_active(true);
+				}
+				else if (has_next)
+				{
+					buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+					buttons[Buttons::NEXT]->set_active(true);
+				}
+				else
+				{
+					buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+					buttons[Buttons::OK]->set_active(true);
+				}
 				break;
 			}
 			case TalkType::SENDYESNO:
@@ -569,28 +719,14 @@ namespace ms
 				buttons[Buttons::NO]->set_active(true);
 				break;
 			}
-			case TalkType::SENDNEXT:
-			{
-				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
-				buttons[Buttons::NEXT]->set_active(true);
-				break;
-			}
-			case TalkType::SENDNEXTPREV:
-			{
-				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
-				buttons[Buttons::NEXT]->set_active(true);
-
-				buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
-				buttons[Buttons::PREV]->set_active(true);
-				break;
-			}
 			case TalkType::SENDACCEPTDECLINE:
 			{
-				buttons[Buttons::QYES]->set_position(Point<int16_t>(389, y_cord));
-				buttons[Buttons::QYES]->set_active(true);
+				// Quest accept/decline — show quest-specific buttons
+				buttons[Buttons::QSTART]->set_position(Point<int16_t>(389, y_cord));
+				buttons[Buttons::QSTART]->set_active(true);
 
-				buttons[Buttons::QNO]->set_position(Point<int16_t>(389 + 65, y_cord));
-				buttons[Buttons::QNO]->set_active(true);
+				buttons[Buttons::QAFTER]->set_position(Point<int16_t>(389 + 65, y_cord));
+				buttons[Buttons::QAFTER]->set_active(true);
 				break;
 			}
 			case TalkType::SENDGETNUMBER:

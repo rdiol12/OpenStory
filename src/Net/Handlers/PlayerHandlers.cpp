@@ -27,6 +27,7 @@
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UISkillBook.h"
+#include "../../IO/UITypes/UISkillMacro.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
 namespace ms
@@ -93,6 +94,11 @@ namespace ms
 			std::cout << "[ChangeStats] stat=" << stat << " value=" << value << std::endl;
 			player.get_stats().set_stat(stat, value);
 			recalculate = true;
+
+			// Trigger death state when HP reaches 0
+			if (stat == MapleStat::Id::HP && value == 0)
+				player.set_state(Char::State::DIED);
+
 			break;
 		}
 		}
@@ -214,13 +220,18 @@ namespace ms
 	{
 		uint8_t size = recv.read_byte();
 
+		auto macro_ui = UI::get().get_element<UISkillMacro>();
+
 		for (uint8_t i = 0; i < size; i++)
 		{
-			recv.read_string();	// name
-			recv.read_byte();	// 'shout' byte
-			recv.read_int();	// skill 1
-			recv.read_int();	// skill 2
-			recv.read_int();	// skill 3
+			std::string name = recv.read_string();
+			bool shout = recv.read_byte() != 0;
+			int32_t skill1 = recv.read_int();
+			int32_t skill2 = recv.read_int();
+			int32_t skill3 = recv.read_int();
+
+			if (macro_ui)
+				macro_ui->set_macro(i, name, shout, skill1, skill2, skill3);
 		}
 	}
 

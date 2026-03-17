@@ -138,6 +138,9 @@ namespace ms
 		Text namelabel;
 		Text joblabel;
 
+		// Main bar background (drawn stretched to screen width)
+		Texture bar_backgrnd;
+
 		// Gauge cover (overlay on top of gauges)
 		Texture gauge_cover;
 
@@ -199,5 +202,15 @@ namespace ms
 		// readyZero
 		Texture ready_zero_backgrnd;
 		Texture ready_zero_gauge_backgrnd;
+
+		// Buff tray background (from StatusBar3.img)
+		Texture buff_backgrnd;
+
+		// Alarm/notification area
+		Texture alarm_backgrnd;
+		Animation alarm_anim;
+
+		// Event shortcut icons
+		Texture event_backgrnd;
 	};
 }

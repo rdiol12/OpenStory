@@ -17,21 +17,39 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../UIElement.h"
 #include "../Messages.h"
-#include "../UIDragElement.h"
 
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
+
 #include "../../Graphics/Geometry.h"
+#include "../../Graphics/Texture.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace ms
 {
-	class UIChatBar : public UIDragElement<PosCHAT>
+	class UIChatBar : public UIElement
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::CHATBAR;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
+
+		enum ChatTarget : uint8_t
+		{
+			CHT_ALL,
+			CHT_BUDDY,
+			CHT_GUILD,
+			CHT_ALLIANCE,
+			CHT_PARTY,
+			CHT_SQUAD,
+			NUM_TARGETS
+		};
 
 		enum LineType
 		{
@@ -42,10 +60,23 @@ namespace ms
 			YELLOW
 		};
 
-		UIChatBar();
+		struct PartyMember
+		{
+			int32_t id = 0;
+			std::string name;
+			int32_t job_id = 0;
+			int32_t level = 0;
+			int32_t channel = -2;
+			int32_t map_id = 0;
+			int32_t hp = 0;
+			int32_t max_hp = 0;
+		};
+
+		UIChatBar(Point<int16_t> position);
 
 		void draw(float inter) const override;
 		void update() override;
+		void set_position(Point<int16_t> pos);
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -54,32 +85,42 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		Cursor::State check_dragtop(bool clicking, Point<int16_t> cursorpos);
-
+		void send_line(const std::string& line, LineType type);
 		void send_chatline(const std::string& line, LineType type);
 		void display_message(Messages::Type line, UIChatBar::LineType type);
+		void focus_chatfield();
 		void toggle_chat();
-		void toggle_chat(bool chat_open);
 		void toggle_chatfield();
-		void toggle_chatfield(bool chatfield_open);
+		void toggle_chatfield(bool open);
 		bool is_chatopen();
 		bool is_chatfieldopen();
+
+		void set_chat_target(ChatTarget target);
+		void cycle_chat_target();
+
+		void set_pending_party_invite(int32_t party_id, const std::string& inviter);
+		void clear_pending_party_invite();
+		void set_party_state(int32_t party_id, int32_t leader_id, const std::vector<PartyMember>& members);
+		void clear_party_state();
+		void set_party_leader(int32_t leader_id);
+		void update_party_member_hp(int32_t cid, int32_t hp, int32_t max_hp);
+		int32_t get_party_id() const;
+		int32_t get_party_leader_id() const;
+		int32_t get_pending_party_invite_id() const;
+		const std::string& get_pending_party_inviter() const;
+		const std::vector<PartyMember>& get_party_members() const;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		bool indragrange(Point<int16_t> cursorpos) const override;
-
-		int16_t getchattop(bool chat_open) const;
-		int16_t getchatbarheight() const;
-		Rectangle<int16_t> getbounds(Point<int16_t> additional_area) const;
-
-		static constexpr int16_t CHATROWHEIGHT = 16;
-		static constexpr int16_t MINCHATROWS = 1;
-		static constexpr int16_t MAXCHATROWS = 16;
-		static constexpr int16_t DIMENSION_Y = 60;
-		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
+		void set_chat_open(bool open);
+		int32_t resolve_party_member_id(const std::string& token) const;
+		bool handle_party_command(const std::string& message);
+		void send_chat_message(const std::string& message);
+		void send_targeted_message(const std::string& target, const std::string& message);
+		void send_party_message(const std::string& message);
+		int16_t getchattop() const;
 
 		enum Buttons : uint16_t
 		{
@@ -87,66 +128,42 @@ namespace ms
 			BT_CLOSECHAT,
 			BT_SCROLLUP,
 			BT_SCROLLDOWN,
-			BT_CHAT,
-			BT_HELP,
-			BT_LINK,
-			BT_TAB_0,
-			BT_TAB_1,
-			BT_TAB_2,
-			BT_TAB_3,
-			BT_TAB_4,
-			BT_TAB_5,
-			BT_TAB_ADD,
-			BT_CHAT_TARGET
+			BT_CHATTARGETS
 		};
 
-		enum ChatTab
-		{
-			CHT_ALL,
-			CHT_BATTLE,
-			CHT_PARTY,
-			CHT_FRIEND,
-			CHT_GUILD,
-			CHT_ALLIANCE,
-			NUM_CHATTAB
-		};
+		static constexpr int16_t CHATYOFFSET = 65;
+		static constexpr int16_t CHATROWHEIGHT = 16;
+		static constexpr int16_t MAXCHATROWS = 16;
+		static constexpr int16_t MINCHATROWS = 1;
+		static constexpr time_t MESSAGE_COOLDOWN = 1000;
 
-		enum ChatTarget : uint8_t
-		{
-			TARGET_ALL,
-			TARGET_PARTY,
-			TARGET_GUILD,
-			TARGET_FRIEND,
-			TARGET_EXPEDITION,
-			TARGET_ASSOCIATION,
-			TARGET_AFCTV,
-			NUM_TARGETS
-		};
-
-		bool chatopen;
-		bool chatopen_persist;
-		bool chatfieldopen;
-		Texture chatspace[4];
+		Textfield chatfield;
+		Texture chatspace[2];
+		Texture chattargets[NUM_TARGETS];
 		Texture chatenter;
 		Texture chatcover;
-		Texture chattarget_textures[NUM_TARGETS];
-		ChatTarget current_target;
-		Textfield chatfield;
+		Texture tapbar;
+		Texture tapbartop;
 
-		Slider slider;
+		bool chatopen;
+		bool chatfieldopen;
+		ChatTarget chattarget;
+		int32_t party_id;
+		int32_t party_leader_id;
+		int32_t pending_party_invite_id;
+		std::string pending_party_inviter;
+		std::vector<PartyMember> party_members;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		std::vector<std::string> lastentered;
 		size_t lastpos;
 
+		std::unordered_map<int16_t, Text> rowtexts;
+		ColorBox chatbox;
 		int16_t chatrows;
 		int16_t rowpos;
 		int16_t rowmax;
-		std::unordered_map<int16_t, Text> rowtexts;
-
+		Slider slider;
 		bool dragchattop;
-		ColorBox chat_background;
-		int32_t chat_fade_timer;
-		static constexpr int32_t CHAT_FADE_DURATION = 5000;
 	};
 }

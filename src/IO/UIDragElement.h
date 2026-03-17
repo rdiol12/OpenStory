@@ -71,6 +71,23 @@ namespace ms
 			return UIElement::send_cursor(clicked, cursorpos);
 		}
 
+		void update_screen(int16_t new_width, int16_t new_height) override
+		{
+			// Clamp position so the window stays visible on screen
+			int16_t x = position.x();
+			int16_t y = position.y();
+
+			if (x + dimension.x() > new_width)
+				x = std::max<int16_t>(0, new_width - dimension.x());
+			if (y + dimension.y() > new_height)
+				y = std::max<int16_t>(0, new_height - dimension.y());
+			if (x < 0) x = 0;
+			if (y < 0) y = 0;
+
+			position = Point<int16_t>(x, y);
+			Setting<T>::get().save(position);
+		}
+
 	protected:
 		UIDragElement() : UIDragElement(Point<int16_t>(0, 0)) {}
 

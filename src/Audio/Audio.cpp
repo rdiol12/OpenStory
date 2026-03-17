@@ -176,7 +176,8 @@ namespace ms
 	std::string Sound::format_id(int32_t itemid)
 	{
 		std::string strid = std::to_string(itemid);
-		strid.insert(0, 8 - strid.size(), '0');
+		if (strid.size() < 8)
+			strid.insert(0, 8 - strid.size(), '0');
 
 		return strid;
 	}

@@ -20,6 +20,7 @@
 #include "UILogin.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 
@@ -29,8 +30,10 @@
 
 namespace ms
 {
-	UILogo::UILogo() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UILogo::UILogo() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
+		screen_adj = Point<int16_t>((Constants::Constants::get().get_viewwidth() - 800) / 2, (Constants::Constants::get().get_viewheight() - 600) / 2);
+
 		Music("BgmUI.img/NxLogo").play_once();
 
 		nexon_ended = false;
@@ -50,19 +53,19 @@ namespace ms
 		{
 			if (!nexon_ended)
 			{
-				Nexon.draw(position + Point<int16_t>(440, 360), inter);
+				Nexon.draw(position + Point<int16_t>(440, 360) + screen_adj, inter);
 			}
 			else
 			{
 				if (!wizet_ended)
-					Wizet.draw(position + Point<int16_t>(263, 195), inter);
+					Wizet.draw(position + Point<int16_t>(263, 195) + screen_adj, inter);
 				else
-					WizetEnd.draw(position + Point<int16_t>(263, 195));
+					WizetEnd.draw(position + Point<int16_t>(263, 195) + screen_adj);
 			}
 		}
 		else
 		{
-			WizetEnd.draw(position + Point<int16_t>(263, 195));
+			WizetEnd.draw(position + Point<int16_t>(263, 195) + screen_adj);
 		}
 	}
 

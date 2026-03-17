@@ -69,6 +69,7 @@ namespace ms
 		FAME_RESPONSE = 38,     // 0x26
 		SHOW_STATUS_INFO = 39,  // 0x27
 		CLAIM_STATUS_CHANGED = 47, // 0x2F
+		QUEST_CLEAR = 49,          // 0x31
 
 		SET_GENDER = 58,        // 0x3A
 
@@ -78,6 +79,8 @@ namespace ms
 		/// Social
 		PARTY_OPERATION = 62,   // 0x3E
 		BUDDY_LIST = 63,        // 0x3F
+		GUILD_OPERATION = 65,   // 0x41
+		GUILD_BBS = 67,         // 0x43
 
 		/// Messaging
 		SERVER_MESSAGE = 68,    // 0x44
@@ -118,6 +121,7 @@ namespace ms
 		DAMAGE_PLAYER = 192,    // 0xC0
 		FACIAL_EXPRESSION = 193,// 0xC1
 		SHOW_ITEM_EFFECT = 194, // 0xC2
+		SHOW_CHAIR = 196,       // 0xC4
 		UPDATE_CHARLOOK = 197,  // 0xC5
 		SHOW_FOREIGN_EFFECT = 198, // 0xC6
 		GIVE_FOREIGN_BUFF = 199,   // 0xC7
@@ -158,6 +162,9 @@ namespace ms
 
 		/// Storage
 		STORAGE = 309,          // 0x135
+
+		/// Parcel (Duey delivery)
+		PARCEL = 322,           // 0x142
 
 		/// Player Interaction (Trade, etc.)
 		PLAYER_INTERACTION = 314, // 0x13A
@@ -270,6 +277,7 @@ namespace ms
 		// Stub handlers for unhandled v83 packets
 		emplace<RELOG_RESPONSE, RelogResponseHandler>();
 		emplace<UPDATE_QUEST_INFO, UpdateQuestInfoHandler>();
+		emplace<QUEST_CLEAR, QuestClearHandler>();
 		emplace<FAME_RESPONSE, FameResponseHandler>();
 		emplace<BUDDY_LIST, BuddyListHandler>();
 		emplace<FAMILY, FamilyHandler>();
@@ -300,9 +308,14 @@ namespace ms
 		emplace<UPDATE_PARTYMEMBER_HP, UpdatePartyMemberHPHandler>();
 		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
 		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
+		emplace<GUILD_OPERATION, GuildOperationHandler>();
+		emplace<GUILD_BBS, GuildBBSHandler>();
 		emplace<CANCEL_CHAIR, CancelChairHandler>();
+		emplace<SHOW_CHAIR, ShowChairHandler>();
 		emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();
 		emplace<STORAGE, StorageHandler>();
+		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
+		emplace<PARCEL, ParcelHandler>();
 		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
 
 		// MTS (Maple Trading System)

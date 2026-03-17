@@ -114,7 +114,7 @@ namespace ms
 			"1024 x 768 ( 4 : 3 )",
 			"1280 x 720 ( 16 : 9 )",
 			"1366 x 768 ( 16 : 9 )",
-			"1920 x 1080 ( 16 : 9 ) - Beta"
+			"1920 x 1080 ( 16 : 9 )"
 		};
 
 		int16_t max_width = Configuration::get().get_max_width();
@@ -253,6 +253,9 @@ namespace ms
 
 				Constants::Constants::get().set_viewwidth(width);
 				Constants::Constants::get().set_viewheight(height);
+
+				// Flush settings to disk immediately so resolution persists
+				Configuration::get().save();
 			}
 			break;
 			case Buttons::TAB1:

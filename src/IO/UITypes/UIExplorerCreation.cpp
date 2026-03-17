@@ -26,6 +26,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
@@ -38,7 +39,7 @@
 
 namespace ms
 {
-	UIExplorerCreation::UIExplorerCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIExplorerCreation::UIExplorerCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
 	{
 		gender = false;
 		charSet = false;
@@ -59,7 +60,12 @@ namespace ms
 		sky = back["2"];
 		cloud = back["27"];
 
-		sprites.emplace_back(back["14"], Point<int16_t>(250, 302));
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		float sx = (float)vw / 800.0f;
+		float sy = (float)vh / 600.0f;
+
+		sprites.emplace_back(back["14"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
 		sprites.emplace_back(signboard["2"], DrawArgument(Point<int16_t>(234, 235), 2.0f));
 		sprites_gender_select.emplace_back(board["genderTop"], Point<int16_t>(486, 95));
 		sprites_gender_select.emplace_back(board["boardMid"], Point<int16_t>(486, 209));
@@ -213,11 +219,13 @@ namespace ms
 
 	void UIExplorerCreation::draw(float inter) const
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+
 		for (size_t i = 0; i < 2; i++)
-			for (size_t k = 0; k < 800; k += sky.width())
+			for (int16_t k = 0; k < vw; k += sky.width())
 				sky.draw(Point<int16_t>(k, (400 * i) - 100));
 
-		int16_t cloudx = static_cast<int16_t>(cloudfx) % 800;
+		int16_t cloudx = static_cast<int16_t>(cloudfx) % vw;
 		cloud.draw(Point<int16_t>(cloudx - cloud.width(), 310));
 		cloud.draw(Point<int16_t>(cloudx, 310));
 		cloud.draw(Point<int16_t>(cloudx + cloud.width(), 310));

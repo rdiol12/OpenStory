@@ -49,6 +49,35 @@ namespace ms
 		}
 	};
 
+	// Saves skill macro configuration
+	// Opcode: SKILL_MACRO_MODIFIED(92)
+	class SkillMacroModifiedPacket : public OutPacket
+	{
+	public:
+		struct MacroData
+		{
+			std::string name;
+			bool shout;
+			int32_t skill1;
+			int32_t skill2;
+			int32_t skill3;
+		};
+
+		SkillMacroModifiedPacket(const MacroData* macros, int16_t count) : OutPacket(OutPacket::Opcode::SKILL_MACRO_MODIFIED)
+		{
+			write_byte(static_cast<int8_t>(count));
+
+			for (int16_t i = 0; i < count; i++)
+			{
+				write_string(macros[i].name);
+				write_byte(macros[i].shout ? 1 : 0);
+				write_int(macros[i].skill1);
+				write_int(macros[i].skill2);
+				write_int(macros[i].skill3);
+			}
+		}
+	};
+
 	// Requests the server to change key mappings
 	// Opcode: CHANGE_KEYMAP(135)
 	class ChangeKeyMapPacket : public OutPacket

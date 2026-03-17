@@ -167,5 +167,26 @@ namespace ms
 
 		Slider list_slider;
 		int16_t list_offset;
+
+		// Sub-panel backgrounds
+		Texture wishlist_bg;
+		Texture gift_bg;
+		Texture coupon_bg;
+		Texture search_bg;
+		Texture cs_inventory_bg;
+		Texture purchase_bg;
+
+		// Active sub-panel tracking
+		enum SubPanel : uint8_t
+		{
+			SUBPANEL_NONE,
+			SUBPANEL_WISHLIST,
+			SUBPANEL_GIFT,
+			SUBPANEL_COUPON,
+			SUBPANEL_SEARCH,
+			SUBPANEL_INVENTORY,
+			SUBPANEL_PURCHASE
+		};
+		SubPanel active_subpanel;
 	};
 }

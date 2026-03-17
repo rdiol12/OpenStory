@@ -44,6 +44,12 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Quest completion visual notification (quest log marker)
+	class QuestClearHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class FameResponseHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
@@ -238,6 +244,36 @@ namespace ms
 
 	// Player interaction: trade, miniroom, player shop
 	class PlayerInteractionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guild operation response (create, invite, expel, rank change, etc.)
+	class GuildOperationHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guild BBS (bulletin board system) response
+	class GuildBBSHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Show chair visual on a foreign character (opcode 0xC4)
+	class ShowChairHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// NPC shop transaction confirmation (opcode 0x132)
+	class ConfirmShopTransactionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Parcel/Duey delivery system (opcode 0x142)
+	class ParcelHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};

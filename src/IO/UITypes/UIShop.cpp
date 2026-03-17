@@ -694,9 +694,11 @@ namespace ms
 		int16_t slot = selection;
 		int32_t itemid = item.get_id();
 
-		if (buyable > 1)
+		if (buyable == 0 || buyable > 1)
 		{
+			// buyable == 0 means unlimited; buyable > 1 means limited quantity
 			constexpr char* question = "How many are you willing to buy?";
+			int16_t max_qty = (buyable == 0) ? 100 : buyable;
 
 			auto onenter = [slot, itemid](int32_t qty)
 			{
@@ -705,7 +707,7 @@ namespace ms
 				NpcShopActionPacket(slot, itemid, shortqty, true).dispatch();
 			};
 
-			UI::get().emplace<UIEnterNumber>(question, onenter, buyable, 1);
+			UI::get().emplace<UIEnterNumber>(question, onenter, max_qty, 1);
 		}
 		else if (buyable > 0)
 		{

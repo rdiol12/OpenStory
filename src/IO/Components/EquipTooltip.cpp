@@ -162,7 +162,7 @@ namespace ms
 						std::string reqstr = std::to_string(equipdata.get_reqstat(ms));
 
 						if (ms != MapleStat::Id::LEVEL)
-							reqstr.insert(0, 3 - reqstr.size(), '0');
+							if (reqstr.size() < 3) reqstr.insert(0, 3 - reqstr.size(), '0');
 
 						reqstatstrings_preview[ms] = reqstr;
 					}
@@ -375,7 +375,7 @@ namespace ms
 			std::string reqstr = std::to_string(equipdata.get_reqstat(ms));
 
 			if (ms != MapleStat::Id::LEVEL)
-				reqstr.insert(0, 3 - reqstr.size(), '0');
+				if (reqstr.size() < 3) reqstr.insert(0, 3 - reqstr.size(), '0');
 
 			reqstatstrings[ms] = reqstr;
 		}

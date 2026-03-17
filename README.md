@@ -12,7 +12,7 @@ A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenCli
 - Complete login flow: account login, world/channel select, character select, PIC entry
 - In-game systems: movement, combat, NPCs, quests, inventory, skills, chat
 
-## What Was Fixed / Added
+## What's Working
 
 ### Recv Opcode Realignment
 All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet handler now uses the correct v83 Cosmic opcode values.
@@ -29,6 +29,7 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - **Combat**: ATTACKED_CLOSE, ATTACKED_RANGED, ATTACKED_MAGIC
 - **Social**: SERVER_MESSAGE, BUDDY_LIST, PARTY_OPERATION, FAMILY, PLAYER_HINT, UPDATE_QUEST_INFO, CHAR_INFO, WEEK_EVENT_MESSAGE
 - **Cash Shop / MTS**: SET_CASH_SHOP, SET_ITC, CS_OPERATION, MTS_OPERATION, MTS_OPERATION2
+- **Misc**: SHOW_CHAIR, PARCEL
 - Unhandled packet logging to `unhandled_packets.txt` for debugging
 
 ### Maple Trading System (MTS)
@@ -38,7 +39,7 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - SET_ITC handler for MTS transition with character info parsing
 - Dark panel UI with Browse/My Sales/Cart tabs, item lists, pagination, buy/sell/search
 
-### Status Bar — Menu & System Sub-Panels
+### Status Bar -- Menu & System Sub-Panels
 - Menu button opens a vertical panel with: Stat, Skill, Quest, Item, Equip, Community, Event, Rank
 - System button opens: Channel, Game Option, Quit, Joypad, Key Setting, Option, Room Change, System Option
 - Sub-panel buttons manually positioned above the bar (NX origins are invalid for this version)
@@ -48,11 +49,15 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - Each sub-panel button wired to its respective UI action
 
 ### Chat System
-- UIChatBar draws NX textures at correct StatusBar anchor position (512, screen_h)
+- UIChatBar draws NX textures at correct StatusBar anchor position
 - Text input field aligned with the visual chat input box
 - Chat background, messages, and text field properly positioned
-- Removed duplicate chat rendering from UIStatusBar
-- Enter key toggles chat input, message history with up/down arrows
+- Open/close chat button works correctly (toggle bounce fixed)
+- Chat target button no longer gets stuck
+- Enter key correctly opens chat and focuses the text input field
+- Writing indicator (blinking cursor) visible inside the chat box when typing
+- Stale focusedtextfield pointer no longer traps keyboard input
+- Message history with up/down arrows
 
 ### Quest Log
 - Detail panel showing quest name, level requirement, NPC sprite, rewards with item icons, requirements, and description
@@ -65,12 +70,28 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - Delete buddy sends confirmation dialog then DeleteBuddyPacket
 - Whisper sends FindPlayerPacket for online buddies
 
-### Physics — Traction Fix
+### Skill Macros
+- Full skill macro editor UI with 5 macro slots
+- Each slot has a name textfield, shout checkbox, and 3 skill icon slots
+- Populated from server-sent SKILL_MACROS data
+- Save sends SkillMacroModifiedPacket (opcode 92)
+
+### Buff Tooltip on Hover
+- Hovering over buff icons in the top-right corner shows the skill/item name as a tooltip
+- Tooltip clears when cursor leaves the buff area
+
+### Player Death
+- Player enters DIED state when HP reaches 0 (immovable, invincible)
+
+### Expression / Face Fix
+- Fixed unsigned integer underflow in `Expression::byaction()` that caused spam log output for large action values
+
+### Physics -- Traction Fix
 - Foothold traction values properly applied to character movement
 - Ice/slippery maps (El Nath, etc.) work correctly without freezing or getting stuck
 - Traction resets on map change
 
-### Hair — backHairOverCape Layer
+### Hair -- backHairOverCape Layer
 - Long hair styles with `backHairOverCape` frames render correctly over capes
 - No extra layer drawn for short hair or when no cape is equipped
 
@@ -92,14 +113,26 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 
 ## What's Left To Do
 
-### Not Yet Implemented
-- **Cash Shop purchases** — UI exists but purchase flow incomplete
-- **Storage UI** — handler/UI stubbed but not fully wired
-- **Trade UI** — player-to-player trade stubbed
+### Known Bugs
+- **Crossbow (1462126) missing idle animation** -- no idle frames displayed when holding this weapon
+- **Pickup too fast** -- item pickup speed feels instant rather than animated
+- **Magic Claw wrong animation/sound** -- wrong attacking animation on character and weapon swing sound plays instead of only the magic claw sound
+- **Mob knockback janky** -- mobs appear to move during their knockback/hit animation instead of being locked in place
+- **Jump-down needs more vertical lift** -- jumping down from a platform drops immediately instead of a slight vertical lift before descent
+- **Item drops off-center** -- drops land off-center from the character (server-controlled positioning, not a client bug)
 
-### Known Issues
-- NPC interaction fallback when dialog not found
-- Hurricane/piercing arrow/rapidfire attack packets may need additional 4 bytes
+### Not Yet Implemented
+- **MTS server-side** -- Cosmic has MTS support but it must be enabled (`USE_MTS: true` in config.yaml, run `019-mts.sql`)
+- **Cash Shop purchases** -- UI exists but purchase flow incomplete
+- **Storage UI** -- handler/UI stubbed but not fully wired
+- **Trade UI** -- player-to-player trade stubbed
+- **Guild UI** -- stub files created, not wired up
+- **Messenger / Party Search** -- stub files created, not wired up
+- **Monster Book** -- stub files created, not wired up
+- **HP/MP regen** -- server-controlled, no client-side regen needed
+
+### UI Stubs Created (Not Yet Functional)
+UIGuild, UIGuildBBS, UIGuildMark, UIMessenger, UIPartySearch, UIMonsterBook, UIMonsterCarnival, UIHiredMerchant, UIPersonalShop, UIMinigame, UIRPSGame, UIMapleTV, UIMapleChat, UISocialChat, UIFarmChat, UIFamily, UIWedding, UIRanking, UIQuestHelper, UISystemOption, UIChatWindow
 
 ## Building
 
@@ -128,11 +161,11 @@ Place your v83 NX files in the `wz/` directory alongside the executable.
 Edit `Configuration.h` for default settings. A `Settings` file is generated after a game session.
 
 Key settings:
-- **ServerIP / ServerPort** — server connection details
-- **Width / Height** — screen resolution (default 1024x768)
-- **BGMVolume / SFXVolume** — audio levels (0-100)
-- **VSync** — vertical sync toggle
-- **SaveLogin** — remember last account name
+- **ServerIP / ServerPort** -- server connection details
+- **Width / Height** -- screen resolution (default 1024x768)
+- **BGMVolume / SFXVolume** -- audio levels (0-100)
+- **VSync** -- vertical sync toggle
+- **SaveLogin** -- remember last account name
 
 ## Required NX Files
 
@@ -154,14 +187,14 @@ All NX files should be v83 GMS conversions placed in the `wz/` directory.
 ## Credits
 
 ### Original Authors
-- **Daniel Allendorf** — Original Journey/HeavenClient creator
-- **Ryan Payton** — Co-developer of the continued Journey client
+- **Daniel Allendorf** -- Original Journey/HeavenClient creator
+- **Ryan Payton** -- Co-developer of the continued Journey client
 
 ### Based On
-- [HeavenClient](https://github.com/HeavenClient/HeavenClient) — The original open-source C++ MapleStory client
+- [HeavenClient](https://github.com/HeavenClient/HeavenClient) -- The original open-source C++ MapleStory client
 
 ### OpenStory Contributors
-- **rdiol12** — v83 Cosmic server compatibility, opcode realignment, MTS, UI systems, packet handlers, physics fixes
+- **rdiol12** -- v83 Cosmic server compatibility, opcode realignment, MTS, UI systems, packet handlers, physics fixes
 
 ## License
 

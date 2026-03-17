@@ -27,9 +27,12 @@
 #include "../../IO/UITypes/UIClock.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UITrade.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UIGuild.h"
+#include "../../IO/UITypes/UIGuildBBS.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
 #include "../../Net/Session.h"
@@ -75,6 +78,8 @@ namespace ms
 
 	void UpdateQuestInfoHandler::handle(InPacket& recv) const
 	{
+		// Cosmic uses UPDATE_QUEST_INFO (0xD3) for NPC info, time limits, expiration
+		// Quest state changes go through SHOW_STATUS_INFO (0x27) mode 1
 		if (!recv.available())
 			return;
 
@@ -82,50 +87,71 @@ namespace ms
 
 		switch (mode)
 		{
-		case 0:
+		case 6:
 		{
-			// Quest forfeit/removed
-			if (recv.length() < 2)
-				return;
+			// Add quest time limit
+			int16_t count = recv.read_short();
+			for (int16_t i = 0; i < count; i++)
+			{
+				int16_t questid = recv.read_short();
+				int32_t time_ms = recv.read_int();
+				std::cout << "[UpdateQuestInfo] Time limit: quest " << questid << " = " << time_ms << "ms" << std::endl;
+			}
+			break;
+		}
+		case 7:
+		{
+			// Remove quest time limit
+			int16_t pos = recv.read_short();
+			int16_t questid = recv.read_short();
+			std::cout << "[UpdateQuestInfo] Remove time limit: quest " << questid << std::endl;
+			break;
+		}
+		case 8:
+		{
+			// Quest NPC info (sent after quest start/complete)
+			int16_t questid = recv.read_short();
+			int32_t npcid = recv.read_int();
+			int32_t zero = recv.read_int();
+			std::cout << "[UpdateQuestInfo] NPC info: quest " << questid << " npc " << npcid << std::endl;
 
+			// Refresh quest log UI if open
+			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
+				questlog_ui->load_quests();
+
+			break;
+		}
+		case 0x0F:
+		{
+			// Quest expired
 			int16_t questid = recv.read_short();
 			Stage::get().get_player().get_quests().forfeit(questid);
-			break;
-		}
-		case 1:
-		{
-			// Quest started or progress updated
-			if (recv.length() < 2)
-				return;
+			std::cout << "[UpdateQuestInfo] Quest expired: " << questid << std::endl;
 
-			int16_t questid = recv.read_short();
+			// Refresh quest log UI if open
+			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
+				questlog_ui->load_quests();
 
-			if (recv.available())
-			{
-				std::string quest_data = recv.read_string();
-				Stage::get().get_player().get_quests().add_started(questid, quest_data);
-			}
-			break;
-		}
-		case 2:
-		{
-			// Quest completed
-			if (recv.length() < 2)
-				return;
-
-			int16_t questid = recv.read_short();
-
-			if (recv.length() >= 8)
-			{
-				int64_t time = recv.read_long();
-				Stage::get().get_player().get_quests().add_completed(questid, time);
-			}
 			break;
 		}
 		default:
 			std::cout << "[UpdateQuestInfoHandler]: Unhandled mode: [" << (int)mode << "] remaining bytes: [" << recv.length() << "]" << std::endl;
 			break;
 		}
+	}
+
+	void QuestClearHandler::handle(InPacket& recv) const
+	{
+		// Cosmic sends: SHORT questId — visual quest completion notification
+		if (recv.length() < 2)
+			return;
+
+		int16_t questid = recv.read_short();
+		std::cout << "[QuestClear] Quest " << questid << " completed (visual)" << std::endl;
+
+		// Refresh quest log UI if open
+		if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
+			questlog_ui->load_quests();
 	}
 
 	void RelogResponseHandler::handle(InPacket& recv) const
@@ -1759,5 +1785,94 @@ namespace ms
 		default:
 			break;
 		}
+	}
+
+	void GuildOperationHandler::handle(InPacket& recv) const
+	{
+		// v83 guild operation response
+		// Opens or updates the guild UI based on the operation type
+		int8_t type = recv.read_byte();
+
+		switch (type)
+		{
+		case 0x26: // Guild info
+		case 0x27: // Guild update
+		{
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->makeactive();
+			else
+				UI::get().emplace<UIGuild>();
+
+			break;
+		}
+		default:
+			std::cout << "[GuildOperation] Unhandled guild op type: " << (int)type << std::endl;
+			break;
+		}
+	}
+
+	void GuildBBSHandler::handle(InPacket& recv) const
+	{
+		// v83 guild BBS response
+		// Opens or updates the guild BBS UI
+		int8_t type = recv.read_byte();
+
+		if (auto bbs = UI::get().get_element<UIGuildBBS>())
+			bbs->makeactive();
+		else
+			UI::get().emplace<UIGuildBBS>();
+
+		std::cout << "[GuildBBS] Received BBS response type: " << (int)type << std::endl;
+	}
+
+	// Opcode 196 (0xC4) — SHOW_CHAIR
+	// Shows a chair being used by a foreign character on the map
+	void ShowChairHandler::handle(InPacket& recv) const
+	{
+		int32_t charid = recv.read_int();
+		int32_t itemid = recv.read_int();
+
+		std::cout << "[ShowChair] charid=" << charid << " itemid=" << itemid << std::endl;
+
+		if (auto other = Stage::get().get_character(charid))
+		{
+			// Set the character's chair state
+			// itemid 0 means get up from chair
+			if (itemid > 0)
+				other->set_direction(false); // face right in chair by default
+		}
+	}
+
+	// Opcode 306 (0x132) — CONFIRM_SHOP_TRANSACTION
+	// Server confirms a shop buy/sell transaction result
+	void ConfirmShopTransactionHandler::handle(InPacket& recv) const
+	{
+		int8_t code = recv.read_byte();
+
+		std::cout << "[ConfirmShopTransaction] code=" << (int)code << std::endl;
+
+		// code 0 = success (inventory already updated via MODIFY_INVENTORY)
+		// code 1-3 = various errors (not enough mesos, inventory full, etc.)
+		if (code != 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "Transaction failed.");
+		}
+	}
+
+	// Opcode 322 (0x142) — PARCEL (Duey delivery system)
+	// Handles parcel/delivery notifications and operations
+	void ParcelHandler::handle(InPacket& recv) const
+	{
+		int8_t operation = recv.read_byte();
+
+		std::cout << "[Parcel] operation=" << (int)operation << std::endl;
+
+		// Duey operations:
+		// 8 = Open Duey window
+		// 5 = Parcel received notification
+		// 7 = Package list
+		// 4 = Remove package
+		// Other codes exist for errors
 	}
 }
