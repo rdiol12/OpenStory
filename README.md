@@ -32,12 +32,6 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - **Misc**: SHOW_CHAIR, PARCEL
 - Unhandled packet logging to `unhandled_packets.txt` for debugging
 
-### Maple Trading System (MTS)
-- Full client-side MTS implementation (auction house)
-- Outgoing packets: EnterMTS, Sell, ChangePage, Search, CancelSale, Transfer, AddCart, RemoveCart, Buy, BuyFromCart
-- Incoming handlers: item listing pages, confirm sell/buy/transfer, transfer inventory, not-yet-sold inventory, fail buy, cash balance
-- SET_ITC handler for MTS transition with character info parsing
-- Dark panel UI with Browse/My Sales/Cart tabs, item lists, pagination, buy/sell/search
 
 ### Status Bar -- Menu & System Sub-Panels
 - Menu button opens a vertical panel with: Stat, Skill, Quest, Item, Equip, Community, Event, Rank
@@ -59,7 +53,7 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - Stale focusedtextfield pointer no longer traps keyboard input
 - Message history with up/down arrows
 
-### Quest Log
+### Quest Log wip
 - Detail panel showing quest name, level requirement, NPC sprite, rewards with item icons, requirements, and description
 - Accept, Complete, and Forfeit quest actions with proper outgoing packets
 - NPC marker button to highlight quest NPCs on the minimap
@@ -80,20 +74,14 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - Hovering over buff icons in the top-right corner shows the skill/item name as a tooltip
 - Tooltip clears when cursor leaves the buff area
 
-### Player Death
+### Player Death wip
 - Player enters DIED state when HP reaches 0 (immovable, invincible)
 
 ### Expression / Face Fix
 - Fixed unsigned integer underflow in `Expression::byaction()` that caused spam log output for large action values
 
-### Physics -- Traction Fix
-- Foothold traction values properly applied to character movement
-- Ice/slippery maps (El Nath, etc.) work correctly without freezing or getting stuck
-- Traction resets on map change
 
-### Hair -- backHairOverCape Layer
-- Long hair styles with `backHairOverCape` frames render correctly over capes
-- No extra layer drawn for short hair or when no cape is equipped
+
 
 ### Soft Keyboard (PIC Entry)
 - Clean 3-column number grid layout (1-9, 0, Del)
@@ -114,22 +102,17 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 ## What's Left To Do
 
 ### Known Bugs
-- **Crossbow (1462126) missing idle animation** -- no idle frames displayed when holding this weapon
-- **Pickup too fast** -- item pickup speed feels instant rather than animated
-- **Magic Claw wrong animation/sound** -- wrong attacking animation on character and weapon swing sound plays instead of only the magic claw sound
 - **Mob knockback janky** -- mobs appear to move during their knockback/hit animation instead of being locked in place
 - **Jump-down needs more vertical lift** -- jumping down from a platform drops immediately instead of a slight vertical lift before descent
 - **Item drops off-center** -- drops land off-center from the character (server-controlled positioning, not a client bug)
 
 ### Not Yet Implemented
-- **MTS server-side** -- Cosmic has MTS support but it must be enabled (`USE_MTS: true` in config.yaml, run `019-mts.sql`)
 - **Cash Shop purchases** -- UI exists but purchase flow incomplete
 - **Storage UI** -- handler/UI stubbed but not fully wired
 - **Trade UI** -- player-to-player trade stubbed
 - **Guild UI** -- stub files created, not wired up
 - **Messenger / Party Search** -- stub files created, not wired up
-- **Monster Book** -- stub files created, not wired up
-- **HP/MP regen** -- server-controlled, no client-side regen needed
+- **Monster Book** -- stub files created, not wired upd
 
 ### UI Stubs Created (Not Yet Functional)
 UIGuild, UIGuildBBS, UIGuildMark, UIMessenger, UIPartySearch, UIMonsterBook, UIMonsterCarnival, UIHiredMerchant, UIPersonalShop, UIMinigame, UIRPSGame, UIMapleTV, UIMapleChat, UISocialChat, UIFarmChat, UIFamily, UIWedding, UIRanking, UIQuestHelper, UISystemOption, UIChatWindow
