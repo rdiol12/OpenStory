@@ -121,7 +121,7 @@ namespace ms
 
 		chatbox = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
 
-		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(-435, -58), Point<int16_t>(-40, -35)), 0);
+		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(-435, -58), Point<int16_t>(-40, -35)), 0);
 
 		set_chat_open(chatopen);
 
@@ -187,6 +187,8 @@ namespace ms
 
 	void UIChatBar::set_chat_open(bool open)
 	{
+		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
+		if (dbg) { fprintf(dbg, "[set_chat_open] open=%d (was %d)\n", open, chatopen); fflush(dbg); }
 		chatopen = open;
 		buttons[BT_OPENCHAT]->set_active(!open);
 		buttons[BT_CLOSECHAT]->set_active(open);
@@ -255,17 +257,6 @@ namespace ms
 
 			chatcover.draw(position);
 			chatfield.draw(position);
-
-			static int dbg_counter = 0;
-			if (dbg_counter++ % 300 == 0)
-			{
-				auto fb = chatfield.get_bounds();
-				std::cout << "[CHATFIELD] state=" << (int)chatfield.get_state()
-					<< " bounds=(" << fb.get_left_top().x() << "," << fb.get_left_top().y()
-					<< ")-(" << fb.get_right_bottom().x() << "," << fb.get_right_bottom().y() << ")"
-					<< " text=\"" << chatfield.get_text() << "\""
-					<< std::endl;
-			}
 		}
 		else if (rowtexts.count(rowmax))
 		{
@@ -346,7 +337,7 @@ namespace ms
 		// UIElement::send_cursor iterates ALL buttons in one loop, so when
 		// BT_CLOSECHAT fires and activates BT_OPENCHAT, the loop immediately
 		// processes BT_OPENCHAT in the same frame, causing toggle bounce.
-		Cursor::State bstate = clicking ? Cursor::State::CLICKING : Cursor::State::IDLE;
+		bool button_handled = false;
 
 		for (auto& btit : buttons)
 		{
@@ -356,7 +347,7 @@ namespace ms
 				{
 					Sound(Sound::Name::BUTTONOVER).play();
 					btit.second->set_state(Button::State::MOUSEOVER);
-					bstate = Cursor::State::CANCLICK;
+					return Cursor::State::CANCLICK;
 				}
 				else if (btit.second->get_state() == Button::State::MOUSEOVER)
 				{
@@ -364,12 +355,12 @@ namespace ms
 					{
 						Sound(Sound::Name::BUTTONCLICK).play();
 						btit.second->set_state(button_pressed(btit.first));
-						bstate = Cursor::State::IDLE;
+						button_handled = true;
 						break;  // Stop processing buttons after a press fires
 					}
 					else
 					{
-						bstate = Cursor::State::CANCLICK;
+						return Cursor::State::CANCLICK;
 					}
 				}
 			}
@@ -379,8 +370,8 @@ namespace ms
 			}
 		}
 
-		if (bstate != Cursor::State::IDLE)
-			return bstate;
+		if (button_handled)
+			return Cursor::State::IDLE;
 
 		if (slider.isenabled())
 		{
@@ -392,8 +383,30 @@ namespace ms
 
 		if (chatopen)
 		{
-			if (Cursor::State tstate = chatfield.send_cursor(cursorpos, clicking))
+			Cursor::State tstate = chatfield.send_cursor(cursorpos, clicking);
+
+			if (tstate == Cursor::State::CLICKING || tstate == Cursor::State::CANCLICK)
 				return tstate;
+
+			// Don't let clicks outside the textfield defocus it —
+			// only Enter key should close the chatfield
+			if (clicking && chatfieldopen && chatfield.get_state() != Textfield::State::FOCUSED)
+				chatfield.set_state(Textfield::State::FOCUSED);
+		}
+		else if (clicking)
+		{
+			// Clicking the chat input area when chat is closed opens and focuses it
+			// Use the chatfield bounds relative to position to check
+			Rectangle<int16_t> input_area(
+				position + Point<int16_t>(-435, -58),
+				position + Point<int16_t>(-40, -35)
+			);
+
+			if (input_area.contains(cursorpos))
+			{
+				toggle_chatfield(true);
+				return Cursor::State::IDLE;
+			}
 		}
 
 		auto chattop_rect = Rectangle<int16_t>(0, 502, getchattop(), getchattop() + 6);
@@ -505,6 +518,8 @@ namespace ms
 
 	void UIChatBar::toggle_chatfield(bool open)
 	{
+		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
+		if (dbg) { fprintf(dbg, "[toggle_chatfield] open=%d (was %d) chatopen=%d\n", open, chatfieldopen, chatopen); fflush(dbg); }
 		chatfieldopen = open;
 
 		if (chatfieldopen)

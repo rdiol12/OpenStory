@@ -551,8 +551,15 @@ namespace ms
 
 						if (drag_element_type != UIElement::Type::NONE)
 						{
-							elementorder.remove(drag_element_type);
-							elementorder.push_back(drag_element_type);
+							// Don't reorder fixed HUD elements to avoid them covering each other
+							if (drag_element_type != UIElement::Type::STATUSBAR &&
+								drag_element_type != UIElement::Type::CHATBAR &&
+								drag_element_type != UIElement::Type::BUFFLIST &&
+								drag_element_type != UIElement::Type::STATUSMESSENGER)
+							{
+								elementorder.remove(drag_element_type);
+								elementorder.push_back(drag_element_type);
+							}
 						}
 					}
 

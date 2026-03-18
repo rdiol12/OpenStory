@@ -67,6 +67,16 @@ namespace ms
 		return &npcs;
 	}
 
+	void MapNpcs::refresh_quest_marks()
+	{
+		for (auto& map_object : npcs)
+		{
+			Npc* npc = static_cast<Npc*>(map_object.second.get());
+			if (npc && npc->is_active())
+				npc->update_quest_mark();
+		}
+	}
+
 	Cursor::State MapNpcs::send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos)
 	{
 		for (auto& map_object : npcs)

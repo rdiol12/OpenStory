@@ -140,6 +140,9 @@ namespace ms
 				quests.add_completed(qid, time);
 				show_status(Color::Name::WHITE, "Quest completed!");
 			}
+
+			// Refresh NPC quest marks after any quest state change
+			Stage::get().get_npcs().refresh_quest_marks();
 		}
 		else if (mode == 3)
 		{
