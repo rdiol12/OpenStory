@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIGuild : public UIDragElement<PosGUILD>
@@ -42,6 +44,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		void change_tab(uint16_t tabid);
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
@@ -50,11 +54,50 @@ namespace ms
 			BT_TAB2,
 			BT_TAB3,
 			BT_TAB4,
-			BT_TAB5
+			BT_TAB5,
+			BT_INVITE,
+			BT_EXPEL,
+			BT_CHANGENAME,
+			BT_CHANGENOTICE,
+			BT_BBS,
+			BT_DISBAND
 		};
+
+		// Tab names: 0=Members, 1=Skills, 2=Rank, 3=Board, 4=Mark, 5=Search
+		static constexpr uint16_t NUM_TABS = 6;
 
 		uint16_t tab;
 		Texture tabbar;
 		std::vector<Texture> backgrounds;
+
+		// Guild info text labels
+		mutable Text guild_name;
+		mutable Text guild_notice;
+		mutable Text guild_level;
+		mutable Text guild_capacity;
+		mutable Text member_count_text;
+
+		// Member list display
+		struct MemberEntry
+		{
+			std::string name;
+			std::string rank;
+			int16_t level;
+			int16_t job;
+			bool online;
+		};
+
+		std::vector<MemberEntry> members;
+		mutable Text member_name_label;
+		mutable Text member_info_label;
+		int16_t scroll_offset;
+
+		// Member list constants
+		static constexpr int16_t MAX_VISIBLE_MEMBERS = 8;
+		static constexpr int16_t MEMBER_ROW_HEIGHT = 24;
+		static constexpr int16_t MEMBER_LIST_Y = 115;
+
+		// Notice area
+		Texture notice_backgrnd;
 	};
 }

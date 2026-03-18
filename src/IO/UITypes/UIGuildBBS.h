@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIGuildBBS : public UIDragElement<PosGUILDBBS>
@@ -47,7 +49,41 @@ namespace ms
 			BT_CLOSE,
 			BT_WRITE,
 			BT_PREV,
-			BT_NEXT
+			BT_NEXT,
+			BT_DELETE,
+			BT_REPLY
 		};
+
+		// Post list display
+		struct BBSPost
+		{
+			int32_t id;
+			std::string author;
+			std::string title;
+			std::string date;
+			int32_t reply_count;
+		};
+
+		std::vector<BBSPost> posts;
+
+		// Pagination
+		int16_t current_page;
+		int16_t total_pages;
+
+		// Text labels
+		mutable Text title_text;
+		mutable Text page_text;
+		mutable Text post_title_label;
+		mutable Text post_author_label;
+		mutable Text post_date_label;
+		mutable Text empty_text;
+
+		// Post list area
+		Texture list_backgrnd;
+
+		// List display constants
+		static constexpr int16_t MAX_VISIBLE_POSTS = 10;
+		static constexpr int16_t POST_ROW_HEIGHT = 20;
+		static constexpr int16_t POST_LIST_Y = 60;
 	};
 }

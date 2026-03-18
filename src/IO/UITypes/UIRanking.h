@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIRanking : public UIDragElement<PosRANKING>
@@ -34,6 +36,7 @@ namespace ms
 		void update() override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -41,6 +44,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		void change_tab(uint16_t tabid);
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
@@ -50,5 +55,10 @@ namespace ms
 			BT_PREV,
 			BT_NEXT
 		};
+
+		uint16_t tab;
+
+		// "No ranking data" placeholder text
+		Text empty_text;
 	};
 }

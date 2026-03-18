@@ -102,12 +102,6 @@ namespace ms
 		chatenter = mainbar["chatSpace2"];
 		chatcover = mainbar["chatCover"];
 
-		std::cout << "[CHATBAR] position=(" << pos.x() << "," << pos.y() << ")" << std::endl;
-		std::cout << "[CHATBAR] chatSpace origin=(" << chatspace[0].get_origin().x() << "," << chatspace[0].get_origin().y() << ") dim=(" << chatspace[0].get_dimensions().x() << "," << chatspace[0].get_dimensions().y() << ")" << std::endl;
-		std::cout << "[CHATBAR] chatEnter origin=(" << chatspace[1].get_origin().x() << "," << chatspace[1].get_origin().y() << ") dim=(" << chatspace[1].get_dimensions().x() << "," << chatspace[1].get_dimensions().y() << ")" << std::endl;
-		std::cout << "[CHATBAR] chatSpace2 origin=(" << chatenter.get_origin().x() << "," << chatenter.get_origin().y() << ") dim=(" << chatenter.get_dimensions().x() << "," << chatenter.get_dimensions().y() << ")" << std::endl;
-		std::cout << "[CHATBAR] chatCover origin=(" << chatcover.get_origin().x() << "," << chatcover.get_origin().y() << ") dim=(" << chatcover.get_dimensions().x() << "," << chatcover.get_dimensions().y() << ")" << std::endl;
-
 		chattargets[CHT_ALL] = mainbar["chatTarget"]["all"];
 		chattargets[CHT_BUDDY] = mainbar["chatTarget"]["friend"];
 		chattargets[CHT_GUILD] = mainbar["chatTarget"]["guild"];
@@ -187,8 +181,6 @@ namespace ms
 
 	void UIChatBar::set_chat_open(bool open)
 	{
-		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
-		if (dbg) { fprintf(dbg, "[set_chat_open] open=%d (was %d)\n", open, chatopen); fflush(dbg); }
 		chatopen = open;
 		buttons[BT_OPENCHAT]->set_active(!open);
 		buttons[BT_CLOSECHAT]->set_active(open);
@@ -277,16 +269,11 @@ namespace ms
 
 	void UIChatBar::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
-		if (dbg) { fprintf(dbg, "[UIChatBar::send_key] keycode=%d pressed=%d escape=%d RETURN=%d\n", keycode, pressed, escape, KeyAction::Id::RETURN); fflush(dbg); }
-
 		if (pressed)
 		{
 			if (keycode == KeyAction::Id::RETURN)
 			{
-				if (dbg) { fprintf(dbg, "[UIChatBar::send_key] calling toggle_chatfield, chatfieldopen=%d\n", chatfieldopen); fflush(dbg); }
 				toggle_chatfield();
-				if (dbg) { fprintf(dbg, "[UIChatBar::send_key] after toggle, chatfieldopen=%d state=%d\n", chatfieldopen, (int)chatfield.get_state()); fflush(dbg); }
 			}
 			else if (escape)
 				toggle_chatfield(false);
@@ -518,8 +505,6 @@ namespace ms
 
 	void UIChatBar::toggle_chatfield(bool open)
 	{
-		static FILE* dbg = fopen("C:\\Users\\rdiol\\OpenStory2\\wz\\ui.txt", "a");
-		if (dbg) { fprintf(dbg, "[toggle_chatfield] open=%d (was %d) chatopen=%d\n", open, chatfieldopen, chatopen); fflush(dbg); }
 		chatfieldopen = open;
 
 		if (chatfieldopen)

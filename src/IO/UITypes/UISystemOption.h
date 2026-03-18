@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Texture.h"
+
 namespace ms
 {
 	class UISystemOption : public UIDragElement<PosSYSTEMOPTION>
@@ -42,11 +44,40 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		void load_settings();
+		void save_settings();
+		int16_t vol_to_slider_x(uint8_t volume) const;
+		uint8_t slider_x_to_vol(int16_t x) const;
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
 			BT_OK,
 			BT_CANCEL
 		};
+
+		// Slider track positions (relative to window position)
+		int16_t slider_track_x;
+		int16_t slider_track_width;
+		int16_t bgm_slider_y;
+		int16_t sfx_slider_y;
+
+		// Slider thumb textures
+		Texture slider_thumb_normal;
+		Texture slider_thumb_pressed;
+
+		// Current slider values (0-100)
+		uint8_t bgm_volume;
+		uint8_t sfx_volume;
+
+		// Dragging state
+		enum DragTarget
+		{
+			DRAG_NONE,
+			DRAG_BGM,
+			DRAG_SFX
+		};
+
+		DragTarget dragging;
 	};
 }

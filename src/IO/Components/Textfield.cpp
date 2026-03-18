@@ -121,7 +121,6 @@ namespace ms
 
 	void Textfield::send_key(KeyType::Id type, int32_t key, bool pressed)
 	{
-		std::cout << "[TEXTFIELD] type=" << (int)type << " key=" << key << " pressed=" << pressed << " state=" << (int)state << std::endl;
 		if (pressed)
 		{
 			if (type == KeyType::Id::ACTION)

@@ -82,22 +82,14 @@ namespace ms
 		const CharLook& look = Stage::get().get_player().get_look();
 		const Inventory& inventory = Stage::get().get_player().get_inventory();
 
-		std::cout << "[UIStateGame] Creating UI elements..." << std::endl;
 		emplace<UIStatusMessenger>();
-		std::cout << "[UIStateGame] StatusMessenger OK" << std::endl;
 		emplace<UIStatusBar>(stats);
-		std::cout << "[UIStateGame] StatusBar OK" << std::endl;
 		int16_t screen_h = Constants::Constants::get().get_viewheight();
 		emplace<UIChatBar>(Point<int16_t>(512, screen_h));
-		std::cout << "[UIStateGame] ChatBar OK" << std::endl;
 		emplace<UIMiniMap>(stats);
-		std::cout << "[UIStateGame] MiniMap OK" << std::endl;
 		emplace<UIBuffList>();
-		std::cout << "[UIStateGame] BuffList OK" << std::endl;
 		emplace<UIShop>(look, inventory);
-		std::cout << "[UIStateGame] Shop OK" << std::endl;
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests());
-		std::cout << "[UIStateGame] QuestHelper OK" << std::endl;
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
