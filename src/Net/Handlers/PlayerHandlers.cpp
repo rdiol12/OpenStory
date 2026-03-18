@@ -47,8 +47,6 @@ namespace ms
 		recv.read_bool(); // 'itemreaction'
 		int32_t updatemask = recv.read_int();
 
-		std::cout << "[ChangeStats] updatemask=0x" << std::hex << updatemask << std::dec << std::endl;
-
 		bool recalculate = false;
 
 		for (auto iter : MapleStat::codes)
@@ -91,7 +89,6 @@ namespace ms
 		default:
 		{
 			int16_t value = recv.read_short();
-			std::cout << "[ChangeStats] stat=" << stat << " value=" << value << std::endl;
 			player.get_stats().set_stat(stat, value);
 			recalculate = true;
 
