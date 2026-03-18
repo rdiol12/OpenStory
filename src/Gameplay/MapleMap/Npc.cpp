@@ -41,37 +41,25 @@ namespace ms
 			return;
 
 		nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
-		nl::node quest_icon = nl::nx::ui["UIWindow.img"]["QuestIcon"];
 
-		// Available quest mark — try QuestGuide/QuestMark first (animated), then QuestIcon/0
+		// Available quest — QuestMark (animated lightbulb, frames 0/1/2/3)
 		nl::node qmark = guide["QuestMark"];
 		if (qmark && qmark.size() > 0)
 			mark_available = Animation(qmark);
-		else if (quest_icon["0"])
-			mark_available = Animation(quest_icon["0"]);
 
-		// In-progress — QuestIcon/2 (blue/yellow ?)
-		if (quest_icon["2"])
-			mark_in_progress = Animation(quest_icon["2"]);
+		// In-progress quest — LowLVQuestMark/forNPC (distinct from available)
+		nl::node inprog = guide["LowLVQuestMark"]["forNPC"];
+		if (inprog && inprog.size() > 0)
+			mark_in_progress = Animation(inprog);
+		else if (qmark && qmark.size() > 0)
+			mark_in_progress = Animation(qmark);
 
-		// Complete — QuestIcon/1 (ready to turn in)
-		if (quest_icon["1"])
-			mark_complete = Animation(quest_icon["1"]);
-
-		// Repeat quest — RepeatQuestMark/forNPC
-		nl::node repeat_npc = guide["RepeatQuestMark"]["forNPC"];
-		if (repeat_npc && repeat_npc.size() > 0)
-			mark_repeat = Animation(repeat_npc);
-
-		// Low level — LowLVQuestMark/forNPC
-		nl::node low_npc = guide["LowLVQuestMark"]["forNPC"];
-		if (low_npc && low_npc.size() > 0)
-			mark_low_level = Animation(low_npc);
-
-		// High level — HighLVQuestMark/forNPC
-		nl::node high_npc = guide["HighLVQuestMark"]["forNPC"];
-		if (high_npc && high_npc.size() > 0)
-			mark_high_level = Animation(high_npc);
+		// Completable quest — RepeatQuestMark/forNPC (book-like icon)
+		nl::node complete = guide["RepeatQuestMark"]["forNPC"];
+		if (complete && complete.size() > 0)
+			mark_complete = Animation(complete);
+		else if (qmark && qmark.size() > 0)
+			mark_complete = Animation(qmark);
 
 		marks_initialized = true;
 	}
@@ -153,14 +141,12 @@ namespace ms
 		// Draw quest mark above NPC
 		if (quest_mark_type != QuestMarkType::NONE)
 		{
-			// Position well above the NPC sprite
-			Point<int16_t> dim =
-				animations.count(stance) ?
-				animations.at(stance).get_dimensions() :
-				Point<int16_t>(0, 60);
-
-			int16_t offset_y = dim.y() + 36;
-			Point<int16_t> mark_pos = absp + Point<int16_t>(0, -offset_y);
+			// absp is at the NPC's feet; offset up to place mark above head
+			// Use the current animation's origin to find head position
+			auto& anim = animations.count(stance) ? animations.at(stance) : animations.begin()->second;
+			Point<int16_t> origin = anim.get_origin();
+			// origin.y() is how far above feet the sprite extends
+			Point<int16_t> mark_pos = absp + Point<int16_t>(0, -origin.y() - 10);
 			quest_mark_anim.draw(DrawArgument(mark_pos), alpha);
 		}
 	}

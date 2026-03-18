@@ -94,13 +94,13 @@ namespace ms
 		QuestMarkType quest_mark_type;
 		mutable Animation quest_mark_anim;
 
-		// Shared quest mark animations (loaded once)
+		// Shared quest mark animations (loaded once from MapHelper.img/quest)
 		static bool marks_initialized;
-		static Animation mark_available;      // QuestMark (yellow !)
-		static Animation mark_in_progress;    // QuestIcon/2 or forNPC
-		static Animation mark_complete;       // QuestIcon/1
-		static Animation mark_repeat;         // RepeatQuestMark/forNPC
-		static Animation mark_low_level;      // LowLVQuestMark/forNPC
-		static Animation mark_high_level;     // HighLVQuestMark/forNPC
+		static Animation mark_available;      // chatNext (lightbulb)
+		static Animation mark_in_progress;    // chatSelf (in-progress)
+		static Animation mark_complete;       // chatComplete (completable)
+		static Animation mark_repeat;
+		static Animation mark_low_level;
+		static Animation mark_high_level;
 	};
 }

@@ -132,6 +132,9 @@ namespace ms
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
 				questlog_ui->load_quests();
 
+			// Refresh NPC quest marks
+			Stage::get().get_npcs().refresh_quest_marks();
+
 			break;
 		}
 		default:
