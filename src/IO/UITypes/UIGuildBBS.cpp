@@ -18,8 +18,11 @@
 #include "UIGuildBBS.h"
 
 #include "../Components/MapleButton.h"
+#include "../UI.h"
+#include "UIChatBar.h"
 
 #include "../../Configuration.h"
+#include "../../Net/Packets/SocialPackets.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -29,33 +32,22 @@ namespace ms
 {
 	UIGuildBBS::UIGuildBBS() : UIDragElement<PosGUILDBBS>(), current_page(0), total_pages(1)
 	{
-		nl::node src = nl::nx::ui["UIWindow2.img"]["GuildBBS"];
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
+		nl::node src = nl::nx::ui["GuildBBS.img"]["GuildBBS"];
 
 		nl::node backgrnd = src["backgrnd"];
 		Texture bg = backgrnd;
 
 		sprites.emplace_back(backgrnd);
 		sprites.emplace_back(src["backgrnd2"]);
+		sprites.emplace_back(src["backgrnd3"]);
 
-		// Close button at top-right
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg.get_dimensions().x() - 19, 5));
+		// Close button (BtQuit in NX)
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(src["BtQuit"]);
 
 		// Action buttons
 		buttons[Buttons::BT_WRITE] = std::make_unique<MapleButton>(src["BtWrite"]);
-		buttons[Buttons::BT_PREV] = std::make_unique<MapleButton>(src["BtPrev"]);
-		buttons[Buttons::BT_NEXT] = std::make_unique<MapleButton>(src["BtNext"]);
-
-		// Optional buttons (may not exist in all NX versions)
-		if (src["BtDelete"])
-			buttons[Buttons::BT_DELETE] = std::make_unique<MapleButton>(src["BtDelete"]);
-
-		if (src["BtReply"])
-			buttons[Buttons::BT_REPLY] = std::make_unique<MapleButton>(src["BtReply"]);
-
-		// List background texture (if available)
-		if (src["list"])
-			list_backgrnd = src["list"];
+		buttons[Buttons::BT_DELETE] = std::make_unique<MapleButton>(src["BtDelete"]);
+		buttons[Buttons::BT_REPLY] = std::make_unique<MapleButton>(src["BtReply"]);
 
 		// Initialize text labels
 		title_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "Guild Board");
@@ -64,13 +56,6 @@ namespace ms
 		post_author_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
 		post_date_label = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY);
 		empty_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY, "No posts yet.");
-
-		// Disable prev/next when on first/only page
-		if (buttons.count(Buttons::BT_PREV) && buttons[Buttons::BT_PREV])
-			buttons[Buttons::BT_PREV]->set_state(Button::State::DISABLED);
-
-		if (buttons.count(Buttons::BT_NEXT) && buttons[Buttons::BT_NEXT])
-			buttons[Buttons::BT_NEXT]->set_state(Button::State::DISABLED);
 
 		dimension = bg.get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
@@ -157,54 +142,41 @@ namespace ms
 			deactivate();
 			break;
 		case Buttons::BT_WRITE:
-			// TODO: Open write post dialog (requires server packet)
-			break;
-		case Buttons::BT_PREV:
-			if (current_page > 0)
-			{
-				current_page--;
-
-				// Update prev/next button states
-				if (current_page == 0)
-				{
-					auto it = buttons.find(Buttons::BT_PREV);
-					if (it != buttons.end() && it->second)
-						it->second->set_state(Button::State::DISABLED);
-				}
-
-				auto it = buttons.find(Buttons::BT_NEXT);
-				if (it != buttons.end() && it->second)
-					it->second->set_state(Button::State::NORMAL);
-			}
-			break;
-		case Buttons::BT_NEXT:
-			if (current_page < total_pages - 1)
-			{
-				current_page++;
-
-				// Update prev/next button states
-				if (current_page >= total_pages - 1)
-				{
-					auto it = buttons.find(Buttons::BT_NEXT);
-					if (it != buttons.end() && it->second)
-						it->second->set_state(Button::State::DISABLED);
-				}
-
-				auto it = buttons.find(Buttons::BT_PREV);
-				if (it != buttons.end() && it->second)
-					it->second->set_state(Button::State::NORMAL);
-			}
+			GuildBBSWritePacket(false, "New Post", "").dispatch();
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("Post submitted.", UIChatBar::LineType::YELLOW);
 			break;
 		case Buttons::BT_DELETE:
-			// TODO: Delete selected post (requires server packet)
+			if (!posts.empty())
+			{
+				GuildBBSDeletePacket(posts[0].id).dispatch();
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("Post deleted.", UIChatBar::LineType::YELLOW);
+			}
 			break;
 		case Buttons::BT_REPLY:
-			// TODO: Reply to selected post (requires server packet)
+			if (!posts.empty())
+			{
+				GuildBBSReplyPacket(posts[0].id, "").dispatch();
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("Reply submitted.", UIChatBar::LineType::YELLOW);
+			}
 			break;
 		default:
 			break;
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	void UIGuildBBS::add_post(int32_t id, const std::string& author, const std::string& title, int64_t timestamp, int32_t reply_count)
+	{
+		posts.push_back({ id, author, title, "", reply_count });
+	}
+
+	void UIGuildBBS::clear_posts()
+	{
+		posts.clear();
+		current_page = 0;
 	}
 }

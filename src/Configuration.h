@@ -604,6 +604,12 @@ namespace ms
 		PosSOCIALCHAT() : PointEntry("PosSOCIALCHAT", "(200, 100)") {}
 	};
 
+	// The default position of UIAlliance
+	struct PosALLIANCE : public Configuration::PointEntry
+	{
+		PosALLIANCE() : PointEntry("PosALLIANCE", "(200, 80)") {}
+	};
+
 	// The default type of UIMiniMap
 	struct MiniMapType : public Configuration::ByteEntry
 	{

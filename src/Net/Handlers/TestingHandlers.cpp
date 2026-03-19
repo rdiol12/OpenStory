@@ -27,16 +27,28 @@
 #include "../../IO/UITypes/UIClock.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UITrade.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIGuild.h"
 #include "../../IO/UITypes/UIGuildBBS.h"
+#include "../../IO/UITypes/UIMessenger.h"
+#include "../../IO/UITypes/UIFamily.h"
+#include "../../IO/UITypes/UIMonsterCarnival.h"
+#include "../../IO/UITypes/UIMinigame.h"
+#include "../../IO/UITypes/UIRPSGame.h"
+#include "../../IO/UITypes/UIHiredMerchant.h"
+#include "../../IO/UITypes/UIPersonalShop.h"
+#include "../../IO/UITypes/UIWedding.h"
+#include "../../IO/UITypes/UIPartySearch.h"
+#include "../../IO/UITypes/UIAlliance.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
 #include "../../Net/Session.h"
 #include "../../Configuration.h"
+#include "Helpers/LoginParser.h"
 
 #include <iomanip>
 #include <sstream>
@@ -95,7 +107,12 @@ namespace ms
 			{
 				int16_t questid = recv.read_short();
 				int32_t time_ms = recv.read_int();
-				std::cout << "[UpdateQuestInfo] Time limit: quest " << questid << " = " << time_ms << "ms" << std::endl;
+
+				// Set countdown for the first (or most recent) quest timer
+				Stage::get().set_countdown(time_ms / 1000);
+
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("[Quest] Time limit set: " + std::to_string(time_ms / 1000) + " seconds", UIChatBar::LineType::YELLOW);
 			}
 			break;
 		}
@@ -1037,9 +1054,8 @@ namespace ms
 			int32_t maple_points = recv.read_int();
 			int32_t cash_prepaid = recv.read_int();
 
-			std::cout << "Cash Balance - NX: " << cash_nx
-				<< " MaplePoints: " << maple_points
-				<< " Prepaid: " << cash_prepaid << std::endl;
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash] NX: " + std::to_string(cash_nx) + " | MaplePoints: " + std::to_string(maple_points) + " | Prepaid: " + std::to_string(cash_prepaid), UIChatBar::LineType::YELLOW);
 		}
 	}
 
@@ -1816,16 +1832,37 @@ namespace ms
 
 	void GuildBBSHandler::handle(InPacket& recv) const
 	{
-		// v83 guild BBS response
-		// Opens or updates the guild BBS UI
 		int8_t type = recv.read_byte();
 
-		if (auto bbs = UI::get().get_element<UIGuildBBS>())
-			bbs->makeactive();
-		else
+		if (!UI::get().get_element<UIGuildBBS>())
 			UI::get().emplace<UIGuildBBS>();
 
-		std::cout << "[GuildBBS] Received BBS response type: " << (int)type << std::endl;
+		auto bbs = UI::get().get_element<UIGuildBBS>();
+		if (!bbs) return;
+
+		if (type == 0x06) // Post list
+		{
+			bbs->clear_posts();
+
+			if (!recv.available()) return;
+
+			int8_t count = recv.read_byte();
+
+			for (int8_t i = 0; i < count && recv.available(); i++)
+			{
+				int32_t post_id = recv.read_int();
+				std::string author = recv.read_string();
+				std::string title = recv.read_string();
+				int64_t timestamp = recv.read_long();
+				int32_t reply_count = recv.read_int();
+
+				bbs->add_post(post_id, author, title, timestamp, reply_count);
+			}
+		}
+		else
+		{
+			bbs->makeactive();
+		}
 	}
 
 	// Opcode 196 (0xC4) — SHOW_CHAIR
@@ -1877,5 +1914,1179 @@ namespace ms
 		// 7 = Package list
 		// 4 = Remove package
 		// Other codes exist for errors
+	}
+
+	void OpenUIHandler::handle(InPacket& recv) const
+	{
+		int8_t ui_type = recv.read_byte();
+
+		std::cout << "[OpenUI] type=" << (int)ui_type << std::endl;
+
+		// UI types from Cosmic:
+		// 0x04 = Equipment Enhance (Star Force)
+		// 0x08 = Item Maker
+		// 0x12 = Monster Book
+		// 0x16 = Equipment Enhance (Scroll)
+		// 0x21 = Profession
+		// Others are typically quest/event UIs
+	}
+
+	void LockUIHandler::handle(InPacket& recv) const
+	{
+		bool locked = recv.read_byte() != 0;
+
+		if (locked)
+			UI::get().disable();
+		else
+			UI::get().enable();
+	}
+
+	void DisableUIHandler::handle(InPacket& recv) const
+	{
+		bool disabled = recv.read_byte() != 0;
+
+		if (disabled)
+			UI::get().disable();
+		else
+			UI::get().enable();
+	}
+
+	void SpawnGuideHandler::handle(InPacket& recv) const
+	{
+		bool spawn = recv.read_bool();
+
+		std::cout << "[SpawnGuide] spawn=" << spawn << std::endl;
+		// Beginner guide NPC — would need a dedicated guide entity
+	}
+
+	void TalkGuideHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode == 0)
+		{
+			std::string text = recv.read_string();
+			recv.skip(8); // two ints: display timing (200, 4000)
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Guide] " + text, UIChatBar::LineType::YELLOW);
+		}
+		else if (mode == 1)
+		{
+			int32_t hint_id = recv.read_int();
+			int32_t duration = recv.read_int();
+
+			std::cout << "[TalkGuide] hint=" << hint_id << " duration=" << duration << std::endl;
+		}
+	}
+
+	void ShowComboHandler::handle(InPacket& recv) const
+	{
+		int32_t count = recv.read_int();
+
+		std::cout << "[ShowCombo] count=" << count << std::endl;
+		// Would need a combo counter UI element
+	}
+
+	void ForcedMapEquipHandler::handle(InPacket& recv) const
+	{
+		if (recv.available())
+		{
+			int8_t team = recv.read_byte(); // 0 = red, 1 = blue
+			std::cout << "[ForcedMapEquip] team=" << (int)team << std::endl;
+		}
+		// Forces the player to wear map-specific equipment (e.g., PQ outfits)
+	}
+
+	void SpouseChatHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte(); // 5 = spouse, 4 = engaged
+		std::string name;
+
+		if (mode == 5)
+			name = recv.read_string();
+
+		int8_t submode = recv.read_byte();
+		std::string text = recv.read_string();
+
+		std::string prefix = (mode == 5) ? "[Spouse] " : "[Fiance] ";
+		std::string line = prefix + name + ": " + text;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::RED);
+	}
+
+	void ContiMoveHandler::handle(InPacket& recv) const
+	{
+		int8_t event_type = recv.read_byte(); // 10 = boat/crog
+		int8_t move_type = recv.read_byte();  // 4 = start, 5 = stop
+
+		std::cout << "[ContiMove] event=" << (int)event_type
+				  << " type=" << (int)move_type << std::endl;
+		// Would need a boat/ship travel visual system
+	}
+
+	void ContiStateHandler::handle(InPacket& recv) const
+	{
+		int8_t state = recv.read_byte(); // 1 = start, 2 = end
+		recv.read_byte(); // padding
+
+		std::cout << "[ContiState] state=" << (int)state << std::endl;
+	}
+
+	void MakerResultHandler::handle(InPacket& recv) const
+	{
+		int32_t result = recv.read_int(); // 0 = success, 1 = fail
+		int32_t mode = recv.read_int();   // 1/2 = craft, 3 = crystal, 4 = desynth
+
+		if (mode == 1 || mode == 2)
+		{
+			bool failed = recv.read_bool();
+
+			if (!failed)
+			{
+				int32_t item_made = recv.read_int();
+				int32_t count = recv.read_int();
+			}
+
+			int32_t num_consumed = recv.read_int();
+
+			for (int32_t i = 0; i < num_consumed; i++)
+			{
+				recv.read_int(); // item id
+				recv.read_int(); // quantity
+			}
+
+			int32_t num_gems = recv.read_int();
+
+			for (int32_t i = 0; i < num_gems; i++)
+				recv.read_int(); // gem id
+
+			int8_t has_catalyst = recv.read_byte();
+
+			if (has_catalyst)
+				recv.read_int(); // catalyst id
+
+			recv.read_int(); // mesos cost
+
+			std::string msg = failed ? "Item creation failed." : "Item created successfully!";
+
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(failed ? Color::Name::RED : Color::Name::WHITE, msg);
+		}
+		else if (mode == 3) // Monster Crystal
+		{
+			recv.read_int(); // item gained
+			recv.read_int(); // item lost
+		}
+		else if (mode == 4) // Desynth
+		{
+			recv.read_int(); // item id
+			int32_t num_gained = recv.read_int();
+
+			for (int32_t i = 0; i < num_gained; i++)
+			{
+				recv.read_int(); // item id
+				recv.read_int(); // quantity
+			}
+
+			recv.read_int(); // mesos
+		}
+	}
+
+	void MonsterCarnivalStartHandler::handle(InPacket& recv) const
+	{
+		int8_t team = recv.read_byte();
+		int16_t cp = recv.read_short();
+		int16_t total_cp = recv.read_short();
+		int16_t team_cp = recv.read_short();
+		int16_t team_total_cp = recv.read_short();
+		int16_t opp_cp = recv.read_short();
+		int16_t opp_total_cp = recv.read_short();
+		recv.read_short(); // unused
+		recv.read_long();  // unused
+
+		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
+		{
+			carnival->set_team(team);
+			carnival->set_cp(cp, total_cp, opp_cp, opp_total_cp);
+		}
+	}
+
+	void MonsterCarnivalCPHandler::handle(InPacket& recv) const
+	{
+		int16_t cp = recv.read_short();
+		int16_t total_cp = recv.read_short();
+
+		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
+			carnival->set_cp(cp, total_cp, -1, -1);
+	}
+
+	void MonsterCarnivalPartyCPHandler::handle(InPacket& recv) const
+	{
+		int8_t team = recv.read_byte();
+		int16_t cp = recv.read_short();
+		int16_t total_cp = recv.read_short();
+
+		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
+		{
+			// Team 0 = my team, team 1 = enemy
+			if (team == 0)
+				carnival->set_cp(cp, total_cp, -1, -1);
+			else
+				carnival->set_cp(-1, -1, cp, total_cp);
+		}
+	}
+
+	void MonsterCarnivalSummonHandler::handle(InPacket& recv) const
+	{
+		int8_t tab = recv.read_byte();
+		int8_t number = recv.read_byte();
+		std::string name = recv.read_string();
+
+		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
+			carnival->set_summon_count(tab, number);
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Carnival] " + name + " summoned a monster!", UIChatBar::LineType::YELLOW);
+	}
+
+	void MonsterCarnivalMessageHandler::handle(InPacket& recv) const
+	{
+		int8_t message = recv.read_byte();
+
+		std::string msg;
+		switch (message)
+		{
+		case 1: msg = "You don't have enough CP!"; break;
+		case 2: msg = "The summon limit has been reached!"; break;
+		case 3: msg = "You cannot summon during this phase!"; break;
+		case 4: msg = "The carnival is about to end!"; break;
+		default: msg = "Carnival message: " + std::to_string(message); break;
+		}
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Carnival] " + msg, UIChatBar::LineType::YELLOW);
+	}
+
+	void MonsterCarnivalDiedHandler::handle(InPacket& recv) const
+	{
+		int8_t team = recv.read_byte();
+		std::string name = recv.read_string();
+		int8_t lost_cp = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Carnival] " + name + " was eliminated! (-" + std::to_string(lost_cp) + " CP)", UIChatBar::LineType::RED);
+	}
+
+	void SpawnHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int32_t item_id = recv.read_int();
+		Point<int16_t> position = recv.read_point();
+		recv.read_short(); // 0
+		std::string owner_name = recv.read_string();
+		recv.read_byte(); // 0x05
+		int32_t object_id = recv.read_int();
+		std::string description = recv.read_string();
+		recv.read_byte(); // sprite index
+		recv.read_byte(); // 1
+		recv.read_byte(); // 4
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[HiredMerchant] " + owner_name + "'s shop: " + description, UIChatBar::LineType::YELLOW);
+	}
+
+	void DestroyHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[HiredMerchant] A hired merchant has been removed.", UIChatBar::LineType::YELLOW);
+	}
+
+	void UpdateHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		recv.read_byte(); // 5 = hired merchant type
+		int32_t object_id = recv.read_int();
+		std::string description = recv.read_string();
+		recv.read_byte(); // sprite index
+		int8_t cur_visitors = recv.read_byte();
+		int8_t max_visitors = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[HiredMerchant] " + description + " (" + std::to_string(cur_visitors) + "/" + std::to_string(max_visitors) + " visitors)", UIChatBar::LineType::YELLOW);
+	}
+
+	void FredrickMessageHandler::handle(InPacket& recv) const
+	{
+		int8_t operation = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Fredrick] Message (op=" + std::to_string(operation) + ")", UIChatBar::LineType::YELLOW);
+	}
+
+	void FredrickHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		// 0x23 = retrieve items, 0x24 = error
+		// Full parsing would require ItemInfo deserialization
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Fredrick] Response (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+	}
+
+	void StopClockHandler::handle(InPacket& recv) const
+	{
+		recv.read_byte(); // 0
+
+		Stage::get().clear_clock();
+	}
+
+	void RPSGameHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode == 8) // Open NPC
+		{
+			int32_t npc_id = recv.read_int();
+			UI::get().emplace<UIRPSGame>();
+		}
+		else if (mode == 0x0B) // Selection result
+		{
+			int8_t selection = recv.read_byte();
+			int8_t answer = recv.read_byte();
+
+			// Determine result: 0=win, 1=lose, 2=tie
+			int8_t result;
+			if (selection == answer)
+				result = 2; // tie
+			else if ((selection == 0 && answer == 2) || (selection == 1 && answer == 0) || (selection == 2 && answer == 1))
+				result = 0; // win
+			else
+				result = 1; // lose
+
+			if (auto rps = UI::get().get_element<UIRPSGame>())
+				rps->show_result(selection, answer, result);
+		}
+		else if (mode == 0x06) // Meso error
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "Not enough mesos for Rock-Paper-Scissors.");
+		}
+		else if (mode == 0x0D) // Game over / exit
+		{
+			UI::get().remove(UIElement::Type::RPSGAME);
+		}
+	}
+
+	void MessengerHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		switch (mode)
+		{
+		case 0x00: // Add player
+		{
+			int8_t slot = recv.read_byte();
+			// Parse CharLook data (skip it - we don't render avatars in messenger)
+			LoginParser::parse_look(recv);
+			std::string name = recv.read_string();
+			recv.read_byte(); // channel
+			recv.read_byte(); // whisper flag
+
+			if (auto msger = UI::get().get_element<UIMessenger>())
+				msger->add_player(slot, name);
+			break;
+		}
+		case 0x01: // Join / self position
+		{
+			int8_t slot = recv.read_byte();
+			UI::get().emplace<UIMessenger>();
+
+			if (auto msger = UI::get().get_element<UIMessenger>())
+				msger->add_player(slot, Stage::get().get_player().get_name());
+			break;
+		}
+		case 0x02: // Remove player
+		{
+			int8_t slot = recv.read_byte();
+
+			if (auto msger = UI::get().get_element<UIMessenger>())
+				msger->remove_player(slot);
+			break;
+		}
+		case 0x03: // Invite
+		{
+			std::string from = recv.read_string();
+			recv.read_byte(); // 0
+			int32_t messenger_id = recv.read_int();
+			recv.read_byte(); // 0
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
+			break;
+		}
+		case 0x06: // Chat
+		{
+			std::string text = recv.read_string();
+
+			if (auto msger = UI::get().get_element<UIMessenger>())
+			{
+				// Text format is "name : message"
+				size_t sep = text.find(" : ");
+				if (sep != std::string::npos)
+					msger->add_chat(text.substr(0, sep), text.substr(sep + 3));
+				else
+					msger->add_chat("", text);
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Messenger] " + text, UIChatBar::LineType::BLUE);
+			break;
+		}
+		default:
+			std::cout << "[Messenger] mode=" << (int)mode << std::endl;
+			break;
+		}
+	}
+
+	void NotifyLevelUpHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte(); // 0=family, 2=guild
+		int32_t level = recv.read_int();
+		std::string name = recv.read_string();
+
+		std::string prefix = (type == 2) ? "[Guild] " : "[Family] ";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(prefix + name + " has reached level " + std::to_string(level) + "!", UIChatBar::LineType::YELLOW);
+	}
+
+	void NotifyJobChangeHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte(); // 0=guild, 1=family
+		int32_t job = recv.read_int();
+		std::string name = recv.read_string();
+
+		std::string prefix = (type == 0) ? "[Guild] " : "[Family] ";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(prefix + name + " has made a job advancement!", UIChatBar::LineType::YELLOW);
+	}
+
+	void AllianceOperationHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		switch (op)
+		{
+		case 0x0C: // Alliance info
+		{
+			if (recv.length() >= 4)
+			{
+				int8_t rank = recv.read_byte();
+				int8_t guild_count = recv.read_byte();
+
+				UI::get().emplace<UIAlliance>();
+
+				if (auto alliance = UI::get().get_element<UIAlliance>())
+				{
+					alliance->clear_guilds();
+					for (int8_t i = 0; i < guild_count; i++)
+					{
+						if (recv.available())
+						{
+							int32_t guild_id = recv.read_int();
+							alliance->add_guild("Guild " + std::to_string(guild_id), guild_id);
+						}
+					}
+				}
+			}
+			break;
+		}
+		case 0x0D: // Alliance notice
+		{
+			if (recv.available())
+			{
+				std::string notice = recv.read_string();
+				if (auto alliance = UI::get().get_element<UIAlliance>())
+					alliance->set_notice(notice);
+			}
+			break;
+		}
+		default:
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] Operation update (code: " + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+			break;
+		}
+		}
+	}
+
+	void OXQuizHandler::handle(InPacket& recv) const
+	{
+		bool asking = recv.read_byte() != 0;
+		int8_t question_set = recv.read_byte();
+		int16_t question_id = recv.read_short();
+
+		if (asking)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[OX Quiz] Question " + std::to_string(question_set) + "-" + std::to_string(question_id) + ": Move to O or X!", UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void SnowballStateHandler::handle(InPacket& recv) const
+	{
+		// First check if it's an enter-map packet (21 zero bytes) or state update
+		int8_t state = recv.read_byte();
+
+		if (state == 0) // Could be entermap zeroes
+		{
+			recv.skip(20); // rest of the 21 zeroes
+		}
+		else
+		{
+			int32_t ball0_hp = recv.read_int();
+			int32_t ball1_hp = recv.read_int();
+			recv.read_short(); // ball0 position
+			recv.read_byte();  // -1
+			recv.read_short(); // ball1 position
+			recv.read_byte();  // -1
+
+			std::cout << "[Snowball] state=" << (int)state
+					  << " HP: " << ball0_hp << " vs " << ball1_hp << std::endl;
+		}
+	}
+
+	void HitSnowballHandler::handle(InPacket& recv) const
+	{
+		int8_t what = recv.read_byte();
+		int32_t damage = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Snowball] Hit! Damage: " + std::to_string(damage), UIChatBar::LineType::YELLOW);
+	}
+
+	void SnowballMessageHandler::handle(InPacket& recv) const
+	{
+		int8_t team = recv.read_byte(); // 0=down, 1=up
+		int32_t message = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Snowball] Team " + std::to_string(team) + " event update!", UIChatBar::LineType::YELLOW);
+	}
+
+	void CoconutHitHandler::handle(InPacket& recv) const
+	{
+		int16_t id = recv.read_short();
+		int16_t delay = recv.read_short();
+		int8_t type = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Coconut] Hit id=" + std::to_string(id) + " type=" + std::to_string(type), UIChatBar::LineType::YELLOW);
+	}
+
+	void CoconutScoreHandler::handle(InPacket& recv) const
+	{
+		int16_t team1 = recv.read_short();
+		int16_t team2 = recv.read_short();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Coconut] Score: Team 1 = " + std::to_string(team1) + " | Team 2 = " + std::to_string(team2), UIChatBar::LineType::YELLOW);
+	}
+
+	void PetNameChangeHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		recv.read_byte(); // 0
+		std::string new_name = recv.read_string();
+		recv.read_byte(); // 0
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Pet] Name changed to: " + new_name, UIChatBar::LineType::YELLOW);
+	}
+
+	void PetExceptionListHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int8_t pet_index = recv.read_byte();
+		recv.read_long(); // pet id
+		int8_t count = recv.read_byte();
+
+		for (int8_t i = 0; i < count; i++)
+			recv.read_int(); // excluded item id
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Pet] Exception list updated: " + std::to_string(count) + " items excluded.", UIChatBar::LineType::YELLOW);
+	}
+
+	void WeddingProgressHandler::handle(InPacket& recv) const
+	{
+		int8_t step = recv.read_byte();
+		int32_t groom_id = recv.read_int();
+		int32_t bride_id = recv.read_int();
+
+		if (auto wedding = UI::get().get_element<UIWedding>())
+			wedding->set_countdown(step);
+	}
+
+	void WeddingCeremonyEndHandler::handle(InPacket& recv) const
+	{
+		int32_t groom_id = recv.read_int();
+		int32_t bride_id = recv.read_int();
+
+		if (auto wedding = UI::get().get_element<UIWedding>())
+			wedding->set_countdown(0);
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Wedding] The ceremony has ended!", UIChatBar::LineType::YELLOW);
+	}
+
+	void MarriageRequestHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode == 9) // Wishlist
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Marriage] Wishlist prompt received.", UIChatBar::LineType::YELLOW);
+		}
+		else // mode 0=engage, 1=cancel, 2=answer
+		{
+			std::string name = recv.read_string();
+			int32_t player_id = recv.read_int();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Marriage] " + name + " has sent you a proposal!", UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void MarriageResultHandler::handle(InPacket& recv) const
+	{
+		int8_t msg = recv.read_byte();
+
+		std::string text;
+		switch (msg)
+		{
+		case 11: text = "Marriage ceremony completed!"; break;
+		case 15: text = "You have received a wedding invitation!"; break;
+		case 36: text = "You are now engaged!"; break;
+		default: text = "Marriage update (code: " + std::to_string(msg) + ")"; break;
+		}
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Marriage] " + text, UIChatBar::LineType::YELLOW);
+	}
+
+	void WeddingGiftResultHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
+			if (mode == 0xA)
+				chatbar->send_chatline("[Wedding] Gift sent successfully!", UIChatBar::LineType::YELLOW);
+			else
+				chatbar->send_chatline("[Wedding] Gift result: " + std::to_string(mode), UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void NotifyMarriedPartnerHandler::handle(InPacket& recv) const
+	{
+		int32_t map_id = recv.read_int();
+		int32_t partner_id = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Marriage] Your partner has moved to another map.", UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyChartResultHandler::handle(InPacket& recv) const
+	{
+		int32_t viewed_id = recv.read_int();
+		int32_t entry_count = recv.read_int();
+
+		if (auto family = UI::get().get_element<UIFamily>())
+		{
+			// Parse entries - each has: cid, parent_id, name, job info
+			for (int32_t i = 0; i < entry_count && recv.available(); i++)
+			{
+				int32_t cid = recv.read_int();
+				int32_t parent_id = recv.read_int();
+				std::string name = recv.read_string();
+
+				// Add as junior if not the viewed player
+				if (cid != viewed_id)
+					family->add_junior(name);
+			}
+		}
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] Family chart loaded with " + std::to_string(entry_count) + " members.", UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyInfoResultHandler::handle(InPacket& recv) const
+	{
+		int32_t current_rep = recv.read_int();
+		int32_t total_rep = recv.read_int();
+		int32_t todays_rep = recv.read_int();
+		int16_t junior_count = recv.read_short();
+		recv.read_short(); // juniors allowed
+		recv.read_short(); // unknown
+		int32_t leader_id = recv.read_int();
+		std::string family_name = recv.read_string();
+		std::string message = recv.read_string();
+
+		if (auto family = UI::get().get_element<UIFamily>())
+			family->set_family_info(family_name, current_rep, total_rep);
+	}
+
+	void FamilyResultHandler::handle(InPacket& recv) const
+	{
+		int32_t type = recv.read_int();
+		int32_t mesos = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] Result type " + std::to_string(type) + " (mesos: " + std::to_string(mesos) + ")", UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyJoinRequestHandler::handle(InPacket& recv) const
+	{
+		int32_t player_id = recv.read_int();
+		std::string name = recv.read_string();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] " + name + " wants to join your family!", UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyJoinRequestResultHandler::handle(InPacket& recv) const
+	{
+		bool accepted = recv.read_byte() != 0;
+		std::string name = recv.read_string();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
+			if (accepted)
+				chatbar->send_chatline("[Family] " + name + " accepted your request.", UIChatBar::LineType::YELLOW);
+			else
+				chatbar->send_chatline("[Family] " + name + " declined your request.", UIChatBar::LineType::RED);
+		}
+	}
+
+	void FamilyJoinAcceptedHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		recv.read_int(); // 0
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] " + name + " has joined your family!", UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyRepGainHandler::handle(InPacket& recv) const
+	{
+		int32_t gain = recv.read_int();
+		std::string from = recv.read_string();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] +" + std::to_string(gain) + " rep from " + from, UIChatBar::LineType::YELLOW);
+	}
+
+	void FamilyLoginLogoutHandler::handle(InPacket& recv) const
+	{
+		bool logged_in = recv.read_bool();
+		std::string name = recv.read_string();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
+			std::string msg = logged_in ? " has logged in." : " has logged out.";
+			chatbar->send_chatline("[Family] " + name + msg, UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void FamilySummonRequestHandler::handle(InPacket& recv) const
+	{
+		std::string from = recv.read_string();
+		std::string family_name = recv.read_string();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Family] " + from + " is summoning you!", UIChatBar::LineType::YELLOW);
+	}
+
+	void SendTVHandler::handle(InPacket& recv) const
+	{
+		int8_t has_partner = recv.read_byte(); // 3 = with partner, 1 = solo
+		int8_t type = recv.read_byte(); // 0=normal, 1=star, 2=heart
+
+		// CharLook + messages follow — complex parsing
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[MapleTV] Broadcast received.", UIChatBar::LineType::YELLOW);
+	}
+
+	void RemoveTVHandler::handle(InPacket& recv) const
+	{
+		// Empty packet body
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[MapleTV] Broadcast ended.", UIChatBar::LineType::YELLOW);
+	}
+
+	void EnableTVHandler::handle(InPacket& recv) const
+	{
+		recv.read_int(); // 0
+		recv.read_byte(); // 0
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[MapleTV] MapleTV enabled.", UIChatBar::LineType::YELLOW);
+	}
+
+	void SetAvatarMegaphoneHandler::handle(InPacket& recv) const
+	{
+		int32_t item_id = recv.read_int();
+		std::string name = recv.read_string();
+
+		// Multiple message strings follow, then channel, ear flag, and CharLook
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[AvatarMegaphone] " + name, UIChatBar::LineType::YELLOW);
+	}
+
+	void ClearAvatarMegaphoneHandler::handle(InPacket& recv) const
+	{
+		recv.read_byte(); // 1
+	}
+
+	void SpawnKiteHandler::handle(InPacket& recv) const
+	{
+		int32_t obj_id = recv.read_int();
+		int32_t item_id = recv.read_int();
+		std::string msg = recv.read_string();
+		std::string name = recv.read_string();
+		int16_t x = recv.read_short();
+		int16_t fh = recv.read_short();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Kite] " + name + ": " + msg, UIChatBar::LineType::YELLOW);
+	}
+
+	void RemoveKiteHandler::handle(InPacket& recv) const
+	{
+		int8_t anim = recv.read_byte();
+		int32_t obj_id = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Kite] A kite has been removed.", UIChatBar::LineType::YELLOW);
+	}
+
+	void CannotSpawnKiteHandler::handle(InPacket& recv) const
+	{
+		// Empty body
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, "Cannot place a kite here.");
+	}
+
+	void AriantScoreHandler::handle(InPacket& recv) const
+	{
+		int8_t count = recv.read_byte();
+
+		for (int8_t i = 0; i < count; i++)
+		{
+			std::string name = recv.read_string();
+			int32_t score = recv.read_int();
+		}
+	}
+
+	void AriantShowResultHandler::handle(InPacket& recv) const
+	{
+		// Empty body — triggers result dialog
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Ariant] Match results!", UIChatBar::LineType::YELLOW);
+	}
+
+	void PyramidGaugeHandler::handle(InPacket& recv) const
+	{
+		int32_t gauge = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Pyramid] Gauge: " + std::to_string(gauge), UIChatBar::LineType::YELLOW);
+	}
+
+	void PyramidScoreHandler::handle(InPacket& recv) const
+	{
+		int8_t rank = recv.read_byte(); // 0=S, 1=A, 2=B, 3=C, 4=D
+		int32_t exp = recv.read_int();
+
+		std::string ranks[] = { "S", "A", "B", "C", "D" };
+		std::string rank_str = (rank >= 0 && rank <= 4) ? ranks[rank] : "?";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Pyramid] Rank " + rank_str + " - EXP: " + std::to_string(exp), UIChatBar::LineType::YELLOW);
+	}
+
+	void TournamentHandler::handle(InPacket& recv) const
+	{
+		int8_t state = recv.read_byte();
+		int8_t sub_state = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Tournament] State update: " + std::to_string(state) + "/" + std::to_string(sub_state), UIChatBar::LineType::YELLOW);
+	}
+
+	void TournamentMatchTableHandler::handle(InPacket& recv) const
+	{
+		// Empty body — prompts match table dialog
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Tournament] Match table received.", UIChatBar::LineType::YELLOW);
+	}
+
+	void TournamentSetPrizeHandler::handle(InPacket& recv) const
+	{
+		int8_t set_prize = recv.read_byte();
+		int8_t has_prize = recv.read_byte();
+
+		if (has_prize)
+		{
+			int32_t item1 = recv.read_int();
+			int32_t item2 = recv.read_int();
+		}
+	}
+
+	void TournamentUEWHandler::handle(InPacket& recv) const
+	{
+		int8_t state = recv.read_byte(); // bitflags for round info
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Tournament] UEW state: " + std::to_string(state), UIChatBar::LineType::YELLOW);
+	}
+
+	void DojoWarpUpHandler::handle(InPacket& recv) const
+	{
+		recv.read_byte(); // 0
+		recv.read_byte(); // 6
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Dojo] Warping to next floor!", UIChatBar::LineType::YELLOW);
+	}
+
+	void ThrowGrenadeHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t x = recv.read_int();
+		int32_t y = recv.read_int();
+		int32_t key_down = recv.read_int();
+		int32_t skill_id = recv.read_int();
+		int32_t skill_level = recv.read_int();
+
+		// Grenade visual — would need an animation system for projectiles
+	}
+
+	void SkillLearnItemResultHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		recv.read_byte(); // 1
+		int32_t skill_id = recv.read_int();
+		int32_t max_level = recv.read_int();
+		bool can_use = recv.read_byte() != 0;
+		bool success = recv.read_byte() != 0;
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+		{
+			if (success)
+				messenger->show_status(Color::Name::WHITE, "Skill book used successfully!");
+			else
+				messenger->show_status(Color::Name::RED, "Skill book usage failed.");
+		}
+	}
+
+	void CatchMonsterWithItemHandler::handle(InPacket& recv) const
+	{
+		int32_t mob_oid = recv.read_int();
+		int32_t item_id = recv.read_int();
+		int8_t success = recv.read_byte();
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+		{
+			if (success)
+				messenger->show_status(Color::Name::WHITE, "Monster captured!");
+			else
+				messenger->show_status(Color::Name::RED, "Failed to capture the monster.");
+		}
+	}
+
+	void SetBackEffectHandler::handle(InPacket& recv) const
+	{
+		bool remove = recv.read_bool();
+		recv.read_int(); // unknown
+		int8_t layer = recv.read_byte();
+		int32_t transition = recv.read_int();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[BackEffect] " + std::string(remove ? "Removed" : "Applied") + " layer=" + std::to_string(layer), UIChatBar::LineType::YELLOW);
+	}
+
+	void BlockedMapHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte();
+
+		std::string messages[] = {
+			"",
+			"Equipment limitations prevent entry.",
+			"One-handed weapon required.",
+			"Level requirement not met.",
+			"Skill requirement not met.",
+			"Ground force map.",
+			"Party members only.",
+			"Cash Shop is currently unavailable."
+		};
+
+		std::string msg = (type >= 1 && type <= 7) ? messages[type] : "Cannot enter this map.";
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, msg);
+	}
+
+	void BlockedServerHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte();
+
+		std::string messages[] = {
+			"",
+			"Cannot change channel right now.",
+			"Cannot access Cash Shop right now.",
+			"Trading shop is unavailable.",
+			"Trading shop user limit reached.",
+			"Level requirement for trading shop not met."
+		};
+
+		std::string msg = (type >= 1 && type <= 5) ? messages[type] : "Action is currently blocked.";
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, msg);
+	}
+
+	void SetExtraPendantSlotHandler::handle(InPacket& recv) const
+	{
+		bool enabled = recv.read_bool();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Equip] Extra pendant slot " + std::string(enabled ? "enabled" : "disabled") + ".", UIChatBar::LineType::YELLOW);
+	}
+
+	void ViciousHammerHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (op == 0x39)
+		{
+			recv.read_int(); // 0
+			int32_t hammer_used = recv.read_int();
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[ViciousHammer] Used " + std::to_string(hammer_used) + " times.", UIChatBar::LineType::YELLOW);
+		}
+		else if (op == 0x3D)
+		{
+			recv.read_int(); // 0
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[ViciousHammer] Hammering complete!", UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void VegaScrollHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[VegaScroll] Result (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+	}
+
+	void NewYearCardHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		// Complex multi-mode packet — card data, errors, broadcasts
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[NewYearCard] Card update (mode=" + std::to_string(mode) + ")", UIChatBar::LineType::YELLOW);
+	}
+
+	void CashShopNameChangeHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		bool in_use = recv.read_bool();
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+		{
+			if (in_use)
+				messenger->show_status(Color::Name::RED, "Name '" + name + "' is already in use.");
+			else
+				messenger->show_status(Color::Name::WHITE, "Name '" + name + "' is available!");
+		}
+	}
+
+	void CashShopNameChangePossibleHandler::handle(InPacket& recv) const
+	{
+		recv.read_int(); // 0
+		int8_t error = recv.read_byte();
+		recv.read_int(); // 0
+
+		if (error == 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::WHITE, "Name change is available.");
+		}
+		else
+		{
+			std::string msg;
+
+			switch (error)
+			{
+			case 1: msg = "A name change has already been submitted."; break;
+			case 2: msg = "Must wait at least one month between name changes."; break;
+			case 3: msg = "Cannot change name due to a recent ban."; break;
+			default: msg = "Name change is not available."; break;
+			}
+
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, msg);
+		}
+	}
+
+	void CashShopTransferWorldHandler::handle(InPacket& recv) const
+	{
+		recv.read_int(); // 0
+		int8_t error = recv.read_byte();
+		recv.read_int(); // 0
+		bool ok = recv.read_bool();
+
+		if (ok)
+		{
+			int32_t world_count = recv.read_int();
+
+			for (int32_t i = 0; i < world_count; i++)
+				recv.read_string(); // world name
+		}
+		else if (error != 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "World transfer failed (error=" + std::to_string(error) + ").");
+		}
+	}
+
+	void CashGachaponResultHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (op == (int8_t)0xE4) // Open failed
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "Gachapon failed to open.");
+		}
+		else if (op == (int8_t)0xE5) // Open success
+		{
+			recv.read_long(); // box cash id
+			int32_t remaining = recv.read_int();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Gachapon] Opened! Remaining: " + std::to_string(remaining), UIChatBar::LineType::YELLOW);
+			// CashItemInfo + reward data follows
+		}
 	}
 }

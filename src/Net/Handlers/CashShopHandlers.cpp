@@ -21,6 +21,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIMTS.h"
 #include "../../IO/Window.h"
 
@@ -76,27 +77,51 @@ namespace ms
 		{
 		case 0x4A:
 		{
-			// Buy item success - the server sends the purchased cash item info
-			// TODO: Parse the cash item data and add it to the CS inventory
+			// Buy item success
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash Shop] Item purchased successfully!", UIChatBar::LineType::YELLOW);
 			break;
 		}
 		case 0x4C:
 		{
-			// Buy item failure
 			int8_t reason = recv.read_byte();
-			// TODO: Display error message to user based on reason code
+			std::string msg;
+			switch (reason)
+			{
+			case 0: msg = "Unknown error."; break;
+			case 1: msg = "You don't have enough NX."; break;
+			case 2: msg = "Item is out of stock."; break;
+			case 3: msg = "Your cash inventory is full."; break;
+			case 4: msg = "This item is not available for purchase."; break;
+			case 5: msg = "You have exceeded the purchase limit."; break;
+			case 6: msg = "You are under the required level."; break;
+			case 7: msg = "You already have this item."; break;
+			default: msg = "Purchase failed (code: " + std::to_string(reason) + ")"; break;
+			}
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash Shop] " + msg, UIChatBar::LineType::RED);
 			break;
 		}
 		case 0x59:
 		{
-			// Coupon code success
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash Shop] Coupon redeemed successfully!", UIChatBar::LineType::YELLOW);
 			break;
 		}
 		case 0x5C:
 		{
-			// Coupon code failure
 			int8_t reason = recv.read_byte();
-			// TODO: Display coupon error to user based on reason code
+			std::string msg;
+			switch (reason)
+			{
+			case 0: msg = "Invalid coupon code."; break;
+			case 1: msg = "This coupon has expired."; break;
+			case 2: msg = "This coupon has already been used."; break;
+			case 3: msg = "This coupon is for a different server."; break;
+			default: msg = "Coupon error (code: " + std::to_string(reason) + ")"; break;
+			}
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash Shop] " + msg, UIChatBar::LineType::RED);
 			break;
 		}
 		default:

@@ -76,7 +76,11 @@ namespace ms
 		chars.clear();
 		npcs.clear();
 		mobs.clear();
+		summons.clear();
+		dragons.clear();
 		drops.clear();
+		doors.clear();
+		mists.clear();
 		reactors.clear();
 	}
 
@@ -126,9 +130,13 @@ namespace ms
 			reactors.draw(id, viewx, viewy, alpha);
 			npcs.draw(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
+			summons.draw(id, viewx, viewy, alpha);
+			dragons.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
 			drops.draw(id, viewx, viewy, alpha);
+			doors.draw(id, viewx, viewy, alpha);
+			mists.draw(id, viewx, viewy, alpha);
 		}
 
 		combat.draw(viewx, viewy, alpha);
@@ -152,8 +160,12 @@ namespace ms
 		reactors.update(physics);
 		npcs.update(physics);
 		mobs.update(physics);
+		summons.update(physics);
+		dragons.update(physics);
 		chars.update(physics);
 		drops.update(physics);
+		doors.update(physics);
+		mists.update(physics);
 		player.update(physics);
 
 		portals.update(player.get_position());
@@ -324,6 +336,26 @@ namespace ms
 	MapDrops& Stage::get_drops()
 	{
 		return drops;
+	}
+
+	MapDoors& Stage::get_doors()
+	{
+		return doors;
+	}
+
+	MapMists& Stage::get_mists()
+	{
+		return mists;
+	}
+
+	MapSummons& Stage::get_summons()
+	{
+		return summons;
+	}
+
+	MapDragons& Stage::get_dragons()
+	{
+		return dragons;
 	}
 
 	Player& Stage::get_player()

@@ -18,6 +18,7 @@
 #pragma once
 
 #include "MapObjects.h"
+#include "Mob.h"
 
 #include "../Spawn.h"
 
@@ -55,6 +56,10 @@ namespace ms
 		void send_attack(AttackResult& result, const Attack& attack, const std::vector<int32_t>& targets, uint8_t mobcount);
 		// Applies damage to a mob.
 		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser& user, const SpecialMove& move);
+		// Apply a status effect to a mob.
+		void apply_status(int32_t oid, int32_t status_mask, int32_t first_mask, const std::vector<std::pair<int32_t, MobStatusEntry>>& statuses);
+		// Cancel a status effect on a mob.
+		void cancel_status(int32_t oid, int32_t status_mask, int32_t first_mask);
 
 		// Check if the mob with the specified oid exists.
 		bool contains(int32_t oid) const;

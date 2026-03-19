@@ -128,4 +128,75 @@ namespace ms
 			write_string(message);
 		}
 	};
+
+	// --- Shop / Hired Merchant Packets ---
+
+	// Buy item from personal shop or hired merchant
+	// action 5: byte slot, short quantity
+	class ShopBuyPacket : public OutPacket
+	{
+	public:
+		ShopBuyPacket(int8_t slot, int16_t quantity) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(5);
+			write_byte(slot);
+			write_short(quantity);
+		}
+	};
+
+	// Rearrange items in hired merchant (owner only)
+	// action 42
+	class ShopArrangePacket : public OutPacket
+	{
+	public:
+		ShopArrangePacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(42);
+		}
+	};
+
+	// Collect stored meso from shop
+	// action 28
+	class ShopTakeMesoPacket : public OutPacket
+	{
+	public:
+		ShopTakeMesoPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(28);
+		}
+	};
+
+	// Open/start personal shop (owner only)
+	// action 13
+	class ShopOpenPacket : public OutPacket
+	{
+	public:
+		ShopOpenPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(13);
+		}
+	};
+
+	// Ban a visitor from shop (owner only)
+	// action 14: byte slot (0 = first visitor)
+	class ShopBanVisitorPacket : public OutPacket
+	{
+	public:
+		ShopBanVisitorPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(14);
+			write_byte(0);
+		}
+	};
+
+	// Blacklist management (owner only)
+	// action 15
+	class ShopBlacklistPacket : public OutPacket
+	{
+	public:
+		ShopBlacklistPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(15);
+		}
+	};
 }

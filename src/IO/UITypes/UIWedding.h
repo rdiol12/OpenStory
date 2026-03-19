@@ -19,6 +19,9 @@
 
 #include "../UIElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIWedding : public UIElement
@@ -37,15 +40,29 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void set_invitation(int8_t type, const std::string& groom, const std::string& bride);
+		void set_countdown(int32_t seconds);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		enum Buttons : uint16_t
 		{
-			BT_CLOSE,
-			BT_YES,
-			BT_NO
+			BT_OK
 		};
+
+		Texture cathedral_tex;
+		Texture vegas_tex;
+		Texture stopwatch_tex;
+
+		int8_t wedding_type;  // 0=Cathedral, 1=Vegas
+		std::string groom_name;
+		std::string bride_name;
+		int32_t countdown;
+
+		mutable Text names_label;
+		mutable Text countdown_label;
 	};
 }

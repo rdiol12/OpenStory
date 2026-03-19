@@ -65,12 +65,14 @@ namespace ms
 		float sx = (float)vw / 800.0f;
 		float sy = (float)vh / 600.0f;
 
+		Point<int16_t> content_offset((vw - 800) / 2, (vh - 600) / 2);
+
 		sprites.emplace_back(back["14"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
-		sprites.emplace_back(signboard["2"], DrawArgument(Point<int16_t>(234, 235), 2.0f));
-		sprites_gender_select.emplace_back(board["genderTop"], Point<int16_t>(486, 95));
-		sprites_gender_select.emplace_back(board["boardMid"], Point<int16_t>(486, 209));
-		sprites_gender_select.emplace_back(board["boardBottom"], Point<int16_t>(486, 329));
-		sprites_lookboard.emplace_back(CustomizeChar["charSet"], Point<int16_t>(486, 95));
+		sprites.emplace_back(signboard["2"], DrawArgument(Point<int16_t>(234, 235) + content_offset, 2.0f));
+		sprites_gender_select.emplace_back(board["genderTop"], Point<int16_t>(486, 95) + content_offset);
+		sprites_gender_select.emplace_back(board["boardMid"], Point<int16_t>(486, 209) + content_offset);
+		sprites_gender_select.emplace_back(board["boardBottom"], Point<int16_t>(486, 329) + content_offset);
+		sprites_lookboard.emplace_back(CustomizeChar["charSet"], Point<int16_t>(486, 95) + content_offset);
 
 		for (size_t i = 0; i <= 5; i++)
 		{
@@ -79,27 +81,27 @@ namespace ms
 			if (i >= 2)
 				f++;
 
-			sprites_lookboard.emplace_back(CustomizeChar["avatarSel"][i]["normal"], Point<int16_t>(497, 197 + (f * 18)));
+			sprites_lookboard.emplace_back(CustomizeChar["avatarSel"][i]["normal"], Point<int16_t>(497, 197 + (f * 18)) + content_offset);
 		}
 
-		buttons[Buttons::BT_CHARC_GENDER_M] = std::make_unique<MapleButton>(genderSelect["male"], Point<int16_t>(487, 109));
-		buttons[Buttons::BT_CHARC_GEMDER_F] = std::make_unique<MapleButton>(genderSelect["female"], Point<int16_t>(485, 109));
-		buttons[Buttons::BT_CHARC_FACEL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (0 * 18)));
-		buttons[Buttons::BT_CHARC_FACER] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (0 * 18)));
-		buttons[Buttons::BT_CHARC_HAIRL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (1 * 18)));
-		buttons[Buttons::BT_CHARC_HAIRR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (1 * 18)));
-		buttons[Buttons::BT_CHARC_SKINL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (3 * 18)));
-		buttons[Buttons::BT_CHARC_SKINR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (3 * 18)));
-		buttons[Buttons::BT_CHARC_TOPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (4 * 18)));
-		buttons[Buttons::BT_CHARC_TOPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (4 * 18)));
-		buttons[Buttons::BT_CHARC_SHOESL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (5 * 18)));
-		buttons[Buttons::BT_CHARC_SHOESR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (5 * 18)));
-		buttons[Buttons::BT_CHARC_WEPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (6 * 18)));
-		buttons[Buttons::BT_CHARC_WEPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (6 * 18)));
+		buttons[Buttons::BT_CHARC_GENDER_M] = std::make_unique<MapleButton>(genderSelect["male"], Point<int16_t>(487, 109) + content_offset);
+		buttons[Buttons::BT_CHARC_GEMDER_F] = std::make_unique<MapleButton>(genderSelect["female"], Point<int16_t>(485, 109) + content_offset);
+		buttons[Buttons::BT_CHARC_FACEL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (0 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_FACER] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (0 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_HAIRL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (1 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_HAIRR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (1 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_SKINL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (3 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_SKINR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (3 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_TOPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (4 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_TOPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (4 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_SHOESL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (5 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_SHOESR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (5 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_WEPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(552, 198 + (6 * 18)) + content_offset);
+		buttons[Buttons::BT_CHARC_WEPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(684, 198 + (6 * 18)) + content_offset);
 
 		for (size_t i = 0; i <= 7; i++)
 		{
-			buttons[Buttons::BT_CHARC_HAIRC0 + i] = std::make_unique<MapleButton>(CustomizeChar["hairSelect"][i], Point<int16_t>(549 + (i * 15), 234));
+			buttons[Buttons::BT_CHARC_HAIRC0 + i] = std::make_unique<MapleButton>(CustomizeChar["hairSelect"][i], Point<int16_t>(549 + (i * 15), 234) + content_offset);
 			buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 		}
 
@@ -116,17 +118,17 @@ namespace ms
 		buttons[Buttons::BT_CHARC_WEPL]->set_active(false);
 		buttons[Buttons::BT_CHARC_WEPR]->set_active(false);
 
-		buttons[Buttons::BT_CHARC_OK] = std::make_unique<MapleButton>(CustomizeChar["BtYes"], Point<int16_t>(514, 394));
-		buttons[Buttons::BT_CHARC_CANCEL] = std::make_unique<MapleButton>(CustomizeChar["BtNo"], Point<int16_t>(590, 394));
+		buttons[Buttons::BT_CHARC_OK] = std::make_unique<MapleButton>(CustomizeChar["BtYes"], Point<int16_t>(514, 394) + content_offset);
+		buttons[Buttons::BT_CHARC_CANCEL] = std::make_unique<MapleButton>(CustomizeChar["BtNo"], Point<int16_t>(590, 394) + content_offset);
 
 		nameboard = CustomizeChar["charName"];
-		namechar = Textfield(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(522, 195), Point<int16_t>(630, 253)), 12);
+		namechar = Textfield(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, Rectangle<int16_t>(Point<int16_t>(522, 195) + content_offset, Point<int16_t>(630, 253) + content_offset), 12);
 
-		sprites.emplace_back(frame, Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["frame"], Point<int16_t>(400, 300));
-		sprites.emplace_back(Common["step"]["3"], Point<int16_t>(40, 0));
+		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(Common["step"]["3"], Point<int16_t>(40, 0) + content_offset);
 
-		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(Login["Common"]["BtStart"], Point<int16_t>(0, 515));
+		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(Login["Common"]["BtStart"], Point<int16_t>(0, 515) + content_offset);
 
 		namechar.set_state(Textfield::DISABLED);
 
@@ -220,6 +222,8 @@ namespace ms
 	void UIExplorerCreation::draw(float inter) const
 	{
 		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		Point<int16_t> content_offset((vw - 800) / 2, (vh - 600) / 2);
 
 		for (size_t i = 0; i < 2; i++)
 			for (int16_t k = 0; k < vw; k += sky.width())
@@ -247,7 +251,7 @@ namespace ms
 
 			UIElement::draw(inter);
 
-			newchar.draw(Point<int16_t>(394, 339), inter);
+			newchar.draw(Point<int16_t>(394, 339) + content_offset, inter);
 		}
 		else
 		{
@@ -258,14 +262,14 @@ namespace ms
 				for (auto& sprite : sprites_lookboard)
 					sprite.draw(position, inter);
 
-				facename.draw(Point<int16_t>(625, 193 + (0 * 18)));
-				hairname.draw(Point<int16_t>(625, 193 + (1 * 18)));
-				bodyname.draw(Point<int16_t>(625, 193 + (3 * 18)));
-				topname.draw(Point<int16_t>(625, 193 + (4 * 18)));
-				shoename.draw(Point<int16_t>(625, 193 + (5 * 18)));
-				wepname.draw(Point<int16_t>(625, 193 + (6 * 18)));
+				facename.draw(Point<int16_t>(625, 193 + (0 * 18)) + content_offset);
+				hairname.draw(Point<int16_t>(625, 193 + (1 * 18)) + content_offset);
+				bodyname.draw(Point<int16_t>(625, 193 + (3 * 18)) + content_offset);
+				topname.draw(Point<int16_t>(625, 193 + (4 * 18)) + content_offset);
+				shoename.draw(Point<int16_t>(625, 193 + (5 * 18)) + content_offset);
+				wepname.draw(Point<int16_t>(625, 193 + (6 * 18)) + content_offset);
 
-				newchar.draw(Point<int16_t>(394, 339), inter);
+				newchar.draw(Point<int16_t>(394, 339) + content_offset, inter);
 
 				UIElement::draw_buttons(inter);
 			}
@@ -275,10 +279,10 @@ namespace ms
 				{
 					UIElement::draw_sprites(inter);
 
-					nameboard.draw(Point<int16_t>(486, 95));
+					nameboard.draw(Point<int16_t>(486, 95) + content_offset);
 
 					namechar.draw(position);
-					newchar.draw(Point<int16_t>(394, 339), inter);
+					newchar.draw(Point<int16_t>(394, 339) + content_offset, inter);
 
 					UIElement::draw_buttons(inter);
 				}
@@ -286,7 +290,7 @@ namespace ms
 				{
 					UIElement::draw_sprites(inter);
 
-					nameboard.draw(Point<int16_t>(486, 95));
+					nameboard.draw(Point<int16_t>(486, 95) + content_offset);
 
 					UIElement::draw_buttons(inter);
 
@@ -296,7 +300,7 @@ namespace ms
 			}
 		}
 
-		version.draw(position + Point<int16_t>(707, 4));
+		version.draw(position + Point<int16_t>(707, 4) + content_offset);
 	}
 
 	void UIExplorerCreation::update()
@@ -429,6 +433,10 @@ namespace ms
 
 	Button::State UIExplorerCreation::button_pressed(uint16_t buttonid)
 	{
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		Point<int16_t> content_offset((vw - 800) / 2, (vh - 600) / 2);
+
 		switch (buttonid)
 		{
 			case Buttons::BT_CHARC_OK:
@@ -457,8 +465,8 @@ namespace ms
 					for (size_t i = 0; i <= 7; i++)
 						buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(true);
 
-					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(523, 425));
-					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(597, 425));
+					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(523, 425) + content_offset);
+					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(597, 425) + content_offset);
 
 					return Button::State::NORMAL;
 				}
@@ -485,8 +493,8 @@ namespace ms
 						for (size_t i = 0; i <= 7; i++)
 							buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 
-						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(513, 273));
-						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(587, 273));
+						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(513, 273) + content_offset);
+						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(587, 273) + content_offset);
 
 						namechar.set_state(Textfield::State::FOCUSED);
 
@@ -590,8 +598,8 @@ namespace ms
 					for (size_t i = 0; i <= 7; i++)
 						buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(true);
 
-					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(523, 425));
-					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(597, 425));
+					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(523, 425) + content_offset);
+					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(597, 425) + content_offset);
 
 					namechar.set_state(Textfield::State::DISABLED);
 
@@ -623,8 +631,8 @@ namespace ms
 						for (size_t i = 0; i <= 7; i++)
 							buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 
-						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(514, 394));
-						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(590, 394));
+						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(514, 394) + content_offset);
+						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(590, 394) + content_offset);
 
 						return Button::State::NORMAL;
 					}

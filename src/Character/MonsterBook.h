@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
 #include <map>
 
 namespace ms
@@ -27,8 +28,14 @@ namespace ms
 	public:
 		MonsterBook();
 
-		void set_cover(int32_t);
-		void add_card(int16_t, int8_t);
+		void set_cover(int32_t cov);
+		void add_card(int16_t cardid, int8_t level);
+
+		int32_t get_cover() const;
+		int8_t get_card_level(int16_t cardid) const;
+		const std::map<int16_t, int8_t>& get_cards() const;
+		int16_t get_total_cards() const;
+
 	private:
 		int32_t cover;
 		std::map<int16_t, int8_t> cards;

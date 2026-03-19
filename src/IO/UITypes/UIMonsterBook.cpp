@@ -18,9 +18,12 @@
 #include "UIMonsterBook.h"
 
 #include "../Components/MapleButton.h"
-#include "../Components/TwoSpriteButton.h"
 
 #include "../../Configuration.h"
+#include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
+
+#include <algorithm>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -28,7 +31,7 @@
 
 namespace ms
 {
-	UIMonsterBook::UIMonsterBook() : UIDragElement<PosMONSTERBOOK>(), cur_page(0), num_pages(MAX_PAGES)
+	UIMonsterBook::UIMonsterBook() : UIDragElement<PosMONSTERBOOK>(), cur_page(0), num_pages(1)
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["MonsterBook"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
@@ -38,22 +41,14 @@ namespace ms
 
 		sprites.emplace_back(backgrnd);
 
-		// Load additional textures for drawing on the book pages
 		cover = src["cover"];
 		card_slot = src["cardSlot"];
-		info_page = src["infoPage"];
 
-		// Close button in the top-right corner
 		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
-
-		// Page navigation arrows
 		buttons[Buttons::BT_ARROW_LEFT] = std::make_unique<MapleButton>(src["arrowLeft"]);
 		buttons[Buttons::BT_ARROW_RIGHT] = std::make_unique<MapleButton>(src["arrowRight"]);
-
-		// Search button
 		buttons[Buttons::BT_SEARCH] = std::make_unique<MapleButton>(src["BtSearch"]);
 
-		// Left-side category tabs (0-8)
 		nl::node left_tab = src["LeftTab"];
 
 		for (uint16_t i = Buttons::BT_TAB0; i <= Buttons::BT_TAB8; i++)
@@ -65,53 +60,130 @@ namespace ms
 				buttons[i] = std::make_unique<MapleButton>(tab_node);
 		}
 
-		// Page number text at the bottom center of the book
-		page_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, "1 / " + std::to_string(num_pages));
+		page_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, "1 / 1");
+		card_count_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Cards: 0");
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
-		// Initialize button states
+		load_cards();
 		update_buttons();
+	}
+
+	void UIMonsterBook::load_cards()
+	{
+		sorted_cards.clear();
+
+		auto& cards = Stage::get().get_player().get_monsterbook().get_cards();
+
+		for (auto& [cardid, level] : cards)
+		{
+			CardEntry entry;
+			entry.cardid = cardid;
+			entry.level = level;
+			entry.full_itemid = 2380000 + cardid;
+			sorted_cards.push_back(entry);
+		}
+
+		std::sort(sorted_cards.begin(), sorted_cards.end(),
+			[](const CardEntry& a, const CardEntry& b) { return a.cardid < b.cardid; });
+
+		int16_t total = static_cast<int16_t>(sorted_cards.size());
+		num_pages = (total > 0) ? ((total - 1) / CARDS_PER_PAGE + 1) + 1 : 1; // +1 for cover page
+
+		if (cur_page >= num_pages)
+			cur_page = num_pages - 1;
+
+		card_count_text.change_text("Cards: " + std::to_string(total));
+		page_text.change_text(std::to_string(cur_page + 1) + " / " + std::to_string(num_pages));
 	}
 
 	void UIMonsterBook::draw(float inter) const
 	{
 		UIElement::draw_sprites(inter);
 
-		// Draw cover on the first page
 		if (cur_page == 0)
 		{
 			cover.draw(position);
+
+			// Draw card count on cover page
+			card_count_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() / 2 + 20));
 		}
 		else
 		{
-			// Draw empty card slots on the left page (4 slots in a 2x2 grid)
+			// Card pages - show 8 cards per page (4 left, 4 right)
+			int16_t card_start = (cur_page - 1) * CARDS_PER_PAGE;
+
+			// Left page - 4 slots (2x2)
 			Point<int16_t> left_page_origin = position + Point<int16_t>(40, 65);
 
-			for (int16_t row = 0; row < 2; row++)
+			for (int16_t slot = 0; slot < 4; slot++)
 			{
-				for (int16_t col = 0; col < 2; col++)
+				int16_t row = slot / 2;
+				int16_t col = slot % 2;
+				Point<int16_t> slot_pos = left_page_origin + Point<int16_t>(col * 80, row * 100);
+
+				card_slot.draw(slot_pos);
+
+				int16_t card_index = card_start + slot;
+
+				if (card_index < static_cast<int16_t>(sorted_cards.size()))
 				{
-					Point<int16_t> slot_pos = left_page_origin + Point<int16_t>(col * 80, row * 100);
-					card_slot.draw(slot_pos);
+					auto& entry = sorted_cards[card_index];
+					const ItemData& idata = ItemData::get(entry.full_itemid);
+
+					if (idata.is_valid())
+					{
+						// Draw card icon centered in slot
+						idata.get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(16, 16)));
+
+						// Draw card level stars below icon
+						std::string level_str = "Lv." + std::to_string(entry.level);
+						Text level_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, level_str);
+						level_text.draw(slot_pos + Point<int16_t>(35, 70));
+					}
+
+					// Draw card name
+					const std::string& name = idata.is_valid() ? idata.get_name() : "???";
+					Text name_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, name);
+					name_text.draw(slot_pos + Point<int16_t>(35, 82));
 				}
 			}
 
-			// Draw empty card slots on the right page (4 slots in a 2x2 grid)
+			// Right page - 4 slots (2x2)
 			Point<int16_t> right_page_origin = position + Point<int16_t>(248, 65);
 
-			for (int16_t row = 0; row < 2; row++)
+			for (int16_t slot = 0; slot < 4; slot++)
 			{
-				for (int16_t col = 0; col < 2; col++)
+				int16_t row = slot / 2;
+				int16_t col = slot % 2;
+				Point<int16_t> slot_pos = right_page_origin + Point<int16_t>(col * 80, row * 100);
+
+				card_slot.draw(slot_pos);
+
+				int16_t card_index = card_start + 4 + slot;
+
+				if (card_index < static_cast<int16_t>(sorted_cards.size()))
 				{
-					Point<int16_t> slot_pos = right_page_origin + Point<int16_t>(col * 80, row * 100);
-					card_slot.draw(slot_pos);
+					auto& entry = sorted_cards[card_index];
+					const ItemData& idata = ItemData::get(entry.full_itemid);
+
+					if (idata.is_valid())
+					{
+						idata.get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(16, 16)));
+
+						std::string level_str = "Lv." + std::to_string(entry.level);
+						Text level_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, level_str);
+						level_text.draw(slot_pos + Point<int16_t>(35, 70));
+					}
+
+					const std::string& name = idata.is_valid() ? idata.get_name() : "???";
+					Text name_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, name);
+					name_text.draw(slot_pos + Point<int16_t>(35, 82));
 				}
 			}
 		}
 
-		// Draw page number text at the bottom of the book
 		page_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() - 18));
 
 		UIElement::draw_buttons(inter);
@@ -143,6 +215,11 @@ namespace ms
 		return TYPE;
 	}
 
+	void UIMonsterBook::update_card(int16_t cardid, int8_t level)
+	{
+		load_cards();
+	}
+
 	Button::State UIMonsterBook::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
@@ -171,7 +248,6 @@ namespace ms
 		case Buttons::BT_TAB6:
 		case Buttons::BT_TAB7:
 		case Buttons::BT_TAB8:
-			// Category tab pressed - reset to first page for now
 			set_page(0);
 			break;
 		default:
@@ -190,7 +266,6 @@ namespace ms
 
 	void UIMonsterBook::update_buttons()
 	{
-		// Disable left arrow on first page, right arrow on last page
 		if (cur_page <= 0)
 			buttons[Buttons::BT_ARROW_LEFT]->set_state(Button::State::DISABLED);
 		else

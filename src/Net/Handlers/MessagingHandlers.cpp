@@ -339,4 +339,62 @@ namespace ms
 			Stage::get().get_combat().show_player_buff(skillid);
 		}
 	}
+
+	void WhisperHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode == 9 || mode == 18) // Whisper received
+		{
+			std::string from = recv.read_string();
+			recv.read_byte(); // channel
+			recv.read_bool(); // from admin
+			std::string message = recv.read_string();
+
+			std::string line = from + " <Whisper>: " + message;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::RED);
+		}
+		else if (mode == 10) // Find reply — "X is on channel Y"
+		{
+			std::string name = recv.read_string();
+			int8_t result = recv.read_byte();
+
+			std::string line;
+
+			if (result == -1)
+				line = name + " is not online.";
+			else if (result == 0)
+				line = name + " is in the same channel but on a different map.";
+			else
+				line = name + " is on Channel " + std::to_string(result) + ".";
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void MultichatHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte(); // 0 = buddy, 1 = party, 2 = guild, 3 = alliance
+		std::string from = recv.read_string();
+		std::string message = recv.read_string();
+
+		std::string prefix;
+
+		switch (type)
+		{
+		case 0: prefix = "[Buddy] "; break;
+		case 1: prefix = "[Party] "; break;
+		case 2: prefix = "[Guild] "; break;
+		case 3: prefix = "[Alliance] "; break;
+		default: prefix = "[Chat] "; break;
+		}
+
+		std::string line = prefix + from + ": " + message;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::BLUE);
+	}
 }

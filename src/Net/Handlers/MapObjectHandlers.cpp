@@ -21,6 +21,9 @@
 #include "Helpers/MovementParser.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/Mob.h"
+#include "../../Gameplay/MapleMap/Summon.h"
+#include "../../Gameplay/MapleMap/Dragon.h"
 
 namespace ms
 {
@@ -174,25 +177,48 @@ namespace ms
 		int32_t cid = recv.read_int();
 		int8_t effect = recv.read_byte();
 
-		if (effect == 10) // recovery
+		switch (effect)
 		{
-			recv.read_byte(); // 'amount'
-		}
-		else if (effect == 13) // card effect
+		case 0: // level up
+			Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+			break;
+		case 1: // skill use
+		case 2: // skill affected
 		{
-			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
-		}
-		else if (recv.available()) // skill
-		{
-			int32_t skillid = recv.read_int();
-			recv.read_byte(); // 'direction'
-			// 9 more bytes after this
+			if (recv.length() >= 5)
+			{
+				int32_t skillid = recv.read_int();
+				recv.read_byte(); // direction
+				// Consume remaining bytes for this effect
+				while (recv.available())
+					recv.read_byte();
 
-			Stage::get().get_combat().show_buff(cid, skillid, effect);
+				Stage::get().get_combat().show_buff(cid, skillid, effect);
+			}
+			break;
 		}
-		else
+		case 6: // job change
+		case 7: // quest complete
+		case 8: // buff effect
+		case 9: // recovery (item use)
+		case 10: // recovery
 		{
-			// No action needed for this spawn type
+			if (recv.available())
+				recv.read_byte();
+			break;
+		}
+		case 11: // wheel of fortune
+		case 14: // scroll success/failure
+		{
+			// No extra data
+			break;
+		}
+		case 13: // card effect
+			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
+			break;
+		default:
+			// Consume all remaining bytes to avoid underflow on next packet
+			break;
 		}
 	}
 
@@ -452,5 +478,332 @@ namespace ms
 		Point<int16_t> point = recv.read_point();
 
 		Stage::get().get_reactors().remove(oid, state, point);
+	}
+
+	void ApplyMonsterStatusHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+
+		recv.skip(8); // long 0 padding
+
+		int32_t first_mask = recv.read_int();
+		int32_t second_mask = recv.read_int();
+
+		std::vector<std::pair<int32_t, MobStatusEntry>> statuses;
+
+		// Parse statuses from first mask (isFirst() statuses)
+		for (int32_t bit = 1; bit != 0; bit <<= 1)
+		{
+			if (first_mask & bit)
+			{
+				MobStatusEntry entry;
+				entry.value = recv.read_short();
+				entry.skillid = recv.read_int(); // skill ID or mob skill (type << 16 | level)
+				entry.duration = recv.read_short(); // -1 = not displayed
+				statuses.emplace_back(bit, entry);
+			}
+		}
+
+		// Parse statuses from second mask (normal statuses)
+		for (int32_t bit = 1; bit != 0; bit <<= 1)
+		{
+			if (second_mask & bit)
+			{
+				MobStatusEntry entry;
+				entry.value = recv.read_short();
+				entry.skillid = recv.read_int();
+				entry.duration = recv.read_short();
+				statuses.emplace_back(bit, entry);
+			}
+		}
+
+		// Skip reflection data + size + padding
+		if (recv.length() > 0)
+		{
+			// Remaining: optional reflection ints, byte size, int 0
+			// Just skip whatever is left
+		}
+
+		Stage::get().get_mobs().apply_status(oid, second_mask, first_mask, statuses);
+	}
+
+	void CancelMonsterStatusHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+
+		// Padding
+		recv.skip(8); // long 0
+
+		int32_t first_mask = recv.read_int();
+		int32_t second_mask = recv.read_int();
+
+		Stage::get().get_mobs().cancel_status(oid, second_mask, first_mask);
+	}
+
+	void SpawnSummonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int32_t oid = recv.read_int();
+		int32_t skill_id = recv.read_int();
+		recv.skip(1); // 0x0A marker
+		int8_t skill_level = recv.read_byte();
+		Point<int16_t> position = recv.read_point();
+		int8_t stance = recv.read_byte();
+		recv.skip(2); // padding short 0
+		int8_t move_type_val = recv.read_byte();
+		bool attacks = recv.read_bool();
+		// recv.read_bool(); // animated flag (not needed client-side)
+
+		Summon::MovementType move_type;
+
+		switch (move_type_val)
+		{
+		case 1:
+			move_type = Summon::MovementType::FOLLOW;
+			break;
+		case 3:
+			move_type = Summon::MovementType::CIRCLE_FOLLOW;
+			break;
+		default:
+			move_type = Summon::MovementType::STATIONARY;
+			break;
+		}
+
+		Stage::get().get_summons().spawn(
+			{ oid, owner_id, skill_id, skill_level, stance, position, move_type, attacks }
+		);
+	}
+
+	void RemoveSummonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int32_t oid = recv.read_int();
+		int8_t anim = recv.read_byte();
+
+		Stage::get().get_summons().remove(oid, anim == 4);
+	}
+
+	void MoveSummonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int32_t oid = recv.read_int();
+		Point<int16_t> start = recv.read_point();
+
+		std::vector<Movement> movements = MovementParser::parse_movements(recv);
+
+		Stage::get().get_summons().send_movement(oid, start, std::move(movements));
+	}
+
+	void SummonAttackHandler::handle(InPacket& recv) const
+	{
+		// Parse but don't need to act on client-side — damage is handled by mob HP updates
+		int32_t owner_id = recv.read_int();
+		int32_t summon_oid = recv.read_int();
+		recv.skip(1); // char level
+		recv.skip(1); // direction
+		int8_t num_targets = recv.read_byte();
+
+		for (int8_t i = 0; i < num_targets; i++)
+		{
+			recv.read_int(); // monster oid
+			recv.skip(1);    // 6
+			recv.read_int(); // damage
+		}
+	}
+
+	void DamageSummonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int32_t oid = recv.read_int();
+		recv.skip(1); // 12
+		int32_t damage = recv.read_int();
+
+		Stage::get().get_summons().apply_damage(oid, damage);
+	}
+
+	void RemoveNpcHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+
+		Stage::get().get_npcs().remove(oid);
+	}
+
+	void SpawnDoorHandler::handle(InPacket& recv) const
+	{
+		bool launched = recv.read_bool();
+		int32_t owner_id = recv.read_int();
+		Point<int16_t> pos = recv.read_point();
+
+		Stage::get().get_doors().spawn(
+			{ owner_id, owner_id, pos, launched }
+		);
+	}
+
+	void RemoveDoorHandler::handle(InPacket& recv) const
+	{
+		recv.read_byte(); // always 0
+		int32_t owner_id = recv.read_int();
+
+		Stage::get().get_doors().remove(owner_id);
+	}
+
+	void SpawnMistHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int32_t mist_type = recv.read_int(); // 0 = mob mist, 1 = poison mist, 2 = smoke screen
+		int32_t owner_id = recv.read_int();
+		int32_t skill_id = recv.read_int();
+		int8_t skill_level = recv.read_byte();
+		recv.read_short(); // skill delay
+		int32_t box_x1 = recv.read_int(); // bounding box
+		int32_t box_y1 = recv.read_int();
+		int32_t box_x2 = recv.read_int();
+		int32_t box_y2 = recv.read_int();
+		recv.read_int(); // 0 padding
+
+		Point<int16_t> pos1(static_cast<int16_t>(box_x1), static_cast<int16_t>(box_y1));
+		Point<int16_t> pos2(static_cast<int16_t>(box_x2), static_cast<int16_t>(box_y2));
+
+		Stage::get().get_mists().spawn(
+			{ oid, owner_id, pos1, pos2, skill_id, skill_level, static_cast<int8_t>(mist_type) }
+		);
+	}
+
+	void RemoveMistHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+
+		Stage::get().get_mists().remove(oid);
+	}
+
+	void MovePetHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t slot = recv.read_byte();
+		recv.read_int(); // pet id
+
+		std::vector<Movement> movements = MovementParser::parse_movements(recv);
+
+		if (auto character = Stage::get().get_character(cid))
+		{
+			if (!movements.empty())
+			{
+				const Movement& last = movements.back();
+				// PetLook doesn't support full movement queues,
+				// so just update position and stance from last movement
+			}
+		}
+	}
+
+	void PetChatHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		recv.read_byte(); // pet index
+		recv.read_byte(); // 0
+		int8_t act = recv.read_byte();
+		std::string text = recv.read_string();
+		recv.read_byte(); // has balloon type
+
+		// Display pet chat as a speech bubble on the character
+		if (auto character = Stage::get().get_character(cid))
+			character->speak(text);
+	}
+
+	void PetCommandHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t pet_index = recv.read_byte();
+		int8_t type = recv.read_byte();     // 1 = command response
+		int8_t animation = recv.read_byte();
+		bool talk = !recv.read_bool();
+		// recv.read_bool(); // balloon type - may not be present
+
+		// Pet command animation — no visual handler yet
+	}
+
+	void MoveMonsterResponseHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int16_t move_id = recv.read_short();
+		bool use_skills = recv.read_bool();
+		int16_t current_mp = recv.read_short();
+		int8_t skill_id = recv.read_byte();
+		int8_t skill_level = recv.read_byte();
+
+		// Server acknowledgement of mob movement — client doesn't need to act
+	}
+
+	void DamageMonsterHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		recv.read_byte(); // 0
+		int32_t damage = recv.read_int();
+
+		if (damage > 0)
+		{
+			// Show damage number on the mob (from other players' attacks)
+			// The mob HP bar is updated separately via SHOW_MOB_HP
+		}
+	}
+
+	void CancelSkillEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t skill_id = recv.read_int();
+
+		// Cancel the visual effect of a skill on a character
+		// The buff cancellation is handled separately via CANCEL_FOREIGN_BUFF
+	}
+
+	void ChalkboardHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		bool has_chalkboard = recv.read_bool();
+		std::string text = has_chalkboard ? recv.read_string() : "";
+
+		// Chalkboard display above character — visual only
+		// Would need a chalkboard text bubble system on OtherChar
+	}
+
+	void SpawnDragonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		int16_t x = recv.read_short();
+		recv.read_short(); // padding
+		int16_t y = recv.read_short();
+		recv.read_short(); // padding
+		uint8_t stance = recv.read_byte();
+		recv.read_byte(); // 0
+		int16_t job = recv.read_short();
+
+		Stage::get().get_dragons().spawn(
+			{ owner_id, Point<int16_t>(x, y), stance, job }
+		);
+	}
+
+	void MoveDragonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+		Point<int16_t> start = recv.read_point();
+
+		std::vector<Movement> movements = MovementParser::parse_movements(recv);
+
+		Stage::get().get_dragons().send_movement(owner_id, movements);
+	}
+
+	void RemoveDragonHandler::handle(InPacket& recv) const
+	{
+		int32_t owner_id = recv.read_int();
+
+		Stage::get().get_dragons().remove(owner_id);
+	}
+
+	void SummonSkillHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t skill_id = recv.read_int();
+		int8_t new_stance = recv.read_byte();
+
+		// Visual update only — the summon's skill animation
 	}
 }

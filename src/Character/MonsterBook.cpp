@@ -33,4 +33,25 @@ namespace ms
 	{
 		cards[card] = level;
 	}
+
+	int32_t MonsterBook::get_cover() const
+	{
+		return cover;
+	}
+
+	int8_t MonsterBook::get_card_level(int16_t cardid) const
+	{
+		auto iter = cards.find(cardid);
+		return (iter != cards.end()) ? iter->second : 0;
+	}
+
+	const std::map<int16_t, int8_t>& MonsterBook::get_cards() const
+	{
+		return cards;
+	}
+
+	int16_t MonsterBook::get_total_cards() const
+	{
+		return static_cast<int16_t>(cards.size());
+	}
 }

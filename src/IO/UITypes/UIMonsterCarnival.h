@@ -19,6 +19,9 @@
 
 #include "../UIElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIMonsterCarnival : public UIElement
@@ -38,16 +41,31 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void set_cp(int32_t my_cp, int32_t my_total, int32_t enemy_cp, int32_t enemy_total);
+		void set_team(int8_t team);
+		void set_summon_count(int8_t category, int16_t count);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		enum Buttons : uint16_t
 		{
-			BT_CLOSE
+			BT_CLOSE,
+			BT_SIDE
 		};
 
-		Texture scoreboard;
-		int32_t cp_gauge;
+		Texture icon0, icon1, icon2, icon3;
+
+		int32_t my_cp, my_total_cp;
+		int32_t enemy_cp, enemy_total_cp;
+		int8_t my_team;
+		bool side_view = false;
+		int16_t summon_counts[4];
+
+		mutable Text my_cp_label;
+		mutable Text enemy_cp_label;
+		mutable Text team_label;
 	};
 }

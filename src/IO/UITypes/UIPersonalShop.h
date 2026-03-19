@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIPersonalShop : public UIDragElement<PosPERSONALSHOP>
@@ -37,6 +40,12 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void set_owner(const std::string& name);
+		void add_item(int8_t slot, int32_t itemid, int16_t quantity, int32_t price);
+		void set_sold_out(int8_t slot);
+		void clear_items();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -45,7 +54,37 @@ namespace ms
 		{
 			BT_CLOSE,
 			BT_BUY,
-			BT_SELL
+			BT_START,
+			BT_ENTER,
+			BT_EXIT,
+			BT_ITEM,
+			BT_INFO,
+			BT_COIN,
+			BT_BAN,
+			BT_BLACKLIST
 		};
+
+		struct ShopItem
+		{
+			int32_t itemid;
+			int16_t quantity;
+			int32_t price;
+			bool sold_out;
+		};
+
+		static constexpr int8_t MAX_ITEMS = 16;
+
+		std::string owner_name;
+		ShopItem items[MAX_ITEMS];
+		int8_t item_count;
+		int8_t selected_slot;
+		bool is_owner;
+
+		Texture select_tex;
+		Texture soldout_tex;
+
+		mutable Text owner_label;
+		mutable Text item_label;
+		mutable Text price_label;
 	};
 }

@@ -67,4 +67,18 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Whisper chat message or find reply
+	// Opcode: WHISPER(135)
+	class WhisperHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Multichat (buddy/party/guild/alliance chat)
+	// Opcode: MULTICHAT(134)
+	class MultichatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

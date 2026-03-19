@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
+
 namespace ms
 {
 	class UIHiredMerchant : public UIDragElement<PosHIREDMERCHANT>
@@ -37,6 +40,12 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void set_owner(const std::string& name);
+		void set_meso(int64_t meso);
+		void add_item(int8_t slot, int32_t itemid, int16_t quantity, int32_t price);
+		void clear_items();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -45,7 +54,32 @@ namespace ms
 		{
 			BT_CLOSE,
 			BT_BUY,
-			BT_ARRANGE
+			BT_ARRANGE,
+			BT_VISIT,
+			BT_COIN,
+			BT_EXIT
 		};
+
+		struct ShopItem
+		{
+			int32_t itemid;
+			int16_t quantity;
+			int32_t price;
+		};
+
+		static constexpr int8_t MAX_ITEMS = 16;
+
+		std::string owner_name;
+		int64_t stored_meso;
+		ShopItem items[MAX_ITEMS];
+		int8_t item_count;
+		int8_t selected_slot;
+
+		mutable Text owner_label;
+		mutable Text meso_label;
+		mutable Text item_label;
+		mutable Text price_label;
+
+		Texture select_tex;
 	};
 }

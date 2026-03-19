@@ -94,6 +94,12 @@ namespace ms
 		dying = false;
 		dead = false;
 		fading = false;
+		stunned = false;
+		frozen = false;
+		poisoned = false;
+		sealed = false;
+		doomed = false;
+		shadowed = false;
 		set_stance(st);
 		flydirection = STRAIGHT;
 		counter = 0;
@@ -182,6 +188,16 @@ namespace ms
 
 		if (!dying)
 		{
+			// Stunned/frozen/webbed mobs can't move
+			if (stunned || frozen || shadowed)
+			{
+				phobj.hforce = 0;
+				phobj.vforce = 0;
+				physics.move_object(phobj);
+
+				return phobj.fhlayer;
+			}
+
 			if (!canfly)
 			{
 				if (phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
@@ -335,7 +351,36 @@ namespace ms
 		{
 			float interopc = opacity.get(alpha);
 
-			animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+			if (frozen)
+			{
+				// Blue tint for frozen mobs
+				Color freeze_color(0.5f, 0.7f, 1.0f, interopc);
+				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, Point<int16_t>(0, 0)), alpha);
+				// Draw with blue overlay
+				DrawArgument freeze_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
+					flip && !noflip ? -1.0f : 1.0f, 1.0f, freeze_color, 0.0f);
+				animations.at(stance).draw(freeze_arg, alpha);
+			}
+			else if (poisoned)
+			{
+				// Green tint for poisoned mobs
+				Color poison_color(0.5f, 1.0f, 0.5f, interopc);
+				DrawArgument poison_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
+					flip && !noflip ? -1.0f : 1.0f, 1.0f, poison_color, 0.0f);
+				animations.at(stance).draw(poison_arg, alpha);
+			}
+			else if (stunned)
+			{
+				// Yellow tint for stunned mobs
+				Color stun_color(1.0f, 1.0f, 0.5f, interopc);
+				DrawArgument stun_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
+					flip && !noflip ? -1.0f : 1.0f, 1.0f, stun_color, 0.0f);
+				animations.at(stance).draw(stun_arg, alpha);
+			}
+			else
+			{
+				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+			}
 
 			if (showhp)
 			{
@@ -602,6 +647,91 @@ namespace ms
 		bounds.shift(get_position());
 
 		return range.overlaps(bounds);
+	}
+
+	void Mob::apply_status(int32_t status_mask, int32_t first_mask, const std::vector<std::pair<int32_t, MobStatusEntry>>& new_statuses)
+	{
+		for (auto& [flag, entry] : new_statuses)
+			statuses[flag] = entry;
+
+		int32_t combined = status_mask | first_mask;
+
+		if (combined & MobStatus::STUN)
+			stunned = true;
+
+		if (combined & MobStatus::FREEZE)
+			frozen = true;
+
+		if (combined & MobStatus::POISON)
+			poisoned = true;
+
+		if (combined & MobStatus::SEAL)
+			sealed = true;
+
+		if (combined & MobStatus::DOOM)
+			doomed = true;
+
+		if (combined & MobStatus::SHADOW_WEB)
+			shadowed = true;
+
+		// Stun and freeze stop mob movement
+		if (stunned || frozen || shadowed)
+			set_stance(Stance::STAND);
+	}
+
+	void Mob::cancel_status(int32_t status_mask, int32_t first_mask)
+	{
+		int32_t combined = status_mask | first_mask;
+
+		if (combined & MobStatus::STUN)
+		{
+			stunned = false;
+			statuses.erase(MobStatus::STUN);
+		}
+
+		if (combined & MobStatus::FREEZE)
+		{
+			frozen = false;
+			statuses.erase(MobStatus::FREEZE);
+		}
+
+		if (combined & MobStatus::POISON)
+		{
+			poisoned = false;
+			statuses.erase(MobStatus::POISON);
+		}
+
+		if (combined & MobStatus::SEAL)
+		{
+			sealed = false;
+			statuses.erase(MobStatus::SEAL);
+		}
+
+		if (combined & MobStatus::DOOM)
+		{
+			doomed = false;
+			statuses.erase(MobStatus::DOOM);
+		}
+
+		if (combined & MobStatus::SHADOW_WEB)
+		{
+			shadowed = false;
+			statuses.erase(MobStatus::SHADOW_WEB);
+		}
+
+		// Remove stat-modifying statuses
+		for (int32_t flag : {
+			MobStatus::WATK, MobStatus::WDEF, MobStatus::MATK, MobStatus::MDEF,
+			MobStatus::ACC, MobStatus::AVOID, MobStatus::SPEED,
+			MobStatus::SHOWDOWN, MobStatus::WEAPON_ATTACK_UP, MobStatus::WEAPON_DEFENSE_UP,
+			MobStatus::MAGIC_ATTACK_UP, MobStatus::MAGIC_DEFENSE_UP,
+			MobStatus::WEAPON_IMMUNITY, MobStatus::MAGIC_IMMUNITY, MobStatus::HARD_SKIN,
+			MobStatus::NINJA_AMBUSH, MobStatus::VENOMOUS_WEAPON, MobStatus::BLIND,
+			MobStatus::SEAL_SKILL, MobStatus::INERTMOB })
+		{
+			if (combined & flag)
+				statuses.erase(flag);
+		}
 	}
 
 	Point<int16_t> Mob::get_head_position() const

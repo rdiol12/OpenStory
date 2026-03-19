@@ -277,4 +277,532 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Server requests client to open a specific UI window
+	// Opcode: OPEN_UI(220)
+	class OpenUIHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Lock the UI (boss fights, cutscenes)
+	// Opcode: LOCK_UI(221)
+	class LockUIHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Disable the UI (boss fights, cutscenes)
+	// Opcode: DISABLE_UI(222)
+	class DisableUIHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn the beginner guide NPC
+	// Opcode: SPAWN_GUIDE(223)
+	class SpawnGuideHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guide NPC dialogue
+	// Opcode: TALK_GUIDE(224)
+	class TalkGuideHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Show combo counter
+	// Opcode: SHOW_COMBO(225)
+	class ShowComboHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Force equip on map entry
+	// Opcode: FORCED_MAP_EQUIP(133)
+	class ForcedMapEquipHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spouse/partner chat message
+	// Opcode: SPOUSE_CHAT(136)
+	class SpouseChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Continental boat/ship movement
+	// Opcode: CONTI_MOVE(148)
+	class ContiMoveHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Continental boat/ship state
+	// Opcode: CONTI_STATE(149)
+	class ContiStateHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Item Maker crafting result
+	// Opcode: MAKER_RESULT(217)
+	class MakerResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival start
+	// Opcode: MONSTER_CARNIVAL_START(289)
+	class MonsterCarnivalStartHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival individual CP update
+	// Opcode: MONSTER_CARNIVAL_OBTAINED_CP(290)
+	class MonsterCarnivalCPHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival party CP update
+	// Opcode: MONSTER_CARNIVAL_PARTY_CP(291)
+	class MonsterCarnivalPartyCPHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival summon notification
+	// Opcode: MONSTER_CARNIVAL_SUMMON(292)
+	class MonsterCarnivalSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival message
+	// Opcode: MONSTER_CARNIVAL_MESSAGE(293)
+	class MonsterCarnivalMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Monster Carnival death notification
+	// Opcode: MONSTER_CARNIVAL_DIED(294)
+	class MonsterCarnivalDiedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn a hired merchant box on the map
+	// Opcode: SPAWN_HIRED_MERCHANT(265)
+	class SpawnHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove a hired merchant box from the map
+	// Opcode: DESTROY_HIRED_MERCHANT(266)
+	class DestroyHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Update a hired merchant box info
+	// Opcode: UPDATE_HIRED_MERCHANT(267)
+	class UpdateHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Fredrick message (merchant storage NPC)
+	// Opcode: FREDRICK_MESSAGE(310)
+	class FredrickMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Fredrick merchant storage retrieval
+	// Opcode: FREDRICK(311)
+	class FredrickHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Stop the on-screen clock/timer
+	// Opcode: STOP_CLOCK(154)
+	class StopClockHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Rock-Paper-Scissors game
+	// Opcode: RPS_GAME(312)
+	class RPSGameHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Maple Messenger chat window
+	// Opcode: MESSENGER(313)
+	class MessengerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Level up notification (guild/family broadcast)
+	// Opcode: NOTIFY_LEVELUP(105)
+	class NotifyLevelUpHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Job change notification (guild/family broadcast)
+	// Opcode: NOTIFY_JOB_CHANGE(107)
+	class NotifyJobChangeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Guild alliance operations
+	// Opcode: ALLIANCE_OPERATION(66)
+	class AllianceOperationHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// OX Quiz event question
+	// Opcode: OX_QUIZ(145)
+	class OXQuizHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Snowball event state
+	// Opcode: SNOWBALL_STATE(281)
+	class SnowballStateHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Snowball hit
+	// Opcode: HIT_SNOWBALL(282)
+	class HitSnowballHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Snowball message
+	// Opcode: SNOWBALL_MESSAGE(283)
+	class SnowballMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Coconut event hit
+	// Opcode: COCONUT_HIT(285)
+	class CoconutHitHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Coconut event score
+	// Opcode: COCONUT_SCORE(286)
+	class CoconutScoreHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pet name change notification
+	// Opcode: PET_NAMECHANGE(172)
+	class PetNameChangeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pet auto-feed exception list
+	// Opcode: PET_EXCEPTION_LIST(173)
+	class PetExceptionListHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Wedding progress step
+	class WeddingProgressHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Wedding ceremony end
+	class WeddingCeremonyEndHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Marriage request / wishlist
+	class MarriageRequestHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Marriage result
+	class MarriageResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Wedding gift result
+	class WeddingGiftResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Partner map transfer notification
+	class NotifyMarriedPartnerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family chart/pedigree
+	class FamilyChartResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family info
+	class FamilyInfoResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family generic result
+	class FamilyResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family join request
+	class FamilyJoinRequestHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family join request result
+	class FamilyJoinRequestResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family join accepted
+	class FamilyJoinAcceptedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family reputation gain
+	class FamilyRepGainHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family member login/logout
+	class FamilyLoginLogoutHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Family summon request
+	class FamilySummonRequestHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// MapleTV broadcast
+	class SendTVHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove MapleTV
+	class RemoveTVHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Enable MapleTV
+	class EnableTVHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Avatar megaphone display
+	class SetAvatarMegaphoneHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Clear avatar megaphone
+	class ClearAvatarMegaphoneHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn kite on map
+	class SpawnKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove kite from map
+	class RemoveKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cannot spawn kite
+	class CannotSpawnKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Ariant arena user scores
+	class AriantScoreHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Ariant arena show result
+	class AriantShowResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pyramid PQ gauge
+	class PyramidGaugeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pyramid PQ score/rank
+	class PyramidScoreHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Tournament info
+	class TournamentHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Tournament match table
+	class TournamentMatchTableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Tournament prize
+	class TournamentSetPrizeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Tournament UEW
+	class TournamentUEWHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Dojo warp up
+	class DojoWarpUpHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Throw grenade visual
+	class ThrowGrenadeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Skill book learning result
+	class SkillLearnItemResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Catch monster with item result
+	class CatchMonsterWithItemHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Set background effect
+	class SetBackEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Blocked map notification
+	class BlockedMapHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Blocked server notification
+	class BlockedServerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Extra pendant slot toggle
+	class SetExtraPendantSlotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Vicious hammer result
+	class ViciousHammerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Vega scroll result
+	class VegaScrollHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// New Year card response
+	class NewYearCardHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cash shop name change check
+	class CashShopNameChangeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cash shop name change possible result
+	class CashShopNameChangePossibleHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cash shop world transfer possible result
+	class CashShopTransferWorldHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cash shop gachapon item result
+	class CashGachaponResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }
