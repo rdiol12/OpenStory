@@ -42,7 +42,7 @@ namespace ms
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),
 		detail_area(0), detail_order(0), detail_auto_start(false),
 		detail_auto_complete(false), filter_my_level(true),
-		show_quest_alarm(false)
+		filter_my_location(false), show_quest_alarm(false)
 	{
 		tab = Buttons::TAB0;
 
@@ -219,6 +219,10 @@ namespace ms
 		auto search_dim = search_pos + search_area_dim + search_dim_adj;
 
 		search = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BOULDER, Rectangle<int16_t>(search_pos, search_dim), 19);
+		search.set_enter_callback([this](std::string text) {
+			search_text = text;
+			load_quests();
+		});
 		placeholder = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BOULDER, "Enter the quest name.");
 
 		// === Detail panel textures from quest_info ===
@@ -325,6 +329,10 @@ namespace ms
 		const auto& started = questlog.get_started();
 		const auto& completed_map = questlog.get_completed();
 
+		// Prepare lowercase search text for case-insensitive matching
+		std::string search_lower = search_text;
+		std::transform(search_lower.begin(), search_lower.end(), search_lower.begin(), ::tolower);
+
 		// TAB1: In-Progress quests (from server)
 		for (auto& iter : started)
 		{
@@ -338,6 +346,15 @@ namespace ms
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
+
+			// Search filter
+			if (!search_lower.empty())
+			{
+				std::string name_lower = name;
+				std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+				if (name_lower.find(search_lower) == std::string::npos)
+					continue;
+			}
 
 			active_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
 		}
@@ -355,6 +372,15 @@ namespace ms
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
+
+			// Search filter
+			if (!search_lower.empty())
+			{
+				std::string name_lower = name;
+				std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+				if (name_lower.find(search_lower) == std::string::npos)
+					continue;
+			}
 
 			completed_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, name, 220, false) });
 		}
@@ -492,6 +518,26 @@ namespace ms
 			std::string name = qnode["name"].get_string();
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
+
+			// Search filter
+			if (!search_lower.empty())
+			{
+				std::string name_lower = name;
+				std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+				if (name_lower.find(search_lower) == std::string::npos)
+					continue;
+			}
+
+			// Location filter — check if quest area matches current map area
+			if (filter_my_location)
+			{
+				int32_t quest_area = qnode["area"].get_integer();
+				int32_t current_map = Stage::get().get_mapid();
+				// Area is the map region (first 1-3 digits of map ID)
+				int32_t current_area = current_map / 10000000;
+				if (quest_area > 0 && quest_area != current_area)
+					continue;
+			}
 
 			available_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
 		}
@@ -1570,7 +1616,17 @@ namespace ms
 			load_quests();
 			return Button::State::IDENTITY;
 		case Buttons::BT_SEARCH:
+			search_text = search.get_text();
+			load_quests();
 			break;
+		case Buttons::BT_ALLLOCN:
+			filter_my_location = false;
+			load_quests();
+			return Button::State::IDENTITY;
+		case Buttons::BT_MYLOCATION:
+			filter_my_location = true;
+			load_quests();
+			return Button::State::IDENTITY;
 		case Buttons::BT_NEXT:
 		{
 			const auto& entries = (tab == Buttons::TAB0) ? available_entries :

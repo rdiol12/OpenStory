@@ -150,6 +150,8 @@ namespace ms
 		std::vector<QuestEntry> active_entries;
 		std::vector<QuestEntry> completed_entries;
 		bool filter_my_level;
+		bool filter_my_location;
+		std::string search_text;
 
 		int16_t selected_entry;
 		int16_t hover_entry;

@@ -20,10 +20,14 @@
 #include "Combat/Combat.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapEnvironments.h"
+#include "MapleMap/MapDoors.h"
 #include "MapleMap/MapDrops.h"
+#include "MapleMap/MapMists.h"
 #include "MapleMap/MapEffect.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapPortals.h"
+#include "MapleMap/MapDragons.h"
+#include "MapleMap/MapSummons.h"
 #include "MapleMap/MapTilesObjs.h"
 
 #include "../Timer.h"
@@ -73,6 +77,14 @@ namespace ms
 		MapReactors& get_reactors();
 		// Returns a reference to the drops on the current map
 		MapDrops& get_drops();
+		// Returns a reference to the doors on the current map
+		MapDoors& get_doors();
+		// Returns a reference to the mists on the current map
+		MapMists& get_mists();
+		// Returns a reference to the summons on the current map
+		MapSummons& get_summons();
+		// Returns a reference to the dragons on the current map
+		MapDragons& get_dragons();
 		// Returns a reference to the Player
 		Player& get_player();
 		// Return a reference to the attack and buff component
@@ -142,7 +154,11 @@ namespace ms
 		MapNpcs npcs;
 		MapChars chars;
 		MapMobs mobs;
+		MapSummons summons;
+		MapDragons dragons;
 		MapDrops drops;
+		MapDoors doors;
+		MapMists mists;
 		MapEffect effect;
 
 		Combat combat;

@@ -30,8 +30,59 @@
 #include "../../Util/Randomizer.h"
 #include "../../Util/TimedBool.h"
 
+#include <unordered_map>
+
 namespace ms
 {
+	namespace MobStatus
+	{
+		enum Id : int32_t
+		{
+			WATK           = 0x1,
+			WDEF           = 0x2,
+			MATK           = 0x4,
+			MDEF           = 0x8,
+			ACC            = 0x10,
+			AVOID          = 0x20,
+			SPEED          = 0x40,
+			STUN           = 0x80,
+			FREEZE         = 0x100,
+			POISON         = 0x200,
+			SEAL           = 0x400,
+			SHOWDOWN       = 0x800,
+			WEAPON_ATTACK_UP  = 0x1000,
+			WEAPON_DEFENSE_UP = 0x2000,
+			MAGIC_ATTACK_UP   = 0x4000,
+			MAGIC_DEFENSE_UP  = 0x8000,
+			DOOM           = 0x10000,
+			SHADOW_WEB     = 0x20000,
+			WEAPON_IMMUNITY = 0x40000,
+			MAGIC_IMMUNITY  = 0x80000,
+			HARD_SKIN      = 0x200000,
+			NINJA_AMBUSH   = 0x400000,
+			VENOMOUS_WEAPON = 0x1000000,
+			BLIND          = 0x2000000,
+			SEAL_SKILL     = 0x4000000,
+			INERTMOB       = 0x10000000
+		};
+
+		// First-mask statuses (from Cosmic: isFirst() == true)
+		enum FirstMask : int32_t
+		{
+			NEUTRALISE     = 0x2,
+			PHANTOM_IMPRINT = 0x4,
+			WEAPON_REFLECT = 0x20000000,
+			MAGIC_REFLECT  = 0x40000000
+		};
+	}
+
+	struct MobStatusEntry
+	{
+		int16_t value;
+		int32_t skillid;
+		int16_t duration;
+	};
+
 	class Mob : public MapObject
 	{
 	public:
@@ -89,6 +140,11 @@ namespace ms
 		void show_hp(int8_t percentage, uint16_t playerlevel);
 		// Show an effect at the mob's position
 		void show_effect(const Animation& animation, int8_t pos, int8_t z, bool flip);
+
+		// Apply a status effect to this mob
+		void apply_status(int32_t status_mask, int32_t first_mask, const std::vector<std::pair<int32_t, MobStatusEntry>>& statuses);
+		// Cancel a status effect on this mob
+		void cancel_status(int32_t status_mask, int32_t first_mask);
 
 		// Calculate the damage to this mob with the specified attack
 		std::vector<std::pair<int32_t, bool>> calculate_damage(const Attack& attack);
@@ -184,5 +240,14 @@ namespace ms
 		bool fading;
 		bool fadein;
 		Linear<float> opacity;
+
+		// Active status effects
+		std::unordered_map<int32_t, MobStatusEntry> statuses;
+		bool stunned;
+		bool frozen;
+		bool poisoned;
+		bool sealed;
+		bool doomed;
+		bool shadowed; // shadow web
 	};
 }

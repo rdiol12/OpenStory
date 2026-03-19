@@ -18,6 +18,7 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "../Components/TwoSpriteButton.h"
 
 #include "../../Graphics/Text.h"
 
@@ -40,6 +41,11 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from guild packet handler
+		void set_guild_info(const std::string& name, const std::string& notice, int16_t level, int16_t capacity);
+		void add_member(const std::string& name, const std::string& rank, int16_t level, int16_t job, bool online);
+		void clear_members();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -52,32 +58,17 @@ namespace ms
 			BT_TAB0,
 			BT_TAB1,
 			BT_TAB2,
-			BT_TAB3,
-			BT_TAB4,
-			BT_TAB5,
-			BT_INVITE,
-			BT_EXPEL,
-			BT_CHANGENAME,
-			BT_CHANGENOTICE,
-			BT_BBS,
-			BT_DISBAND
+			BT_TAB3
 		};
 
-		// Tab names: 0=Members, 1=Skills, 2=Rank, 3=Board, 4=Mark, 5=Search
-		static constexpr uint16_t NUM_TABS = 6;
-
 		uint16_t tab;
-		Texture tabbar;
-		std::vector<Texture> backgrounds;
 
-		// Guild info text labels
 		mutable Text guild_name;
 		mutable Text guild_notice;
 		mutable Text guild_level;
 		mutable Text guild_capacity;
 		mutable Text member_count_text;
 
-		// Member list display
 		struct MemberEntry
 		{
 			std::string name;
@@ -92,12 +83,8 @@ namespace ms
 		mutable Text member_info_label;
 		int16_t scroll_offset;
 
-		// Member list constants
 		static constexpr int16_t MAX_VISIBLE_MEMBERS = 8;
 		static constexpr int16_t MEMBER_ROW_HEIGHT = 24;
 		static constexpr int16_t MEMBER_LIST_Y = 115;
-
-		// Notice area
-		Texture notice_backgrnd;
 	};
 }

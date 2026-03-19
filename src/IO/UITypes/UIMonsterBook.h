@@ -21,6 +21,8 @@
 
 #include "../../Graphics/Text.h"
 
+#include <vector>
+
 namespace ms
 {
 	class UIMonsterBook : public UIDragElement<PosMONSTERBOOK>
@@ -40,12 +42,15 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		void update_card(int16_t cardid, int8_t level);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		void set_page(int16_t page);
 		void update_buttons();
+		void load_cards();
 
 		enum Buttons : uint16_t
 		{
@@ -65,16 +70,22 @@ namespace ms
 			NUM_BUTTONS
 		};
 
-		// Number of card slots per page (4 columns x 2 rows on each side = 8 per spread)
 		static constexpr int16_t CARDS_PER_PAGE = 8;
-		static constexpr int16_t MAX_PAGES = 10;
+
+		struct CardEntry
+		{
+			int16_t cardid;
+			int8_t level;
+			int32_t full_itemid;
+		};
 
 		Texture cover;
 		Texture card_slot;
-		Texture info_page;
 
 		Text page_text;
+		Text card_count_text;
 
+		std::vector<CardEntry> sorted_cards;
 		int16_t cur_page;
 		int16_t num_pages;
 	};

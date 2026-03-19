@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIPartySearch : public UIDragElement<PosPARTYSEARCH>
@@ -37,6 +40,11 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void add_party(const std::string& leader, int8_t member_count, int8_t max_members, int16_t min_level, int16_t max_level);
+		void clear_results();
+		void set_searching(bool searching);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -44,8 +52,33 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_SEARCH,
-			BT_CREATE
+			BT_START,
+			BT_STOP,
+			BT_REG,
+			BT_CANCEL,
+			BT_PAUSE
 		};
+
+		struct PartyEntry
+		{
+			std::string leader;
+			int8_t member_count;
+			int8_t max_members;
+			int16_t min_level;
+			int16_t max_level;
+		};
+
+		std::vector<PartyEntry> results;
+		bool is_searching;
+		int16_t scroll_offset;
+
+		Texture party_icons[4];
+		Texture check_on, check_off;
+
+		mutable Text leader_label;
+		mutable Text info_label;
+		mutable Text status_label;
+
+		static constexpr int16_t MAX_VISIBLE = 6;
 	};
 }

@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
+
 namespace ms
 {
 	class UIMessenger : public UIDragElement<PosMESSENGER>
@@ -37,6 +40,11 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void add_player(int8_t slot, const std::string& name);
+		void remove_player(int8_t slot);
+		void add_chat(const std::string& name, const std::string& message);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -44,7 +52,32 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_INVITE
+			BT_ENTER
 		};
+
+		static constexpr int8_t MAX_PLAYERS = 3;
+		static constexpr int16_t MAX_CHAT_LINES = 8;
+
+		// Player slots (up to 3 people in a messenger)
+		std::string player_names[MAX_PLAYERS];
+		bool player_occupied[MAX_PLAYERS];
+
+		// Name bar textures (0-3 states)
+		Texture name_bars[4];
+		Texture blink_tex;
+
+		// Chat balloon textures
+		Texture chat_balloons[5];
+
+		// Chat history
+		struct ChatLine
+		{
+			std::string name;
+			std::string message;
+		};
+
+		std::vector<ChatLine> chat_lines;
+		mutable Text name_label;
+		mutable Text chat_label;
 	};
 }

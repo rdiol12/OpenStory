@@ -115,7 +115,26 @@ namespace ms
 
 			/// MTS (Maple Trading System)
 			ENTER_MTS = 156,
-			MTS_OPERATION = 253
+			MTS_OPERATION = 253,
+
+			/// Guild
+			GUILD_OPERATION = 138,
+
+			/// Messenger
+			MESSENGER = 126,
+
+			/// Family
+			FAMILY_OPERATION = 364,
+
+			/// RPS Game
+			RPS_ACTION = 231,
+
+			/// Party Search
+			PARTY_SEARCH_REGISTER = 221,
+			PARTY_SEARCH_START = 222,
+
+			/// Wedding
+			WEDDING_ACTION = 232
 		};
 
 	protected:

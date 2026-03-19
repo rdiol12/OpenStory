@@ -19,6 +19,9 @@
 
 #include "../UIElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIRPSGame : public UIElement
@@ -38,15 +41,48 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handler to show result
+		void show_result(int8_t player_choice, int8_t npc_choice, int8_t result);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		void set_phase(int8_t phase);
+
 		enum Buttons : uint16_t
 		{
 			BT_ROCK,
 			BT_PAPER,
-			BT_SCISSORS
+			BT_SCISSOR,
+			BT_START,
+			BT_CONTINUE,
+			BT_RETRY,
+			BT_EXIT
 		};
+
+		enum Phase : int8_t
+		{
+			WAITING,
+			SELECTING,
+			RESULT
+		};
+
+		Phase current_phase;
+		int8_t player_selection;
+		int8_t npc_selection;
+		int8_t game_result;  // 0=lose, 1=win, 2=draw
+		int16_t wins;
+
+		// Hand sprite textures
+		Texture rock, paper, scissor;
+		Texture frock, fpaper, fscissor;
+
+		// Result textures
+		Texture win_tex, lose_tex, draw_tex, timeover_tex;
+		Texture char_win, char_lose;
+
+		Text score_label;
+		Text result_label;
 	};
 }

@@ -22,6 +22,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Constants.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -180,8 +181,11 @@ namespace ms
 			buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(type["BtCancel"], Point<int16_t>(137, 107));
 		}
 
-		position = Point<int16_t>(286, 189);
 		dimension = Texture(backgrnd).get_dimensions();
+
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		position = Point<int16_t>((vw - dimension.x()) / 2, (vh - dimension.y()) / 2);
 	}
 
 	Cursor::State UIClassConfirm::send_cursor(bool clicked, Point<int16_t> cursorpos)

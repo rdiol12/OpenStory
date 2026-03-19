@@ -19,6 +19,9 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Texture.h"
+#include "../../Graphics/Text.h"
+
 namespace ms
 {
 	class UIFamily : public UIDragElement<PosFAMILY>
@@ -37,6 +40,11 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void set_family_info(const std::string& leader, int32_t rep, int32_t total_rep);
+		void set_senior(const std::string& name);
+		void add_junior(const std::string& name);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -44,7 +52,26 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_INVITE
+			BT_TREE,
+			BT_SPECIAL,
+			BT_JUNIOR_ENTRY,
+			BT_FAMILY_PRECEPT,
+			BT_LEFT,
+			BT_RIGHT,
+			BT_OK
 		};
+
+		std::vector<Texture> right_icons;
+
+		std::string leader_name;
+		std::string senior_name;
+		std::vector<std::string> juniors;
+		int32_t reputation;
+		int32_t total_reputation;
+
+		mutable Text leader_label;
+		mutable Text senior_label;
+		mutable Text rep_label;
+		mutable Text junior_label;
 	};
 }

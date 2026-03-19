@@ -22,6 +22,8 @@
 #include "MapleMap/Mob.h"
 #include "MapleMap/Npc.h"
 #include "MapleMap/Reactor.h"
+#include "MapleMap/Door.h"
+#include "MapleMap/Mist.h"
 
 #include "../Character/OtherChar.h"
 
@@ -107,5 +109,31 @@ namespace ms
 	std::unique_ptr<MapObject> CharSpawn::instantiate() const
 	{
 		return std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+	}
+
+	DoorSpawn::DoorSpawn(int32_t o, int32_t ow, Point<int16_t> p, bool l) : oid(o), owner_id(ow), position(p), launched(l) {}
+
+	int32_t DoorSpawn::get_oid() const
+	{
+		return oid;
+	}
+
+	std::unique_ptr<MapObject> DoorSpawn::instantiate(const Physics& physics) const
+	{
+		return std::make_unique<Door>(oid, owner_id, position, launched);
+	}
+
+	MistSpawn::MistSpawn(int32_t o, int32_t ow, Point<int16_t> p1, Point<int16_t> p2,
+		int32_t si, int8_t sl, int8_t mt)
+		: oid(o), owner_id(ow), pos1(p1), pos2(p2), skill_id(si), skill_level(sl), mist_type(mt) {}
+
+	int32_t MistSpawn::get_oid() const
+	{
+		return oid;
+	}
+
+	std::unique_ptr<MapObject> MistSpawn::instantiate(const Physics& physics) const
+	{
+		return std::make_unique<Mist>(oid, owner_id, pos1, pos2, skill_id, skill_level, mist_type);
 	}
 }

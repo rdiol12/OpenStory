@@ -129,6 +129,7 @@ namespace ms
 		std::vector<Texture> class_details;
 		std::vector<Texture> class_title;
 		std::vector<uint16_t> class_map;
+		Texture backFull;
 		Texture back;
 		Texture backZero;
 		Sprite back_ani;

@@ -26,6 +26,7 @@
 
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
+#include "../../IO/UITypes/UIMonsterBook.h"
 #include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UISkillMacro.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
@@ -251,5 +252,28 @@ namespace ms
 
 			UI::get().add_keymapping(i, type, action);
 		}
+	}
+
+	void MonsterBookCardHandler::handle(InPacket& recv) const
+	{
+		int8_t full = recv.read_byte(); // 0 = card maxed (level 5), 1 = not full
+		int32_t cardid = recv.read_int();
+		int32_t level = recv.read_int();
+
+		// Card IDs in the book are stored as cardid % 10000
+		int16_t card_short = static_cast<int16_t>(cardid % 10000);
+		int8_t card_level = static_cast<int8_t>(level);
+
+		Stage::get().get_player().get_monsterbook().add_card(card_short, card_level);
+
+		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
+			monsterbook->update_card(card_short, card_level);
+	}
+
+	void MonsterBookCoverHandler::handle(InPacket& recv) const
+	{
+		int32_t cardid = recv.read_int();
+
+		Stage::get().get_player().get_monsterbook().set_cover(cardid);
 	}
 }

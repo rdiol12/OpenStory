@@ -40,6 +40,10 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Called from packet handlers
+		void add_post(int32_t id, const std::string& author, const std::string& title, int64_t timestamp, int32_t reply_count);
+		void clear_posts();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -48,8 +52,6 @@ namespace ms
 		{
 			BT_CLOSE,
 			BT_WRITE,
-			BT_PREV,
-			BT_NEXT,
 			BT_DELETE,
 			BT_REPLY
 		};

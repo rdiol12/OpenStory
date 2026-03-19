@@ -98,6 +98,167 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Applies a status effect to a mob
+	// Opcode: APPLY_MONSTER_STATUS(242)
+	class ApplyMonsterStatusHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cancels a status effect on a mob
+	// Opcode: CANCEL_MONSTER_STATUS(243)
+	class CancelMonsterStatusHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawns a summon on the map
+	// Opcode: SPAWN_SPECIAL_MAPOBJECT(175)
+	class SpawnSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Removes a summon from the map
+	// Opcode: REMOVE_SPECIAL_MAPOBJECT(176)
+	class RemoveSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Updates a summon's position
+	// Opcode: MOVE_SUMMON(177)
+	class MoveSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Summon attacks a mob
+	// Opcode: SUMMON_ATTACK(178)
+	class SummonAttackHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A summon takes damage
+	// Opcode: DAMAGE_SUMMON(179)
+	class DamageSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove an NPC from the map
+	// Opcode: REMOVE_NPC(258)
+	class RemoveNpcHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn a mystic door on the map
+	// Opcode: SPAWN_DOOR(275)
+	class SpawnDoorHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove a mystic door from the map
+	// Opcode: REMOVE_DOOR(276)
+	class RemoveDoorHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn a mist effect on the map
+	// Opcode: SPAWN_MIST(273)
+	class SpawnMistHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove a mist effect from the map
+	// Opcode: REMOVE_MIST(274)
+	class RemoveMistHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Update pet position
+	// Opcode: MOVE_PET(170)
+	class MovePetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pet chat message
+	// Opcode: PET_CHAT(171)
+	class PetChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Pet command response
+	// Opcode: PET_COMMAND(174)
+	class PetCommandHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Server acknowledges mob movement
+	// Opcode: MOVE_MONSTER_RESPONSE(240)
+	class MoveMonsterResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Damage numbers on a mob (from other players)
+	// Opcode: DAMAGE_MONSTER(246)
+	class DamageMonsterHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Cancel a skill effect on a character
+	// Opcode: CANCEL_SKILL_EFFECT(191)
+	class CancelSkillEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Display or hide a chalkboard above a character
+	// Opcode: CHALKBOARD(164)
+	class ChalkboardHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Spawn an Evan dragon on the map
+	// Opcode: SPAWN_DRAGON(181)
+	class SpawnDragonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Move an Evan dragon
+	// Opcode: MOVE_DRAGON(182)
+	class MoveDragonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Remove an Evan dragon from the map
+	// Opcode: REMOVE_DRAGON(183)
+	class RemoveDragonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Summon uses a skill
+	// Opcode: SUMMON_SKILL(180)
+	class SummonSkillHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Spawn an NPC on the current stage
 	// Opcode: SPAWN_NPC(257)
 	class SpawnNpcHandler : public PacketHandler

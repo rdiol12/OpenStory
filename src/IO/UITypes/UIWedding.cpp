@@ -19,32 +19,32 @@
 
 #include "../Components/MapleButton.h"
 
-#include "../../Configuration.h"
-
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UIWedding::UIWedding() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0))
+	UIWedding::UIWedding() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0)),
+		wedding_type(0), countdown(0)
 	{
-		nl::node src = nl::nx::ui["UIWindow2.img"]["Wedding"];
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
+		nl::node wedding = nl::nx::ui["UIWindow.img"]["Wedding"];
+		nl::node invite = wedding["Invitation"];
+		nl::node counter = wedding["Counter"];
 
-		nl::node backgrnd = src["backgrnd"];
-		Point<int16_t> bg_dimensions = Texture(backgrnd).get_dimensions();
+		cathedral_tex = invite["Cathedral"];
+		vegas_tex = invite["Vegas"];
+		stopwatch_tex = counter["StopWatch"];
 
-		sprites.emplace_back(backgrnd);
+		// Default to Cathedral
+		Point<int16_t> bg_dimensions = cathedral_tex.get_dimensions();
 
-		nl::node backgrnd2 = src["backgrnd2"];
+		sprites.emplace_back(invite["Cathedral"]);
 
-		if (backgrnd2.size() > 0)
-			sprites.emplace_back(backgrnd2);
+		buttons[Buttons::BT_OK] = std::make_unique<MapleButton>(invite["BtOK"]);
 
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
-		buttons[Buttons::BT_YES] = std::make_unique<MapleButton>(src["BtYes"]);
-		buttons[Buttons::BT_NO] = std::make_unique<MapleButton>(src["BtNo"]);
+		names_label = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "");
+		countdown_label = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::YELLOW, "");
 
 		dimension = bg_dimensions;
 	}
@@ -52,11 +52,54 @@ namespace ms
 	void UIWedding::draw(float inter) const
 	{
 		UIElement::draw(inter);
+
+		Point<int16_t> center = position + Point<int16_t>(dimension.x() / 2, 0);
+
+		names_label.draw(center + Point<int16_t>(0, dimension.y() / 2 - 20));
+
+		if (countdown > 0)
+		{
+			stopwatch_tex.draw(center + Point<int16_t>(0, dimension.y() / 2 + 10));
+			countdown_label.draw(center + Point<int16_t>(0, dimension.y() / 2 + 30));
+		}
 	}
 
 	void UIWedding::update()
 	{
 		UIElement::update();
+	}
+
+	void UIWedding::set_invitation(int8_t type, const std::string& groom, const std::string& bride)
+	{
+		wedding_type = type;
+		groom_name = groom;
+		bride_name = bride;
+
+		names_label.change_text(groom + " & " + bride);
+
+		// Swap background for Vegas type
+		if (type == 1 && !sprites.empty())
+		{
+			sprites.clear();
+			sprites.emplace_back(nl::nx::ui["UIWindow.img"]["Wedding"]["Invitation"]["Vegas"]);
+			dimension = vegas_tex.get_dimensions();
+		}
+	}
+
+	void UIWedding::set_countdown(int32_t seconds)
+	{
+		countdown = seconds;
+
+		if (seconds > 0)
+		{
+			int32_t mins = seconds / 60;
+			int32_t secs = seconds % 60;
+			countdown_label.change_text(std::to_string(mins) + ":" + (secs < 10 ? "0" : "") + std::to_string(secs));
+		}
+		else
+		{
+			countdown_label.change_text("");
+		}
 	}
 
 	void UIWedding::send_key(int32_t keycode, bool pressed, bool escape)
@@ -74,12 +117,7 @@ namespace ms
 	{
 		switch (buttonid)
 		{
-		case Buttons::BT_CLOSE:
-			deactivate();
-			break;
-		case Buttons::BT_YES:
-			break;
-		case Buttons::BT_NO:
+		case Buttons::BT_OK:
 			deactivate();
 			break;
 		default:

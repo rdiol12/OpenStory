@@ -21,6 +21,8 @@
 
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
+#include <iostream>
+
 namespace ms
 {
 	void MapNpcs::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
@@ -88,6 +90,7 @@ namespace ms
 				if (pressed)
 				{
 					// NPC interaction fallback
+					std::cout << "[NPC-CLICK] Talking to NPC: " << npc->get_name() << " (npcid=" << npc->get_npcid() << ", oid=" << npc->get_oid() << ")" << std::endl;
 					TalkToNPCPacket(npc->get_oid()).dispatch();
 
 					return Cursor::State::IDLE;

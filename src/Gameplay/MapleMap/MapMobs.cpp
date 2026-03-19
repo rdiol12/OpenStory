@@ -118,6 +118,18 @@ namespace ms
 		}
 	}
 
+	void MapMobs::apply_status(int32_t oid, int32_t status_mask, int32_t first_mask, const std::vector<std::pair<int32_t, MobStatusEntry>>& statuses)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->apply_status(status_mask, first_mask, statuses);
+	}
+
+	void MapMobs::cancel_status(int32_t oid, int32_t status_mask, int32_t first_mask)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->cancel_status(status_mask, first_mask);
+	}
+
 	bool MapMobs::contains(int32_t oid) const
 	{
 		return mobs.contains(oid);

@@ -73,6 +73,13 @@ namespace ms
 
 		SET_GENDER = 58,        // 0x3A
 
+		/// Skills / Items
+		SKILL_LEARN_ITEM_RESULT = 51, // 0x33
+
+		/// Monster Book
+		MONSTER_BOOK_SET_CARD = 83, // 0x53
+		MONSTER_BOOK_SET_COVER = 84, // 0x54
+
 		/// Player Interaction
 		CHAR_INFO = 61,         // 0x3D
 
@@ -85,10 +92,37 @@ namespace ms
 		/// Messaging
 		SERVER_MESSAGE = 68,    // 0x44
 		WEEK_EVENT_MESSAGE = 77,// 0x4D
+		MULTICHAT = 134,        // 0x86
+		WHISPER = 135,          // 0x87
 
 		/// Family
 		FAMILY = 95,            // 0x5F
 		FAMILY_PRIVILEGE_LIST = 100, // 0x64
+
+		SET_BACK_EFFECT = 128,  // 0x80
+		BLOCKED_MAP = 131,      // 0x83
+		BLOCKED_SERVER = 132,   // 0x84
+		FORCED_MAP_EQUIP = 133, // 0x85
+		SPOUSE_CHAT = 136,      // 0x88
+		ALLIANCE_OPERATION = 66, // 0x42
+		MARRIAGE_REQUEST = 72,  // 0x48
+		MARRIAGE_RESULT = 73,   // 0x49
+		WEDDING_GIFT_RESULT = 74, // 0x4A
+		NOTIFY_MARRIED_PARTNER = 75, // 0x4B
+		FAMILY_CHART_RESULT = 94, // 0x5E
+		FAMILY_RESULT = 96,     // 0x60
+		FAMILY_JOIN_REQUEST = 97, // 0x61
+		FAMILY_JOIN_REQUEST_RESULT = 98, // 0x62
+		FAMILY_JOIN_ACCEPTED = 99, // 0x63
+		FAMILY_REP_GAIN = 101,  // 0x65
+		FAMILY_NOTIFY_LOGIN = 102, // 0x66
+		FAMILY_SUMMON_REQUEST = 104, // 0x68
+		NOTIFY_LEVELUP = 105,   // 0x69
+		NOTIFY_JOB_CHANGE = 107, // 0x6B
+		SET_AVATAR_MEGAPHONE = 111, // 0x6F
+		CLEAR_AVATAR_MEGAPHONE = 112, // 0x70
+		NEW_YEAR_CARD = 118,    // 0x76
+		SET_EXTRA_PENDANT_SLOT = 121, // 0x79
 
 		/// Map / Field
 		SCRIPT_PROGRESS_MESSAGE = 122, // 0x7A
@@ -98,17 +132,41 @@ namespace ms
 		SET_CASH_SHOP = 127,    // 0x7F
 		FIELD_EFFECT = 138,     // 0x8A
 		FIELD_OBSTACLE_ONOFF = 140, // 0x8C
+		CONTI_MOVE = 148,       // 0x94
+		CONTI_STATE = 149,      // 0x95
+		ARIANT_ARENA_SHOW_RESULT = 155, // 0x9B
+		PYRAMID_GAUGE = 157,    // 0x9D
+		PYRAMID_SCORE = 158,    // 0x9E
+		STOP_CLOCK = 154,       // 0x9A
 		ADMIN_RESULT = 144,     // 0x90
 		BLOW_WEATHER = 142,     // 0x8E
+		OX_QUIZ = 145,          // 0x91
 		CLOCK = 147,            // 0x93
+		MAKER_RESULT = 217,     // 0xD9
+		OPEN_UI = 220,          // 0xDC
+		LOCK_UI = 221,          // 0xDD
+		DISABLE_UI = 222,       // 0xDE
+		SPAWN_GUIDE = 223,      // 0xDF
+		TALK_GUIDE = 224,       // 0xE0
+		SHOW_COMBO = 225,       // 0xE1
 		QUICKSLOT_INIT = 159,   // 0x9F
 
 		/// MapObject — Characters
 		SPAWN_CHAR = 160,       // 0xA0
 		REMOVE_CHAR = 161,      // 0xA1
 		CHAT_RECEIVED = 162,    // 0xA2
+		CHALKBOARD = 164,       // 0xA4
 		SCROLL_RESULT = 167,    // 0xA7
 		SPAWN_PET = 168,        // 0xA8
+		MOVE_PET = 170,         // 0xAA
+		PET_CHAT = 171,         // 0xAB
+		PET_NAMECHANGE = 172,   // 0xAC
+		PET_EXCEPTION_LIST = 173, // 0xAD
+		PET_COMMAND = 174,      // 0xAE
+		SUMMON_SKILL = 180,     // 0xB4
+		SPAWN_DRAGON = 181,     // 0xB5
+		MOVE_DRAGON = 182,      // 0xB6
+		REMOVE_DRAGON = 183,    // 0xB7
 		CHAR_MOVED = 185,       // 0xB9
 
 		/// Attack
@@ -117,7 +175,17 @@ namespace ms
 		ATTACKED_RANGED = 187,  // 0xBB
 		ATTACKED_MAGIC = 188,   // 0xBC
 
+		/// Summons
+		SPAWN_SUMMON = 175,     // 0xAF
+		REMOVE_SUMMON = 176,    // 0xB0
+		MOVE_SUMMON = 177,      // 0xB1
+		SUMMON_ATTACK = 178,    // 0xB2
+		DAMAGE_SUMMON = 179,    // 0xB3
+
 		/// Foreign character visuals
+		THROW_GRENADE = 204,    // 0xCC
+		DOJO_WARP_UP = 207,     // 0xCF
+		CANCEL_SKILL_EFFECT = 191, // 0xBF
 		DAMAGE_PLAYER = 192,    // 0xC0
 		FACIAL_EXPRESSION = 193,// 0xC1
 		SHOW_ITEM_EFFECT = 194, // 0xC2
@@ -144,11 +212,17 @@ namespace ms
 		KILL_MOB = 237,         // 0xED
 		SPAWN_MOB_C = 238,      // 0xEE
 		MOB_MOVED = 239,        // 0xEF
+		MOVE_MONSTER_RESPONSE = 240, // 0xF0
+		APPLY_MONSTER_STATUS = 242, // 0xF2
+		CANCEL_MONSTER_STATUS = 243, // 0xF3
+		DAMAGE_MONSTER = 246,   // 0xF6
 		SHOW_MOB_HP = 250,      // 0xFA
 		CATCH_MONSTER = 251,    // 0xFB
+		CATCH_MONSTER_WITH_ITEM = 252, // 0xFC
 
 		/// MapObject — NPCs
 		SPAWN_NPC = 257,        // 0x101
+		REMOVE_NPC = 258,       // 0x102
 		SPAWN_NPC_C = 259,      // 0x103
 		NPC_ACTION = 260,       // 0x104
 		SET_NPC_SCRIPTABLE = 263, // 0x107
@@ -156,9 +230,51 @@ namespace ms
 		/// MapObject — Drops / Reactors
 		DROP_LOOT = 268,        // 0x10C
 		REMOVE_LOOT = 269,      // 0x10D
+		CANNOT_SPAWN_KITE = 270, // 0x10E
+		SPAWN_KITE = 271,       // 0x10F
+		REMOVE_KITE = 272,      // 0x110
+		SPAWN_HIRED_MERCHANT = 265, // 0x109
+		DESTROY_HIRED_MERCHANT = 266, // 0x10A
+		UPDATE_HIRED_MERCHANT = 267, // 0x10B
+		SPAWN_MIST = 273,       // 0x111
+		REMOVE_MIST = 274,      // 0x112
+		SPAWN_DOOR = 275,       // 0x113
+		REMOVE_DOOR = 276,      // 0x114
 		HIT_REACTOR = 277,      // 0x115
 		SPAWN_REACTOR = 279,    // 0x117
 		REMOVE_REACTOR = 280,   // 0x118
+
+		/// Events
+		SNOWBALL_STATE = 281,   // 0x119
+		HIT_SNOWBALL = 282,     // 0x11A
+		SNOWBALL_MESSAGE = 283, // 0x11B
+		COCONUT_HIT = 285,     // 0x11D
+		COCONUT_SCORE = 286,   // 0x11E
+		ARIANT_ARENA_USER_SCORE = 297, // 0x129
+
+		/// Monster Carnival
+		MONSTER_CARNIVAL_START = 289,  // 0x121
+		MONSTER_CARNIVAL_CP = 290,     // 0x122
+		MONSTER_CARNIVAL_PARTY_CP = 291, // 0x123
+		MONSTER_CARNIVAL_SUMMON = 292,  // 0x124
+		MONSTER_CARNIVAL_MESSAGE = 293, // 0x125
+		MONSTER_CARNIVAL_DIED = 294,    // 0x126
+
+		/// Tournament
+		TOURNAMENT = 315,       // 0x13B
+		TOURNAMENT_MATCH_TABLE = 316, // 0x13C
+		TOURNAMENT_SET_PRIZE = 317, // 0x13D
+		TOURNAMENT_UEW = 318,   // 0x13E
+
+		/// Wedding
+		WEDDING_PROGRESS = 320, // 0x140
+		WEDDING_CEREMONY_END = 321, // 0x141
+
+		/// NPC Services
+		FREDRICK_MESSAGE = 310, // 0x136
+		FREDRICK = 311,         // 0x137
+		RPS_GAME = 312,         // 0x138
+		MESSENGER_OP = 313,     // 0x139
 
 		/// Storage
 		STORAGE = 309,          // 0x135
@@ -177,15 +293,28 @@ namespace ms
 		/// Cash Shop
 		QUERY_CASH_RESULT = 324, // 0x144
 		CS_OPERATION = 325,     // 0x145
+		CS_CHECK_NAME_CHANGE = 328, // 0x148
+		CS_NAME_CHANGE_POSSIBLE = 329, // 0x149
+		CS_TRANSFER_WORLD = 331, // 0x14B
+		CS_CASH_GACHAPON_RESULT = 333, // 0x14D
 
 		/// Keymap
 		KEYMAP = 335,           // 0x14F
 		AUTO_HP_POT = 336,      // 0x150
 		AUTO_MP_POT = 337,      // 0x151
 
+		/// MapleTV
+		SEND_TV = 341,          // 0x155
+		REMOVE_TV = 342,        // 0x156
+		ENABLE_TV = 343,        // 0x157
+
 		/// MTS (Maple Trading System)
 		MTS_OPERATION = 348,    // 0x15C
-		MTS_OPERATION2 = 347    // 0x15B
+		MTS_OPERATION2 = 347,   // 0x15B
+
+		/// Item Enhancement
+		VICIOUS_HAMMER = 354,   // 0x162
+		VEGA_SCROLL = 358       // 0x166
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -215,18 +344,43 @@ namespace ms
 		emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
 		emplace<REMOVE_CHAR, RemoveCharHandler>();
 		emplace<SPAWN_PET, SpawnPetHandler>();
+		emplace<MOVE_PET, MovePetHandler>();
+		emplace<PET_CHAT, PetChatHandler>();
+		emplace<PET_COMMAND, PetCommandHandler>();
+		emplace<CHALKBOARD, ChalkboardHandler>();
+		emplace<CANCEL_SKILL_EFFECT, CancelSkillEffectHandler>();
+		emplace<SUMMON_SKILL, SummonSkillHandler>();
+		emplace<SPAWN_DRAGON, SpawnDragonHandler>();
+		emplace<MOVE_DRAGON, MoveDragonHandler>();
+		emplace<REMOVE_DRAGON, RemoveDragonHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
+		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();
 		emplace<SPAWN_MOB, SpawnMobHandler>();
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
+		emplace<MOVE_MONSTER_RESPONSE, MoveMonsterResponseHandler>();
+		emplace<DAMAGE_MONSTER, DamageMonsterHandler>();
+		emplace<APPLY_MONSTER_STATUS, ApplyMonsterStatusHandler>();
+		emplace<CANCEL_MONSTER_STATUS, CancelMonsterStatusHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
+		emplace<SPAWN_MIST, SpawnMistHandler>();
+		emplace<REMOVE_MIST, RemoveMistHandler>();
+		emplace<SPAWN_DOOR, SpawnDoorHandler>();
+		emplace<REMOVE_DOOR, RemoveDoorHandler>();
 		emplace<HIT_REACTOR, HitReactorHandler>();
 		emplace<SPAWN_REACTOR, SpawnReactorHandler>();
 		emplace<REMOVE_REACTOR, RemoveReactorHandler>();
+
+		// Summon handlers
+		emplace<SPAWN_SUMMON, SpawnSummonHandler>();
+		emplace<REMOVE_SUMMON, RemoveSummonHandler>();
+		emplace<MOVE_SUMMON, MoveSummonHandler>();
+		emplace<SUMMON_ATTACK, SummonAttackHandler>();
+		emplace<DAMAGE_SUMMON, DamageSummonHandler>();
 
 		// Attack handlers
 		emplace<ATTACKED_CLOSE, CloseAttackHandler>();
@@ -243,6 +397,9 @@ namespace ms
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
+		emplace<SKILL_LEARN_ITEM_RESULT, SkillLearnItemResultHandler>();
+		emplace<MONSTER_BOOK_SET_CARD, MonsterBookCardHandler>();
+		emplace<MONSTER_BOOK_SET_COVER, MonsterBookCoverHandler>();
 
 		// Messaging handlers
 		emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();
@@ -251,6 +408,8 @@ namespace ms
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
+		emplace<WHISPER, WhisperHandler>();
+		emplace<MULTICHAT, MultichatHandler>();
 
 		// Inventory Handlers
 		emplace<MODIFY_INVENTORY, ModifyInventoryHandler>();
@@ -299,6 +458,100 @@ namespace ms
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF, FieldObstacleOnOffHandler>();
+		emplace<OPEN_UI, OpenUIHandler>();
+		emplace<LOCK_UI, LockUIHandler>();
+		emplace<DISABLE_UI, DisableUIHandler>();
+		emplace<SPAWN_GUIDE, SpawnGuideHandler>();
+		emplace<TALK_GUIDE, TalkGuideHandler>();
+		emplace<SHOW_COMBO, ShowComboHandler>();
+		emplace<FORCED_MAP_EQUIP, ForcedMapEquipHandler>();
+		emplace<SPOUSE_CHAT, SpouseChatHandler>();
+		emplace<CONTI_MOVE, ContiMoveHandler>();
+		emplace<CONTI_STATE, ContiStateHandler>();
+		emplace<STOP_CLOCK, StopClockHandler>();
+		emplace<MAKER_RESULT, MakerResultHandler>();
+		emplace<ALLIANCE_OPERATION, AllianceOperationHandler>();
+		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
+		emplace<MARRIAGE_RESULT, MarriageResultHandler>();
+		emplace<WEDDING_GIFT_RESULT, WeddingGiftResultHandler>();
+		emplace<NOTIFY_MARRIED_PARTNER, NotifyMarriedPartnerHandler>();
+		emplace<FAMILY_CHART_RESULT, FamilyChartResultHandler>();
+		emplace<FAMILY_RESULT, FamilyResultHandler>();
+		emplace<FAMILY_JOIN_REQUEST, FamilyJoinRequestHandler>();
+		emplace<FAMILY_JOIN_REQUEST_RESULT, FamilyJoinRequestResultHandler>();
+		emplace<FAMILY_JOIN_ACCEPTED, FamilyJoinAcceptedHandler>();
+		emplace<FAMILY_REP_GAIN, FamilyRepGainHandler>();
+		emplace<FAMILY_NOTIFY_LOGIN, FamilyLoginLogoutHandler>();
+		emplace<FAMILY_SUMMON_REQUEST, FamilySummonRequestHandler>();
+		emplace<NOTIFY_LEVELUP, NotifyLevelUpHandler>();
+		emplace<NOTIFY_JOB_CHANGE, NotifyJobChangeHandler>();
+		emplace<SET_AVATAR_MEGAPHONE, SetAvatarMegaphoneHandler>();
+		emplace<CLEAR_AVATAR_MEGAPHONE, ClearAvatarMegaphoneHandler>();
+		emplace<NEW_YEAR_CARD, NewYearCardHandler>();
+		emplace<SET_EXTRA_PENDANT_SLOT, SetExtraPendantSlotHandler>();
+		emplace<SET_BACK_EFFECT, SetBackEffectHandler>();
+		emplace<BLOCKED_MAP, BlockedMapHandler>();
+		emplace<BLOCKED_SERVER, BlockedServerHandler>();
+		emplace<OX_QUIZ, OXQuizHandler>();
+		emplace<SPAWN_HIRED_MERCHANT, SpawnHiredMerchantHandler>();
+		emplace<DESTROY_HIRED_MERCHANT, DestroyHiredMerchantHandler>();
+		emplace<UPDATE_HIRED_MERCHANT, UpdateHiredMerchantHandler>();
+		emplace<FREDRICK_MESSAGE, FredrickMessageHandler>();
+		emplace<FREDRICK, FredrickHandler>();
+		emplace<RPS_GAME, RPSGameHandler>();
+		emplace<MESSENGER_OP, MessengerHandler>();
+		emplace<PET_NAMECHANGE, PetNameChangeHandler>();
+		emplace<PET_EXCEPTION_LIST, PetExceptionListHandler>();
+		emplace<CATCH_MONSTER_WITH_ITEM, CatchMonsterWithItemHandler>();
+		emplace<CANNOT_SPAWN_KITE, CannotSpawnKiteHandler>();
+		emplace<SPAWN_KITE, SpawnKiteHandler>();
+		emplace<REMOVE_KITE, RemoveKiteHandler>();
+		emplace<THROW_GRENADE, ThrowGrenadeHandler>();
+		emplace<DOJO_WARP_UP, DojoWarpUpHandler>();
+		emplace<ARIANT_ARENA_SHOW_RESULT, AriantShowResultHandler>();
+		emplace<PYRAMID_GAUGE, PyramidGaugeHandler>();
+		emplace<PYRAMID_SCORE, PyramidScoreHandler>();
+
+		// Event handlers
+		emplace<SNOWBALL_STATE, SnowballStateHandler>();
+		emplace<HIT_SNOWBALL, HitSnowballHandler>();
+		emplace<SNOWBALL_MESSAGE, SnowballMessageHandler>();
+		emplace<COCONUT_HIT, CoconutHitHandler>();
+		emplace<COCONUT_SCORE, CoconutScoreHandler>();
+		emplace<ARIANT_ARENA_USER_SCORE, AriantScoreHandler>();
+
+		// Tournament
+		emplace<TOURNAMENT, TournamentHandler>();
+		emplace<TOURNAMENT_MATCH_TABLE, TournamentMatchTableHandler>();
+		emplace<TOURNAMENT_SET_PRIZE, TournamentSetPrizeHandler>();
+		emplace<TOURNAMENT_UEW, TournamentUEWHandler>();
+
+		// Wedding
+		emplace<WEDDING_PROGRESS, WeddingProgressHandler>();
+		emplace<WEDDING_CEREMONY_END, WeddingCeremonyEndHandler>();
+
+		// MapleTV
+		emplace<SEND_TV, SendTVHandler>();
+		emplace<REMOVE_TV, RemoveTVHandler>();
+		emplace<ENABLE_TV, EnableTVHandler>();
+
+		// Item Enhancement
+		emplace<VICIOUS_HAMMER, ViciousHammerHandler>();
+		emplace<VEGA_SCROLL, VegaScrollHandler>();
+
+		// Cash Shop extensions
+		emplace<CS_CHECK_NAME_CHANGE, CashShopNameChangeHandler>();
+		emplace<CS_NAME_CHANGE_POSSIBLE, CashShopNameChangePossibleHandler>();
+		emplace<CS_TRANSFER_WORLD, CashShopTransferWorldHandler>();
+		emplace<CS_CASH_GACHAPON_RESULT, CashGachaponResultHandler>();
+
+		// Monster Carnival
+		emplace<MONSTER_CARNIVAL_START, MonsterCarnivalStartHandler>();
+		emplace<MONSTER_CARNIVAL_CP, MonsterCarnivalCPHandler>();
+		emplace<MONSTER_CARNIVAL_PARTY_CP, MonsterCarnivalPartyCPHandler>();
+		emplace<MONSTER_CARNIVAL_SUMMON, MonsterCarnivalSummonHandler>();
+		emplace<MONSTER_CARNIVAL_MESSAGE, MonsterCarnivalMessageHandler>();
+		emplace<MONSTER_CARNIVAL_DIED, MonsterCarnivalDiedHandler>();
 
 		// Foreign character effect handlers
 		emplace<DAMAGE_PLAYER, DamagePlayerHandler>();
@@ -338,6 +591,10 @@ namespace ms
 			else
 				std::cout << "Received Packet: " << std::to_string(opcode) << std::endl;
 		}
+
+		// Always log NPC-related opcodes for debugging
+		if (opcode == NPC_DIALOGUE || opcode == OPEN_NPC_SHOP || opcode == CONFIRM_SHOP_TRANSACTION)
+			std::cout << "[NPC-DEBUG] Received NPC opcode: " << opcode << std::endl;
 
 		if (opcode < NUM_HANDLERS)
 		{
