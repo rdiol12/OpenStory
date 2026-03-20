@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIRPSGame::UIRPSGame() : UIElement(Point<int16_t>(400, 250), Point<int16_t>(0, 0)),
+	UIRPSGame::UIRPSGame() : UIElement(Point<int16_t>(400, 250), Point<int16_t>(0, 0), ScaleMode::CENTER_OFFSET),
 		current_phase(Phase::WAITING), player_selection(-1), npc_selection(-1), game_result(-1), wins(0)
 	{
 		nl::node main = nl::nx::ui["UIWindow.img"]["RpsGame"];

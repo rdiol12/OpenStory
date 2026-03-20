@@ -20,6 +20,7 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "../UIScale.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Util/Misc.h"
@@ -30,7 +31,7 @@
 
 namespace ms
 {
-	UISoftKey::UISoftKey(OkCallback ok_callback, CancelCallback cancel_callback, std::string tooltip_text, Point<int16_t> tooltip_pos) : UIElement(Point<int16_t>(104, 140), Point<int16_t>(0, 0)), ok_callback(ok_callback), cancel_callback(cancel_callback), tooltip_pos(tooltip_pos), highCase(false), dragged(false)
+	UISoftKey::UISoftKey(OkCallback ok_callback, CancelCallback cancel_callback, std::string tooltip_text, Point<int16_t> tooltip_pos) : UIElement(UIScale::at(104, 140), Point<int16_t>(0, 0)), ok_callback(ok_callback), cancel_callback(cancel_callback), tooltip_pos(tooltip_pos), highCase(false), dragged(false)
 	{
 		nl::node SoftKey = nl::nx::ui["Login.img"]["Common"]["SoftKey"];
 		nl::node backgrnd = SoftKey["backgrnd"];
@@ -108,7 +109,7 @@ namespace ms
 		(void)caseKeyIndex;
 #pragma endregion
 
-		Point<int16_t> textfield_tl = Point<int16_t>(350, 205);
+		Point<int16_t> textfield_tl = UIScale::at(350, 205);
 
 		textfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, Rectangle<int16_t>(textfield_tl, textfield_tl + Point<int16_t>(117, 20)), MAX_TEXT_LEN);
 		textfield.set_cryptchar('*');

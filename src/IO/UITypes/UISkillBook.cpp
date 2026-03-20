@@ -101,7 +101,7 @@ namespace ms
 		return icon.get();
 	}
 
-	UISkillBook::UISkillBook(const CharStats& in_stats, const SkillBook& in_skillbook) : UIDragElement<PosSKILL>(), stats(in_stats), skillbook(in_skillbook), grabbing(false), tab(0), macro_enabled(false), sp_enabled(false)
+	UISkillBook::UISkillBook(const CharStats& in_stats, const SkillBook& in_skillbook) : UIDragElement<PosSKILL>(), stats(in_stats), skillbook(in_skillbook), grabbing(false), tab(0), macro_enabled(false)
 	{
 		nl::node Skill = nl::nx::ui["UIWindow2.img"]["Skill"];
 		nl::node main = Skill["main"];
@@ -123,25 +123,6 @@ namespace ms
 		buttons[Buttons::BT_GUILDSKILL]->set_state(Button::State::DISABLED);
 		buttons[Buttons::BT_RIDE]->set_state(Button::State::DISABLED);
 
-		nl::node skillPoint = nl::nx::ui["UIWindow4.img"]["Skill"]["skillPoint"];
-
-		sp_backgrnd = skillPoint["backgrnd"];
-		sp_backgrnd2 = skillPoint["backgrnd2"];
-		sp_backgrnd3 = skillPoint["backgrnd3"];
-
-		buttons[Buttons::BT_CANCLE] = std::make_unique<MapleButton>(skillPoint["BtCancle"], Point<int16_t>(bg_dimensions.x(), 0));
-		buttons[Buttons::BT_OKAY] = std::make_unique<MapleButton>(skillPoint["BtOkay"], Point<int16_t>(bg_dimensions.x(), 0));
-		buttons[Buttons::BT_SPDOWN] = std::make_unique<MapleButton>(skillPoint["BtSpDown"], Point<int16_t>(bg_dimensions.x(), 0));
-		buttons[Buttons::BT_SPMAX] = std::make_unique<MapleButton>(skillPoint["BtSpMax"], Point<int16_t>(bg_dimensions.x(), 0));
-		buttons[Buttons::BT_SPUP] = std::make_unique<MapleButton>(skillPoint["BtSpUp"], Point<int16_t>(bg_dimensions.x(), 0));
-
-		buttons[Buttons::BT_SPDOWN]->set_state(Button::State::DISABLED);
-
-		sp_before = Charset(skillPoint["num"], Charset::Alignment::RIGHT);
-		sp_after = Charset(skillPoint["num"], Charset::Alignment::RIGHT);
-		sp_used = Text(Text::Font::A12B, Text::Alignment::RIGHT, Color::Name::WHITE);
-		sp_remaining = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::SUPERNOVA);
-		sp_name = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE);
 
 		sprites.emplace_back(ui_backgrnd, Point<int16_t>(1, 0));
 		sprites.emplace_back(main["backgrnd2"]);
@@ -179,7 +160,7 @@ namespace ms
 		}
 
 		booktext = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "", 150);
-		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
 		slider = Slider(
 			Slider::Type::DEFAULT_SILVER, Range<int16_t>(92, 236), 154, ROWS, 1,
@@ -197,7 +178,6 @@ namespace ms
 		change_job(stats.get_stat(MapleStat::Id::JOB));
 
 		set_macro(false);
-		set_skillpoint(false);
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
@@ -209,7 +189,7 @@ namespace ms
 
 		bookicon.draw(position + Point<int16_t>(11, 85));
 		booktext.draw(position + Point<int16_t>(95, 59));
-		splabel.draw(position + Point<int16_t>(304, 23));
+		splabel.draw(position + Point<int16_t>(bg_dimensions.x() - 18, 251));
 
 		Point<int16_t> skill_position = position + SKILL_OFFSET;
 
@@ -253,30 +233,15 @@ namespace ms
 			macro_backgrnd3.draw(macro_pos);
 		}
 
-		if (sp_enabled)
-		{
-			Point<int16_t> sp_pos = position + Point<int16_t>(bg_dimensions.x(), 0);
-
-			sp_backgrnd.draw(sp_pos);
-			sp_backgrnd2.draw(sp_pos);
-			sp_backgrnd3.draw(sp_pos);
-
-			Point<int16_t> sp_level_pos = sp_pos + Point<int16_t>(78, 149);
-
-			sp_before.draw(sp_before_text, 12, sp_level_pos);
-			sp_after.draw(sp_after_text, 11, sp_level_pos + Point<int16_t>(78, 0));
-			sp_used.draw(sp_pos + Point<int16_t>(82, 87));
-			sp_remaining.draw(sp_pos + Point<int16_t>(76, 65));
-			sp_name.draw(sp_pos + Point<int16_t>(97, 35));
-			sp_skill.draw(sp_pos + Point<int16_t>(13, 31));
-		}
 
 		UIElement::draw_buttons(alpha);
 	}
 
 	Button::State UISkillBook::button_pressed(uint16_t id)
 	{
-		int16_t cur_sp = std::stoi(splabel.get_text());
+		std::cout << "[SkillBook] button_pressed id=" << id << std::endl;
+		std::string sp_text = splabel.get_text();
+		int16_t cur_sp = sp_text.empty() ? 0 : std::stoi(sp_text);
 
 		switch (id)
 		{
@@ -286,85 +251,6 @@ namespace ms
 		case Buttons::BT_MACRO:
 			set_macro(!macro_enabled);
 			break;
-		case Buttons::BT_CANCLE:
-			set_skillpoint(false);
-			break;
-		case Buttons::BT_OKAY:
-		{
-			int32_t used = std::stoi(sp_used.get_text());
-
-			while (used > 0)
-			{
-				spend_sp(sp_id);
-				used--;
-			}
-
-			change_sp();
-			set_skillpoint(false);
-		}
-		break;
-		case Buttons::BT_SPDOWN:
-		{
-			int32_t used = std::stoi(sp_used.get_text());
-			int32_t sp_after = std::stoi(sp_after_text);
-			int32_t sp_before = std::stoi(sp_before_text);
-			used--;
-			sp_after--;
-
-			sp_after_text = std::to_string(sp_after);
-			sp_used.change_text(std::to_string(used));
-			sp_remaining.change_text(std::to_string(cur_sp - used));
-
-			buttons[Buttons::BT_SPUP]->set_state(Button::State::NORMAL);
-			buttons[Buttons::BT_SPMAX]->set_state(Button::State::NORMAL);
-
-			if (sp_after - 1 == sp_before)
-				return Button::State::DISABLED;
-
-			return Button::State::NORMAL;
-		}
-		break;
-		case Buttons::BT_SPMAX:
-		{
-			int32_t used = std::stoi(sp_used.get_text());
-			int32_t sp_before = std::stoi(sp_before_text);
-			int32_t sp_touse = sp_masterlevel - sp_before - used;
-
-			used += sp_touse;
-
-			sp_after_text = std::to_string(sp_masterlevel);
-			sp_used.change_text(std::to_string(used));
-			sp_remaining.change_text(std::to_string(cur_sp - used));
-
-			buttons[Buttons::BT_SPUP]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_SPDOWN]->set_state(Button::State::NORMAL);
-
-			return Button::State::DISABLED;
-		}
-		break;
-		case Buttons::BT_SPUP:
-		{
-			int32_t used = std::stoi(sp_used.get_text());
-			int32_t sp_after = std::stoi(sp_after_text);
-			used++;
-			sp_after++;
-
-			sp_after_text = std::to_string(sp_after);
-			sp_used.change_text(std::to_string(used));
-			sp_remaining.change_text(std::to_string(cur_sp - used));
-
-			buttons[Buttons::BT_SPDOWN]->set_state(Button::State::NORMAL);
-
-			if (sp_after == sp_masterlevel)
-			{
-				buttons[Buttons::BT_SPMAX]->set_state(Button::State::DISABLED);
-
-				return Button::State::DISABLED;
-			}
-
-			return Button::State::NORMAL;
-		}
-		break;
 		case Buttons::BT_TAB0:
 		case Buttons::BT_TAB1:
 		case Buttons::BT_TAB2:
@@ -392,12 +278,8 @@ namespace ms
 
 	void UISkillBook::toggle_active()
 	{
-		if (!is_skillpoint_enabled())
-		{
-			UIElement::toggle_active();
-
-			clear_tooltip();
-		}
+		UIElement::toggle_active();
+		clear_tooltip();
 	}
 
 	void UISkillBook::doubleclick(Point<int16_t> cursorpos)
@@ -438,6 +320,21 @@ namespace ms
 
 				return new_state;
 			}
+		}
+
+		// UIDragElement::send_cursor already called UIElement::send_cursor
+		// which handles button clicks. Check if a button was hit and return early.
+		if (clicked)
+		{
+			for (uint16_t i = Buttons::BT_SPUP0; i <= Buttons::BT_SPUP3; i++)
+			{
+				if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
+					return dstate;
+			}
+			if (buttons[Buttons::BT_CLOSE]->is_active() && buttons[Buttons::BT_CLOSE]->bounds(position).contains(cursorpos))
+				return dstate;
+			if (buttons[Buttons::BT_MACRO]->is_active() && buttons[Buttons::BT_MACRO]->bounds(position).contains(cursorpos))
+				return dstate;
 		}
 
 		Point<int16_t> skill_position = position + SKILL_OFFSET;
@@ -500,7 +397,26 @@ namespace ms
 			grabbing = false;
 		}
 
-		return UIElement::send_cursor(clicked, cursorpos);
+		return dstate;
+	}
+
+	void UISkillBook::send_scroll(double yoffset)
+	{
+		if (!slider.isenabled())
+			return;
+
+		int16_t new_offset = offset;
+
+		if (yoffset < 0)
+			new_offset = std::min<int16_t>(offset + 1, skillcount > ROWS ? skillcount - ROWS : 0);
+		else if (yoffset > 0)
+			new_offset = std::max<int16_t>(offset - 1, 0);
+
+		if (new_offset != offset)
+		{
+			change_offset(new_offset);
+			slider.setrows(new_offset, ROWS, skillcount);
+		}
 	}
 
 	void UISkillBook::send_key(int32_t keycode, bool pressed, bool escape)
@@ -509,10 +425,7 @@ namespace ms
 		{
 			if (escape)
 			{
-				if (sp_enabled)
-					set_skillpoint(false);
-				else
-					close();
+				close();
 			}
 			else if (keycode == KeyAction::Id::TAB)
 			{
@@ -571,6 +484,7 @@ namespace ms
 	{
 		Job::Level joblevel = joblevel_by_tab(tab);
 		uint16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+		std::cout << "[SkillBook] change_sp: tab=" << tab << " joblevel=" << joblevel << " level=" << level << " sp_stat=" << stats.get_stat(MapleStat::Id::SP) << " job=" << stats.get_stat(MapleStat::Id::JOB) << std::endl;
 
 		if (joblevel == Job::Level::BEGINNER)
 		{
@@ -584,13 +498,16 @@ namespace ms
 			for (size_t i = 0; i < skills.size(); i++)
 			{
 				int32_t skillid = skills[i].get_id();
+				int32_t base = skillid % 10000;
 
-				if (skillid == SkillId::Id::THREE_SNAILS || skillid == SkillId::Id::HEAL || skillid == SkillId::Id::FEATHER)
+				// Three Snails/Recovery/Nimble Feet (works for Explorer, Noblesse, Aran)
+				if (base == 1000 || base == 1001 || base == 1002)
 					remaining_beginner_sp -= skills[i].get_level();
 			}
 
 			beginner_sp = remaining_beginner_sp;
 			splabel.change_text(std::to_string(beginner_sp));
+			std::cout << "[SkillBook] beginner_sp=" << beginner_sp << " splabel='" << splabel.get_text() << "' bg_dim=" << bg_dimensions.y() << std::endl;
 		}
 		else
 		{
@@ -599,7 +516,6 @@ namespace ms
 		}
 
 		change_offset(offset);
-		set_skillpoint(false);
 	}
 
 	void UISkillBook::change_tab(uint16_t new_tab)
@@ -614,10 +530,14 @@ namespace ms
 		Job::Level joblevel = joblevel_by_tab(tab);
 		uint16_t subid = job.get_subjob(joblevel);
 
+		std::cout << "[SkillBook] change_tab: tab=" << tab << " joblevel=" << joblevel << " subid=" << subid << std::endl;
+
 		const JobData& data = JobData::get(subid);
 
 		bookicon = data.get_icon();
 		booktext.change_text(data.get_name());
+
+		std::cout << "[SkillBook] JobData name='" << data.get_name() << "' skills=" << data.get_skills().size() << std::endl;
 
 		for (int32_t skill_id : data.get_skills())
 		{
@@ -629,12 +549,25 @@ namespace ms
 			if (invisible && masterlevel == 0)
 				continue;
 
+			// Hide skills with no level and no master level (not learned/not learnable)
+			// Unless it's a core beginner skill (Three Snails/Recovery/Nimble Feet variants)
+			if (level == 0 && masterlevel == 0)
+			{
+				int32_t base = skill_id % 10000;
+				// 1000=Three Snails, 1001=Recovery, 1002=Nimble Feet
+				if (base != 1000 && base != 1001 && base != 1002)
+					continue;
+			}
+
+			std::cout << "[SkillBook]   SHOW skill " << skill_id << " base=" << (skill_id % 10000) << " lv=" << level << " mlv=" << masterlevel << std::endl;
 			skills.emplace_back(skill_id, level);
 			skillcount++;
 		}
 
+		std::cout << "[SkillBook] visible skills: " << skillcount << std::endl;
+
 		slider.setrows(ROWS, skillcount);
-		change_offset(0);
+		offset = 0;
 		change_sp();
 	}
 
@@ -677,10 +610,16 @@ namespace ms
 		Job::Level joblevel = joblevel_by_tab(tab);
 
 		if (joblevel == Job::Level::BEGINNER && beginner_sp <= 0)
+		{
+			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (beginner_sp=0)" << std::endl;
 			return false;
+		}
 
 		if (tab + Buttons::BT_TAB0 != Buttons::BT_TAB0 && sp <= 0)
+		{
+			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (sp=0)" << std::endl;
 			return false;
+		}
 
 		int32_t level = skillbook.get_level(skill_id);
 		int32_t masterlevel = skillbook.get_masterlevel(skill_id);
@@ -689,14 +628,21 @@ namespace ms
 			masterlevel = SkillData::get(skill_id).get_masterlevel();
 
 		if (level >= masterlevel)
+		{
+			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (lv=" << level << " >= mlv=" << masterlevel << ")" << std::endl;
 			return false;
+		}
 
-		switch (skill_id)
+		int32_t base_id = skill_id % 10000;
+
+		switch (base_id)
 		{
 		case SkillId::Id::ANGEL_BLESSING:
 			return false;
 		default:
-			return check_required(skill_id);
+			bool req = check_required(skill_id);
+			std::cout << "[SkillBook] can_raise " << skill_id << ": " << (req ? "YES" : "NO (req failed)") << " lv=" << level << " mlv=" << masterlevel << std::endl;
+			return req;
 		}
 	}
 
@@ -707,50 +653,20 @@ namespace ms
 
 		int32_t id = skills[row].get_id();
 
-		if (sp_enabled && id == sp_id)
-		{
-			set_skillpoint(false);
+		std::string sp_txt = splabel.get_text();
+		int16_t cur_sp = sp_txt.empty() ? 0 : std::stoi(sp_txt);
+
+		if (cur_sp <= 0)
 			return;
-		}
 
-		int32_t level = skills[row].get_level();
-		int32_t used = 1;
-
-		const SkillData& skillData = SkillData::get(id);
-		std::string name = skillData.get_name();
-		int16_t cur_sp = std::stoi(splabel.get_text());
-
-		sp_before_text = std::to_string(level);
-		sp_after_text = std::to_string(level + used);
-		sp_used.change_text(std::to_string(used));
-		sp_remaining.change_text(std::to_string(cur_sp - used));
-		sp_name.change_text(name);
-		sp_skill = skills[row].get_icon()->get_texture();
-		sp_id = id;
-		sp_masterlevel = skillData.get_masterlevel();
-
-		if (sp_masterlevel == 1)
-		{
-			buttons[Buttons::BT_SPDOWN]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_SPMAX]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_SPUP]->set_state(Button::State::DISABLED);
-		}
-		else
-		{
-			buttons[Buttons::BT_SPDOWN]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_SPMAX]->set_state(Button::State::NORMAL);
-			buttons[Buttons::BT_SPUP]->set_state(Button::State::NORMAL);
-		}
-
-		if (!sp_enabled)
-			set_skillpoint(true);
+		spend_sp(id);
+		change_sp();
 	}
 
 	void UISkillBook::spend_sp(int32_t skill_id)
 	{
+		std::cout << "[SkillBook] spend_sp sending skill_id=" << skill_id << std::endl;
 		SpendSpPacket(skill_id).dispatch();
-
-		UI::get().disable();
 	}
 
 	Job::Level UISkillBook::joblevel_by_tab(uint16_t t) const
@@ -826,36 +742,10 @@ namespace ms
 
 		if (macro_enabled)
 			dimension = bg_dimensions + Point<int16_t>(macro_backgrnd.get_dimensions().x(), 0);
-		else if (!sp_enabled)
+		else
 			dimension = bg_dimensions;
 
 		buttons[Buttons::BT_MACRO_OK]->set_active(macro_enabled);
-
-		if (macro_enabled && sp_enabled)
-			set_skillpoint(false);
 	}
 
-	void UISkillBook::set_skillpoint(bool enabled)
-	{
-		sp_enabled = enabled;
-
-		if (sp_enabled)
-			dimension = bg_dimensions + Point<int16_t>(sp_backgrnd.get_dimensions().x(), 0);
-		else if (!macro_enabled)
-			dimension = bg_dimensions;
-
-		buttons[Buttons::BT_CANCLE]->set_active(sp_enabled);
-		buttons[Buttons::BT_OKAY]->set_active(sp_enabled);
-		buttons[Buttons::BT_SPDOWN]->set_active(sp_enabled);
-		buttons[Buttons::BT_SPMAX]->set_active(sp_enabled);
-		buttons[Buttons::BT_SPUP]->set_active(sp_enabled);
-
-		if (sp_enabled && macro_enabled)
-			set_macro(false);
-	}
-
-	bool UISkillBook::is_skillpoint_enabled()
-	{
-		return sp_enabled;
-	}
 }

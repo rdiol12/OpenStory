@@ -21,9 +21,17 @@
 #include "Components/Icon.h"
 
 #include "../Graphics/Sprite.h"
+#include "UIScale.h"
 
 namespace ms
 {
+	// Scaling mode for UI elements
+	enum class ScaleMode
+	{
+		NONE,           // No auto-scaling (in-game HUD, minimap, etc.)
+		CENTER_OFFSET   // Auto-center 800x600 content in larger viewport
+	};
+
 	// Base class for all types of user interfaces on screen.
 	class UIElement
 	{
@@ -129,15 +137,24 @@ namespace ms
 	protected:
 		UIElement(Point<int16_t> position, Point<int16_t> dimension, bool active);
 		UIElement(Point<int16_t> position, Point<int16_t> dimension);
+		UIElement(Point<int16_t> position, Point<int16_t> dimension, ScaleMode mode);
 		UIElement();
 
 		void draw_sprites(float alpha) const;
 		void draw_buttons(float alpha) const;
+
+		// Returns position adjusted for scale mode (adds content_offset when CENTER_OFFSET)
+		Point<int16_t> get_draw_position() const;
+
+		// Adjusts a hardcoded 800x600 point for the current scale mode
+		Point<int16_t> scaled(int16_t x, int16_t y) const;
+		Point<int16_t> scaled(Point<int16_t> p) const;
 
 		std::map<uint16_t, std::unique_ptr<Button>> buttons;
 		std::vector<Sprite> sprites;
 		Point<int16_t> position;
 		Point<int16_t> dimension;
 		bool active;
+		ScaleMode scale_mode;
 	};
 }

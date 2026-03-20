@@ -95,11 +95,19 @@ namespace ms
 		}
 	}
 
+	// Viewport parameters for cursor mapping (set in initwindow)
+	// s_vp_y_top is the top offset in screen coords (GLFW uses top-left origin)
+	static int s_vp_x = 0, s_vp_y_top = 0, s_vp_w = 1920, s_vp_h = 1080;
+
 	void cursor_callback(GLFWwindow*, double xpos, double ypos)
 	{
-		float scale = Constants::Constants::get().get_ui_scale();
-		int16_t x = static_cast<int16_t>(xpos / scale);
-		int16_t y = static_cast<int16_t>(ypos / scale);
+		// Map screen coordinates to game logical coordinates
+		// Account for viewport offset (letterbox/pillarbox) and scaling
+		int vw = Constants::Constants::get().get_viewwidth();
+		int vh = Constants::Constants::get().get_viewheight();
+
+		int16_t x = static_cast<int16_t>((xpos - s_vp_x) * vw / s_vp_w);
+		int16_t y = static_cast<int16_t>((ypos - s_vp_y_top) * vh / s_vp_h);
 		Point<int16_t> pos = Point<int16_t>(x, y);
 		UI::get().send_cursor(pos);
 	}
@@ -146,23 +154,53 @@ namespace ms
 		if (glwnd)
 			glfwDestroyWindow(glwnd);
 
+		int wnd_width = width;
+		int wnd_height = height;
+
+		if (fullscreen)
+		{
+			GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+			const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+			if (mode)
+			{
+				wnd_width = mode->width;
+				wnd_height = mode->height;
+			}
+			glfwWindowHint(GLFW_DECORATED, GL_FALSE);
+		}
+		else
+		{
+			glfwWindowHint(GLFW_DECORATED, GL_TRUE);
+		}
+
 		glwnd = glfwCreateWindow(
-			width,
-			height,
+			wnd_width,
+			wnd_height,
 			Configuration::get().get_title().c_str(),
-			fullscreen ? glfwGetPrimaryMonitor() : nullptr,
+			nullptr,
 			context
 		);
 
 		if (!glwnd)
 			return Error::Code::WINDOW;
 
+		if (fullscreen)
+			glfwSetWindowPos(glwnd, 0, 0);
+
 		glfwMakeContextCurrent(glwnd);
 
 		bool vsync = Setting<VSync>::get().load();
 		glfwSwapInterval(vsync ? 1 : 0);
 
-		glViewport(0, 0, width, height);
+		int fb_width, fb_height;
+		glfwGetFramebufferSize(glwnd, &fb_width, &fb_height);
+
+		// Stretch to fill entire screen — no black bars
+		s_vp_x = 0;
+		s_vp_y_top = 0;
+		s_vp_w = fb_width;
+		s_vp_h = fb_height;
+		glViewport(0, 0, fb_width, fb_height);
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 

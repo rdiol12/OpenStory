@@ -25,6 +25,7 @@
 #include "UILoginNotice.h"
 
 #include "../UI.h"
+#include "../UIScale.h"
 
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
@@ -40,19 +41,8 @@
 
 namespace ms
 {
-	UIRaceSelect::UIRaceSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
+	UIRaceSelect::UIRaceSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET)
 	{
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-
-		// Offset to center 800x600 content on the current resolution
-		int16_t ox = (vw - 800) / 2;
-		int16_t oy = (vh - 600) / 2;
-		Point<int16_t> content_offset(ox, oy);
-
-		float sx = (float)vw / 800.0f;
-		float sy = (float)vh / 600.0f;
-
 		std::string version_text = Configuration::get().get_version();
 		version = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::LEMONGRASS, "Ver. " + version_text);
 
@@ -109,8 +99,8 @@ namespace ms
 		class_isdisabled[Classes::ARAN] = false;
 		class_isdisabled[Classes::EVAN] = false;
 
-		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
-		sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(frame, UIScale::bg_args());
+		sprites.emplace_back(Common["frame"], UIScale::bg_args());
 
 		backFull = RaceSelect["Back"]["0"]["0"];
 		back = RaceSelect["Back"]["1"]["0"];
@@ -141,13 +131,13 @@ namespace ms
 			class_title[i] = RaceSelect["Back3"][corrected_index]["0"];
 		}
 
-		buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], content_offset + Point<int16_t>(0, 515));
+		buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(0, 515));
 		buttons[Buttons::MAKE] = std::make_unique<MapleButton>(RaceSelect["make"]);
-		buttons[Buttons::LEFT] = std::make_unique<MapleButton>(RaceSelect["leftArrow"], content_offset + Point<int16_t>(41, 458));
-		buttons[Buttons::RIGHT] = std::make_unique<MapleButton>(RaceSelect["rightArrow"], content_offset + Point<int16_t>(718, 458));
+		buttons[Buttons::LEFT] = std::make_unique<MapleButton>(RaceSelect["leftArrow"], Point<int16_t>(41, 458));
+		buttons[Buttons::RIGHT] = std::make_unique<MapleButton>(RaceSelect["rightArrow"], Point<int16_t>(718, 458));
 
 		for (size_t i = 0; i <= Buttons::CLASS0; i++)
-			buttons[Buttons::CLASS0 + i] = std::make_unique<AreaButton>(content_offset + get_class_pos(i), class_normal[0][true].get_dimensions());
+			buttons[Buttons::CLASS0 + i] = std::make_unique<AreaButton>(get_class_pos(i), class_normal[0][true].get_dimensions());
 
 		index_shift = 0;
 		selected_index = 0;
@@ -164,21 +154,11 @@ namespace ms
 
 	void UIRaceSelect::draw(float inter) const
 	{
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		float sx = (float)vw / 800.0f;
-		float sy = (float)vh / 600.0f;
-
 		// Scale backgrounds to fill the full screen
-		DrawArgument bg_args = DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy);
-
-		// Offset to center 800x600 content on the current resolution
-		int16_t ox = (vw - 800) / 2;
-		int16_t oy = (vh - 600) / 2;
-		Point<int16_t> content_offset(ox, oy);
+		DrawArgument bg_args = UIScale::bg_args();
 
 		// Draw class artwork at the content offset (positions them as if on 800x600 canvas, centered)
-		DrawArgument class_args(content_offset);
+		DrawArgument class_args(get_draw_position());
 
 		uint16_t corrected_index = get_corrected_class_index(selected_class);
 
@@ -191,7 +171,7 @@ namespace ms
 
 		UIElement::draw_sprites(inter);
 
-		version.draw(position + content_offset + Point<int16_t>(707, 4));
+		version.draw(scaled(707, 4));
 
 		if (selected_class == Classes::KANNA || selected_class == Classes::CHASE)
 		{
@@ -220,9 +200,9 @@ namespace ms
 			if (node.get_integer() == selected_class)
 			{
 				if (selected_class == Classes::ZERO)
-					hotlabelZero.draw(position + content_offset, inter);
+					hotlabelZero.draw(get_draw_position(), inter);
 				else
-					hotlabel.draw(position + content_offset, inter);
+					hotlabel.draw(get_draw_position(), inter);
 
 				break;
 			}
@@ -232,7 +212,7 @@ namespace ms
 		{
 			if (node.get_integer() == selected_class)
 			{
-				newlabel.draw(position + content_offset, inter);
+				newlabel.draw(get_draw_position(), inter);
 				break;
 			}
 		}
@@ -243,13 +223,13 @@ namespace ms
 
 			uint16_t cur_class = get_corrected_class_index(class_index[i]);
 			auto found_class = class_isdisabled[cur_class] ? class_disabled : class_normal;
-			found_class[cur_class][mouseover[i]].draw(position + content_offset + button_pos);
+			found_class[cur_class][mouseover[i]].draw(scaled(button_pos));
 
 			for (nl::node node : hotlist)
 			{
 				if (node.get_integer() == class_index[i])
 				{
-					hotbtn.draw(position + content_offset + button_pos, inter);
+					hotbtn.draw(scaled(button_pos), inter);
 					break;
 				}
 			}
@@ -258,7 +238,7 @@ namespace ms
 			{
 				if (node.get_integer() == class_index[i])
 				{
-					newbtn.draw(position + content_offset + button_pos, inter);
+					newbtn.draw(scaled(button_pos), inter);
 					break;
 				}
 			}
@@ -266,16 +246,12 @@ namespace ms
 
 		UIElement::draw_buttons(inter);
 
-		back_ani.draw(position + content_offset, inter);
+		back_ani.draw(get_draw_position(), inter);
 	}
 
 	void UIRaceSelect::update()
 	{
 		UIElement::update();
-
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		Point<int16_t> content_offset((vw - 800) / 2, (vh - 600) / 2);
 
 		hotlabel.update();
 		hotlabelZero.update();
@@ -284,9 +260,9 @@ namespace ms
 		newbtn.update();
 
 		if (selected_class == Classes::ZERO)
-			buttons[Buttons::MAKE]->set_position(position + content_offset + posZero);
+			buttons[Buttons::MAKE]->set_position(posZero);
 		else
-			buttons[Buttons::MAKE]->set_position(position + content_offset + pos);
+			buttons[Buttons::MAKE]->set_position(pos);
 
 		back_ani.update();
 	}
@@ -295,7 +271,7 @@ namespace ms
 	{
 		for (auto& btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
+			if (btit.second->is_active() && btit.second->bounds(get_draw_position()).contains(cursorpos))
 			{
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{

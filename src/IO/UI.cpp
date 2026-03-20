@@ -165,7 +165,8 @@ namespace ms
 
 	void UI::send_cursor(Point<int16_t> pos)
 	{
-		send_cursor(pos, cursor.get_state());
+		// Position updates are not clicks — always send as IDLE
+		send_cursor(pos, Cursor::State::IDLE);
 	}
 
 	void UI::rightclick()

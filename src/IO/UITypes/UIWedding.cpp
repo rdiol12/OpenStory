@@ -25,7 +25,7 @@
 
 namespace ms
 {
-	UIWedding::UIWedding() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0)),
+	UIWedding::UIWedding() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0), ScaleMode::CENTER_OFFSET),
 		wedding_type(0), countdown(0)
 	{
 		nl::node wedding = nl::nx::ui["UIWindow.img"]["Wedding"];

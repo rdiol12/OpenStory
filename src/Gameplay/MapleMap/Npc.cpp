@@ -40,26 +40,55 @@ namespace ms
 		if (marks_initialized)
 			return;
 
-		nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
+		// Primary: UIWindow.img/QuestIcon/0 (animated lightbulb in speech bubble)
+		nl::node quest_icon_src = nl::nx::ui["UIWindow.img"]["QuestIcon"];
+		nl::node qi0 = quest_icon_src["0"];
+		if (qi0 && qi0.size() > 0)
+			mark_available = Animation(qi0);
 
-		// Available quest — QuestMark (animated lightbulb, frames 0/1/2/3)
-		nl::node qmark = guide["QuestMark"];
-		if (qmark && qmark.size() > 0)
-			mark_available = Animation(qmark);
+		// In-progress: QuestIcon/1, Complete: QuestIcon/2
+		nl::node qi1 = quest_icon_src["1"];
+		if (qi1 && qi1.size() > 0)
+			mark_in_progress = Animation(qi1);
 
-		// In-progress quest — LowLVQuestMark/forNPC (distinct from available)
-		nl::node inprog = guide["LowLVQuestMark"]["forNPC"];
-		if (inprog && inprog.size() > 0)
-			mark_in_progress = Animation(inprog);
-		else if (qmark && qmark.size() > 0)
-			mark_in_progress = Animation(qmark);
+		nl::node qi2 = quest_icon_src["2"];
+		if (qi2 && qi2.size() > 0)
+			mark_complete = Animation(qi2);
 
-		// Completable quest — RepeatQuestMark/forNPC (book-like icon)
-		nl::node complete = guide["RepeatQuestMark"]["forNPC"];
-		if (complete && complete.size() > 0)
-			mark_complete = Animation(complete);
-		else if (qmark && qmark.size() > 0)
-			mark_complete = Animation(qmark);
+		// Fallback to MapHelper.img/quest
+		nl::node quest_marks = nl::nx::map["MapHelper.img"]["quest"];
+
+		if (!mark_available.get_dimensions().x())
+		{
+			nl::node chat_next = quest_marks["chatNext"];
+			if (chat_next && chat_next.size() > 0)
+				mark_available = Animation(chat_next);
+		}
+		if (!mark_in_progress.get_dimensions().x())
+		{
+			nl::node chat_self = quest_marks["chatSelf"];
+			if (chat_self && chat_self.size() > 0)
+				mark_in_progress = Animation(chat_self);
+		}
+		if (!mark_complete.get_dimensions().x())
+		{
+			nl::node chat_complete = quest_marks["chatComplete"];
+			if (chat_complete && chat_complete.size() > 0)
+				mark_complete = Animation(chat_complete);
+		}
+
+		// Final fallback to UIWindow2.img/QuestGuide
+		if (!mark_available.get_dimensions().x())
+		{
+			nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
+			nl::node qmark = guide["QuestMark"];
+			if (qmark && qmark.size() > 0)
+				mark_available = Animation(qmark);
+			if (!mark_in_progress.get_dimensions().x() && qmark)
+				mark_in_progress = Animation(qmark);
+			if (!mark_complete.get_dimensions().x() && qmark)
+				mark_complete = Animation(qmark);
+		}
 
 		marks_initialized = true;
 	}
@@ -146,7 +175,7 @@ namespace ms
 			auto& anim = animations.count(stance) ? animations.at(stance) : animations.begin()->second;
 			Point<int16_t> origin = anim.get_origin();
 			// origin.y() is how far above feet the sprite extends
-			Point<int16_t> mark_pos = absp + Point<int16_t>(0, -origin.y() - 10);
+			Point<int16_t> mark_pos = absp + Point<int16_t>(22, -origin.y() - 10);
 			quest_mark_anim.draw(DrawArgument(mark_pos), alpha);
 		}
 	}
@@ -312,7 +341,11 @@ namespace ms
 			if (start_npc <= 0 || start_npc != npcid)
 				continue;
 
-			// Level check — stricter: only show if quest is close to player level
+			// Skip auto-start quests (they don't need a bulb indicator)
+			if (start_check["normalAutoStart"].get_integer() != 0)
+				continue;
+
+			// Level checks
 			int32_t lvmin = start_check["lvmin"].get_integer();
 			int32_t lvmax = start_check["lvmax"].get_integer();
 
@@ -324,6 +357,11 @@ namespace ms
 
 			// Skip quests that are way below player level
 			if (lvmin > 0 && (player_level - lvmin) > 10)
+				continue;
+
+			// Skip expired event quests
+			std::string end_date = start_check["end"].get_string();
+			if (!end_date.empty())
 				continue;
 
 			// Job check

@@ -24,6 +24,8 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
+#include "../UIScale.h"
+
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/LoginPackets.h"
@@ -35,7 +37,7 @@
 
 namespace ms
 {
-	UIWorldSelect::UIWorldSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
+	UIWorldSelect::UIWorldSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET)
 	{
 		worldid = Setting<DefaultWorld>::get().load();
 		channelid = Setting<DefaultChannel>::get().load();
@@ -46,18 +48,13 @@ namespace ms
 		hovered_world = -1;
 		active_channelcount = 0;
 
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		float sx = (float)vw / 800.0f;
-		float sy = (float)vh / 600.0f;
-
 		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
 		nl::node ws = nl::nx::ui["Login.img"]["WorldSelect"];
 		nl::node worldsrc = ws["BtWorld"]["release"];
 		nl::node channelsrc = ws["BtChannel"];
 
 		// === Background sprites ===
-		sprites.emplace_back(back["11"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(back["11"], UIScale::bg_args());
 		sprites.emplace_back(worldsrc["layer:bg"], Point<int16_t>(650, 45));
 
 		// === Enter world button ===
@@ -162,56 +159,58 @@ namespace ms
 		// Draw sprites (backgrounds) first
 		UIElement::draw_sprites(alpha);
 
+		auto drawpos = get_draw_position();
+
 		// Draw world notice (NX origin positions it)
 		if (world_notice.is_valid())
-			world_notice.draw(DrawArgument(position));
+			world_notice.draw(DrawArgument(drawpos));
 
 		// Draw channel panel AFTER sprites but BEFORE buttons
 		if (world_selected)
 		{
 			// Channel background (NX origin positions it)
 			if (ch_backgrn.is_valid())
-				ch_backgrn.draw(DrawArgument(position));
+				ch_backgrn.draw(DrawArgument(drawpos));
 
-			channels_background.draw(position + Point<int16_t>(200, 170));
+			channels_background.draw(drawpos + Point<int16_t>(200, 170));
 
 			// World texture layer
 			if (worldid < world_textures.size())
-				world_textures[worldid].draw(position + Point<int16_t>(200, 170));
+				world_textures[worldid].draw(drawpos + Point<int16_t>(200, 170));
 
 			// World name label (NX origin positions it)
 			if (worldid < world_labels.size() && world_labels[worldid].is_valid())
-				world_labels[worldid].draw(DrawArgument(position));
+				world_labels[worldid].draw(DrawArgument(drawpos));
 
 			// Channel selection highlight (NX origin positions it relative to channel area)
 			if (ch_select.is_valid() && channelid < 20)
-				ch_select.draw(DrawArgument(position));
+				ch_select.draw(DrawArgument(drawpos));
 
 			// Channel labels (only draw for active channels)
 			for (size_t i = 0; i < active_channelcount && i < channel_labels.size(); ++i)
 			{
 				if (channel_labels[i].is_valid())
-					channel_labels[i].draw(DrawArgument(position));
+					channel_labels[i].draw(DrawArgument(drawpos));
 			}
 
 			// Channel gauge (load indicator - NX origin)
 			if (channel_gauge.is_valid())
-				channel_gauge.draw(DrawArgument(position));
+				channel_gauge.draw(DrawArgument(drawpos));
 
 			// Channel load gauge bars (NX origin)
 			if (ch_gauge_bar.is_valid())
-				ch_gauge_bar.draw(DrawArgument(position));
+				ch_gauge_bar.draw(DrawArgument(drawpos));
 
 			// Channel event marker (NX origin)
 			if (ch_event.is_valid())
-				ch_event.draw(DrawArgument(position));
+				ch_event.draw(DrawArgument(drawpos));
 		}
 
 		// Draw alert panel (NX origin positions it)
 		if (show_alert)
 		{
 			if (alert_backgrd.is_valid())
-				alert_backgrd.draw(DrawArgument(position));
+				alert_backgrd.draw(DrawArgument(drawpos));
 		}
 
 		// Draw buttons last (on top of everything)
@@ -225,7 +224,7 @@ namespace ms
 			if (btn_it != buttons.end() && btn_it->second->is_active())
 			{
 				// Draw tooltip at the world button's position (NX origin handles offset)
-				tooltip_textures[hovered_world].draw(DrawArgument(position));
+				tooltip_textures[hovered_world].draw(DrawArgument(drawpos));
 			}
 		}
 	}
@@ -233,13 +232,14 @@ namespace ms
 	Cursor::State UIWorldSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
+		auto drawpos = get_draw_position();
 
 		// Track world button hover for tooltips
 		hovered_world = -1;
 
 		for (auto& btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
+			if (btit.second->is_active() && btit.second->bounds(drawpos).contains(cursorpos))
 			{
 				// Track which world button is hovered
 				if (btit.first >= BT_WORLD0 && btit.first < BT_CHANNEL0)

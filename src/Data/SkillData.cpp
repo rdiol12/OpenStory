@@ -30,7 +30,8 @@ namespace ms
 	{
 		/// Locate sources
 		std::string strid = string_format::extend_id(id, 7);
-		std::string jobid = strid.substr(0, 3);
+		// Job ID is skill_id / 10000 — use that to find the correct .img
+		std::string jobid = std::to_string(id / 10000);
 		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
 		nl::node strsrc = nl::nx::string["Skill.img"][strid];
 

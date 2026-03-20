@@ -1,8 +1,8 @@
 # OpenStory
-support for 1920x1080 is wip
-
 
 A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient), rewritten and extended for full v83 compatibility.
+
+**Status: Playable.** There are major UI fixes still needed, but the client is functional for gameplay.
 
 ## Features
 
@@ -99,12 +99,43 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - Lost items/fame status messages implemented
 - World select draw order fixed
 
+## Recent Changes
+
+### Fullscreen Support
+- Borderless windowed fullscreen stretches to fill any monitor resolution (including 16:10)
+- Cursor mapping adjusted for viewport scaling
+- Works across all screens (login, world select, character select, gameplay)
+
+### Skill Book Fixes
+- Fixed Cygnus Knights (Noblesse) job classification and skill display
+- Fixed NX path lookup for 4-digit job IDs (1000+)
+- SP spending works directly from "+" button (no confirmation panel)
+- Beginner SP calculated client-side correctly
+- Blessing of the Fairy correctly excluded from SP upgrades
+- Mouse wheel scrolling support
+- Filtered out event/mount skills that shouldn't be visible
+
+### Button & Input Fixes
+- Global button click detection fix -- buttons no longer require MOUSEOVER state before clicking
+- Fixed double-click bug where buttons fired twice per click
+- Fixed cursor position updates re-triggering click events
+
+### Sound Effects
+- Added level up sound
+- Added player damage/hurt sound
+- Added quest complete sound
+
+### UI Fixes
+- Hidden quickslot/numpad sprites from status bar
+- Key config UI uses English NX nodes where available
+
 ## What's Left To Do
 
 ### Known Bugs
 - **Mob knockback janky** -- mobs appear to move during their knockback/hit animation instead of being locked in place
 - **Jump-down needs more vertical lift** -- jumping down from a platform drops immediately instead of a slight vertical lift before descent
 - **Item drops off-center** -- drops land off-center from the character (server-controlled positioning, not a client bug)
+- **Key config UI has Korean buttons** -- NX sprites for some buttons contain Korean text
 
 ### Not Yet Implemented
 - **Cash Shop purchases** -- UI exists but purchase flow incomplete
@@ -112,7 +143,7 @@ All recv opcodes realigned to match Cosmic's `SendOpcodes.java`. Every packet ha
 - **Trade UI** -- player-to-player trade stubbed
 - **Guild UI** -- stub files created, not wired up
 - **Messenger / Party Search** -- stub files created, not wired up
-- **Monster Book** -- stub files created, not wired upd
+- **Monster Book** -- stub files created, not wired up
 
 ### UI Stubs Created (Not Yet Functional)
 UIGuild, UIGuildBBS, UIGuildMark, UIMessenger, UIPartySearch, UIMonsterBook, UIMonsterCarnival, UIHiredMerchant, UIPersonalShop, UIMinigame, UIRPSGame, UIMapleTV, UIMapleChat, UISocialChat, UIFarmChat, UIFamily, UIWedding, UIRanking, UIQuestHelper, UISystemOption, UIChatWindow

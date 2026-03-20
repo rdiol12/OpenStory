@@ -258,6 +258,7 @@ namespace ms
 		nl::node qs = mainbar["quickSlot"];
 		quickslot_bg = Texture(qs["quickSlot"]);
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
+		buttons[BT_QS_OPEN]->set_active(false);
 		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"]);
 		buttons[BT_QS_CLOSE]->set_active(false);
 
@@ -496,20 +497,20 @@ namespace ms
 		if (sp > 0)
 			sp_notify.draw(DrawArgument(position), alpha);
 
-		// Draw menu sub-panel background
+		// Draw menu sub-panel background (positioned to align with menu buttons)
 		if (show_menu)
 		{
-			// 8 visible buttons * 27px = 216px tall, 67px wide, starting at screen (698, 441)
+			auto menu_bounds = buttons.at(BT_MENU_STAT)->bounds(position);
 			ColorBox menu_bg(69, 220, Color::Name::BLACK, 0.75f);
-			menu_bg.draw(DrawArgument(Point<int16_t>(698, 439)));
+			menu_bg.draw(DrawArgument(Point<int16_t>(menu_bounds.get_left_top().x() - 2, menu_bounds.get_left_top().y() - 2)));
 		}
 
-		// Draw system sub-panel background
+		// Draw system sub-panel background (positioned to align with system buttons)
 		if (show_system)
 		{
-			// 8 active buttons * 27px = 216px, starting at screen (774, 441)
+			auto sys_bounds = buttons.at(BT_SYS_CHANNEL)->bounds(position);
 			ColorBox sys_bg(69, 220, Color::Name::BLACK, 0.75f);
-			sys_bg.draw(DrawArgument(Point<int16_t>(774, 439)));
+			sys_bg.draw(DrawArgument(Point<int16_t>(sys_bounds.get_left_top().x() - 2, sys_bounds.get_left_top().y() - 2)));
 		}
 
 		// Draw quick slot panel

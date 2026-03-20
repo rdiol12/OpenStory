@@ -43,13 +43,13 @@ namespace ms
 		void doubleclick(Point<int16_t> cursorpos) override;
 		void remove_cursor() override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
 		void update_stat(MapleStat::Id stat, int16_t value);
 		void update_skills(int32_t skill_id);
-		bool is_skillpoint_enabled();
 
 	protected:
 		Button::State button_pressed(uint16_t id) override;
@@ -110,7 +110,6 @@ namespace ms
 		bool check_required(int32_t id) const;
 
 		void set_macro(bool enabled);
-		void set_skillpoint(bool enabled);
 
 		enum Buttons : uint16_t
 		{
@@ -120,11 +119,6 @@ namespace ms
 			BT_RIDE,
 			BT_MACRO,
 			BT_MACRO_OK,
-			BT_CANCLE,
-			BT_OKAY,
-			BT_SPDOWN,
-			BT_SPMAX,
-			BT_SPUP,
 			BT_TAB0,
 			BT_TAB1,
 			BT_TAB2,
@@ -172,19 +166,5 @@ namespace ms
 		Texture macro_backgrnd2;
 		Texture macro_backgrnd3;
 
-		bool sp_enabled;
-		Texture sp_backgrnd;
-		Texture sp_backgrnd2;
-		Texture sp_backgrnd3;
-		Charset sp_before;
-		Charset sp_after;
-		std::string sp_before_text;
-		std::string sp_after_text;
-		Text sp_used;
-		Text sp_remaining;
-		Text sp_name;
-		Texture sp_skill;
-		int32_t sp_id;
-		int32_t sp_masterlevel;
 	};
 }

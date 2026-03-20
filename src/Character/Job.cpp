@@ -34,8 +34,10 @@ namespace ms
 		id = i;
 		name = get_name(id);
 
-		if (id == 0)
+		if (id == 0 || id == 1000 || id == 2000 || id == 900)
 			level = Level::BEGINNER;
+		else if (id == 910)
+			level = Level::FIRST;
 		else if (id % 100 == 0)
 			level = Level::FIRST;
 		else if (id % 10 == 0)
@@ -74,11 +76,24 @@ namespace ms
 	{
 		if (lv <= level)
 		{
+			// Determine the beginner job for this job tree
+			uint16_t beginner_id;
+			if (id >= 2000 && id <= 2112)
+				beginner_id = 2000; // Aran
+			else if (id >= 1000 && id <= 1512)
+				beginner_id = 1000; // Noblesse (Cygnus Knights)
+			else if (id == 900 || id == 910)
+				beginner_id = 900;  // GM
+			else
+				beginner_id = 0;    // Explorer
+
 			switch (lv)
 			{
 				case Level::BEGINNER:
-					return 0;
+					return beginner_id;
 				case Level::FIRST:
+					if (id == 910)
+						return 910; // SuperGM skills on tab 1
 					return (id / 100) * 100;
 				case Level::SECOND:
 					return (id / 10) * 10;

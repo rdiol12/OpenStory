@@ -22,6 +22,7 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "../UIScale.h"
 
 #include "../../Net/Packets/LoginPackets.h"
 
@@ -1082,7 +1083,7 @@ namespace ms
 
 		update_accept(offset);
 
-		position = Point<int16_t>(0, 10);
+		position = UIScale::at(0, 10);
 		dimension = Texture(TOS).get_dimensions();
 	}
 
