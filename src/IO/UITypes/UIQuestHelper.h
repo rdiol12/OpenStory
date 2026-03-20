@@ -40,6 +40,8 @@ namespace ms
 		void update() override;
 		void toggle_active() override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
+		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
 
@@ -53,6 +55,7 @@ namespace ms
 
 	private:
 		void refresh_quest_info();
+		void recalc_dimension();
 
 		enum Buttons : uint16_t
 		{
@@ -104,7 +107,11 @@ namespace ms
 		// Tracked quest state
 		int16_t tracked_questid;
 		bool minimized;
-		bool show_bulb;
+		bool show_messenger;
+		Point<int16_t> expanded_dimension;
+
+		// Position of the X untrack button (set during draw)
+		mutable Point<int16_t> quest_untrack_pos;
 
 		// Quest display info
 		Text quest_name;

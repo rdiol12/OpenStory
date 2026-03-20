@@ -124,7 +124,10 @@ namespace ms
 			{
 				msg = trim(msg);
 				if (msg.empty())
+				{
+					toggle_chatfield(false);
 					return;
+				}
 
 				if (!handle_party_command(msg))
 					send_chat_message(msg);
@@ -519,7 +522,7 @@ namespace ms
 		}
 		else
 		{
-			chatfield.set_state(chatopen ? Textfield::State::NORMAL : Textfield::State::DISABLED);
+			chatfield.set_state(Textfield::State::DISABLED);
 		}
 	}
 

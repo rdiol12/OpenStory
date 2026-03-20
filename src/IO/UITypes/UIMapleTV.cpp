@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIMapleTV::UIMapleTV() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0))
+	UIMapleTV::UIMapleTV() : UIElement(Point<int16_t>(400, 300), Point<int16_t>(0, 0), ScaleMode::CENTER_OFFSET)
 	{
 		nl::node main = nl::nx::ui["UIWindow2.img"]["MapleTV"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

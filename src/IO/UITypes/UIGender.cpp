@@ -21,6 +21,7 @@
 
 #include "../Components/MapleButton.h"
 #include "../Components/MapleComboBox.h"
+#include "../UIScale.h"
 #include "../UITypes/UILoginWait.h"
 
 #include "../../Net/Packets/LoginPackets.h"
@@ -31,7 +32,7 @@
 
 namespace ms
 {
-	UIGender::UIGender(std::function<void()> oh) : UIElement(Point<int16_t>(0, 15), Point<int16_t>(0, 0)), okhandler(oh)
+	UIGender::UIGender(std::function<void()> oh) : UIElement(UIScale::at(0, 15), Point<int16_t>(0, 0)), okhandler(oh)
 	{
 		CUR_TIMESTEP = 0;
 

@@ -20,6 +20,7 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "../UIScale.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
@@ -65,7 +66,7 @@ namespace ms
 			buttons[Buttons::YES] = std::make_unique<MapleButton>(Notice["BtYes"], Point<int16_t>(100, 106));
 		}
 
-		position = Point<int16_t>(275, 209);
+		position = UIScale::at(275, 209);
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 
@@ -121,7 +122,7 @@ namespace ms
 		buttons[Buttons::BT_OK] = std::make_unique<MapleButton>(notice["BtYes"], Point<int16_t>(70, 106));
 		buttons[Buttons::BT_CANCEL] = std::make_unique<MapleButton>(notice["BtNo"], Point<int16_t>(130, 106));
 
-		position = Point<int16_t>(275, 209);
+		position = UIScale::at(275, 209);
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 
@@ -183,9 +184,7 @@ namespace ms
 
 		dimension = Texture(backgrnd).get_dimensions();
 
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		position = Point<int16_t>((vw - dimension.x()) / 2, (vh - dimension.y()) / 2);
+		position = UIScale::at((800 - dimension.x()) / 2, (600 - dimension.y()) / 2);
 	}
 
 	Cursor::State UIClassConfirm::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -259,7 +258,7 @@ namespace ms
 		if (login)
 			buttons[Buttons::CLOSE]->set_active(false);
 
-		position = Point<int16_t>(181, 145);
+		position = UIScale::at(181, 145);
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 
@@ -316,7 +315,7 @@ namespace ms
 
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(alert["btOk"]);
 
-		position = Point<int16_t>(276, 229);
+		position = UIScale::at(276, 229);
 		dimension = Texture(background).get_dimensions();
 	}
 

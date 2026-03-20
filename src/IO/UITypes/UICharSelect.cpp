@@ -27,6 +27,8 @@
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 
+#include "../UIScale.h"
+
 #include "../../Configuration.h"
 #include "../../Constants.h"
 
@@ -44,7 +46,7 @@
 
 namespace ms
 {
-	UICharSelect::UICharSelect(std::vector<CharEntry> characters, int8_t characters_count, int32_t slots, int8_t require_pic) : characters(characters), characters_count(characters_count), slots(slots), require_pic(require_pic)
+	UICharSelect::UICharSelect(std::vector<CharEntry> characters, int8_t characters_count, int32_t slots, int8_t require_pic) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET), characters(characters), characters_count(characters_count), slots(slots), require_pic(require_pic)
 	{
 		burning_character = true;
 
@@ -111,16 +113,11 @@ namespace ms
 		if (!back_node)
 			back_node = map_login["back"]["0"];
 
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		float sx = (float)vw / 800.0f;
-		float sy = (float)vh / 600.0f;
-
 		if (back_node)
-			sprites.emplace_back(back_node, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+			sprites.emplace_back(back_node, UIScale::bg_args());
 
 		if (Common["frame"])
-			sprites.emplace_back(Common["frame"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+			sprites.emplace_back(Common["frame"], UIScale::bg_args());
 
 		if (Common["step"]["2"])
 			sprites.emplace_back(Common["step"]["2"], Point<int16_t>(40, 0));
@@ -198,20 +195,21 @@ namespace ms
 			).dispatch();
 		}
 
-		dimension = Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 	}
 
 	void UICharSelect::draw(float inter) const
 	{
 		UIElement::draw_sprites(inter);
 
-		version.draw(position + Point<int16_t>(707, 4));
+		auto drawpos = get_draw_position();
 
-		charslot.draw(position + Point<int16_t>(589, 106 - charslot_y));
-		charslotlabel.draw(position + Point<int16_t>(702, 111 - charslot_y));
+		version.draw(drawpos + Point<int16_t>(707, 4));
+
+		charslot.draw(drawpos + Point<int16_t>(589, 106 - charslot_y));
+		charslotlabel.draw(drawpos + Point<int16_t>(702, 111 - charslot_y));
 
 		for (Sprite sprite : world_sprites)
-			sprite.draw(position, inter);
+			sprite.draw(drawpos, inter);
 
 		std::string total = pad_number_with_leading_zero(page_count);
 		std::string current = pad_number_with_leading_zero(selected_page + 1);
@@ -226,7 +224,7 @@ namespace ms
 
 			if (index < characters_count)
 			{
-				Point<int16_t> charpos = get_character_slot_pos(i, 330, 214);
+				Point<int16_t> charpos = drawpos + get_character_slot_pos(i, 330, 214);
 				DrawArgument chararg = DrawArgument(charpos, flip_character);
 
 				nametags[index].draw(charpos + Point<int16_t>(2, 25));
@@ -238,9 +236,9 @@ namespace ms
 					selectedslot_effect[1].draw(charpos + Point<int16_t>(-5, 16), inter);
 
 					int8_t lvy = -115;
-					Point<int16_t> pos_adj = Point<int16_t>(662, 365);
+					Point<int16_t> pos_adj = drawpos + Point<int16_t>(662, 365);
 
-					charinfo.draw(position + charinfopos);
+					charinfo.draw(drawpos + charinfopos);
 
 					std::string levelstr = std::to_string(character_stats.stats[MapleStat::Id::LEVEL]);
 					int16_t lvx = levelset.draw(levelstr, pos_adj + Point<int16_t>(12, lvy));
@@ -275,7 +273,7 @@ namespace ms
 			}
 			else if (i < slots)
 			{
-				Point<int16_t> emptyslotpos = get_character_slot_pos(i, 330, 214);
+				Point<int16_t> emptyslotpos = drawpos + get_character_slot_pos(i, 330, 214);
 
 				emptyslot_effect.draw(emptyslotpos, inter);
 				emptyslot.draw(DrawArgument(emptyslotpos, flip_character));
@@ -285,19 +283,19 @@ namespace ms
 		UIElement::draw_buttons(inter);
 
 		if (tab_active)
-			tab.draw(position + tab_pos[tab_index] + Point<int16_t>(0, tab_move_pos));
+			tab.draw(drawpos + tab_pos[tab_index] + Point<int16_t>(0, tab_move_pos));
 
 		if (burning_character)
 		{
-			burning_notice.draw(position + Point<int16_t>(190, 502), inter);
-			burning_count.draw(position + Point<int16_t>(149, 464));
+			burning_notice.draw(drawpos + Point<int16_t>(190, 502), inter);
+			burning_count.draw(drawpos + Point<int16_t>(149, 464));
 		}
 
-		pagebase.draw(position + pagepos);
-		pagenumber.draw(current.substr(0, 1), position + pagepos + Point<int16_t>(pagenumberpos[0]));
-		pagenumber.draw(current.substr(1, 1), position + pagepos + Point<int16_t>(pagenumberpos[1]));
-		pagenumber.draw(total.substr(0, 1), position + pagepos + Point<int16_t>(pagenumberpos[2]));
-		pagenumber.draw(total.substr(1, 1), position + pagepos + Point<int16_t>(pagenumberpos[3]));
+		pagebase.draw(drawpos + pagepos);
+		pagenumber.draw(current.substr(0, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[0]));
+		pagenumber.draw(current.substr(1, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[1]));
+		pagenumber.draw(total.substr(0, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[2]));
+		pagenumber.draw(total.substr(1, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[3]));
 	}
 
 	void UICharSelect::update()
@@ -351,15 +349,17 @@ namespace ms
 		uint16_t button_index = selected_character + Buttons::CHARACTER_SLOT0;
 		auto& btit = buttons[button_index];
 
-		if (btit->is_active() && btit->bounds(position).contains(cursorpos) && btit->get_state() == Button::State::NORMAL && button_index >= Buttons::CHARACTER_SLOT0)
+		if (btit->is_active() && btit->bounds(get_draw_position()).contains(cursorpos) && btit->get_state() == Button::State::NORMAL && button_index >= Buttons::CHARACTER_SLOT0)
 			button_pressed(Buttons::CHARACTER_SELECT);
 	}
 
 	Cursor::State UICharSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		auto drawpos = get_draw_position();
+
 		Rectangle<int16_t> charslot_bounds = Rectangle<int16_t>(
-			worldpos,
-			worldpos + world_dimensions
+			drawpos + worldpos,
+			drawpos + worldpos + world_dimensions
 			);
 
 		if (charslot_bounds.contains(cursorpos))
@@ -376,7 +376,7 @@ namespace ms
 
 		for (auto& btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
+			if (btit.second->is_active() && btit.second->bounds(drawpos).contains(cursorpos))
 			{
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{

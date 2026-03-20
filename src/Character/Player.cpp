@@ -19,6 +19,7 @@
 
 #include "PlayerStates.h"
 
+#include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
@@ -345,6 +346,9 @@ namespace ms
 		int32_t damage = stats.calculate_damage(attack.watk);
 		show_damage(damage);
 
+		if (damage > 0)
+			Sound(Sound::Name::HURTDAMAGE).play();
+
 		bool fromleft = attack.origin.x() > phobj.get_x();
 
 		bool missed = damage <= 0;
@@ -406,7 +410,10 @@ namespace ms
 		uint16_t oldlevel = get_level();
 
 		if (level > oldlevel)
+		{
 			show_effect_id(CharEffect::Id::LEVELUP);
+			Sound(Sound::Name::LEVELUP).play();
+		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
 	}

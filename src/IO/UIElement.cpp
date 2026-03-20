@@ -18,12 +18,38 @@
 #include "UIElement.h"
 
 #include "../Audio/Audio.h"
+#include "UIScale.h"
 
 namespace ms
 {
-	UIElement::UIElement(Point<int16_t> p, Point<int16_t> d, bool a) : position(p), dimension(d), active(a) {}
+	UIElement::UIElement(Point<int16_t> p, Point<int16_t> d, bool a) : position(p), dimension(d), active(a), scale_mode(ScaleMode::NONE) {}
 	UIElement::UIElement(Point<int16_t> p, Point<int16_t> d) : UIElement(p, d, true) {}
+	UIElement::UIElement(Point<int16_t> p, Point<int16_t> d, ScaleMode mode) : position(p), dimension(d), active(true), scale_mode(mode) {}
 	UIElement::UIElement() : UIElement(Point<int16_t>(), Point<int16_t>()) {}
+
+	Point<int16_t> UIElement::get_draw_position() const
+	{
+		if (scale_mode == ScaleMode::CENTER_OFFSET)
+			return position + UIScale::content_offset();
+
+		return position;
+	}
+
+	Point<int16_t> UIElement::scaled(int16_t x, int16_t y) const
+	{
+		if (scale_mode == ScaleMode::CENTER_OFFSET)
+			return UIScale::at(x, y);
+
+		return Point<int16_t>(x, y);
+	}
+
+	Point<int16_t> UIElement::scaled(Point<int16_t> p) const
+	{
+		if (scale_mode == ScaleMode::CENTER_OFFSET)
+			return UIScale::at(p);
+
+		return p;
+	}
 
 	void UIElement::draw(float alpha) const
 	{
@@ -33,15 +59,19 @@ namespace ms
 
 	void UIElement::draw_sprites(float alpha) const
 	{
+		auto drawpos = get_draw_position();
+
 		for (const Sprite& sprite : sprites)
-			sprite.draw(position, alpha);
+			sprite.draw(drawpos, alpha);
 	}
 
 	void UIElement::draw_buttons(float) const
 	{
+		auto drawpos = get_draw_position();
+
 		for (auto& iter : buttons)
 			if (const Button* button = iter.second.get())
-				button->draw(position);
+				button->draw(drawpos);
 	}
 
 	void UIElement::update()
@@ -79,7 +109,8 @@ namespace ms
 
 	bool UIElement::is_in_range(Point<int16_t> cursorpos) const
 	{
-		auto bounds = Rectangle<int16_t>(position, position + dimension);
+		auto drawpos = get_draw_position();
+		auto bounds = Rectangle<int16_t>(drawpos, drawpos + dimension);
 
 		return bounds.contains(cursorpos);
 	}
@@ -98,32 +129,27 @@ namespace ms
 	Cursor::State UIElement::send_cursor(bool down, Point<int16_t> pos)
 	{
 		Cursor::State ret = down ? Cursor::State::CLICKING : Cursor::State::IDLE;
+		auto drawpos = get_draw_position();
 
 		for (auto& btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(pos))
+			if (btit.second->is_active() && btit.second->bounds(drawpos).contains(pos))
 			{
-				if (btit.second->get_state() == Button::State::NORMAL)
+				if (down)
 				{
-					Sound(Sound::Name::BUTTONOVER).play();
+					Sound(Sound::Name::BUTTONCLICK).play();
+
+					btit.second->set_state(button_pressed(btit.first));
+
+					ret = Cursor::State::IDLE;
+				}
+				else
+				{
+					if (btit.second->get_state() == Button::State::NORMAL)
+						Sound(Sound::Name::BUTTONOVER).play();
 
 					btit.second->set_state(Button::State::MOUSEOVER);
 					ret = Cursor::State::CANCLICK;
-				}
-				else if (btit.second->get_state() == Button::State::MOUSEOVER)
-				{
-					if (down)
-					{
-						Sound(Sound::Name::BUTTONCLICK).play();
-
-						btit.second->set_state(button_pressed(btit.first));
-
-						ret = Cursor::State::IDLE;
-					}
-					else
-					{
-						ret = Cursor::State::CANCLICK;
-					}
 				}
 			}
 			else if (btit.second->get_state() == Button::State::MOUSEOVER)

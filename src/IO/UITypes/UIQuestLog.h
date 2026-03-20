@@ -43,6 +43,8 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
+		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
 
@@ -53,7 +55,7 @@ namespace ms
 
 	private:
 		void change_tab(uint16_t tabid);
-		void select_quest(int16_t index);
+		void select_quest(int16_t index, bool from_recommended = false);
 
 		// Safe button accessors (many buttons don't exist in v83)
 		void set_btn_active(uint16_t id, bool active);
@@ -84,7 +86,8 @@ namespace ms
 			BT_DELIVERY_ACCEPT,
 			BT_DELIVERY_COMPLETE,
 			BT_NO,
-			BT_ALERT
+			BT_ALERT,
+			TAB3
 		};
 
 		static constexpr int16_t ROWS = 10;
@@ -147,17 +150,32 @@ namespace ms
 		};
 
 		std::vector<QuestEntry> available_entries;
+		std::vector<QuestEntry> recommended_entries;
 		std::vector<QuestEntry> active_entries;
 		std::vector<QuestEntry> completed_entries;
+		std::vector<QuestEntry> weekly_entries;
 		bool filter_my_level;
 		bool filter_my_location;
+		bool show_recommended;
 		std::string search_text;
 
 		int16_t selected_entry;
 		int16_t hover_entry;
+		Point<int16_t> last_cursor_pos;
+		bool selected_from_recommended;
+
+		// Returns total virtual row count for TAB0 (headers + entries)
+		uint16_t get_available_row_count() const;
+		// Maps a virtual row index to what it represents
+		enum class RowType { RECOMMEND_HEADER, RECOMMEND_ENTRY, AVAILABLE_HEADER, AVAILABLE_ENTRY };
+		RowType get_row_type(int16_t row, int16_t& entry_index) const;
+		// Select quest from a virtual row
+		void select_row(int16_t row);
 
 		// Detail panel
 		bool show_detail;
+		int16_t detail_scroll;
+		mutable int16_t detail_content_height;
 		Texture detail_backgrnd;
 		Texture detail_backgrnd2;
 		Texture detail_backgrnd3;
@@ -218,6 +236,7 @@ namespace ms
 		int32_t detail_order;
 		bool detail_auto_start;
 		bool detail_auto_complete;
+		int32_t detail_time_limit;
 
 		// v83 root textures from UIWindow.img/Quest
 		Texture basic_texture;
@@ -225,7 +244,9 @@ namespace ms
 		Texture reward_texture;
 		Texture summary_texture;
 
-		// v83 overlay backgrounds from UIWindow.img/Quest
+		// Per-tab backgrounds (one per tab, never stacked)
+		Texture list_backgrnd;
+		Texture list_backgrnd2;
 		Texture v83_backgrnd3;
 		Texture v83_backgrnd4;
 		Texture v83_backgrnd5;

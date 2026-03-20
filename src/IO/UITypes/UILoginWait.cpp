@@ -18,6 +18,7 @@
 #include "UILoginWait.h"
 
 #include "../Components/MapleButton.h"
+#include "../UIScale.h"
 
 #include "../../Net/Session.h"
 
@@ -39,7 +40,7 @@ namespace ms
 
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Loading["BtCancel"], Point<int16_t>(101, 106));
 
-		position = Point<int16_t>(276, 229);
+		position = UIScale::at(276, 229);
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 

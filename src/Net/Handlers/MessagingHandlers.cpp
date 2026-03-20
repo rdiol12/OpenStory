@@ -17,12 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MessagingHandlers.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 #include "../../Character/QuestLog.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIQuestHelper.h"
+#include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 
 namespace ms
@@ -139,10 +142,22 @@ namespace ms
 				int64_t time = recv.read_long();
 				quests.add_completed(qid, time);
 				show_status(Color::Name::WHITE, "Quest completed!");
+				Sound(Sound::Name::QUESTCOMPLETE).play();
 			}
 
 			// Refresh NPC quest marks after any quest state change
 			Stage::get().get_npcs().refresh_quest_marks();
+
+			// Refresh quest log UI if open
+			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
+				questlog_ui->load_quests();
+
+			// Auto-track newly started quest in quest helper
+			if (status == 1)
+			{
+				if (auto helper = UI::get().get_element<UIQuestHelper>())
+					helper->track_quest(qid);
+			}
 		}
 		else if (mode == 3)
 		{
@@ -333,6 +348,9 @@ namespace ms
 		}
 		else // Buff effect
 		{
+			if (recv.length() < 4)
+				return;
+
 			int32_t skillid = recv.read_int();
 
 			// More bytes, but we don't need them.

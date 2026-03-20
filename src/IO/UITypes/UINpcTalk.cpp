@@ -26,6 +26,7 @@
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Constants.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -345,6 +346,12 @@ namespace ms
 
 			NpcTalkMorePacket(type, 0).dispatch();
 		}
+	}
+
+	void UINpcTalk::send_scroll(double yoffset)
+	{
+		if (show_slider)
+			slider.send_scroll(yoffset);
 	}
 
 	UIElement::Type UINpcTalk::get_type() const
@@ -746,7 +753,9 @@ namespace ms
 			}
 		}
 
-		position = Point<int16_t>(400 - top.width() / 2, 240 - height / 2);
+		int16_t vw = Constants::Constants::get().get_viewwidth();
+		int16_t vh = Constants::Constants::get().get_viewheight();
+		position = Point<int16_t>(vw / 2 - top.width() / 2, vh / 2 - height / 2);
 		dimension = Point<int16_t>(top.width(), height + 120);
 	}
 }

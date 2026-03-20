@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIMonsterCarnival::UIMonsterCarnival() : UIElement(Point<int16_t>(400, 50), Point<int16_t>(0, 0)),
+	UIMonsterCarnival::UIMonsterCarnival() : UIElement(Point<int16_t>(400, 50), Point<int16_t>(0, 0), ScaleMode::CENTER_OFFSET),
 		my_cp(0), my_total_cp(0), enemy_cp(0), enemy_total_cp(0), my_team(0)
 	{
 		nl::node main = nl::nx::ui["UIWindow.img"]["MonsterCarnival"];

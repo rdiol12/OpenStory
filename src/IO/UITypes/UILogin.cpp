@@ -21,6 +21,7 @@
 #include "UILoginWait.h"
 
 #include "../UI.h"
+#include "../UIScale.h"
 
 #include "../Components/MapleButton.h"
 
@@ -37,15 +38,9 @@
 
 namespace ms
 {
-	UILogin::UILogin() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()))
+	UILogin::UILogin() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET)
 	{
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		Point<int16_t> screen_adj = Point<int16_t>((vw - 800) / 2, (vh - 600) / 2);
-		float sx = (float)vw / 800.0f;
-		float sy = (float)vh / 600.0f;
-
-		signboard_pos = Point<int16_t>(510, 330) + screen_adj;
+		signboard_pos = Point<int16_t>(510, 330);
 
 		LoginStartPacket().dispatch();
 
@@ -67,16 +62,16 @@ namespace ms
 		nl::node logo = Login["Title"]["logo"]["0"];
 		nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
 
-		sprites.emplace_back(back["11"], DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
-		sprites.emplace_back(logo, Point<int16_t>(409, 144) + screen_adj);
+		sprites.emplace_back(back["11"], UIScale::bg_args());
+		sprites.emplace_back(logo, Point<int16_t>(409, 144));
 		sprites.emplace_back(signboard, signboard_pos);
-		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(500, 50) + screen_adj);
-		sprites.emplace_back(frame, DrawArgument(Point<int16_t>(vw / 2, vh / 2), sx, sy));
+		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(500, 50));
+		sprites.emplace_back(frame, UIScale::bg_args());
 
 
 		buttons[Buttons::BT_LOGIN] = std::make_unique<MapleButton>(loginUI["BtLogin"], signboard_pos + Point<int16_t>(85, -105));
@@ -91,7 +86,7 @@ namespace ms
 		checkbox[false] = loginUI["check"]["0"];
 		checkbox[true] = loginUI["check"]["1"];
 
-		background = ColorBox(dimension.x(), dimension.y(), Color::Name::BLACK, 1.0f);
+		background = ColorBox(UIScale::view_width(), UIScale::view_height(), Color::Name::BLACK, 1.0f);
 
 		Point<int16_t> textbox_pos = signboard_pos + Point<int16_t>(-55, -95);
 		Point<int16_t> textbox_dim = Point<int16_t>(150, 45);
@@ -161,18 +156,16 @@ namespace ms
 
 	void UILogin::draw(float alpha) const
 	{
-		background.draw(position);
+		background.draw(Point<int16_t>(0, 0));
 
 		UIElement::draw(alpha);
 
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-		Point<int16_t> screen_adj = Point<int16_t>((vw - 800) / 2, (vh - 600) / 2);
+		auto drawpos = get_draw_position();
 
-		version.draw(position + Point<int16_t>(680, 10) + screen_adj);
-		account.draw(position);
-		password.draw(position);
-		checkbox[saveid].draw(position + signboard_pos + Point<int16_t>(-120, -25));
+		version.draw(drawpos + Point<int16_t>(680, 10));
+		account.draw(drawpos);
+		password.draw(drawpos);
+		checkbox[saveid].draw(drawpos + signboard_pos + Point<int16_t>(-120, -25));
 	}
 
 	void UILogin::update()
@@ -193,8 +186,8 @@ namespace ms
 		
 		UIElement::update();
 
-		account.update(position);
-		password.update(position);
+		account.update(get_draw_position());
+		password.update(get_draw_position());
 	}
 
 	void UILogin::login()

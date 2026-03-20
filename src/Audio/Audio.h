@@ -64,6 +64,8 @@ namespace ms
 			PICKUP,
 			PORTAL,
 			LEVELUP,
+			HURTDAMAGE,
+			QUESTCOMPLETE,
 			TOMBSTONE,
 			LENGTH
 		};
