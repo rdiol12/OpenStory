@@ -72,7 +72,7 @@ jobs:
         # Clone NoLifeNx
         git clone --depth 1 https://github.com/NoLifeDev/NoLifeNx.git /tmp/NoLifeNx
 
-        cd /tmp/NoLifeNx/nlnx
+        cd /tmp/NoLifeNx
 
         IPHONEOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
         CXX="xcrun --sdk iphoneos clang++"
