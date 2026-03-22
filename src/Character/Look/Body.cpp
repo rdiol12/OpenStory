@@ -126,12 +126,7 @@ namespace ms
 		auto layer_iter = layers_by_name.find(name);
 
 		if (layer_iter == layers_by_name.end())
-		{
-			if (name != "")
-				std::cout << "Unknown Body::Layer name: [" << name << "]" << std::endl;
-
 			return Body::Layer::NONE;
-		}
 
 		return layer_iter->second;
 	}

@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "InventoryType.h"
 
-#include <iostream>
-
 namespace ms
 {
 	InventoryType::Id InventoryType::by_item_id(int32_t item_id)
@@ -55,8 +53,6 @@ namespace ms
 		case 5:
 			return Id::CASH;
 		}
-
-		std::cout << "Unknown InventoryType::Id value: [" << value << "]" << std::endl;
 
 		return Id::NONE;
 	}

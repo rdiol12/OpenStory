@@ -52,7 +52,6 @@
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 
-#include <iostream>
 #include <fstream>
 
 #ifdef USE_NX

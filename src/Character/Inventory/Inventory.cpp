@@ -20,8 +20,6 @@
 #include "../../Data/BulletData.h"
 #include "../../Data/EquipData.h"
 
-#include <iostream>
-
 namespace ms
 {
 	Inventory::Inventory()
@@ -365,8 +363,6 @@ namespace ms
 	{
 		if (value >= Inventory::Movement::MOVE_INTERNAL && value <= Inventory::Movement::MOVE_EQUIP)
 			return static_cast<Movement>(value);
-
-		std::cout << "Unknown Inventory::Movement value: [" << value << "]" << std::endl;
 
 		return Inventory::Movement::MOVE_NONE;
 	}

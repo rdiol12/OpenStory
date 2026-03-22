@@ -107,6 +107,7 @@ namespace ms
 			FARMCHAT,
 			MAPLECHAT,
 			SOCIALCHAT,
+			COMBO,
 			NUM_TYPES
 		};
 

@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerHandlers.h"
 
-#include <iostream>
-
 #include "Helpers/LoginParser.h"
 
 #include "../../Gameplay/Stage.h"

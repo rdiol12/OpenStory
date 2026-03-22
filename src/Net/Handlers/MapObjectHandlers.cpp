@@ -115,7 +115,6 @@ namespace ms
 	void RemoveCharHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
-
 		Stage::get().get_chars().remove(cid);
 	}
 

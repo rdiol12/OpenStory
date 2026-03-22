@@ -127,6 +127,10 @@ namespace ms
 		int32_t get_auto_mp_pot() const { return auto_mp_pot; }
 		void set_auto_mp_pot(int32_t itemid) { auto_mp_pot = itemid; }
 
+		// Extra pendant slot
+		bool get_extra_pendant_slot() const { return extra_pendant_slot; }
+		void set_extra_pendant_slot(bool enabled) { extra_pendant_slot = enabled; }
+
 		// Base class for an entry in the settings file
 		class Entry
 		{
@@ -263,6 +267,7 @@ namespace ms
 		bool admin;
 		int32_t auto_hp_pot = 0;
 		int32_t auto_mp_pot = 0;
+		bool extra_pendant_slot = false;
 		TypeMap<Entry> settings;
 	};
 

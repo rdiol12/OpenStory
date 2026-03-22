@@ -10,6 +10,8 @@
 *.vcxproj
 *.filters
 *.cmake
+!CMakeLists.ios.cmake
+!ios.toolchain.cmake
 CMakeCache.txt
 
 *.nx

@@ -343,7 +343,7 @@ namespace ms
 
 	bool Player::is_hidden() const
 	{
-		return has_buff(Buffstat::Id::DARKSIGHT);
+		return Char::is_hidden();
 	}
 
 	MobAttackResult Player::damage(const MobAttack& attack)

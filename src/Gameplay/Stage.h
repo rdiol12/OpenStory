@@ -112,6 +112,12 @@ namespace ms
 		int8_t get_clock_sec() const;
 		int32_t get_countdown_seconds() const;
 
+		// Combo counter (Aran)
+		void set_combo(int32_t count);
+		int32_t get_combo() const;
+		bool is_combo_active() const;
+
+
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -174,5 +180,9 @@ namespace ms
 		bool clock_active = false;
 		int32_t countdown_seconds = 0;
 		bool countdown_active = false;
+
+		// Combo counter
+		int32_t combo_count = 0;
+
 	};
 }

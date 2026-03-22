@@ -36,13 +36,6 @@ namespace ms
 	{
 		Session::get().write(bytes.data(), bytes.size());
 
-		if (Configuration::get().get_show_packets())
-		{
-			if (opcode == Opcode::PONG)
-				std::cout << "Sent Packet: PONG" << std::endl;
-			else
-				std::cout << "Sent Packet: " << std::to_string(opcode) << std::endl;
-		}
 	}
 
 	void OutPacket::skip(size_t count)

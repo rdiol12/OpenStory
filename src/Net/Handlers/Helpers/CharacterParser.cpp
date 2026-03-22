@@ -19,8 +19,6 @@
 
 #include "ItemParser.h"
 
-#include <iostream>
-
 namespace ms
 {
 	void CharacterParser::parse_inventory(InPacket& recv, Inventory& invent)
@@ -97,7 +95,6 @@ namespace ms
 	void CharacterParser::parse_questlog(InPacket& recv, QuestLog& quests)
 	{
 		int16_t size = recv.read_short();
-		std::cout << "[QuestLog] Parsing " << size << " started quests" << std::endl;
 
 		for (int16_t i = 0; i < size; i++)
 		{
@@ -118,7 +115,6 @@ namespace ms
 
 		std::map<int16_t, int64_t> completed;
 		size = recv.read_short();
-		std::cout << "[QuestLog] Parsing " << size << " completed quests" << std::endl;
 
 		for (int16_t i = 0; i < size; i++)
 		{

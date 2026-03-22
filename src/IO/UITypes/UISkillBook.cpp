@@ -239,7 +239,6 @@ namespace ms
 
 	Button::State UISkillBook::button_pressed(uint16_t id)
 	{
-		std::cout << "[SkillBook] button_pressed id=" << id << std::endl;
 		std::string sp_text = splabel.get_text();
 		int16_t cur_sp = sp_text.empty() ? 0 : std::stoi(sp_text);
 
@@ -484,8 +483,6 @@ namespace ms
 	{
 		Job::Level joblevel = joblevel_by_tab(tab);
 		uint16_t level = stats.get_stat(MapleStat::Id::LEVEL);
-		std::cout << "[SkillBook] change_sp: tab=" << tab << " joblevel=" << joblevel << " level=" << level << " sp_stat=" << stats.get_stat(MapleStat::Id::SP) << " job=" << stats.get_stat(MapleStat::Id::JOB) << std::endl;
-
 		if (joblevel == Job::Level::BEGINNER)
 		{
 			int16_t remaining_beginner_sp = 0;
@@ -507,7 +504,6 @@ namespace ms
 
 			beginner_sp = remaining_beginner_sp;
 			splabel.change_text(std::to_string(beginner_sp));
-			std::cout << "[SkillBook] beginner_sp=" << beginner_sp << " splabel='" << splabel.get_text() << "' bg_dim=" << bg_dimensions.y() << std::endl;
 		}
 		else
 		{
@@ -530,14 +526,10 @@ namespace ms
 		Job::Level joblevel = joblevel_by_tab(tab);
 		uint16_t subid = job.get_subjob(joblevel);
 
-		std::cout << "[SkillBook] change_tab: tab=" << tab << " joblevel=" << joblevel << " subid=" << subid << std::endl;
-
 		const JobData& data = JobData::get(subid);
 
 		bookicon = data.get_icon();
 		booktext.change_text(data.get_name());
-
-		std::cout << "[SkillBook] JobData name='" << data.get_name() << "' skills=" << data.get_skills().size() << std::endl;
 
 		for (int32_t skill_id : data.get_skills())
 		{
@@ -559,12 +551,9 @@ namespace ms
 					continue;
 			}
 
-			std::cout << "[SkillBook]   SHOW skill " << skill_id << " base=" << (skill_id % 10000) << " lv=" << level << " mlv=" << masterlevel << std::endl;
 			skills.emplace_back(skill_id, level);
 			skillcount++;
 		}
-
-		std::cout << "[SkillBook] visible skills: " << skillcount << std::endl;
 
 		slider.setrows(ROWS, skillcount);
 		offset = 0;
@@ -610,16 +599,10 @@ namespace ms
 		Job::Level joblevel = joblevel_by_tab(tab);
 
 		if (joblevel == Job::Level::BEGINNER && beginner_sp <= 0)
-		{
-			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (beginner_sp=0)" << std::endl;
 			return false;
-		}
 
 		if (tab + Buttons::BT_TAB0 != Buttons::BT_TAB0 && sp <= 0)
-		{
-			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (sp=0)" << std::endl;
 			return false;
-		}
 
 		int32_t level = skillbook.get_level(skill_id);
 		int32_t masterlevel = skillbook.get_masterlevel(skill_id);
@@ -628,10 +611,7 @@ namespace ms
 			masterlevel = SkillData::get(skill_id).get_masterlevel();
 
 		if (level >= masterlevel)
-		{
-			std::cout << "[SkillBook] can_raise " << skill_id << ": NO (lv=" << level << " >= mlv=" << masterlevel << ")" << std::endl;
 			return false;
-		}
 
 		int32_t base_id = skill_id % 10000;
 
@@ -640,9 +620,7 @@ namespace ms
 		case SkillId::Id::ANGEL_BLESSING:
 			return false;
 		default:
-			bool req = check_required(skill_id);
-			std::cout << "[SkillBook] can_raise " << skill_id << ": " << (req ? "YES" : "NO (req failed)") << " lv=" << level << " mlv=" << masterlevel << std::endl;
-			return req;
+			return check_required(skill_id);
 		}
 	}
 
@@ -665,7 +643,6 @@ namespace ms
 
 	void UISkillBook::spend_sp(int32_t skill_id)
 	{
-		std::cout << "[SkillBook] spend_sp sending skill_id=" << skill_id << std::endl;
 		SpendSpPacket(skill_id).dispatch();
 	}
 

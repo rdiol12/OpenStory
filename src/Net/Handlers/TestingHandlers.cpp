@@ -46,6 +46,14 @@
 #include "../../IO/UITypes/UIAlliance.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
+#include "../../IO/UITypes/UIEquipInventory.h"
+#include "../../IO/UITypes/UIStatsInfo.h"
+#include "../../IO/UITypes/UISkillBook.h"
+#include "../../IO/UITypes/UIBuddyList.h"
+#include "../../IO/UITypes/UIWorldMap.h"
+#include "../../IO/UITypes/UIKeyConfig.h"
+#include "../../IO/UITypes/UIMonsterBook.h"
+#include "../../IO/UITypes/UIComboCounter.h"
 #include "../../Net/Session.h"
 #include "../../Configuration.h"
 #include "Helpers/LoginParser.h"
@@ -66,26 +74,59 @@ namespace ms
 		if (reason == 0)
 			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::INCORRECT_PIC);
 		else
-			std::cout << "[CheckSpwResultHandler]: Unknown reason: [" << reason << "]" << std::endl;
+			// Unknown SPW reason
 
 		UI::get().enable();
 	}
 
 	void FieldEffectHandler::handle(InPacket& recv) const
 	{
-		int rand = recv.read_byte();
-
-		// Effect
-		if (rand == 3)
-		{
-			std::string path = recv.read_string();
-
-			Stage::get().add_effect(path);
-
+		if (!recv.available())
 			return;
-		}
 
-		std::cout << "[FieldEffectHandler]: Unknown value: [" << rand << "]" << std::endl;
+		int8_t type = recv.read_byte();
+
+		switch (type)
+		{
+		case 0:
+		{
+			// Summon message — map-specific event string
+			// e.g., "Eos Tower" summon messages
+			std::string path = recv.read_string();
+			Stage::get().add_effect("Map/Effect.img/" + path);
+			break;
+		}
+		case 1:
+		{
+			// Boss HP bar / map boss spawn effect
+			// Cosmic: MapEffect.MapBossHPBar
+			Stage::get().add_effect("Map/Effect.img/quest/party/clear");
+			break;
+		}
+		case 2:
+		{
+			// Map effect with WZ path
+			std::string path = recv.read_string();
+			Stage::get().add_effect("Map/Effect.img/" + path);
+			break;
+		}
+		case 3:
+		{
+			// Screen effect (full path provided)
+			std::string path = recv.read_string();
+			Stage::get().add_effect(path);
+			break;
+		}
+		case 4:
+		{
+			// Sound effect — path to Sound.wz entry
+			// We don't have a sound system hooked up, so just consume
+			std::string path = recv.read_string();
+			break;
+		}
+		default:
+			break;
+		}
 	}
 
 	void UpdateQuestInfoHandler::handle(InPacket& recv) const
@@ -121,7 +162,7 @@ namespace ms
 			// Remove quest time limit
 			int16_t pos = recv.read_short();
 			int16_t questid = recv.read_short();
-			std::cout << "[UpdateQuestInfo] Remove time limit: quest " << questid << std::endl;
+			(void)questid;
 			break;
 		}
 		case 8:
@@ -130,8 +171,6 @@ namespace ms
 			int16_t questid = recv.read_short();
 			int32_t npcid = recv.read_int();
 			int32_t zero = recv.read_int();
-			std::cout << "[UpdateQuestInfo] NPC info: quest " << questid << " npc " << npcid << std::endl;
-
 			// Refresh quest log UI if open
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
 				questlog_ui->load_quests();
@@ -143,7 +182,6 @@ namespace ms
 			// Quest expired
 			int16_t questid = recv.read_short();
 			Stage::get().get_player().get_quests().forfeit(questid);
-			std::cout << "[UpdateQuestInfo] Quest expired: " << questid << std::endl;
 
 			// Refresh quest log UI if open
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
@@ -155,7 +193,7 @@ namespace ms
 			break;
 		}
 		default:
-			std::cout << "[UpdateQuestInfoHandler]: Unhandled mode: [" << (int)mode << "] remaining bytes: [" << recv.length() << "]" << std::endl;
+			// Unhandled quest info mode
 			break;
 		}
 	}
@@ -167,7 +205,7 @@ namespace ms
 			return;
 
 		int16_t questid = recv.read_short();
-		std::cout << "[QuestClear] Quest " << questid << " completed (visual)" << std::endl;
+		(void)questid;
 
 		// Refresh quest log UI if open
 		if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
@@ -262,326 +300,6 @@ namespace ms
 				if (messenger)
 					messenger->show_status(Color::Name::YELLOW, msg);
 			}
-			break;
-		}
-		default:
-			break;
-		}
-	}
-
-	void BuddyListHandler::handle(InPacket& recv) const
-	{
-		// v83: byte operation
-		// 7 = buddy list update
-		// 10 = buddy channel change
-		// 14 = buddy capacity
-		// 18 = buddy added/online
-		if (!recv.available())
-			return;
-
-		int8_t operation = recv.read_byte();
-
-		switch (operation)
-		{
-		case 7:
-		{
-			// Buddy list update
-			if (!recv.available())
-				break;
-
-			int8_t count = recv.read_byte();
-			std::cout << "[BuddyListHandler]: Buddy list update, count: [" << (int)count << "]" << std::endl;
-
-			std::map<int32_t, BuddyEntry> entries;
-
-			for (int8_t i = 0; i < count; i++)
-			{
-				if (recv.length() < 4)
-					break;
-
-				BuddyEntry entry;
-				entry.cid = recv.read_int();
-				entry.name = recv.read_padded_string(13);
-				entry.status = recv.read_byte();
-				entry.channel = recv.read_int();
-				entry.group = recv.read_padded_string(17);
-
-				std::cout << "  Buddy: [" << entry.name << "] cid: [" << entry.cid << "] status: [" << (int)entry.status << "] ch: [" << entry.channel << "] online: [" << entry.online() << "]" << std::endl;
-
-				entries[entry.cid] = entry;
-			}
-
-			Stage::get().get_player().get_buddylist().update(entries);
-			break;
-		}
-		case 14:
-		{
-			// Buddy capacity
-			if (recv.available())
-			{
-				int8_t capacity = recv.read_byte();
-				Stage::get().get_player().get_buddylist().set_capacity(capacity);
-				std::cout << "[BuddyListHandler]: Buddy capacity: [" << (int)capacity << "]" << std::endl;
-			}
-			break;
-		}
-		default:
-			std::cout << "[BuddyListHandler]: operation: [" << (int)operation << "] remaining bytes: [" << recv.length() << "]" << std::endl;
-			break;
-		}
-	}
-
-	void FamilyHandler::handle(InPacket& recv) const
-	{
-		// v83 family packet - show family-related messages
-		if (!recv.available())
-			return;
-
-		int8_t mode = recv.read_byte();
-		auto messenger = UI::get().get_element<UIStatusMessenger>();
-
-		switch (mode)
-		{
-		case 0:
-		{
-			// Family info update - list of family members
-			// int count, then for each: int cid, string name, short job, short level, int rep
-			if (recv.length() < 4)
-				break;
-
-			int32_t count = recv.read_int();
-
-			for (int32_t i = 0; i < count && recv.available(); i++)
-			{
-				recv.read_int();    // cid
-				recv.read_string(); // name
-				recv.read_short();  // job
-				recv.read_short();  // level
-				recv.read_int();    // reputation
-			}
-			break;
-		}
-		case 2:
-		{
-			// Family invitation
-			if (recv.available())
-			{
-				std::string from_name = recv.read_string();
-
-				if (messenger)
-					messenger->show_status(Color::Name::YELLOW, from_name + " has invited you to join their family.");
-			}
-			break;
-		}
-		default:
-			break;
-		}
-	}
-
-	namespace
-	{
-		void parse_party_data(InPacket& recv, int32_t partyid)
-		{
-			// v83 full party data block:
-			// 6x int cid, 6x padded(13) name, 6x int job, 6x int level,
-			// 6x int channel, 6x int mapid, int leader_cid,
-			// then door data and misc we skip
-			if (recv.length() < 4 * 6)
-				return;
-
-			int32_t cids[6];
-			for (int i = 0; i < 6; i++)
-				cids[i] = recv.read_int();
-
-			std::string names[6];
-			for (int i = 0; i < 6; i++)
-				names[i] = recv.read_padded_string(13);
-
-			int32_t jobs[6];
-			for (int i = 0; i < 6; i++)
-				jobs[i] = recv.read_int();
-
-			int32_t levels[6];
-			for (int i = 0; i < 6; i++)
-				levels[i] = recv.read_int();
-
-			int32_t channels[6];
-			for (int i = 0; i < 6; i++)
-				channels[i] = recv.read_int();
-
-			int32_t mapids[6];
-			for (int i = 0; i < 6; i++)
-				mapids[i] = recv.read_int();
-
-			int32_t leader_cid = recv.read_int();
-
-			std::vector<PartyMember> members;
-
-			for (int i = 0; i < 6; i++)
-			{
-				if (cids[i] == 0)
-					continue;
-
-				PartyMember member;
-				member.cid = cids[i];
-				member.name = names[i];
-				member.job = static_cast<int16_t>(jobs[i]);
-				member.level = static_cast<int16_t>(levels[i]);
-				member.channel = channels[i];
-				member.mapid = mapids[i];
-				member.online = channels[i] >= 0;
-				members.push_back(member);
-			}
-
-			Stage::get().get_player().get_party().update(partyid, members, leader_cid);
-		}
-	}
-
-	void PartyOperationHandler::handle(InPacket& recv) const
-	{
-		// v83 party operations:
-		// 7  = silent party update (full party data)
-		// 11 = party created / you joined (full party data)
-		// 12 = invite received
-		// 13 = expel (int partyid, int target_cid, byte new_leader, then full party data if still in)
-		// 14 = member left (int partyid, int target_cid, byte new_leader, then full party data if still in)
-		// 15 = disband (int partyid, int leader_cid)
-		// 22 = leader changed
-		// 25 = member online/channel status changed (full party data)
-		if (!recv.available())
-			return;
-
-		int8_t operation = recv.read_byte();
-		auto messenger = UI::get().get_element<UIStatusMessenger>();
-
-		switch (operation)
-		{
-		case 7:
-		case 11:
-		case 25:
-		{
-			// Full party data update
-			// Op 7 = silent refresh, 11 = joined/created, 25 = member status change
-			if (recv.length() < 4)
-				break;
-
-			int32_t partyid = recv.read_int();
-			parse_party_data(recv, partyid);
-
-			if (operation == 11 && messenger)
-				messenger->show_status(Color::Name::WHITE, "You have joined the party.");
-
-			break;
-		}
-		case 12:
-		{
-			// Invite received
-			if (recv.length() < 4)
-				break;
-
-			int32_t from_cid = recv.read_int();
-			std::string from_name = recv.read_string();
-
-			if (messenger)
-				messenger->show_status(Color::Name::YELLOW, from_name + " has invited you to a party.");
-
-			break;
-		}
-		case 13:
-		{
-			// Member expelled
-			if (recv.length() < 4)
-				break;
-
-			int32_t partyid = recv.read_int();
-			int32_t target_cid = recv.read_int();
-
-			int32_t my_cid = Stage::get().get_player().get_oid();
-
-			if (target_cid == my_cid)
-			{
-				Stage::get().get_player().get_party().clear();
-
-				if (messenger)
-					messenger->show_status(Color::Name::RED, "You have been expelled from the party.");
-			}
-			else
-			{
-				// Skip byte (leader_changed flag) and re-parse party data
-				if (recv.available())
-					recv.read_byte();
-
-				if (recv.length() >= 4 * 6)
-					parse_party_data(recv, partyid);
-			}
-
-			break;
-		}
-		case 14:
-		{
-			// Member left
-			if (recv.length() < 4)
-				break;
-
-			int32_t partyid = recv.read_int();
-			int32_t target_cid = recv.read_int();
-
-			int32_t my_cid = Stage::get().get_player().get_oid();
-
-			if (target_cid == my_cid)
-			{
-				Stage::get().get_player().get_party().clear();
-
-				if (messenger)
-					messenger->show_status(Color::Name::WHITE, "You have left the party.");
-			}
-			else
-			{
-				if (recv.available())
-					recv.read_byte();
-
-				if (recv.length() >= 4 * 6)
-					parse_party_data(recv, partyid);
-			}
-
-			break;
-		}
-		case 15:
-		{
-			// Party disbanded
-			if (recv.length() < 8)
-				break;
-
-			recv.read_int(); // partyid
-			recv.read_int(); // leader_cid
-
-			Stage::get().get_player().get_party().clear();
-
-			if (messenger)
-				messenger->show_status(Color::Name::WHITE, "The party has been disbanded.");
-
-			break;
-		}
-		case 22:
-		{
-			// Leader changed
-			if (recv.length() < 4)
-				break;
-
-			int32_t new_leader_cid = recv.read_int();
-
-			Party& party = Stage::get().get_player().get_party();
-			int32_t partyid = party.get_id();
-
-			// Re-parse with same partyid if full data follows
-			if (recv.length() >= 4 * 6)
-			{
-				parse_party_data(recv, partyid);
-			}
-
-			if (messenger)
-				messenger->show_status(Color::Name::WHITE, "The party leader has changed.");
-
 			break;
 		}
 		default:
@@ -837,204 +555,6 @@ namespace ms
 		}
 	}
 
-	void DamagePlayerHandler::handle(InPacket& recv) const
-	{
-		// v83 DAMAGE_PLAYER: int cid, byte skill, int damage, ...
-		// Shows damage taken by another player on the map
-		if (recv.length() < 9)
-			return;
-
-		int32_t cid = recv.read_int();
-		int8_t skill = recv.read_byte();
-
-		if (skill == -3 && recv.length() >= 4)
-			recv.read_int(); // padding 0
-
-		int32_t damage = recv.read_int();
-
-		if (skill != -4 && recv.length() >= 5)
-		{
-			int32_t monsteridfrom = recv.read_int();
-			int8_t direction = recv.read_byte();
-
-			(void)monsteridfrom;
-			(void)direction;
-		}
-
-		// Show damage number on the character
-		Optional<Char> character = Stage::get().get_character(cid);
-		if (character)
-			character->show_damage(damage);
-	}
-
-	void FacialExpressionHandler::handle(InPacket& recv) const
-	{
-		// v83 FACIAL_EXPRESSION: int cid, int expression
-		if (recv.length() < 8)
-			return;
-
-		int32_t cid = recv.read_int();
-		int32_t expression = recv.read_int();
-
-		Optional<Char> character = Stage::get().get_character(cid);
-		if (character)
-			character->set_expression(expression);
-	}
-
-	void GiveForeignBuffHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, long buffmask, then for each set bit: short value
-		// Applies buff stat modifiers to another character on the map
-		if (recv.length() < 4)
-			return;
-
-		int32_t cid = recv.read_int();
-
-		if (recv.length() < 8)
-			return;
-
-		int64_t buffmask = recv.read_long();
-
-		// Buff mask bits (v83):
-		// bit 0 = PAD, bit 1 = PDD, bit 2 = MAD, bit 3 = MDD
-		// bit 4 = ACC, bit 5 = EVA, bit 7 = SPEED, bit 8 = JUMP
-		// bit 42 = DARKSIGHT
-		uint8_t speed = 0;
-		bool darksight = (buffmask & 0x40000000000LL) != 0;
-
-		int bit = 0;
-		for (int64_t mask = buffmask; mask != 0 && recv.length() >= 2; mask >>= 1, bit++)
-		{
-			if (mask & 1)
-			{
-				int16_t value = recv.read_short();
-
-				// Speed buff (bit 7)
-				if (bit == 7)
-					speed = static_cast<uint8_t>(value);
-			}
-		}
-
-		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
-		if (ochar)
-		{
-			if (speed > 0)
-				ochar->update_speed(speed);
-
-			if (darksight)
-				ochar->set_hidden(true);
-		}
-	}
-
-	void CancelForeignBuffHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, long buffmask
-		// Resets buff stat modifiers on another character
-		if (recv.length() < 12)
-			return;
-
-		int32_t cid = recv.read_int();
-		int64_t buffmask = recv.read_long();
-
-		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
-		if (ochar)
-		{
-			// If speed buff was cancelled (bit 7), reset speed
-			if (buffmask & (1LL << 7))
-				ochar->update_speed(100); // default speed
-
-			// If DARKSIGHT was cancelled (bit 42), unhide
-			if (buffmask & 0x40000000000LL)
-				ochar->set_hidden(false);
-		}
-	}
-
-	void UpdatePartyMemberHPHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, int hp, int maxhp
-		// Updates a party member's HP in the party data
-		if (recv.length() < 12)
-			return;
-
-		int32_t cid = recv.read_int();
-		int32_t hp = recv.read_int();
-		int32_t maxhp = recv.read_int();
-
-		Stage::get().get_player().get_party().update_member_hp(cid, hp, maxhp);
-	}
-
-	void GuildNameChangedHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, string guildname
-		// Updates guild name display for a character on the map
-		if (recv.length() < 4)
-			return;
-
-		int32_t cid = recv.read_int();
-		std::string guildname = recv.available() ? recv.read_string() : "";
-
-		Optional<Char> character = Stage::get().get_character(cid);
-		if (character)
-			character->set_guild(guildname);
-	}
-
-	void GuildMarkChangedHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, short bg, byte bgcolor, short logo, byte logocolor
-		// Updates guild mark/emblem for a character on the map
-		if (recv.length() < 4)
-			return;
-
-		int32_t cid = recv.read_int();
-
-		if (recv.length() >= 6)
-		{
-			int16_t bg = recv.read_short();
-			int8_t bgcolor = recv.read_byte();
-			int16_t logo = recv.read_short();
-			int8_t logocolor = recv.read_byte();
-
-			Optional<Char> character = Stage::get().get_character(cid);
-			if (character)
-				character->set_guild_mark(bg, bgcolor, logo, logocolor);
-		}
-	}
-
-	void CancelChairHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid
-		// Cancels the chair sitting visual for a character
-		if (recv.length() < 4)
-			return;
-
-		int32_t cid = recv.read_int();
-
-		Optional<Char> character = Stage::get().get_character(cid);
-		if (character)
-			character->set_state(Char::State::STAND);
-	}
-
-	void ShowItemEffectHandler::handle(InPacket& recv) const
-	{
-		// v83: int cid, int itemid
-		// Shows an item-use visual effect on a character
-		if (recv.length() < 8)
-			return;
-
-		int32_t cid = recv.read_int();
-		int32_t itemid = recv.read_int();
-
-		// Load the item effect animation from Effect.wz
-		nl::node effect_node = nl::nx::effect["ItemEff.img"][std::to_string(itemid)];
-
-		if (effect_node)
-		{
-			Optional<Char> character = Stage::get().get_character(cid);
-			if (character)
-				character->show_attack_effect(Animation(effect_node), 0);
-		}
-	}
-
 	void QuickSlotInitHandler::handle(InPacket& recv) const
 	{
 		// Quick slot key init — read 8 int32 key bindings for the quick slot bar
@@ -1099,27 +619,8 @@ namespace ms
 			recv.read_byte(); // gender (0=male, 1=female)
 	}
 
-	void FamilyPrivilegeListHandler::handle(InPacket& recv) const
-	{
-		// Family privilege list — read and consume all entries
-		if (!recv.available())
-			return;
-
-		int32_t count = recv.read_int();
-
-		for (int32_t i = 0; i < count && recv.available(); i++)
-		{
-			recv.read_byte();   // type (1 or 2)
-			recv.read_int();    // reputation cost
-			recv.read_int();    // usage limit
-			recv.read_string(); // privilege name
-			recv.read_string(); // privilege description
-		}
-	}
-
 	void AdminResultHandler::handle(InPacket& recv) const
 	{
-		// GM command result — read type and mode
 		if (!recv.available())
 			return;
 
@@ -1128,31 +629,11 @@ namespace ms
 		if (recv.available())
 		{
 			int8_t mode = recv.read_byte();
-			(void)type;
-			(void)mode;
+
+			// type 0x10 = GM hide toggle, mode 1 = hidden, mode 0 = visible
+			if (type == 0x10)
+				Stage::get().get_player().set_hidden(mode == 1);
 		}
-	}
-
-	void SkillEffectHandler::handle(InPacket& recv) const
-	{
-		// Skill effect on another player — shows the skill animation
-		// Format: int cid, int skillid, byte level, byte flags, byte speed, byte direction
-		if (!recv.available())
-			return;
-
-		int32_t cid = recv.read_int();
-		int32_t skillid = recv.read_int();
-		int8_t level = recv.read_byte();
-		int8_t flags = recv.read_byte();
-		int8_t speed = recv.read_byte();
-		int8_t direction = recv.read_byte();
-
-		(void)flags;
-		(void)speed;
-		(void)direction;
-
-		// Use Combat::show_buff which loads skill animation from NX and applies it
-		Stage::get().get_combat().show_buff(cid, skillid, level);
 	}
 
 	void SetNpcScriptableHandler::handle(InPacket& recv) const
@@ -1202,300 +683,6 @@ namespace ms
 		Configuration::get().set_auto_mp_pot(itemid);
 	}
 
-	namespace
-	{
-		InventoryType::Id type_by_storage_bitfield(int16_t bitfield)
-		{
-			switch (bitfield)
-			{
-			case 4: return InventoryType::Id::EQUIP;
-			case 8: return InventoryType::Id::USE;
-			case 16: return InventoryType::Id::SETUP;
-			case 32: return InventoryType::Id::ETC;
-			case 64: return InventoryType::Id::CASH;
-			default: return InventoryType::Id::NONE;
-			}
-		}
-
-		UIStorage::ItemEntry parse_storage_item(InPacket& recv, InventoryType::Id forced_type, InventoryType::Id& parsed_type)
-		{
-			int8_t item_type = recv.read_byte();
-			int32_t itemid = recv.read_int();
-
-			parsed_type = forced_type;
-			if (parsed_type == InventoryType::Id::NONE)
-				parsed_type = InventoryType::by_item_id(itemid);
-
-			bool cash = recv.read_bool();
-			if (cash)
-				recv.skip(8); // unique ID
-
-			recv.skip(8); // expiration
-
-			UIStorage::ItemEntry entry = { itemid, 1 };
-
-			bool is_equip = (parsed_type == InventoryType::Id::EQUIP) || (item_type == 1);
-			bool is_pet = (itemid >= 5000000 && itemid <= 5000102);
-
-			if (is_equip)
-			{
-				recv.read_byte();  // upgrade slots
-				recv.read_byte();  // level
-
-				// 15 equip stats (Cosmic v83): STR, DEX, INT, LUK, HP, MP, WATK, MATK, WDEF, MDEF, ACC, AVOID, HANDS, SPEED, JUMP
-				for (int i = 0; i < 15; i++)
-					recv.read_short();
-
-				recv.read_string(); // owner
-				recv.read_short();  // flag
-
-				if (cash)
-				{
-					recv.skip(10);
-				}
-				else
-				{
-					recv.read_byte();   // unk
-					recv.read_byte();   // item level
-					recv.read_short();  // unk
-					recv.read_short();  // item exp
-					recv.read_int();    // vicious
-					recv.read_long();   // unk
-				}
-
-				recv.skip(12); // trailing data
-			}
-			else if (is_pet)
-			{
-				recv.read_padded_string(13);
-				recv.read_byte();  // pet level
-				recv.read_short(); // closeness
-				recv.read_byte();  // fullness
-				recv.skip(18);
-			}
-			else
-			{
-				entry.count = recv.read_short();
-				recv.read_string(); // owner
-				recv.read_short();  // flag
-
-				if ((itemid / 10000 == 233) || (itemid / 10000 == 207))
-					recv.skip(8);
-			}
-
-			return entry;
-		}
-
-		struct ParsedStorageItems
-		{
-			std::vector<UIStorage::ItemEntry> equip;
-			std::vector<UIStorage::ItemEntry> use;
-			std::vector<UIStorage::ItemEntry> setup;
-			std::vector<UIStorage::ItemEntry> etc_items;
-			std::vector<UIStorage::ItemEntry> cash;
-
-			std::vector<UIStorage::ItemEntry>& get(InventoryType::Id type)
-			{
-				switch (type)
-				{
-				case InventoryType::Id::EQUIP: return equip;
-				case InventoryType::Id::USE: return use;
-				case InventoryType::Id::SETUP: return setup;
-				case InventoryType::Id::ETC: return etc_items;
-				case InventoryType::Id::CASH: return cash;
-				default: return etc_items;
-				}
-			}
-		};
-
-		ParsedStorageItems parse_storage_items(InPacket& recv, uint8_t count, InventoryType::Id forced_type)
-		{
-			ParsedStorageItems result;
-
-			for (size_t i = 0; i < count && recv.available(); ++i)
-			{
-				InventoryType::Id parsed_type = InventoryType::Id::NONE;
-				UIStorage::ItemEntry entry = parse_storage_item(recv, forced_type, parsed_type);
-				if (parsed_type != InventoryType::Id::NONE)
-					result.get(parsed_type).push_back(entry);
-			}
-
-			return result;
-		}
-	}
-
-	void StorageHandler::handle(InPacket& recv) const
-	{
-		if (!recv.available())
-			return;
-
-		int8_t mode = recv.read_byte();
-		auto messenger = UI::get().get_element<UIStatusMessenger>();
-
-		switch (mode)
-		{
-		case 0x16:
-		{
-			// Open storage
-			if (recv.length() < 4)
-				break;
-
-			int32_t npcid = recv.read_int();
-			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
-
-			recv.skip(2); // inventory mask
-			recv.skip(2); // zero
-			recv.skip(4); // zero
-			int32_t meso = recv.read_int();
-			recv.skip(2); // zero
-
-			uint8_t item_count = static_cast<uint8_t>(recv.read_byte());
-			ParsedStorageItems items = parse_storage_items(recv, item_count, InventoryType::Id::NONE);
-
-			if (recv.length() >= 2)
-				recv.skip(2);
-			if (recv.length() >= 1)
-				recv.skip(1);
-
-			const Inventory& inv = Stage::get().get_player().get_inventory();
-			UI::get().emplace<UIStorage>(inv);
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-			{
-				storage_ui->open(npcid, slots, meso);
-
-				InventoryType::Id types[] = {
-					InventoryType::Id::EQUIP, InventoryType::Id::USE,
-					InventoryType::Id::SETUP, InventoryType::Id::ETC,
-					InventoryType::Id::CASH
-				};
-				std::vector<UIStorage::ItemEntry> tab_items[] = {
-					items.equip, items.use, items.setup, items.etc_items, items.cash
-				};
-				storage_ui->set_items_for_all(types, 5, tab_items);
-			}
-
-			break;
-		}
-		case 0x09:
-		case 0x0D:
-		{
-			// Take out (0x09) or Store (0x0D) result — updates one tab
-			if (recv.length() < 2)
-				break;
-
-			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
-			int16_t type_bitfield = recv.read_short();
-			InventoryType::Id type = type_by_storage_bitfield(type_bitfield);
-
-			recv.skip(2); // zero
-			recv.skip(4); // zero
-
-			uint8_t count = static_cast<uint8_t>(recv.read_byte());
-			ParsedStorageItems parsed = parse_storage_items(recv, count, type);
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-			{
-				storage_ui->set_slots(slots);
-				if (type != InventoryType::Id::NONE)
-					storage_ui->set_items_for_tab(type, parsed.get(type));
-			}
-
-			break;
-		}
-		case 0x0F:
-		{
-			// Arrange result — updates all tabs
-			if (recv.length() < 2)
-				break;
-
-			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
-
-			recv.skip(1);  // mask byte (writeByte(124))
-			recv.skip(10); // zeroes
-
-			uint8_t count = static_cast<uint8_t>(recv.read_byte());
-			ParsedStorageItems items = parse_storage_items(recv, count, InventoryType::Id::NONE);
-
-			if (recv.length() >= 1)
-				recv.skip(1);
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-			{
-				storage_ui->set_slots(slots);
-
-				InventoryType::Id types[] = {
-					InventoryType::Id::EQUIP, InventoryType::Id::USE,
-					InventoryType::Id::SETUP, InventoryType::Id::ETC,
-					InventoryType::Id::CASH
-				};
-				std::vector<UIStorage::ItemEntry> tab_items[] = {
-					items.equip, items.use, items.setup, items.etc_items, items.cash
-				};
-				storage_ui->set_items_for_all(types, 5, tab_items);
-			}
-
-			break;
-		}
-		case 0x13:
-		{
-			// Meso update
-			if (recv.length() < 2)
-				break;
-
-			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
-
-			recv.skip(2); // type mask
-			recv.skip(2); // zero
-			recv.skip(4); // zero
-
-			int32_t meso = recv.read_int();
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-			{
-				storage_ui->set_slots(slots);
-				storage_ui->set_meso(meso);
-			}
-
-			break;
-		}
-		case 0x0A:
-		{
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "Your inventory is full.");
-			break;
-		}
-		case 0x0B:
-		{
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "You do not have enough mesos.");
-			break;
-		}
-		case 0x0C:
-		{
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "You already have that one-of-a-kind item.");
-			break;
-		}
-		case 0x11:
-		{
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "Storage is full.");
-			break;
-		}
-		default:
-			std::cout << "[StorageHandler]: mode " << (int)mode
-				<< " remaining: " << recv.length() << std::endl;
-			break;
-		}
-
-		UI::get().enable();
-	}
-
 	void FieldObstacleOnOffHandler::handle(InPacket& recv) const
 	{
 		// Field obstacle on/off list — controls gates, platforms, etc. in maps/PQs
@@ -1513,442 +700,51 @@ namespace ms
 			Stage::get().toggle_environment(env_name, mode);
 		}
 	}
-
-	void PlayerInteractionHandler::handle(InPacket& recv) const
+	void OpenUIHandler::handle(InPacket& recv) const
 	{
 		if (!recv.available())
 			return;
 
-		int8_t action = recv.read_byte();
-
-		switch (action)
-		{
-		case 2:  // INVITE
-		{
-			int8_t type = recv.read_byte();
-			std::string inviter = recv.read_string();
-
-			// Read trailing bytes
-			if (recv.available())
-				recv.skip(4);
-
-			if (type == 3) // Trade invite
-			{
-				// Show accept/decline dialog
-				UI::get().emplace<UIYesNo>(
-					"Trade request from " + inviter + ". Accept?",
-					[](bool yes)
-					{
-						if (yes)
-						{
-							// Create and visit the trade
-							TradeCreatePacket().dispatch();
-						}
-						else
-						{
-							TradeDeclinePacket().dispatch();
-						}
-					}
-				);
-			}
-			break;
-		}
-
-		case 4:  // VISIT — partner joined the trade
-		{
-			uint8_t slot = recv.read_byte();
-
-			// Skip partner appearance data (addCharLook)
-			// This is complex; skip what we can
-			// For now, just read the partner name at the end
-			// We'll skip the look data by reading until we find the name
-
-			// In v83: addCharLook writes gender(byte), skin(byte), face(int),
-			// hair flag(byte), hair(int), then equipped items, then cash items,
-			// then end marker -1, then pets
-			// This is variable length, so we need to parse it
-
-			int8_t gender = recv.read_byte();
-			int8_t skin = recv.read_byte();
-			int32_t face = recv.read_int();
-
-			// mega flag
-			recv.skip_byte();
-
-			int32_t hair = recv.read_int();
-
-			// Equipped items (slot, itemid pairs until slot == -1)
-			while (recv.available())
-			{
-				int8_t equipped_slot = recv.read_byte();
-				if (equipped_slot == -1)
-					break;
-				recv.skip_int(); // item id
-			}
-
-			// Cash items (slot, itemid pairs until slot == -1)
-			while (recv.available())
-			{
-				int8_t cash_slot = recv.read_byte();
-				if (cash_slot == -1)
-					break;
-				recv.skip_int(); // item id
-			}
-
-			// Skip remaining look data (weapon sticker, pets)
-			recv.skip_int(); // weapon sticker
-
-			for (int i = 0; i < 3; i++)
-				recv.skip_int(); // pet ids
-
-			std::string partner_name = recv.read_string();
-
-			if (auto trade = UI::get().get_element<UITrade>())
-				trade->set_partner(slot, partner_name);
-
-			break;
-		}
-
-		case 5:  // ROOM — trade room setup
-		{
-			int8_t room_type = recv.read_byte();
-
-			if (room_type == 3) // Trade
-			{
-				int8_t room_mode = recv.read_byte();
-				uint8_t player_num = recv.read_byte();
-
-				// Create the trade UI
-				UI::get().emplace<UITrade>();
-
-				if (player_num == 1)
-				{
-					// Partner data follows
-					recv.skip_byte(); // slot
-
-					// Skip partner addCharLook
-					recv.skip_byte(); // gender
-					recv.skip_byte(); // skin
-					recv.skip_int();  // face
-					recv.skip_byte(); // mega flag
-					recv.skip_int();  // hair
-
-					// Equipped items
-					while (recv.available())
-					{
-						int8_t eslot = recv.read_byte();
-						if (eslot == -1) break;
-						recv.skip_int();
-					}
-
-					// Cash items
-					while (recv.available())
-					{
-						int8_t cslot = recv.read_byte();
-						if (cslot == -1) break;
-						recv.skip_int();
-					}
-
-					recv.skip_int(); // weapon sticker
-					for (int i = 0; i < 3; i++)
-						recv.skip_int(); // pet ids
-
-					std::string partner_name = recv.read_string();
-
-					if (auto trade = UI::get().get_element<UITrade>())
-						trade->set_partner(1, partner_name);
-				}
-
-				// Self data
-				uint8_t self_num = recv.read_byte();
-
-				// Skip self addCharLook
-				recv.skip_byte(); // gender
-				recv.skip_byte(); // skin
-				recv.skip_int();  // face
-				recv.skip_byte(); // mega flag
-				recv.skip_int();  // hair
-
-				// Equipped items
-				while (recv.available())
-				{
-					int8_t eslot = recv.read_byte();
-					if (eslot == -1) break;
-					recv.skip_int();
-				}
-
-				// Cash items
-				while (recv.available())
-				{
-					int8_t cslot = recv.read_byte();
-					if (cslot == -1) break;
-					recv.skip_int();
-				}
-
-				recv.skip_int(); // weapon sticker
-				for (int i = 0; i < 3; i++)
-					recv.skip_int(); // pet ids
-
-				recv.skip_string(); // self name
-
-				// End marker
-				if (recv.available())
-					recv.skip_byte(); // 0xFF
-			}
-			break;
-		}
-
-		case 10: // EXIT — trade cancelled/completed
-		{
-			uint8_t player_num = recv.read_byte();
-			uint8_t result = recv.read_byte();
-
-			if (auto trade = UI::get().get_element<UITrade>())
-			{
-				trade->trade_result(result);
-
-				// Close after showing result
-				if (result == 7) // SUCCESS
-				{
-					// Trade completed successfully
-				}
-			}
-
-			// Deactivate trade window
-			if (auto trade = UI::get().get_element<UITrade>())
-				trade->deactivate();
-
-			break;
-		}
-
-		case 15: // SET_ITEMS — item added to trade
-		{
-			uint8_t player_num = recv.read_byte();
-			uint8_t trade_slot = recv.read_byte();
-
-			// Parse item info — simplified version
-			// Full item info includes type detection, but for trade we read basics
-			int8_t item_type = recv.read_byte(); // 1=equip, 2=use/etc
-
-			if (item_type == 1)
-			{
-				// Equip item
-				int32_t itemid = recv.read_int();
-
-				// Skip equip stats (variable, but typically ~40+ bytes)
-				// Flags
-				bool has_uid = recv.read_bool();
-				if (has_uid)
-					recv.skip_long(); // unique id
-
-				recv.skip_long(); // expiration
-
-				// Equip stats: 15 shorts + owner string + flags
-				for (int i = 0; i < 15; i++)
-					recv.skip_short();
-
-				recv.skip_string(); // owner
-				recv.skip_byte();   // flag
-
-				// Additional bytes depend on type
-				if (recv.available())
-				{
-					recv.skip_byte(); // level up type
-					recv.skip_byte(); // level
-					recv.skip_int();  // exp
-					recv.skip_int();  // vicious
-					recv.skip_int();  // flag2
-				}
-
-				if (auto trade = UI::get().get_element<UITrade>())
-					trade->set_item(player_num, trade_slot, itemid, 1);
-			}
-			else
-			{
-				// Regular item
-				int32_t itemid = recv.read_int();
-
-				bool has_uid = recv.read_bool();
-				if (has_uid)
-					recv.skip_long();
-
-				recv.skip_long(); // expiration
-
-				int16_t quantity = recv.read_short();
-				recv.skip_string(); // owner
-				recv.skip_short();  // flag
-
-				// Rechargeable check
-				if ((itemid / 10000) == 207 || (itemid / 10000) == 233)
-					recv.skip_long(); // recharge bytes
-
-				if (auto trade = UI::get().get_element<UITrade>())
-					trade->set_item(player_num, trade_slot, itemid, quantity);
-			}
-			break;
-		}
-
-		case 16: // SET_MESO
-		{
-			uint8_t player_num = recv.read_byte();
-			int32_t meso = recv.read_int();
-
-			if (auto trade = UI::get().get_element<UITrade>())
-				trade->set_meso(player_num, meso);
-
-			break;
-		}
-
-		case 17: // CONFIRM
-		{
-			if (auto trade = UI::get().get_element<UITrade>())
-				trade->set_partner_confirmed();
-
-			break;
-		}
-
-		case 6:  // CHAT
-		{
-			if (recv.available())
-			{
-				recv.skip_byte(); // CHAT_THING (0x08)
-				uint8_t speaker = recv.read_byte();
-				std::string message = recv.read_string();
-
-				if (auto trade = UI::get().get_element<UITrade>())
-					trade->add_chat(message);
-			}
-			break;
-		}
-
-		default:
-			break;
-		}
-	}
-
-	void GuildOperationHandler::handle(InPacket& recv) const
-	{
-		// v83 guild operation response
-		// Opens or updates the guild UI based on the operation type
-		int8_t type = recv.read_byte();
-
-		switch (type)
-		{
-		case 0x26: // Guild info
-		case 0x27: // Guild update
-		{
-			if (auto guild = UI::get().get_element<UIGuild>())
-				guild->makeactive();
-			else
-				UI::get().emplace<UIGuild>();
-
-			break;
-		}
-		default:
-			std::cout << "[GuildOperation] Unhandled guild op type: " << (int)type << std::endl;
-			break;
-		}
-	}
-
-	void GuildBBSHandler::handle(InPacket& recv) const
-	{
-		int8_t type = recv.read_byte();
-
-		if (!UI::get().get_element<UIGuildBBS>())
-			UI::get().emplace<UIGuildBBS>();
-
-		auto bbs = UI::get().get_element<UIGuildBBS>();
-		if (!bbs) return;
-
-		if (type == 0x06) // Post list
-		{
-			bbs->clear_posts();
-
-			if (!recv.available()) return;
-
-			int8_t count = recv.read_byte();
-
-			for (int8_t i = 0; i < count && recv.available(); i++)
-			{
-				int32_t post_id = recv.read_int();
-				std::string author = recv.read_string();
-				std::string title = recv.read_string();
-				int64_t timestamp = recv.read_long();
-				int32_t reply_count = recv.read_int();
-
-				bbs->add_post(post_id, author, title, timestamp, reply_count);
-			}
-		}
-		else
-		{
-			bbs->makeactive();
-		}
-	}
-
-	// Opcode 196 (0xC4) — SHOW_CHAIR
-	// Shows a chair being used by a foreign character on the map
-	void ShowChairHandler::handle(InPacket& recv) const
-	{
-		int32_t charid = recv.read_int();
-		int32_t itemid = recv.read_int();
-
-		std::cout << "[ShowChair] charid=" << charid << " itemid=" << itemid << std::endl;
-
-		if (auto other = Stage::get().get_character(charid))
-		{
-			// Set the character's chair state
-			// itemid 0 means get up from chair
-			if (itemid > 0)
-				other->set_direction(false); // face right in chair by default
-		}
-	}
-
-	// Opcode 306 (0x132) — CONFIRM_SHOP_TRANSACTION
-	// Server confirms a shop buy/sell transaction result
-	void ConfirmShopTransactionHandler::handle(InPacket& recv) const
-	{
-		int8_t code = recv.read_byte();
-
-		std::cout << "[ConfirmShopTransaction] code=" << (int)code << std::endl;
-
-		// code 0 = buy success, code 8 = sell/recharge success
-		// Other codes = errors (not enough mesos, inventory full, etc.)
-		if (code != 0 && code != 8)
-		{
-			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
-				messenger->show_status(Color::Name::RED, "Transaction failed.");
-		}
-	}
-
-	// Opcode 322 (0x142) — PARCEL (Duey delivery system)
-	// Handles parcel/delivery notifications and operations
-	void ParcelHandler::handle(InPacket& recv) const
-	{
-		int8_t operation = recv.read_byte();
-
-		std::cout << "[Parcel] operation=" << (int)operation << std::endl;
-
-		// Duey operations:
-		// 8 = Open Duey window
-		// 5 = Parcel received notification
-		// 7 = Package list
-		// 4 = Remove package
-		// Other codes exist for errors
-	}
-
-	void OpenUIHandler::handle(InPacket& recv) const
-	{
 		int8_t ui_type = recv.read_byte();
 
-		std::cout << "[OpenUI] type=" << (int)ui_type << std::endl;
+		Player& player = Stage::get().get_player();
 
-		// UI types from Cosmic:
-		// 0x04 = Equipment Enhance (Star Force)
-		// 0x08 = Item Maker
-		// 0x12 = Monster Book
-		// 0x16 = Equipment Enhance (Scroll)
-		// 0x21 = Profession
-		// Others are typically quest/event UIs
+		// v83 OpenUI types — server requests client to open a specific window
+		switch (ui_type)
+		{
+		case 0x00: // Equipment inventory
+			UI::get().emplace<UIEquipInventory>(player.get_inventory());
+			break;
+		case 0x01: // Stats
+			UI::get().emplace<UIStatsInfo>(player.get_stats());
+			break;
+		case 0x02: // Skill book
+			UI::get().emplace<UISkillBook>(player.get_stats(), player.get_skills());
+			break;
+		case 0x03: // Buddy list
+			UI::get().emplace<UIBuddyList>();
+			break;
+		case 0x04: // World map
+			UI::get().emplace<UIWorldMap>();
+			break;
+		case 0x05: // Messenger
+			UI::get().emplace<UIMessenger>();
+			break;
+		case 0x09: // Quest log
+			UI::get().emplace<UIQuestLog>(player.get_quests());
+			break;
+		case 0x0A: // Key config
+			UI::get().emplace<UIKeyConfig>(player.get_inventory(), player.get_skills());
+			break;
+		case 0x12: // Monster book
+			UI::get().emplace<UIMonsterBook>();
+			break;
+		case 0x16: // Party search
+			UI::get().emplace<UIPartySearch>();
+			break;
+		default:
+			break;
+		}
 	}
 
 	void LockUIHandler::handle(InPacket& recv) const
@@ -1973,10 +769,17 @@ namespace ms
 
 	void SpawnGuideHandler::handle(InPacket& recv) const
 	{
+		if (!recv.available())
+			return;
+
 		bool spawn = recv.read_bool();
 
-		std::cout << "[SpawnGuide] spawn=" << spawn << std::endl;
-		// Beginner guide NPC — would need a dedicated guide entity
+		// Beginner guide NPC — show helpful message when spawned
+		if (spawn)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Guide] Maple Guide has appeared! Press the guide key for help.", UIChatBar::LineType::YELLOW);
+		}
 	}
 
 	void TalkGuideHandler::handle(InPacket& recv) const
@@ -1996,26 +799,35 @@ namespace ms
 			int32_t hint_id = recv.read_int();
 			int32_t duration = recv.read_int();
 
-			std::cout << "[TalkGuide] hint=" << hint_id << " duration=" << duration << std::endl;
+			(void)hint_id;
+			(void)duration;
 		}
 	}
 
 	void ShowComboHandler::handle(InPacket& recv) const
 	{
+		if (!recv.available())
+			return;
+
 		int32_t count = recv.read_int();
 
-		std::cout << "[ShowCombo] count=" << count << std::endl;
-		// Would need a combo counter UI element
+		Stage::get().set_combo(count);
+
+		if (count > 0)
+		{
+			if (!UI::get().get_element<UIComboCounter>())
+				UI::get().emplace<UIComboCounter>();
+		}
 	}
 
 	void ForcedMapEquipHandler::handle(InPacket& recv) const
 	{
-		if (recv.available())
-		{
-			int8_t team = recv.read_byte(); // 0 = red, 1 = blue
-			std::cout << "[ForcedMapEquip] team=" << (int)team << std::endl;
-		}
-		// Forces the player to wear map-specific equipment (e.g., PQ outfits)
+		// v83: Empty packet body — server tells client to re-equip based on map restrictions
+		// This triggers when entering maps that force specific equipment (PQ maps, event maps)
+		// The equip data is already applied server-side via MODIFY_INVENTORY before this packet
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::WHITE, "Map equipment restrictions applied.");
 	}
 
 	void SpouseChatHandler::handle(InPacket& recv) const
@@ -2038,20 +850,43 @@ namespace ms
 
 	void ContiMoveHandler::handle(InPacket& recv) const
 	{
+		if (!recv.available())
+			return;
+
 		int8_t event_type = recv.read_byte(); // 10 = boat/crog
 		int8_t move_type = recv.read_byte();  // 4 = start, 5 = stop
 
-		std::cout << "[ContiMove] event=" << (int)event_type
-				  << " type=" << (int)move_type << std::endl;
-		// Would need a boat/ship travel visual system
+		// The ship is a real map — player is already on it via SET_FIELD.
+		// ContiMove just signals departure/arrival for the map's scrolling backgrounds.
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
+			if (move_type == 4)
+				chatbar->send_chatline("The ship has departed.", UIChatBar::LineType::YELLOW);
+			else if (move_type == 5)
+				chatbar->send_chatline("The ship has arrived at its destination.", UIChatBar::LineType::YELLOW);
+		}
 	}
 
 	void ContiStateHandler::handle(InPacket& recv) const
 	{
-		int8_t state = recv.read_byte(); // 1 = start, 2 = end
-		recv.read_byte(); // padding
+		if (!recv.available())
+			return;
 
-		std::cout << "[ContiState] state=" << (int)state << std::endl;
+		int8_t state = recv.read_byte(); // 0 = waiting, 1 = in transit, 2 = arrived
+		if (recv.available())
+			recv.read_byte(); // padding
+
+		std::string state_str;
+		switch (state)
+		{
+		case 0: state_str = "Waiting"; break;
+		case 1: state_str = "In Transit"; break;
+		case 2: state_str = "Arrived"; break;
+		default: state_str = "Unknown (" + std::to_string(state) + ")"; break;
+		}
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[Ship] Status: " + state_str, UIChatBar::LineType::YELLOW);
 	}
 
 	void MakerResultHandler::handle(InPacket& recv) const
@@ -2113,790 +948,11 @@ namespace ms
 			recv.read_int(); // mesos
 		}
 	}
-
-	void MonsterCarnivalStartHandler::handle(InPacket& recv) const
-	{
-		int8_t team = recv.read_byte();
-		int16_t cp = recv.read_short();
-		int16_t total_cp = recv.read_short();
-		int16_t team_cp = recv.read_short();
-		int16_t team_total_cp = recv.read_short();
-		int16_t opp_cp = recv.read_short();
-		int16_t opp_total_cp = recv.read_short();
-		recv.read_short(); // unused
-		recv.read_long();  // unused
-
-		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
-		{
-			carnival->set_team(team);
-			carnival->set_cp(cp, total_cp, opp_cp, opp_total_cp);
-		}
-	}
-
-	void MonsterCarnivalCPHandler::handle(InPacket& recv) const
-	{
-		int16_t cp = recv.read_short();
-		int16_t total_cp = recv.read_short();
-
-		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
-			carnival->set_cp(cp, total_cp, -1, -1);
-	}
-
-	void MonsterCarnivalPartyCPHandler::handle(InPacket& recv) const
-	{
-		int8_t team = recv.read_byte();
-		int16_t cp = recv.read_short();
-		int16_t total_cp = recv.read_short();
-
-		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
-		{
-			// Team 0 = my team, team 1 = enemy
-			if (team == 0)
-				carnival->set_cp(cp, total_cp, -1, -1);
-			else
-				carnival->set_cp(-1, -1, cp, total_cp);
-		}
-	}
-
-	void MonsterCarnivalSummonHandler::handle(InPacket& recv) const
-	{
-		int8_t tab = recv.read_byte();
-		int8_t number = recv.read_byte();
-		std::string name = recv.read_string();
-
-		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
-			carnival->set_summon_count(tab, number);
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + name + " summoned a monster!", UIChatBar::LineType::YELLOW);
-	}
-
-	void MonsterCarnivalMessageHandler::handle(InPacket& recv) const
-	{
-		int8_t message = recv.read_byte();
-
-		std::string msg;
-		switch (message)
-		{
-		case 1: msg = "You don't have enough CP!"; break;
-		case 2: msg = "The summon limit has been reached!"; break;
-		case 3: msg = "You cannot summon during this phase!"; break;
-		case 4: msg = "The carnival is about to end!"; break;
-		default: msg = "Carnival message: " + std::to_string(message); break;
-		}
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + msg, UIChatBar::LineType::YELLOW);
-	}
-
-	void MonsterCarnivalDiedHandler::handle(InPacket& recv) const
-	{
-		int8_t team = recv.read_byte();
-		std::string name = recv.read_string();
-		int8_t lost_cp = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + name + " was eliminated! (-" + std::to_string(lost_cp) + " CP)", UIChatBar::LineType::RED);
-	}
-
-	void SpawnHiredMerchantHandler::handle(InPacket& recv) const
-	{
-		int32_t owner_id = recv.read_int();
-		int32_t item_id = recv.read_int();
-		Point<int16_t> position = recv.read_point();
-		recv.read_short(); // 0
-		std::string owner_name = recv.read_string();
-		recv.read_byte(); // 0x05
-		int32_t object_id = recv.read_int();
-		std::string description = recv.read_string();
-		recv.read_byte(); // sprite index
-		recv.read_byte(); // 1
-		recv.read_byte(); // 4
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] " + owner_name + "'s shop: " + description, UIChatBar::LineType::YELLOW);
-	}
-
-	void DestroyHiredMerchantHandler::handle(InPacket& recv) const
-	{
-		int32_t owner_id = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] A hired merchant has been removed.", UIChatBar::LineType::YELLOW);
-	}
-
-	void UpdateHiredMerchantHandler::handle(InPacket& recv) const
-	{
-		int32_t owner_id = recv.read_int();
-		recv.read_byte(); // 5 = hired merchant type
-		int32_t object_id = recv.read_int();
-		std::string description = recv.read_string();
-		recv.read_byte(); // sprite index
-		int8_t cur_visitors = recv.read_byte();
-		int8_t max_visitors = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] " + description + " (" + std::to_string(cur_visitors) + "/" + std::to_string(max_visitors) + " visitors)", UIChatBar::LineType::YELLOW);
-	}
-
-	void FredrickMessageHandler::handle(InPacket& recv) const
-	{
-		int8_t operation = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Fredrick] Message (op=" + std::to_string(operation) + ")", UIChatBar::LineType::YELLOW);
-	}
-
-	void FredrickHandler::handle(InPacket& recv) const
-	{
-		int8_t op = recv.read_byte();
-
-		// 0x23 = retrieve items, 0x24 = error
-		// Full parsing would require ItemInfo deserialization
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Fredrick] Response (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
-	}
-
 	void StopClockHandler::handle(InPacket& recv) const
 	{
 		recv.read_byte(); // 0
 
 		Stage::get().clear_clock();
-	}
-
-	void RPSGameHandler::handle(InPacket& recv) const
-	{
-		int8_t mode = recv.read_byte();
-
-		if (mode == 8) // Open NPC
-		{
-			int32_t npc_id = recv.read_int();
-			UI::get().emplace<UIRPSGame>();
-		}
-		else if (mode == 0x0B) // Selection result
-		{
-			int8_t selection = recv.read_byte();
-			int8_t answer = recv.read_byte();
-
-			// Determine result: 0=win, 1=lose, 2=tie
-			int8_t result;
-			if (selection == answer)
-				result = 2; // tie
-			else if ((selection == 0 && answer == 2) || (selection == 1 && answer == 0) || (selection == 2 && answer == 1))
-				result = 0; // win
-			else
-				result = 1; // lose
-
-			if (auto rps = UI::get().get_element<UIRPSGame>())
-				rps->show_result(selection, answer, result);
-		}
-		else if (mode == 0x06) // Meso error
-		{
-			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
-				messenger->show_status(Color::Name::RED, "Not enough mesos for Rock-Paper-Scissors.");
-		}
-		else if (mode == 0x0D) // Game over / exit
-		{
-			UI::get().remove(UIElement::Type::RPSGAME);
-		}
-	}
-
-	void MessengerHandler::handle(InPacket& recv) const
-	{
-		int8_t mode = recv.read_byte();
-
-		switch (mode)
-		{
-		case 0x00: // Add player
-		{
-			int8_t slot = recv.read_byte();
-			// Parse CharLook data (skip it - we don't render avatars in messenger)
-			LoginParser::parse_look(recv);
-			std::string name = recv.read_string();
-			recv.read_byte(); // channel
-			recv.read_byte(); // whisper flag
-
-			if (auto msger = UI::get().get_element<UIMessenger>())
-				msger->add_player(slot, name);
-			break;
-		}
-		case 0x01: // Join / self position
-		{
-			int8_t slot = recv.read_byte();
-			UI::get().emplace<UIMessenger>();
-
-			if (auto msger = UI::get().get_element<UIMessenger>())
-				msger->add_player(slot, Stage::get().get_player().get_name());
-			break;
-		}
-		case 0x02: // Remove player
-		{
-			int8_t slot = recv.read_byte();
-
-			if (auto msger = UI::get().get_element<UIMessenger>())
-				msger->remove_player(slot);
-			break;
-		}
-		case 0x03: // Invite
-		{
-			std::string from = recv.read_string();
-			recv.read_byte(); // 0
-			int32_t messenger_id = recv.read_int();
-			recv.read_byte(); // 0
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
-			break;
-		}
-		case 0x06: // Chat
-		{
-			std::string text = recv.read_string();
-
-			if (auto msger = UI::get().get_element<UIMessenger>())
-			{
-				// Text format is "name : message"
-				size_t sep = text.find(" : ");
-				if (sep != std::string::npos)
-					msger->add_chat(text.substr(0, sep), text.substr(sep + 3));
-				else
-					msger->add_chat("", text);
-			}
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Messenger] " + text, UIChatBar::LineType::BLUE);
-			break;
-		}
-		default:
-			std::cout << "[Messenger] mode=" << (int)mode << std::endl;
-			break;
-		}
-	}
-
-	void NotifyLevelUpHandler::handle(InPacket& recv) const
-	{
-		int8_t type = recv.read_byte(); // 0=family, 2=guild
-		int32_t level = recv.read_int();
-		std::string name = recv.read_string();
-
-		std::string prefix = (type == 2) ? "[Guild] " : "[Family] ";
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(prefix + name + " has reached level " + std::to_string(level) + "!", UIChatBar::LineType::YELLOW);
-	}
-
-	void NotifyJobChangeHandler::handle(InPacket& recv) const
-	{
-		int8_t type = recv.read_byte(); // 0=guild, 1=family
-		int32_t job = recv.read_int();
-		std::string name = recv.read_string();
-
-		std::string prefix = (type == 0) ? "[Guild] " : "[Family] ";
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(prefix + name + " has made a job advancement!", UIChatBar::LineType::YELLOW);
-	}
-
-	void AllianceOperationHandler::handle(InPacket& recv) const
-	{
-		int8_t op = recv.read_byte();
-
-		switch (op)
-		{
-		case 0x0C: // Alliance info
-		{
-			if (recv.length() >= 4)
-			{
-				int8_t rank = recv.read_byte();
-				int8_t guild_count = recv.read_byte();
-
-				UI::get().emplace<UIAlliance>();
-
-				if (auto alliance = UI::get().get_element<UIAlliance>())
-				{
-					alliance->clear_guilds();
-					for (int8_t i = 0; i < guild_count; i++)
-					{
-						if (recv.available())
-						{
-							int32_t guild_id = recv.read_int();
-							alliance->add_guild("Guild " + std::to_string(guild_id), guild_id);
-						}
-					}
-				}
-			}
-			break;
-		}
-		case 0x0D: // Alliance notice
-		{
-			if (recv.available())
-			{
-				std::string notice = recv.read_string();
-				if (auto alliance = UI::get().get_element<UIAlliance>())
-					alliance->set_notice(notice);
-			}
-			break;
-		}
-		default:
-		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Operation update (code: " + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
-			break;
-		}
-		}
-	}
-
-	void OXQuizHandler::handle(InPacket& recv) const
-	{
-		bool asking = recv.read_byte() != 0;
-		int8_t question_set = recv.read_byte();
-		int16_t question_id = recv.read_short();
-
-		if (asking)
-		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[OX Quiz] Question " + std::to_string(question_set) + "-" + std::to_string(question_id) + ": Move to O or X!", UIChatBar::LineType::YELLOW);
-		}
-	}
-
-	void SnowballStateHandler::handle(InPacket& recv) const
-	{
-		// First check if it's an enter-map packet (21 zero bytes) or state update
-		int8_t state = recv.read_byte();
-
-		if (state == 0) // Could be entermap zeroes
-		{
-			recv.skip(20); // rest of the 21 zeroes
-		}
-		else
-		{
-			int32_t ball0_hp = recv.read_int();
-			int32_t ball1_hp = recv.read_int();
-			recv.read_short(); // ball0 position
-			recv.read_byte();  // -1
-			recv.read_short(); // ball1 position
-			recv.read_byte();  // -1
-
-			std::cout << "[Snowball] state=" << (int)state
-					  << " HP: " << ball0_hp << " vs " << ball1_hp << std::endl;
-		}
-	}
-
-	void HitSnowballHandler::handle(InPacket& recv) const
-	{
-		int8_t what = recv.read_byte();
-		int32_t damage = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Snowball] Hit! Damage: " + std::to_string(damage), UIChatBar::LineType::YELLOW);
-	}
-
-	void SnowballMessageHandler::handle(InPacket& recv) const
-	{
-		int8_t team = recv.read_byte(); // 0=down, 1=up
-		int32_t message = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Snowball] Team " + std::to_string(team) + " event update!", UIChatBar::LineType::YELLOW);
-	}
-
-	void CoconutHitHandler::handle(InPacket& recv) const
-	{
-		int16_t id = recv.read_short();
-		int16_t delay = recv.read_short();
-		int8_t type = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Coconut] Hit id=" + std::to_string(id) + " type=" + std::to_string(type), UIChatBar::LineType::YELLOW);
-	}
-
-	void CoconutScoreHandler::handle(InPacket& recv) const
-	{
-		int16_t team1 = recv.read_short();
-		int16_t team2 = recv.read_short();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Coconut] Score: Team 1 = " + std::to_string(team1) + " | Team 2 = " + std::to_string(team2), UIChatBar::LineType::YELLOW);
-	}
-
-	void PetNameChangeHandler::handle(InPacket& recv) const
-	{
-		int32_t cid = recv.read_int();
-		recv.read_byte(); // 0
-		std::string new_name = recv.read_string();
-		recv.read_byte(); // 0
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pet] Name changed to: " + new_name, UIChatBar::LineType::YELLOW);
-	}
-
-	void PetExceptionListHandler::handle(InPacket& recv) const
-	{
-		int32_t cid = recv.read_int();
-		int8_t pet_index = recv.read_byte();
-		recv.read_long(); // pet id
-		int8_t count = recv.read_byte();
-
-		for (int8_t i = 0; i < count; i++)
-			recv.read_int(); // excluded item id
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pet] Exception list updated: " + std::to_string(count) + " items excluded.", UIChatBar::LineType::YELLOW);
-	}
-
-	void WeddingProgressHandler::handle(InPacket& recv) const
-	{
-		int8_t step = recv.read_byte();
-		int32_t groom_id = recv.read_int();
-		int32_t bride_id = recv.read_int();
-
-		if (auto wedding = UI::get().get_element<UIWedding>())
-			wedding->set_countdown(step);
-	}
-
-	void WeddingCeremonyEndHandler::handle(InPacket& recv) const
-	{
-		int32_t groom_id = recv.read_int();
-		int32_t bride_id = recv.read_int();
-
-		if (auto wedding = UI::get().get_element<UIWedding>())
-			wedding->set_countdown(0);
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Wedding] The ceremony has ended!", UIChatBar::LineType::YELLOW);
-	}
-
-	void MarriageRequestHandler::handle(InPacket& recv) const
-	{
-		int8_t mode = recv.read_byte();
-
-		if (mode == 9) // Wishlist
-		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Marriage] Wishlist prompt received.", UIChatBar::LineType::YELLOW);
-		}
-		else // mode 0=engage, 1=cancel, 2=answer
-		{
-			std::string name = recv.read_string();
-			int32_t player_id = recv.read_int();
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Marriage] " + name + " has sent you a proposal!", UIChatBar::LineType::YELLOW);
-		}
-	}
-
-	void MarriageResultHandler::handle(InPacket& recv) const
-	{
-		int8_t msg = recv.read_byte();
-
-		std::string text;
-		switch (msg)
-		{
-		case 11: text = "Marriage ceremony completed!"; break;
-		case 15: text = "You have received a wedding invitation!"; break;
-		case 36: text = "You are now engaged!"; break;
-		default: text = "Marriage update (code: " + std::to_string(msg) + ")"; break;
-		}
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Marriage] " + text, UIChatBar::LineType::YELLOW);
-	}
-
-	void WeddingGiftResultHandler::handle(InPacket& recv) const
-	{
-		int8_t mode = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-		{
-			if (mode == 0xA)
-				chatbar->send_chatline("[Wedding] Gift sent successfully!", UIChatBar::LineType::YELLOW);
-			else
-				chatbar->send_chatline("[Wedding] Gift result: " + std::to_string(mode), UIChatBar::LineType::YELLOW);
-		}
-	}
-
-	void NotifyMarriedPartnerHandler::handle(InPacket& recv) const
-	{
-		int32_t map_id = recv.read_int();
-		int32_t partner_id = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Marriage] Your partner has moved to another map.", UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyChartResultHandler::handle(InPacket& recv) const
-	{
-		int32_t viewed_id = recv.read_int();
-		int32_t entry_count = recv.read_int();
-
-		if (auto family = UI::get().get_element<UIFamily>())
-		{
-			// Parse entries - each has: cid, parent_id, name, job info
-			for (int32_t i = 0; i < entry_count && recv.available(); i++)
-			{
-				int32_t cid = recv.read_int();
-				int32_t parent_id = recv.read_int();
-				std::string name = recv.read_string();
-
-				// Add as junior if not the viewed player
-				if (cid != viewed_id)
-					family->add_junior(name);
-			}
-		}
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] Family chart loaded with " + std::to_string(entry_count) + " members.", UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyInfoResultHandler::handle(InPacket& recv) const
-	{
-		int32_t current_rep = recv.read_int();
-		int32_t total_rep = recv.read_int();
-		int32_t todays_rep = recv.read_int();
-		int16_t junior_count = recv.read_short();
-		recv.read_short(); // juniors allowed
-		recv.read_short(); // unknown
-		int32_t leader_id = recv.read_int();
-		std::string family_name = recv.read_string();
-		std::string message = recv.read_string();
-
-		if (auto family = UI::get().get_element<UIFamily>())
-			family->set_family_info(family_name, current_rep, total_rep);
-	}
-
-	void FamilyResultHandler::handle(InPacket& recv) const
-	{
-		int32_t type = recv.read_int();
-		int32_t mesos = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] Result type " + std::to_string(type) + " (mesos: " + std::to_string(mesos) + ")", UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyJoinRequestHandler::handle(InPacket& recv) const
-	{
-		int32_t player_id = recv.read_int();
-		std::string name = recv.read_string();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + name + " wants to join your family!", UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyJoinRequestResultHandler::handle(InPacket& recv) const
-	{
-		bool accepted = recv.read_byte() != 0;
-		std::string name = recv.read_string();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-		{
-			if (accepted)
-				chatbar->send_chatline("[Family] " + name + " accepted your request.", UIChatBar::LineType::YELLOW);
-			else
-				chatbar->send_chatline("[Family] " + name + " declined your request.", UIChatBar::LineType::RED);
-		}
-	}
-
-	void FamilyJoinAcceptedHandler::handle(InPacket& recv) const
-	{
-		std::string name = recv.read_string();
-		recv.read_int(); // 0
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + name + " has joined your family!", UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyRepGainHandler::handle(InPacket& recv) const
-	{
-		int32_t gain = recv.read_int();
-		std::string from = recv.read_string();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] +" + std::to_string(gain) + " rep from " + from, UIChatBar::LineType::YELLOW);
-	}
-
-	void FamilyLoginLogoutHandler::handle(InPacket& recv) const
-	{
-		bool logged_in = recv.read_bool();
-		std::string name = recv.read_string();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-		{
-			std::string msg = logged_in ? " has logged in." : " has logged out.";
-			chatbar->send_chatline("[Family] " + name + msg, UIChatBar::LineType::YELLOW);
-		}
-	}
-
-	void FamilySummonRequestHandler::handle(InPacket& recv) const
-	{
-		std::string from = recv.read_string();
-		std::string family_name = recv.read_string();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + from + " is summoning you!", UIChatBar::LineType::YELLOW);
-	}
-
-	void SendTVHandler::handle(InPacket& recv) const
-	{
-		int8_t has_partner = recv.read_byte(); // 3 = with partner, 1 = solo
-		int8_t type = recv.read_byte(); // 0=normal, 1=star, 2=heart
-
-		// CharLook + messages follow — complex parsing
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] Broadcast received.", UIChatBar::LineType::YELLOW);
-	}
-
-	void RemoveTVHandler::handle(InPacket& recv) const
-	{
-		// Empty packet body
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] Broadcast ended.", UIChatBar::LineType::YELLOW);
-	}
-
-	void EnableTVHandler::handle(InPacket& recv) const
-	{
-		recv.read_int(); // 0
-		recv.read_byte(); // 0
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] MapleTV enabled.", UIChatBar::LineType::YELLOW);
-	}
-
-	void SetAvatarMegaphoneHandler::handle(InPacket& recv) const
-	{
-		int32_t item_id = recv.read_int();
-		std::string name = recv.read_string();
-
-		// Multiple message strings follow, then channel, ear flag, and CharLook
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[AvatarMegaphone] " + name, UIChatBar::LineType::YELLOW);
-	}
-
-	void ClearAvatarMegaphoneHandler::handle(InPacket& recv) const
-	{
-		recv.read_byte(); // 1
-	}
-
-	void SpawnKiteHandler::handle(InPacket& recv) const
-	{
-		int32_t obj_id = recv.read_int();
-		int32_t item_id = recv.read_int();
-		std::string msg = recv.read_string();
-		std::string name = recv.read_string();
-		int16_t x = recv.read_short();
-		int16_t fh = recv.read_short();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Kite] " + name + ": " + msg, UIChatBar::LineType::YELLOW);
-	}
-
-	void RemoveKiteHandler::handle(InPacket& recv) const
-	{
-		int8_t anim = recv.read_byte();
-		int32_t obj_id = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Kite] A kite has been removed.", UIChatBar::LineType::YELLOW);
-	}
-
-	void CannotSpawnKiteHandler::handle(InPacket& recv) const
-	{
-		// Empty body
-		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
-			messenger->show_status(Color::Name::RED, "Cannot place a kite here.");
-	}
-
-	void AriantScoreHandler::handle(InPacket& recv) const
-	{
-		int8_t count = recv.read_byte();
-
-		for (int8_t i = 0; i < count; i++)
-		{
-			std::string name = recv.read_string();
-			int32_t score = recv.read_int();
-		}
-	}
-
-	void AriantShowResultHandler::handle(InPacket& recv) const
-	{
-		// Empty body — triggers result dialog
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Ariant] Match results!", UIChatBar::LineType::YELLOW);
-	}
-
-	void PyramidGaugeHandler::handle(InPacket& recv) const
-	{
-		int32_t gauge = recv.read_int();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pyramid] Gauge: " + std::to_string(gauge), UIChatBar::LineType::YELLOW);
-	}
-
-	void PyramidScoreHandler::handle(InPacket& recv) const
-	{
-		int8_t rank = recv.read_byte(); // 0=S, 1=A, 2=B, 3=C, 4=D
-		int32_t exp = recv.read_int();
-
-		std::string ranks[] = { "S", "A", "B", "C", "D" };
-		std::string rank_str = (rank >= 0 && rank <= 4) ? ranks[rank] : "?";
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pyramid] Rank " + rank_str + " - EXP: " + std::to_string(exp), UIChatBar::LineType::YELLOW);
-	}
-
-	void TournamentHandler::handle(InPacket& recv) const
-	{
-		int8_t state = recv.read_byte();
-		int8_t sub_state = recv.read_byte();
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] State update: " + std::to_string(state) + "/" + std::to_string(sub_state), UIChatBar::LineType::YELLOW);
-	}
-
-	void TournamentMatchTableHandler::handle(InPacket& recv) const
-	{
-		// Empty body — prompts match table dialog
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] Match table received.", UIChatBar::LineType::YELLOW);
-	}
-
-	void TournamentSetPrizeHandler::handle(InPacket& recv) const
-	{
-		int8_t set_prize = recv.read_byte();
-		int8_t has_prize = recv.read_byte();
-
-		if (has_prize)
-		{
-			int32_t item1 = recv.read_int();
-			int32_t item2 = recv.read_int();
-		}
-	}
-
-	void TournamentUEWHandler::handle(InPacket& recv) const
-	{
-		int8_t state = recv.read_byte(); // bitflags for round info
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] UEW state: " + std::to_string(state), UIChatBar::LineType::YELLOW);
-	}
-
-	void DojoWarpUpHandler::handle(InPacket& recv) const
-	{
-		recv.read_byte(); // 0
-		recv.read_byte(); // 6
-
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Dojo] Warping to next floor!", UIChatBar::LineType::YELLOW);
-	}
-
-	void ThrowGrenadeHandler::handle(InPacket& recv) const
-	{
-		int32_t cid = recv.read_int();
-		int32_t x = recv.read_int();
-		int32_t y = recv.read_int();
-		int32_t key_down = recv.read_int();
-		int32_t skill_id = recv.read_int();
-		int32_t skill_level = recv.read_int();
-
-		// Grenade visual — would need an animation system for projectiles
 	}
 
 	void SkillLearnItemResultHandler::handle(InPacket& recv) const
@@ -2934,13 +990,15 @@ namespace ms
 
 	void SetBackEffectHandler::handle(InPacket& recv) const
 	{
-		bool remove = recv.read_bool();
-		recv.read_int(); // unknown
-		int8_t layer = recv.read_byte();
-		int32_t transition = recv.read_int();
+		// v83: string path — sets the background effect for the map
+		// Used for boss arenas, special event maps, etc.
+		if (!recv.available())
+			return;
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[BackEffect] " + std::string(remove ? "Removed" : "Applied") + " layer=" + std::to_string(layer), UIChatBar::LineType::YELLOW);
+		std::string path = recv.read_string();
+
+		if (!path.empty())
+			Stage::get().add_effect(path);
 	}
 
 	void BlockedMapHandler::handle(InPacket& recv) const
@@ -2985,10 +1043,20 @@ namespace ms
 
 	void SetExtraPendantSlotHandler::handle(InPacket& recv) const
 	{
+		if (!recv.available())
+			return;
+
 		bool enabled = recv.read_bool();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Equip] Extra pendant slot " + std::string(enabled ? "enabled" : "disabled") + ".", UIChatBar::LineType::YELLOW);
+		Configuration::get().set_extra_pendant_slot(enabled);
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+		{
+			if (enabled)
+				messenger->show_status(Color::Name::WHITE, "Extra pendant slot has been activated.");
+			else
+				messenger->show_status(Color::Name::WHITE, "Extra pendant slot has been deactivated.");
+		}
 	}
 
 	void ViciousHammerHandler::handle(InPacket& recv) const
@@ -3079,9 +1147,20 @@ namespace ms
 		if (ok)
 		{
 			int32_t world_count = recv.read_int();
+			std::string world_list = "[CashShop] Available worlds: ";
 
 			for (int32_t i = 0; i < world_count; i++)
-				recv.read_string(); // world name
+			{
+				std::string world_name = recv.read_string();
+
+				if (i > 0)
+					world_list += ", ";
+
+				world_list += world_name;
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(world_list, UIChatBar::LineType::YELLOW);
 		}
 		else if (error != 0)
 		{

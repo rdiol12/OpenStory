@@ -22,8 +22,6 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
-#include <iostream>
-
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif

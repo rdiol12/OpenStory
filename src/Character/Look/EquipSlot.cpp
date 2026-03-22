@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "EquipSlot.h"
 
-#include <iostream>
-
 namespace ms
 {
 	namespace EquipSlot
@@ -26,11 +24,7 @@ namespace ms
 		Id by_id(size_t id)
 		{
 			if (id >= Id::LENGTH)
-			{
-				std::cout << "Unknown EquipSlot::Id id: [" << id << "]" << std::endl;
-
 				return Id::NONE;
-			}
 
 			return static_cast<Id>(id);
 		}

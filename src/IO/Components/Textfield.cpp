@@ -20,7 +20,6 @@
 #include "../UI.h"
 
 #include <sstream>
-#include <iostream>
 
 namespace ms
 {

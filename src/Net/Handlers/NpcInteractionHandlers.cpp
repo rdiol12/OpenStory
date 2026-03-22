@@ -26,16 +26,12 @@ namespace ms
 {
 	void NpcDialogueHandler::handle(InPacket& recv) const
 	{
-		std::cout << "[NPC] NpcDialogueHandler::handle() called, packet length: " << recv.length() << std::endl;
-
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
 		int8_t msgtype = recv.read_byte(); // 0 - textonly, 1 - yes/no, 4 - selection, 12 - accept/decline
 		int8_t speaker = recv.read_byte();
 		std::string text = recv.read_string();
-
-		std::cout << "[NPC] npcid=" << npcid << " msgtype=" << (int)msgtype << " speaker=" << (int)speaker << " text=" << text.substr(0, 100) << std::endl;
 
 		int16_t style = 0;
 
@@ -63,8 +59,6 @@ namespace ms
 
 		int16_t size = recv.read_short();
 
-		std::cout << "[Shop] npcid=" << npcid << " items=" << size << std::endl;
-
 		for (int16_t i = 0; i < size; i++)
 		{
 			int32_t itemid = recv.read_int();
@@ -75,8 +69,6 @@ namespace ms
 			recv.skip(4);
 
 			bool norecharge = recv.read_short() == 1;
-
-			std::cout << "[Shop] item[" << i << "] id=" << itemid << " price=" << price << " pitch=" << pitch << " norecharge=" << norecharge << std::endl;
 
 			if (norecharge)
 			{

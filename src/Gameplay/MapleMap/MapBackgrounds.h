@@ -21,8 +21,6 @@
 
 #include "../../Graphics/Animation.h"
 
-#include <iostream>
-
 namespace ms
 {
 	class Background
@@ -50,8 +48,6 @@ namespace ms
 		{
 			if (id >= NORMAL && id <= VMOVEB)
 				return static_cast<Type>(id);
-
-			std::cout << "Unknown Background::Type id: [" << id << "]" << std::endl;
 
 			return NORMAL;
 		}

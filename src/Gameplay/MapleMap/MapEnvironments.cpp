@@ -19,8 +19,6 @@
 
 #include "../../Graphics/GraphicsGL.h"
 
-#include <iostream>
-
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif

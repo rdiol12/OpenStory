@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "FootholdTree.h"
 
-#include <iostream>
-
 namespace ms
 {
 	FootholdTree::FootholdTree(nl::node src)
@@ -36,9 +34,8 @@ namespace ms
 			{
 				layer = static_cast<uint8_t>(std::stoi(basef.name()));
 			}
-			catch (const std::exception& ex)
+			catch (const std::exception&)
 			{
-				std::cout << __func__ << ": " << ex.what() << std::endl;
 				continue;
 			}
 
@@ -52,9 +49,8 @@ namespace ms
 					{
 						id = static_cast<uint16_t>(std::stoi(lastf.name()));
 					}
-					catch (const std::exception& ex)
+					catch (const std::exception&)
 					{
-						std::cout << __func__ << ": " << ex.what() << std::endl;
 						continue;
 					}
 

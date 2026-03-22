@@ -19,7 +19,6 @@
 
 #include "../Graphics/Text.h"
 
-#include <iostream>
 #include <unordered_map>
 
 namespace ms
@@ -34,10 +33,8 @@ namespace ms
 				int32_t intval = std::stoi(str);
 				return static_cast<T>(intval);
 			}
-			catch (const std::exception& ex)
+			catch (const std::exception&)
 			{
-				std::cout << __func__ << ": " << ex.what() << std::endl;
-
 				return def;
 			}
 		}

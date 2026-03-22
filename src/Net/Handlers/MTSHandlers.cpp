@@ -20,8 +20,6 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIMTS.h"
 
-#include <iostream>
-
 namespace ms
 {
 	// Skip an item's serialized data from the packet (addItemInfo with zeroPosition=true)
@@ -238,7 +236,6 @@ namespace ms
 		}
 
 		default:
-			std::cout << "Unhandled MTS operation: 0x" << std::hex << (int)operation << std::dec << std::endl;
 			break;
 		}
 	}
