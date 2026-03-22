@@ -21,9 +21,13 @@
 
 #include "../Template/Singleton.h"
 
-#define GLEW_STATIC
-#include <glew.h>
-#include <glfw3.h>
+#ifdef PLATFORM_IOS
+	#include <OpenGLES/ES3/gl.h>
+#else
+	#define GLEW_STATIC
+	#include <glew.h>
+	#include <glfw3.h>
+#endif
 
 #include <functional>
 #include <string>
@@ -54,8 +58,12 @@ namespace ms
 	private:
 		void updateopc();
 
+#ifndef PLATFORM_IOS
 		GLFWwindow* glwnd;
 		GLFWwindow* context;
+#else
+		bool closed;
+#endif
 		bool fullscreen;
 		float opacity;
 		float opcstep;

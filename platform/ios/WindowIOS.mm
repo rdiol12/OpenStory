@@ -3,11 +3,12 @@
 //	The GL context and swap buffers are managed by GLKViewController.
 //	This class provides the same interface as the desktop Window class.
 //////////////////////////////////////////////////////////////////////////////////
-#include "WindowIOS.h"
+#include "IO/Window.h"
 
 #include "Configuration.h"
 #include "Constants.h"
 #include "Timer.h"
+#include "Graphics/GraphicsGL.h"
 
 #import <UIKit/UIKit.h>
 

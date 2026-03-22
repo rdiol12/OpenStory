@@ -17,8 +17,16 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#define GLEW_STATIC
-#include <glew.h>
+#ifdef PLATFORM_IOS
+	#include <OpenGLES/ES3/gl.h>
+	#include <OpenGLES/ES3/glext.h>
+	#ifndef GL_BGRA
+		#define GL_BGRA GL_BGRA_EXT
+	#endif
+#else
+	#define GLEW_STATIC
+	#include <glew.h>
+#endif
 
 #include <array>
 #include <stdint.h>

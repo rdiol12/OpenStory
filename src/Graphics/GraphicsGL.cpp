@@ -19,6 +19,12 @@
 
 #include "../Configuration.h"
 
+#ifdef PLATFORM_IOS
+// Defined in FontPathIOS.mm
+extern const char* ios_font_path_normal();
+extern const char* ios_font_path_bold();
+#endif
+
 namespace ms
 {
 	GraphicsGL::GraphicsGL()
@@ -32,8 +38,54 @@ namespace ms
 
 	Error GraphicsGL::init()
 	{
-		// Setup parameters
-		// ----------------
+#ifdef PLATFORM_IOS
+		// OpenGL ES 3.0 shaders
+		const char* vertexShaderSource =
+			"#version 300 es\n"
+			"in vec4 coord;\n"
+			"in vec4 color;\n"
+			"out vec2 texpos;\n"
+			"out vec4 colormod;\n"
+			"uniform vec2 screensize;\n"
+			"uniform int yoffset;\n"
+			"\n"
+			"void main(void)\n"
+			"{\n"
+			"	float x = -1.0 + coord.x * 2.0 / screensize.x;\n"
+			"	float y = 1.0 - (coord.y + float(yoffset)) * 2.0 / screensize.y;\n"
+			"	gl_Position = vec4(x, y, 0.0, 1.0);\n"
+			"	texpos = coord.zw;\n"
+			"	colormod = color;\n"
+			"}\n";
+
+		const char* fragmentShaderSource =
+			"#version 300 es\n"
+			"precision mediump float;\n"
+			"in vec2 texpos;\n"
+			"in vec4 colormod;\n"
+			"out vec4 fragColor;\n"
+			"uniform sampler2D tex;\n"
+			"uniform vec2 atlassize;\n"
+			"uniform int fontregion;\n"
+			"\n"
+			"void main(void)\n"
+			"{\n"
+			"	if (texpos.y == 0.0)\n"
+			"	{\n"
+			"		fragColor = colormod;\n"
+			"	}\n"
+			"	else if (texpos.y <= float(fontregion))\n"
+			"	{\n"
+			"		fragColor = vec4(1.0, 1.0, 1.0, texture(tex, texpos / atlassize).r) * colormod;\n"
+			"	}\n"
+			"	else\n"
+			"	{\n"
+			"		fragColor = texture(tex, texpos / atlassize) * colormod;\n"
+			"	}\n"
+			"}\n";
+
+		const char* uniformTexName = "tex";
+#else
 		const char* vertexShaderSource =
 			"#version 120\n"
 			"attribute vec4 coord;"
@@ -76,15 +128,18 @@ namespace ms
 			"	}"
 			"}";
 
+		const char* uniformTexName = "texture";
+#endif
+
 		const GLsizei bufSize = 512;
 
 		GLint success;
 		GLchar infoLog[bufSize];
 
-		// Initialize and configure
-		// ------------------------
+#ifndef PLATFORM_IOS
 		if (GLenum error = glewInit())
 			return Error(Error::Code::GLEW, (const char*)glewGetErrorString(error));
+#endif
 
 		if (FT_Init_FreeType(&ftlibrary))
 			return Error::Code::FREETYPE;
@@ -95,21 +150,16 @@ namespace ms
 
 		FT_Library_Version(ftlibrary, &ftmajor, &ftminor, &ftpatch);
 
-		// Build and compile our shader program
-		// ------------------------------------
-
 		// Vertex Shader
 		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 		glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
 		glCompileShader(vertexShader);
 
-		// Check for shader compile errors
 		glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
 
 		if (success != GL_TRUE)
 		{
 			glGetShaderInfoLog(vertexShader, bufSize, NULL, infoLog);
-
 			return Error(Error::Code::VERTEX_SHADER, infoLog);
 		}
 
@@ -118,13 +168,11 @@ namespace ms
 		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
 		glCompileShader(fragmentShader);
 
-		// Check for shader compile errors
 		glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
 
 		if (success != GL_TRUE)
 		{
 			glGetShaderInfoLog(fragmentShader, bufSize, NULL, infoLog);
-
 			return Error(Error::Code::FRAGMENT_SHADER, infoLog);
 		}
 
@@ -134,26 +182,21 @@ namespace ms
 		glAttachShader(shaderProgram, fragmentShader);
 		glLinkProgram(shaderProgram);
 
-		// Check for linking errors
 		glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
 
 		if (success != GL_TRUE)
 		{
 			glGetProgramInfoLog(shaderProgram, bufSize, NULL, infoLog);
-
 			return Error(Error::Code::SHADER_PROGRAM_LINK, infoLog);
 		}
 
-		// Validate Program
 		glValidateProgram(shaderProgram);
 
-		// Check for validation errors
 		glGetProgramiv(shaderProgram, GL_VALIDATE_STATUS, &success);
 
 		if (success != GL_TRUE)
 		{
 			glGetProgramInfoLog(shaderProgram, bufSize, NULL, infoLog);
-
 			return Error(Error::Code::SHADER_PROGRAM_VALID, infoLog);
 		}
 
@@ -162,7 +205,7 @@ namespace ms
 
 		attribute_coord = glGetAttribLocation(shaderProgram, "coord");
 		attribute_color = glGetAttribLocation(shaderProgram, "color");
-		uniform_texture = glGetUniformLocation(shaderProgram, "texture");
+		uniform_texture = glGetUniformLocation(shaderProgram, uniformTexName);
 		uniform_atlassize = glGetUniformLocation(shaderProgram, "atlassize");
 		uniform_screensize = glGetUniformLocation(shaderProgram, "screensize");
 		uniform_yoffset = glGetUniformLocation(shaderProgram, "yoffset");
@@ -170,6 +213,13 @@ namespace ms
 
 		if (attribute_coord == -1 || attribute_color == -1 || uniform_texture == -1 || uniform_atlassize == -1 || uniform_screensize == -1 || uniform_yoffset == -1)
 			return Error::Code::SHADER_VARS;
+
+#ifdef PLATFORM_IOS
+		// VAO required by OpenGL ES 3.0
+		GLuint VAO;
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+#endif
 
 		// Vertex Buffer Object
 		glGenBuffers(1, &VBO);
@@ -183,6 +233,13 @@ namespace ms
 
 		fontborder.set_y(1);
 
+#ifdef PLATFORM_IOS
+		const char* FONT_NORMAL_STR = ios_font_path_normal();
+		const char* FONT_BOLD_STR = ios_font_path_bold();
+
+		if (!FONT_NORMAL_STR || !FONT_BOLD_STR)
+			return Error::Code::FONT_PATH;
+#else
 		const std::string FONT_NORMAL = Setting<FontPathNormal>().get().load();
 		const std::string FONT_BOLD = Setting<FontPathBold>().get().load();
 
@@ -191,6 +248,7 @@ namespace ms
 
 		const char* FONT_NORMAL_STR = FONT_NORMAL.c_str();
 		const char* FONT_BOLD_STR = FONT_BOLD.c_str();
+#endif
 
 		addfont(FONT_NORMAL_STR, Text::Font::A11M, 0, 11);
 		addfont(FONT_BOLD_STR, Text::Font::A11B, 0, 11);
@@ -844,7 +902,30 @@ namespace ms
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBufferData(GL_ARRAY_BUFFER, csize, quads.data(), GL_STREAM_DRAW);
 
+		glVertexAttribPointer(attribute_coord, 4, GL_SHORT, GL_FALSE, sizeof(Quad::Vertex), 0);
+		glVertexAttribPointer(attribute_color, 4, GL_FLOAT, GL_FALSE, sizeof(Quad::Vertex), (const void*)8);
+
+#ifdef PLATFORM_IOS
+		// OpenGL ES 3.0 does not support GL_QUADS — draw as indexed triangles
+		size_t quad_count = quads.size();
+		std::vector<GLushort> indices;
+		indices.reserve(quad_count * 6);
+
+		for (size_t i = 0; i < quad_count; i++)
+		{
+			GLushort base = static_cast<GLushort>(i * Quad::LENGTH);
+			indices.push_back(base + 0);
+			indices.push_back(base + 1);
+			indices.push_back(base + 2);
+			indices.push_back(base + 0);
+			indices.push_back(base + 2);
+			indices.push_back(base + 3);
+		}
+
+		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_SHORT, indices.data());
+#else
 		glDrawArrays(GL_QUADS, 0, fsize);
+#endif
 
 		glDisableVertexAttribArray(attribute_coord);
 		glDisableVertexAttribArray(attribute_color);
