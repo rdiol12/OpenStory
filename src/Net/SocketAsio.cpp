@@ -20,7 +20,7 @@
 #ifdef USE_ASIO
 namespace ms
 {
-	SocketAsio::SocketAsio() : resolver(ioservice), socket(ioservice) {}
+	SocketAsio::SocketAsio() : resolver(iocontext), socket(iocontext) {}
 
 	SocketAsio::~SocketAsio()
 	{
@@ -33,10 +33,9 @@ namespace ms
 
 	bool SocketAsio::open(const char* address, const char* port)
 	{
-		tcp::resolver::query query(address, port);
-		tcp::resolver::iterator endpointiter = resolver.resolve(query);
+		auto endpoints = resolver.resolve(address, port);
 		error_code error;
-		asio::connect(socket, endpointiter, error);
+		asio::connect(socket, endpoints, error);
 
 		if (!error)
 		{
