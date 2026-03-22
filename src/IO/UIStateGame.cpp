@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateGame.h"
 
-#include <iostream>
-
 #include "UI.h"
 #include "../Constants.h"
 
@@ -430,7 +428,6 @@ namespace ms
 							}
 							default:
 							{
-								std::cout << "Unknown KeyAction::Id action: [" << action << "]" << std::endl;
 								break;
 							}
 						}

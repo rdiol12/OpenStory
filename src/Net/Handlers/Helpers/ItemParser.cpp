@@ -115,6 +115,64 @@ namespace ms
 			inventory.add_equip(invtype, slot, id, cash, expire, slots, level, stats, owner, flag, itemlevel, itemexp, vicious);
 		}
 
+		void skip_item(InPacket& recv)
+		{
+			int8_t type = recv.read_byte();
+			int32_t iid = recv.read_int();
+
+			bool cash = recv.read_bool();
+
+			if (cash)
+				recv.skip(8); // unique id
+
+			int64_t expire = recv.read_long();
+
+			if (iid >= 5000000 && iid <= 5000102)
+			{
+				// Pet
+				recv.skip(13); // pet name (padded)
+				recv.read_byte(); // level
+				recv.read_short(); // closeness
+				recv.read_byte(); // fullness
+				recv.skip(18); // unused
+			}
+			else if (type == 1)
+			{
+				// Equip
+				recv.read_byte(); // upgrade slots
+				recv.read_byte(); // level
+				recv.skip(EquipStat::Id::LENGTH * 2); // equip stats (15 x short)
+				recv.read_string(); // owner
+				recv.read_short(); // flag
+
+				if (cash)
+				{
+					recv.skip(10);
+				}
+				else
+				{
+					recv.read_byte();
+					recv.read_byte(); // item level
+					recv.read_short();
+					recv.read_short(); // item exp
+					recv.read_int(); // vicious
+					recv.read_long();
+				}
+
+				recv.skip(12);
+			}
+			else
+			{
+				// Normal item
+				recv.read_short(); // count
+				recv.read_string(); // owner
+				recv.read_short(); // flag
+
+				if ((iid / 10000 == 233) || (iid / 10000 == 207))
+					recv.skip(8); // rechargeable
+			}
+		}
+
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)
 		{
 			// Read type and item id

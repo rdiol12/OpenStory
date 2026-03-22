@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Hair.h"
 
-#include <iostream>
-
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -47,10 +45,7 @@ namespace ms
 					auto layer_iter = layers_by_name.find(layername);
 
 					if (layer_iter == layers_by_name.end())
-					{
-						std::cout << "Unknown Hair::Layer name: [" << layername << "]\tLocation: [" << hairnode.name() << "][" << stancename << "][" << frame << "]" << std::endl;
 						continue;
-					}
 
 					Layer layer = layer_iter->second;
 

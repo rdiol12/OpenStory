@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIResources.h"
 
-#include <iostream>
-
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -29,11 +27,6 @@ namespace ms
 	{
 		basic = nl::nx::ui["Basic.img"];
 		is_loaded = basic.size() > 0;
-
-		if (is_loaded)
-			std::cout << "[UIResources] Basic.img loaded successfully (" << basic.size() << " nodes)" << std::endl;
-		else
-			std::cout << "[UIResources] Warning: Basic.img failed to load" << std::endl;
 	}
 
 	nl::node UIResources::get_close_button(int variant) const

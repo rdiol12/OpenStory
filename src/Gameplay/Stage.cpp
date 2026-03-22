@@ -465,4 +465,20 @@ namespace ms
 	{
 		return countdown_seconds;
 	}
+
+	void Stage::set_combo(int32_t count)
+	{
+		combo_count = count;
+	}
+
+	int32_t Stage::get_combo() const
+	{
+		return combo_count;
+	}
+
+	bool Stage::is_combo_active() const
+	{
+		return combo_count > 0;
+	}
+
 }

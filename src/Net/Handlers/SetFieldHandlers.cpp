@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SetFieldHandlers.h"
 
-#include <iostream>
-
 #include "Helpers/CharacterParser.h"
 #include "Helpers/LoginParser.h"
 
@@ -70,8 +68,6 @@ namespace ms
 		int8_t mode1 = recv.read_byte();
 		int8_t mode2 = recv.read_byte();
 
-		std::cout << "[SetField] handle: channel=" << channel << " mode1=" << (int)mode1 << " mode2=" << (int)mode2 << std::endl;
-
 		if (mode1 == 0 && mode2 == 0)
 			change_map(recv, channel);
 		else
@@ -93,8 +89,6 @@ namespace ms
 		recv.skip(23);
 
 		int32_t cid = recv.read_int();
-
-		std::cout << "[SetField] set_field called, cid=" << cid << std::endl;
 
 		// Parse stats directly from packet (same fields as LoginParser::parse_stats)
 		StatsEntry statsentry;
@@ -141,8 +135,6 @@ namespace ms
 		// Create CharEntry and load the player
 		CharEntry playerentry = { statsentry, look, cid };
 		Stage::get().loadplayer(playerentry);
-
-		std::cout << "[SetField] Player loaded: " << statsentry.name << " mapid=" << statsentry.mapid << std::endl;
 
 		Player& player = Stage::get().get_player();
 

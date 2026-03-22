@@ -17,8 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Stance.h"
 
-#include <iostream>
-
 namespace ms
 {
 	Stance::Id Stance::by_state(int8_t state)
@@ -58,8 +56,6 @@ namespace ms
 		for (auto iter : names)
 			if (iter.second == name)
 				return iter.first;
-
-		std::cout << "Unknown Stance::Id name: [" << name << "]" << std::endl;
 
 		return NONE;
 	}

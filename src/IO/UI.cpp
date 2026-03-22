@@ -35,8 +35,6 @@
 #include "UITypes/UILogin.h"
 #include "../Net/Packets/LoginPackets.h"
 
-#include <iostream>
-
 namespace ms
 {
 	UI::UI()

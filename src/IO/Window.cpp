@@ -44,9 +44,8 @@ namespace ms
 		glfwTerminate();
 	}
 
-	void error_callback(int no, const char* description)
+	void error_callback(int, const char*)
 	{
-		std::cout << "GLFW error [" << no << "]: " << description << std::endl;
 	}
 
 	void key_callback(GLFWwindow*, int key, int, int action, int)

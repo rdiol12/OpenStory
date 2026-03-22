@@ -15,6 +15,8 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
+#include <iostream>
+
 #include "Gameplay/Stage.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
@@ -118,10 +120,6 @@ namespace ms
 				}
 				else if (period)
 				{
-					int64_t fps = (samples * 1000000) / period;
-
-					std::cout << "FPS: " << fps << std::endl;
-
 					period = 0;
 					samples = 0;
 				}
@@ -136,17 +134,7 @@ namespace ms
 		// Initialize and check for errors
 		if (Error error = init())
 		{
-			const char* message = error.get_message();
-			const char* args = error.get_args();
 			bool can_retry = error.can_retry();
-
-			std::cout << "Error: " << message << std::endl;
-
-			if (args && args[0])
-				std::cout << "Message: " << args << std::endl;
-
-			if (can_retry)
-				std::cout << "Enter 'retry' to try again." << std::endl;
 
 			std::string command;
 			std::cin >> command;

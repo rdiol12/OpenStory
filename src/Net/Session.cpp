@@ -99,9 +99,8 @@ namespace ms
 			{
 				packetswitch.forward(buffer, length);
 			}
-			catch (const PacketError& err)
+			catch (const PacketError&)
 			{
-				std::cout << err.what() << std::endl;
 			}
 
 			pos = 0;

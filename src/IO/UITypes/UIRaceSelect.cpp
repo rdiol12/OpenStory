@@ -557,8 +557,6 @@ namespace ms
 			if (index == class_map[i])
 				return i;
 
-		std::cout << "Failed to find corrected class index" << std::endl;
-
 		return index;
 	}
 }

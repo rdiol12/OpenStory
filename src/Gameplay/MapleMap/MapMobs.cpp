@@ -19,7 +19,6 @@
 #include "Mob.h"
 
 #include <algorithm>
-#include <iostream>
 #include <map>
 
 namespace ms

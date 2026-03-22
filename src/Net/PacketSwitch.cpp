@@ -29,9 +29,13 @@
 #include "Handlers/PlayerInteractionHandlers.h"
 #include "Handlers/SetFieldHandlers.h"
 #include "Handlers/TestingHandlers.h"
+#include "Handlers/ForeignCharHandlers.h"
+#include "Handlers/ShopStorageHandlers.h"
 #include "Handlers/MTSHandlers.h"
 
 #include "../Configuration.h"
+
+#include <iostream>
 
 namespace ms
 {
@@ -131,6 +135,7 @@ namespace ms
 		SET_ITC = 126,          // 0x7E — MTS/CS transition (ignored)
 		SET_CASH_SHOP = 127,    // 0x7F
 		FIELD_EFFECT = 138,     // 0x8A
+		SET_TRACTION = 141, // 0x8D
 		FIELD_OBSTACLE_ONOFF = 140, // 0x8C
 		CONTI_MOVE = 148,       // 0x94
 		CONTI_STATE = 149,      // 0x95
@@ -458,6 +463,7 @@ namespace ms
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF, FieldObstacleOnOffHandler>();
+		emplace<SET_TRACTION, SetTractionHandler>();
 		emplace<OPEN_UI, OpenUIHandler>();
 		emplace<LOCK_UI, LockUIHandler>();
 		emplace<DISABLE_UI, DisableUIHandler>();
@@ -591,10 +597,6 @@ namespace ms
 			else
 				std::cout << "Received Packet: " << std::to_string(opcode) << std::endl;
 		}
-
-		// Always log NPC-related opcodes for debugging
-		if (opcode == NPC_DIALOGUE || opcode == OPEN_NPC_SHOP || opcode == CONFIRM_SHOP_TRANSACTION)
-			std::cout << "[NPC-DEBUG] Received NPC opcode: " << opcode << std::endl;
 
 		if (opcode < NUM_HANDLERS)
 		{
