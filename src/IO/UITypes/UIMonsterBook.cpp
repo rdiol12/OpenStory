@@ -31,7 +31,7 @@
 
 namespace ms
 {
-	UIMonsterBook::UIMonsterBook() : UIDragElement<PosMONSTERBOOK>(), cur_page(0), num_pages(1)
+	UIMonsterBook::UIMonsterBook() : UIDragElement<PosMONSTERBOOK>(Point<int16_t>(300, 20)), cur_page(0), num_pages(1)
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["MonsterBook"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

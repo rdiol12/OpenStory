@@ -50,6 +50,7 @@ namespace ms
 		void send_cursor(Point<int16_t> pos);
 		void send_cursor(bool pressed);
 		void send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate);
+		bool is_mouse_held() const;
 		void send_focus(int focused);
 		void send_scroll(double yoffset);
 		void send_close();
@@ -109,5 +110,6 @@ namespace ms
 		bool enabled;
 		bool quitted;
 		bool caps_lock_enabled = false;
+		bool mouse_held = false;
 	};
 }

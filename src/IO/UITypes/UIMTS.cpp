@@ -33,7 +33,7 @@
 
 namespace ms
 {
-	UIMTS::UIMTS() : UIDragElement<PosTRADE>()
+	UIMTS::UIMTS() : UIDragElement<PosTRADE>(Point<int16_t>(400, 20))
 	{
 		// MTS uses a fixed-size window
 		dimension = Point<int16_t>(480, 460);

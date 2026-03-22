@@ -26,7 +26,7 @@
 namespace ms
 {
 	// Combo box UI not implemented
-	UIJoypad::UIJoypad() : UIDragElement<PosJOYPAD>()
+	UIJoypad::UIJoypad() : UIDragElement<PosJOYPAD>(Point<int16_t>(250, 20))
 	{
 		alternative_settings = false;
 

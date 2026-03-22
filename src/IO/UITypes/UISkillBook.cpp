@@ -101,7 +101,7 @@ namespace ms
 		return icon.get();
 	}
 
-	UISkillBook::UISkillBook(const CharStats& in_stats, const SkillBook& in_skillbook) : UIDragElement<PosSKILL>(), stats(in_stats), skillbook(in_skillbook), grabbing(false), tab(0), macro_enabled(false)
+	UISkillBook::UISkillBook(const CharStats& in_stats, const SkillBook& in_skillbook) : UIDragElement<PosSKILL>(Point<int16_t>(174, 20)), stats(in_stats), skillbook(in_skillbook), grabbing(false), tab(0), macro_enabled(false)
 	{
 		nl::node Skill = nl::nx::ui["UIWindow2.img"]["Skill"];
 		nl::node main = Skill["main"];

@@ -19,6 +19,8 @@
 
 #include "../Constants.h"
 
+#include <cmath>
+
 namespace ms
 {
 	OtherChar::OtherChar(int32_t id, const CharLook& lk, uint8_t lvl, int16_t jb, const std::string& nm, int8_t st, Point<int16_t> pos) : Char(id, lk, nm)
@@ -38,21 +40,11 @@ namespace ms
 
 	int8_t OtherChar::update(const Physics& physics)
 	{
-		if (timer > 1)
+		// Consume one movement per frame (don't skip any)
+		if (!movements.empty())
 		{
-			timer--;
-		}
-		else if (timer == 1)
-		{
-			if (!movements.empty())
-			{
-				lastmove = movements.front();
-				movements.pop();
-			}
-			else
-			{
-				timer = 0;
-			}
+			lastmove = movements.front();
+			movements.pop();
 		}
 
 		if (!attacking)
@@ -61,11 +53,42 @@ namespace ms
 			set_state(laststate);
 		}
 
-		phobj.hspeed = lastmove.xpos - phobj.crnt_x();
-		phobj.vspeed = lastmove.ypos - phobj.crnt_y();
-		phobj.move();
+		double targetx = lastmove.xpos;
+		double targety = lastmove.ypos;
+		double dx = targetx - phobj.crnt_x();
+		double dy = targety - phobj.crnt_y();
 
-		physics.get_fht().update_fh(phobj);
+		// Move toward target position
+		// If we have queued movements, snap to consume them on time
+		// If queue is empty, interpolate smoothly to fill gaps between packets
+		if (!movements.empty())
+		{
+			// More packets waiting — snap to this one so we keep up
+			phobj.x = targetx;
+			phobj.y = targety;
+			phobj.hspeed = dx;
+			phobj.vspeed = dy;
+		}
+		else
+		{
+			// No more packets — interpolate toward target to fill frames
+			double dist = std::sqrt(dx * dx + dy * dy);
+			if (dist > 1.0)
+			{
+				// Move a fraction toward target each frame
+				phobj.x = phobj.crnt_x() + dx * 0.5;
+				phobj.y = phobj.crnt_y() + dy * 0.5;
+				phobj.hspeed = dx * 0.5;
+				phobj.vspeed = dy * 0.5;
+			}
+			else
+			{
+				phobj.x = targetx;
+				phobj.y = targety;
+				phobj.hspeed = 0.0;
+				phobj.vspeed = 0.0;
+			}
+		}
 
 		bool aniend = Char::update(physics, get_stancespeed());
 
@@ -78,12 +101,6 @@ namespace ms
 	void OtherChar::send_movement(const std::vector<Movement>& newmoves)
 	{
 		movements.push(newmoves.back());
-
-		if (timer == 0)
-		{
-			constexpr uint16_t DELAY = 50;
-			timer = DELAY;
-		}
 	}
 
 	void OtherChar::update_skill(int32_t skillid, uint8_t skilllevel)

@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UIEvent::UIEvent() : UIDragElement<PosEVENT>()
+	UIEvent::UIEvent() : UIDragElement<PosEVENT>(Point<int16_t>(250, 20))
 	{
 		offset = 0;
 		event_count = 16;

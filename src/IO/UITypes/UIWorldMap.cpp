@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UIWorldMap::UIWorldMap() : UIDragElement<PosMAP>()
+	UIWorldMap::UIWorldMap() : UIDragElement<PosMAP>(Point<int16_t>(500, 20))
 	{
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
 		nl::node WorldMap = nl::nx::ui["UIWindow2.img"]["WorldMap"];

@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIMinigame::UIMinigame() : UIDragElement<PosMINIGAME>(),
+	UIMinigame::UIMinigame() : UIDragElement<PosMINIGAME>(Point<int16_t>(250, 20)),
 		is_my_turn(false), am_host(true), last_result(-1),
 		my_wins(0), my_ties(0), my_losses(0)
 	{

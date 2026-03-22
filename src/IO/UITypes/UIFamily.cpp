@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UIFamily::UIFamily() : UIDragElement<PosFAMILY>(), reputation(0), total_reputation(0)
+	UIFamily::UIFamily() : UIDragElement<PosFAMILY>(Point<int16_t>(250, 20)), reputation(0), total_reputation(0)
 	{
 		nl::node src = nl::nx::ui["UIWindow.img"]["Family"];
 

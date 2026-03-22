@@ -25,7 +25,7 @@
 
 namespace ms
 {
-	UIAlliance::UIAlliance() : UIDragElement<PosALLIANCE>(), rank(0), capacity(0)
+	UIAlliance::UIAlliance() : UIDragElement<PosALLIANCE>(Point<int16_t>(300, 20)), rank(0), capacity(0)
 	{
 		dimension = Point<int16_t>(300, 300);
 		dragarea = Point<int16_t>(300, 20);

@@ -34,7 +34,7 @@
 
 namespace ms
 {
-	UITrade::UITrade() : UIDragElement<PosTRADE>()
+	UITrade::UITrade() : UIDragElement<PosTRADE>(Point<int16_t>(250, 20))
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["MiniRoom"];
 

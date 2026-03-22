@@ -28,7 +28,7 @@
 
 namespace ms
 {
-	UIRanking::UIRanking() : UIDragElement<PosRANKING>(), tab(Buttons::BT_TAB0)
+	UIRanking::UIRanking() : UIDragElement<PosRANKING>(Point<int16_t>(300, 20)), tab(Buttons::BT_TAB0)
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["Ranking"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

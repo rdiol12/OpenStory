@@ -30,7 +30,7 @@
 
 namespace ms
 {
-	UIGuildBBS::UIGuildBBS() : UIDragElement<PosGUILDBBS>(), current_page(0), total_pages(1)
+	UIGuildBBS::UIGuildBBS() : UIDragElement<PosGUILDBBS>(Point<int16_t>(300, 20)), current_page(0), total_pages(1)
 	{
 		nl::node src = nl::nx::ui["GuildBBS.img"]["GuildBBS"];
 

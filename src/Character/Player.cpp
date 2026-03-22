@@ -341,6 +341,11 @@ namespace ms
 		return Char::is_invincible();
 	}
 
+	bool Player::is_hidden() const
+	{
+		return has_buff(Buffstat::Id::DARKSIGHT);
+	}
+
 	MobAttackResult Player::damage(const MobAttack& attack)
 	{
 		int32_t damage = stats.calculate_damage(attack.watk);

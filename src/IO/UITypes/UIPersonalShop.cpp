@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UIPersonalShop::UIPersonalShop() : UIDragElement<PosPERSONALSHOP>(),
+	UIPersonalShop::UIPersonalShop() : UIDragElement<PosPERSONALSHOP>(Point<int16_t>(250, 20)),
 		item_count(0), selected_slot(-1), is_owner(false)
 	{
 		nl::node src = nl::nx::ui["UIWindow.img"]["PersonalShop"]["main"];

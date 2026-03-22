@@ -220,18 +220,75 @@ namespace ms
 
 		std::string message = recv.read_string();
 
-		if (type == 3)
+		auto chatbar = UI::get().get_element<UIChatBar>();
+
+		switch (type)
+		{
+		case 0: // Notice (blue text in chat)
+			if (chatbar)
+				chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::BLUE);
+			break;
+		case 1: // Popup notice (server-side popup, also show in chat)
+			if (chatbar)
+				chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::YELLOW);
+			break;
+		case 2: // Megaphone (visible only on current map)
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+			break;
+		case 3: // Super Megaphone (visible on all channels)
 		{
 			recv.read_byte(); // channel
-			recv.read_bool(); // megaphone
+			recv.read_bool(); // megaphone ear (whisper icon)
+
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+			break;
 		}
-		else if (type == 4)
-		{
+		case 4: // Scroll notice (top of screen ticker)
 			UI::get().set_scrollnotice(message);
-		}
-		else if (type == 7)
-		{
+			break;
+		case 5: // Pink text server message
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::PINK);
+			break;
+		case 6: // Light blue text server message
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::LIGHTBLUE);
+			break;
+		case 7: // NPC broadcast (item megaphone with NPC)
 			recv.read_int(); // npcid
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+			break;
+		case 8: // Item megaphone
+		{
+			recv.read_byte(); // channel
+			recv.read_bool(); // megaphone ear (whisper icon)
+
+			// Item data follows (1 byte hasItem, then item info if present)
+			if (recv.available())
+			{
+				bool has_item = recv.read_bool();
+				if (has_item && recv.available())
+					recv.skip(recv.length()); // skip item display data
+			}
+
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::GREEN);
+			break;
+		}
+		case 10: // Triple megaphone (multi-line)
+		{
+			// Message already read above; there may be additional lines
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+			break;
+		}
+		default:
+			if (chatbar)
+				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+			break;
 		}
 	}
 
@@ -252,8 +309,7 @@ namespace ms
 	void ChatReceivedHandler::handle(InPacket& recv) const
 	{
 		int32_t charid = recv.read_int();
-
-		recv.read_bool(); // 'gm'
+		bool gm = recv.read_bool();
 
 		std::string message = recv.read_string();
 		int8_t type = recv.read_byte();
@@ -264,7 +320,7 @@ namespace ms
 			character->speak(message);
 		}
 
-		auto linetype = static_cast<UIChatBar::LineType>(type);
+		auto linetype = gm ? UIChatBar::LineType::WHITE : static_cast<UIChatBar::LineType>(type);
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline(message, linetype);
@@ -366,13 +422,13 @@ namespace ms
 		{
 			std::string from = recv.read_string();
 			recv.read_byte(); // channel
-			recv.read_bool(); // from admin
+			bool from_admin = recv.read_bool();
 			std::string message = recv.read_string();
 
 			std::string line = from + " <Whisper>: " + message;
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, UIChatBar::LineType::RED);
+				chatbar->send_chatline(line, from_admin ? UIChatBar::LineType::WHITE : UIChatBar::LineType::RED);
 		}
 		else if (mode == 10) // Find reply — "X is on channel Y"
 		{

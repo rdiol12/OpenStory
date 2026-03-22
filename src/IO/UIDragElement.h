@@ -103,7 +103,14 @@ namespace ms
 	private:
 		virtual bool indragrange(Point<int16_t> cursorpos) const
 		{
-			auto bounds = Rectangle<int16_t>(position, position + dragarea);
+			Point<int16_t> area = dragarea;
+
+			// If no drag area was specified, use the element's full width
+			// with a 20px title bar height as a reasonable default
+			if (area.x() == 0 && area.y() == 0)
+				area = Point<int16_t>(dimension.x() > 0 ? dimension.x() : 300, 20);
+
+			auto bounds = Rectangle<int16_t>(position, position + area);
 
 			return bounds.contains(cursorpos);
 		}

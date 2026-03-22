@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIHiredMerchant::UIHiredMerchant() : UIDragElement<PosHIREDMERCHANT>(),
+	UIHiredMerchant::UIHiredMerchant() : UIDragElement<PosHIREDMERCHANT>(Point<int16_t>(250, 20)),
 		stored_meso(0), item_count(0), selected_slot(-1)
 	{
 		nl::node src = nl::nx::ui["UIWindow.img"]["PersonalShop"]["main"];

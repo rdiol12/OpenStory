@@ -898,7 +898,9 @@ namespace ms
 		// Buff mask bits (v83):
 		// bit 0 = PAD, bit 1 = PDD, bit 2 = MAD, bit 3 = MDD
 		// bit 4 = ACC, bit 5 = EVA, bit 7 = SPEED, bit 8 = JUMP
+		// bit 42 = DARKSIGHT
 		uint8_t speed = 0;
+		bool darksight = (buffmask & 0x40000000000LL) != 0;
 
 		int bit = 0;
 		for (int64_t mask = buffmask; mask != 0 && recv.length() >= 2; mask >>= 1, bit++)
@@ -913,12 +915,14 @@ namespace ms
 			}
 		}
 
-		// Update the character's movement speed if a speed buff was present
-		if (speed > 0)
+		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
+		if (ochar)
 		{
-			Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
-			if (ochar)
+			if (speed > 0)
 				ochar->update_speed(speed);
+
+			if (darksight)
+				ochar->set_hidden(true);
 		}
 	}
 
@@ -932,12 +936,16 @@ namespace ms
 		int32_t cid = recv.read_int();
 		int64_t buffmask = recv.read_long();
 
-		// If speed buff was cancelled (bit 7), reset speed
-		if (buffmask & (1LL << 7))
+		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
+		if (ochar)
 		{
-			Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
-			if (ochar)
+			// If speed buff was cancelled (bit 7), reset speed
+			if (buffmask & (1LL << 7))
 				ochar->update_speed(100); // default speed
+
+			// If DARKSIGHT was cancelled (bit 42), unhide
+			if (buffmask & 0x40000000000LL)
+				ochar->set_hidden(false);
 		}
 	}
 
@@ -1196,56 +1204,45 @@ namespace ms
 
 	namespace
 	{
-		// Parse a single storage item — same as addItemInfo on server side
-		// Returns: invtype_byte, itemid, count
-		struct ParsedStorageItem
+		InventoryType::Id type_by_storage_bitfield(int16_t bitfield)
 		{
-			int8_t invtype_byte;
-			int32_t itemid;
-			int16_t count;
-		};
+			switch (bitfield)
+			{
+			case 4: return InventoryType::Id::EQUIP;
+			case 8: return InventoryType::Id::USE;
+			case 16: return InventoryType::Id::SETUP;
+			case 32: return InventoryType::Id::ETC;
+			case 64: return InventoryType::Id::CASH;
+			default: return InventoryType::Id::NONE;
+			}
+		}
 
-		ParsedStorageItem parse_storage_item(InPacket& recv)
+		UIStorage::ItemEntry parse_storage_item(InPacket& recv, InventoryType::Id forced_type, InventoryType::Id& parsed_type)
 		{
-			ParsedStorageItem result = { 0, 0, 0 };
-
-			int8_t type_byte = recv.read_byte(); // 1=equip, 2=use, etc.
+			int8_t item_type = recv.read_byte();
 			int32_t itemid = recv.read_int();
-			result.itemid = itemid;
 
-			// Determine inventory type from item ID
-			int32_t prefix = itemid / 1000000;
-			if (prefix == 1)
-				result.invtype_byte = 1; // equip
-			else if (prefix == 2)
-				result.invtype_byte = 2; // use
-			else if (prefix == 3)
-				result.invtype_byte = 3; // setup
-			else if (prefix == 4)
-				result.invtype_byte = 4; // etc
-			else if (prefix == 5)
-				result.invtype_byte = 5; // cash
-			else
-				result.invtype_byte = type_byte;
+			parsed_type = forced_type;
+			if (parsed_type == InventoryType::Id::NONE)
+				parsed_type = InventoryType::by_item_id(itemid);
 
-			bool is_equip = (result.invtype_byte == 1);
-
-			// Cash flag
 			bool cash = recv.read_bool();
 			if (cash)
 				recv.skip(8); // unique ID
 
-			// Expiration
-			recv.skip(8); // expire timestamp
+			recv.skip(8); // expiration
+
+			UIStorage::ItemEntry entry = { itemid, 1 };
+
+			bool is_equip = (parsed_type == InventoryType::Id::EQUIP) || (item_type == 1);
+			bool is_pet = (itemid >= 5000000 && itemid <= 5000102);
 
 			if (is_equip)
 			{
-				// Equip data
 				recv.read_byte();  // upgrade slots
 				recv.read_byte();  // level
 
-				// 14 equip stats (STR, DEX, INT, LUK, HP, MP, WATK, MATK, WDEF, MDEF, ACC, AVOID, HANDS, SPEED, JUMP)
-				// EnumMap has exactly this many stats
+				// 15 equip stats (Cosmic v83): STR, DEX, INT, LUK, HP, MP, WATK, MATK, WDEF, MDEF, ACC, AVOID, HANDS, SPEED, JUMP
 				for (int i = 0; i < 15; i++)
 					recv.read_short();
 
@@ -1267,29 +1264,60 @@ namespace ms
 				}
 
 				recv.skip(12); // trailing data
-
-				result.count = 1;
 			}
-			else if (itemid >= 5000000 && itemid <= 5000102)
+			else if (is_pet)
 			{
-				// Pet
-				std::string petname = recv.read_padded_string(13);
+				recv.read_padded_string(13);
 				recv.read_byte();  // pet level
 				recv.read_short(); // closeness
 				recv.read_byte();  // fullness
-				recv.skip(18);     // unused
-				result.count = 1;
+				recv.skip(18);
 			}
 			else
 			{
-				// Regular item
-				result.count = recv.read_short();
+				entry.count = recv.read_short();
 				recv.read_string(); // owner
 				recv.read_short();  // flag
 
-				// Rechargeable check
 				if ((itemid / 10000 == 233) || (itemid / 10000 == 207))
 					recv.skip(8);
+			}
+
+			return entry;
+		}
+
+		struct ParsedStorageItems
+		{
+			std::vector<UIStorage::ItemEntry> equip;
+			std::vector<UIStorage::ItemEntry> use;
+			std::vector<UIStorage::ItemEntry> setup;
+			std::vector<UIStorage::ItemEntry> etc_items;
+			std::vector<UIStorage::ItemEntry> cash;
+
+			std::vector<UIStorage::ItemEntry>& get(InventoryType::Id type)
+			{
+				switch (type)
+				{
+				case InventoryType::Id::EQUIP: return equip;
+				case InventoryType::Id::USE: return use;
+				case InventoryType::Id::SETUP: return setup;
+				case InventoryType::Id::ETC: return etc_items;
+				case InventoryType::Id::CASH: return cash;
+				default: return etc_items;
+				}
+			}
+		};
+
+		ParsedStorageItems parse_storage_items(InPacket& recv, uint8_t count, InventoryType::Id forced_type)
+		{
+			ParsedStorageItems result;
+
+			for (size_t i = 0; i < count && recv.available(); ++i)
+			{
+				InventoryType::Id parsed_type = InventoryType::Id::NONE;
+				UIStorage::ItemEntry entry = parse_storage_item(recv, forced_type, parsed_type);
+				if (parsed_type != InventoryType::Id::NONE)
+					result.get(parsed_type).push_back(entry);
 			}
 
 			return result;
@@ -1298,7 +1326,6 @@ namespace ms
 
 	void StorageHandler::handle(InPacket& recv) const
 	{
-		// v83 STORAGE: byte mode, then mode-specific data
 		if (!recv.available())
 			return;
 
@@ -1309,18 +1336,26 @@ namespace ms
 		{
 		case 0x16:
 		{
-			// Open storage: int npcid, byte slots, short 0x7E, short 0, int 0, int meso, short 0, byte count, items...
+			// Open storage
 			if (recv.length() < 4)
 				break;
 
 			int32_t npcid = recv.read_int();
-			int8_t slots = recv.read_byte();
-			recv.read_short(); // flag (0x7E)
-			recv.read_short(); // padding
-			recv.read_int();   // padding
+			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
+
+			recv.skip(2); // inventory mask
+			recv.skip(2); // zero
+			recv.skip(4); // zero
 			int32_t meso = recv.read_int();
-			recv.read_short(); // padding
-			int8_t item_count = recv.read_byte();
+			recv.skip(2); // zero
+
+			uint8_t item_count = static_cast<uint8_t>(recv.read_byte());
+			ParsedStorageItems items = parse_storage_items(recv, item_count, InventoryType::Id::NONE);
+
+			if (recv.length() >= 2)
+				recv.skip(2);
+			if (recv.length() >= 1)
+				recv.skip(1);
 
 			const Inventory& inv = Stage::get().get_player().get_inventory();
 			UI::get().emplace<UIStorage>(inv);
@@ -1328,120 +1363,103 @@ namespace ms
 			auto storage_ui = UI::get().get_element<UIStorage>();
 			if (storage_ui)
 			{
-				storage_ui->set_storage(npcid, slots, meso);
+				storage_ui->open(npcid, slots, meso);
 
-				for (int8_t i = 0; i < item_count && recv.available(); i++)
-				{
-					ParsedStorageItem psi = parse_storage_item(recv);
-					storage_ui->add_stored_item(psi.invtype_byte, i, psi.itemid, psi.count);
-				}
-
-				storage_ui->refresh_items();
+				InventoryType::Id types[] = {
+					InventoryType::Id::EQUIP, InventoryType::Id::USE,
+					InventoryType::Id::SETUP, InventoryType::Id::ETC,
+					InventoryType::Id::CASH
+				};
+				std::vector<UIStorage::ItemEntry> tab_items[] = {
+					items.equip, items.use, items.setup, items.etc_items, items.cash
+				};
+				storage_ui->set_items_for_all(types, 5, tab_items);
 			}
 
-			// Consume remaining bytes (trailing padding)
 			break;
 		}
 		case 0x09:
-		{
-			// Take out result: byte slots, short invtype_bitfield, short 0, int 0, byte count, items...
-			if (recv.length() < 2)
-				break;
-
-			int8_t slots = recv.read_byte();
-			recv.read_short(); // inv type bitfield
-			recv.read_short(); // padding
-			recv.read_int();   // padding
-			int8_t count = recv.read_byte();
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-			{
-				// Clear and re-add items
-				storage_ui->set_storage(0, slots, 0);
-
-				for (int8_t i = 0; i < count && recv.available(); i++)
-				{
-					ParsedStorageItem psi = parse_storage_item(recv);
-					storage_ui->add_stored_item(psi.invtype_byte, i, psi.itemid, psi.count);
-				}
-
-				storage_ui->refresh_items();
-			}
-			break;
-		}
 		case 0x0D:
 		{
-			// Store result: byte slots, short invtype_bitfield, short 0, int 0, byte count, items...
+			// Take out (0x09) or Store (0x0D) result — updates one tab
 			if (recv.length() < 2)
 				break;
 
-			int8_t slots = recv.read_byte();
-			recv.read_short();
-			recv.read_short();
-			recv.read_int();
-			int8_t count = recv.read_byte();
+			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
+			int16_t type_bitfield = recv.read_short();
+			InventoryType::Id type = type_by_storage_bitfield(type_bitfield);
+
+			recv.skip(2); // zero
+			recv.skip(4); // zero
+
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			ParsedStorageItems parsed = parse_storage_items(recv, count, type);
 
 			auto storage_ui = UI::get().get_element<UIStorage>();
 			if (storage_ui)
 			{
-				storage_ui->set_storage(0, slots, 0);
-
-				for (int8_t i = 0; i < count && recv.available(); i++)
-				{
-					ParsedStorageItem psi = parse_storage_item(recv);
-					storage_ui->add_stored_item(psi.invtype_byte, i, psi.itemid, psi.count);
-				}
-
-				storage_ui->refresh_items();
+				storage_ui->set_slots(slots);
+				if (type != InventoryType::Id::NONE)
+					storage_ui->set_items_for_tab(type, parsed.get(type));
 			}
-			break;
-		}
-		case 0x13:
-		{
-			// Meso update: byte slots, short 2, short 0, int 0, int meso
-			if (recv.length() < 2)
-				break;
-
-			recv.read_byte();  // slots
-			recv.read_short(); // flag
-			recv.read_short(); // padding
-			recv.read_int();   // padding
-			int32_t meso = recv.read_int();
-
-			auto storage_ui = UI::get().get_element<UIStorage>();
-			if (storage_ui)
-				storage_ui->update_meso(meso);
 
 			break;
 		}
 		case 0x0F:
 		{
-			// Arrange result: byte slots, byte 124, 10 bytes skip, byte count, items..., byte 0
+			// Arrange result — updates all tabs
 			if (recv.length() < 2)
 				break;
 
-			int8_t slots = recv.read_byte();
-			recv.read_byte(); // 124
-			recv.skip(10);
-			int8_t count = recv.read_byte();
+			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
+
+			recv.skip(1);  // mask byte (writeByte(124))
+			recv.skip(10); // zeroes
+
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			ParsedStorageItems items = parse_storage_items(recv, count, InventoryType::Id::NONE);
+
+			if (recv.length() >= 1)
+				recv.skip(1);
 
 			auto storage_ui = UI::get().get_element<UIStorage>();
 			if (storage_ui)
 			{
-				storage_ui->set_storage(0, slots, 0);
+				storage_ui->set_slots(slots);
 
-				for (int8_t i = 0; i < count && recv.available(); i++)
-				{
-					ParsedStorageItem psi = parse_storage_item(recv);
-					storage_ui->add_stored_item(psi.invtype_byte, i, psi.itemid, psi.count);
-				}
-
-				storage_ui->refresh_items();
+				InventoryType::Id types[] = {
+					InventoryType::Id::EQUIP, InventoryType::Id::USE,
+					InventoryType::Id::SETUP, InventoryType::Id::ETC,
+					InventoryType::Id::CASH
+				};
+				std::vector<UIStorage::ItemEntry> tab_items[] = {
+					items.equip, items.use, items.setup, items.etc_items, items.cash
+				};
+				storage_ui->set_items_for_all(types, 5, tab_items);
 			}
 
-			if (recv.available())
-				recv.read_byte(); // trailing 0
+			break;
+		}
+		case 0x13:
+		{
+			// Meso update
+			if (recv.length() < 2)
+				break;
+
+			uint8_t slots = static_cast<uint8_t>(recv.read_byte());
+
+			recv.skip(2); // type mask
+			recv.skip(2); // zero
+			recv.skip(4); // zero
+
+			int32_t meso = recv.read_int();
+
+			auto storage_ui = UI::get().get_element<UIStorage>();
+			if (storage_ui)
+			{
+				storage_ui->set_slots(slots);
+				storage_ui->set_meso(meso);
+			}
 
 			break;
 		}
@@ -1474,6 +1492,8 @@ namespace ms
 				<< " remaining: " << recv.length() << std::endl;
 			break;
 		}
+
+		UI::get().enable();
 	}
 
 	void FieldObstacleOnOffHandler::handle(InPacket& recv) const
@@ -1891,9 +1911,9 @@ namespace ms
 
 		std::cout << "[ConfirmShopTransaction] code=" << (int)code << std::endl;
 
-		// code 0 = success (inventory already updated via MODIFY_INVENTORY)
-		// code 1-3 = various errors (not enough mesos, inventory full, etc.)
-		if (code != 0)
+		// code 0 = buy success, code 8 = sell/recharge success
+		// Other codes = errors (not enough mesos, inventory full, etc.)
+		if (code != 0 && code != 8)
 		{
 			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 				messenger->show_status(Color::Name::RED, "Transaction failed.");
