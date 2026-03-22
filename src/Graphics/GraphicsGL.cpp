@@ -897,6 +897,17 @@ namespace ms
 		GLsizeiptr csize = quads.size() * sizeof(Quad);
 		GLsizeiptr fsize = quads.size() * Quad::LENGTH;
 
+#ifdef PLATFORM_IOS
+		// iOS/GLKit may reset GL state between frames — re-establish it
+		glUseProgram(shaderProgram);
+		glUniform1i(uniform_fontregion, fontymax);
+		glUniform2f(uniform_atlassize, ATLASW, ATLASH);
+		glUniform2f(uniform_screensize, VWIDTH, VHEIGHT);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glBindTexture(GL_TEXTURE_2D, atlas);
+#endif
+
 		glEnableVertexAttribArray(attribute_coord);
 		glEnableVertexAttribArray(attribute_color);
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
