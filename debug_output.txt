@@ -1,4 +1,0 @@
-Using OpenGL 4.6.0 NVIDIA 591.86
-Using GLEW 2.1.0
-Using FreeType 2.9.1
-Sent Packet: 35
