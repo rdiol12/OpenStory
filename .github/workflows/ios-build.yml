@@ -39,8 +39,7 @@ jobs:
 
     - name: Build FreeType for iOS
       run: |
-        git clone --depth 1 https://github.com/nicebyte/freetyp2.git /tmp/freetype 2>/dev/null || \
-        git clone --depth 1 -b VER-2-13-2 https://gitlab.freedesktop.org/freetype/freetype.git /tmp/freetype
+        git clone --depth 1 -b VER-2-13-3 https://gitlab.freedesktop.org/freetype/freetype.git /tmp/freetype
 
         cd /tmp/freetype
         mkdir build-ios && cd build-ios
@@ -50,6 +49,7 @@ jobs:
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
           -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -DBUILD_SHARED_LIBS=OFF \
           -DFT_DISABLE_HARFBUZZ=ON \
           -DFT_DISABLE_BROTLI=ON \
@@ -59,13 +59,13 @@ jobs:
 
         cmake --build . --config Release -- -sdk iphoneos
 
-        cp Release-iphoneos/libfreetype.a $GITHUB_WORKSPACE/libs/ios/lib/ 2>/dev/null || \
         find . -name "libfreetype.a" -exec cp {} $GITHUB_WORKSPACE/libs/ios/lib/ \;
 
         # Copy headers
         cp -r /tmp/freetype/include/* $GITHUB_WORKSPACE/libs/ios/include/
-        cp /tmp/freetype/build-ios/include/freetype/config/ftconfig.h \
-           $GITHUB_WORKSPACE/libs/ios/include/freetype2/freetype/config/ 2>/dev/null || true
+        mkdir -p $GITHUB_WORKSPACE/libs/ios/include/freetype2/freetype/config
+        find . -name "ftconfig.h" -exec cp {} $GITHUB_WORKSPACE/libs/ios/include/freetype2/freetype/config/ \; 2>/dev/null || true
+        find . -name "ftoption.h" -exec cp {} $GITHUB_WORKSPACE/libs/ios/include/freetype2/freetype/config/ \; 2>/dev/null || true
 
     - name: Build NoLifeNx for iOS
       run: |
