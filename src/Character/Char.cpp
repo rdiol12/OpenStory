@@ -42,6 +42,10 @@ namespace ms
 
 			color = Color(rgb, rgb, rgb, 1.0f);
 		}
+		else if (is_hidden())
+		{
+			color = Color(1.0f, 1.0f, 1.0f, 0.5f);
+		}
 		else
 		{
 			color = Color::Code::CWHITE;
@@ -343,6 +347,16 @@ namespace ms
 	bool Char::is_invincible() const
 	{
 		return invincible == true;
+	}
+
+	bool Char::is_hidden() const
+	{
+		return hidden;
+	}
+
+	void Char::set_hidden(bool h)
+	{
+		hidden = h;
 	}
 
 	bool Char::is_sitting() const

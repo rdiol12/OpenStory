@@ -283,6 +283,25 @@ namespace ms
 		}
 	}
 
+	void UIChatBar::send_scroll(double yoffset)
+	{
+		if (!chatopen)
+			return;
+
+		if (yoffset > 0)
+		{
+			if (rowpos < rowmax)
+				rowpos++;
+		}
+		else if (yoffset < 0)
+		{
+			if (rowpos > 0)
+				rowpos--;
+		}
+
+		slider.setrows(rowpos, chatrows, rowmax);
+	}
+
 	UIElement::Type UIChatBar::get_type() const
 	{
 		return TYPE;
@@ -466,6 +485,15 @@ namespace ms
 			break;
 		case YELLOW:
 			color = Color::Name::YELLOW;
+			break;
+		case PINK:
+			color = Color::Name::PINK;
+			break;
+		case LIGHTBLUE:
+			color = Color::Name::LIGHTBLUE;
+			break;
+		case GREEN:
+			color = Color::Name::GREEN;
 			break;
 		default:
 			color = Color::Name::WHITE;

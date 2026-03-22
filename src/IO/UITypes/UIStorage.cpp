@@ -18,12 +18,13 @@
 #include "UIStorage.h"
 
 #include "UINotice.h"
-#include "UIStatusMessenger.h"
 
 #include "../UI.h"
 
-#include "../Components/MapleButton.h"
 #include "../Components/AreaButton.h"
+#include "../Components/Charset.h"
+#include "../Components/MapleButton.h"
+#include "../Components/TwoSpriteButton.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
@@ -35,48 +36,87 @@
 #include <nlnx/nx.hpp>
 #endif
 
+#include <algorithm>
+
 namespace ms
 {
-	UIStorage::UIStorage(const Inventory& inv) : UIDragElement<PosSTORAGE>(), inventory(inv)
+	// StorageItemIcon - drag from storage to take out
+	UIStorage::StorageItemIcon::StorageItemIcon(int16_t idx, InventoryType::Id t)
+		: index(idx), tab(t) {}
+
+	bool UIStorage::StorageItemIcon::drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const
 	{
-		nl::node src = nl::nx::ui["UIWindow.img"]["Trunk"];
+		// Dropped on right panel (inventory) = take out from storage
+		int8_t invtype_byte = 0;
+		switch (tab)
+		{
+		case InventoryType::Id::EQUIP: invtype_byte = 1; break;
+		case InventoryType::Id::USE: invtype_byte = 2; break;
+		case InventoryType::Id::SETUP: invtype_byte = 3; break;
+		case InventoryType::Id::ETC: invtype_byte = 4; break;
+		case InventoryType::Id::CASH: invtype_byte = 5; break;
+		default: break;
+		}
 
-		// Load background sprites
-		nl::node backgrnd = src["backgrnd"];
-		background = backgrnd;
+		StorageTakeOutPacket(invtype_byte, static_cast<int8_t>(index)).dispatch();
+		return true;
+	}
 
-		auto bg_dim = background.get_dimensions();
+	// PlayerItemIcon - drag from inventory to store
+	UIStorage::PlayerItemIcon::PlayerItemIcon(int16_t s, int32_t id, int16_t c)
+		: inv_slot(s), itemid(id), count(c) {}
 
-		sprites.emplace_back(backgrnd);
+	bool UIStorage::PlayerItemIcon::drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const
+	{
+		// Dropped on left panel (storage) = store item
+		StorageStorePacket(inv_slot, itemid, count).dispatch();
+		return true;
+	}
 
-		nl::node backgrnd2 = src["backgrnd2"];
-		if (backgrnd2.size() > 0)
-			sprites.emplace_back(backgrnd2);
+	UIStorage::UIStorage(const Inventory& inv) : UIDragElement<PosSTORAGE>(Point<int16_t>(500, 20)), inventory(inv)
+	{
+		nl::node src = nl::nx::ui["UIWindow2.img"]["Trunk"];
 
-		nl::node backgrnd3 = src["backgrnd3"];
-		if (backgrnd3.size() > 0)
-			sprites.emplace_back(backgrnd3);
+		// Use FullBackgrnd for two-panel layout
+		nl::node full_bg_node = src["FullBackgrnd"];
+		Texture full_bg_tex = full_bg_node;
+		bool use_full = full_bg_tex.is_valid() && full_bg_tex.get_dimensions().x() > 0;
 
-		// Buttons — Trunk NX uses: BtExit, BtGet, BtPut, BtSort
-		buttons[BT_CLOSE] = std::make_unique<MapleButton>(src["BtExit"]);
-
-		nl::node bt_take = src["BtGet"];
-		if (bt_take.size() > 0)
-			buttons[BT_TAKE_OUT] = std::make_unique<MapleButton>(bt_take);
+		if (use_full)
+		{
+			sprites.emplace_back(full_bg_node);
+			nl::node fb2 = src["FullBackgrnd2"];
+			nl::node fb3 = src["FullBackgrnd3"];
+			if (Texture(fb2).is_valid()) sprites.emplace_back(fb2);
+			if (Texture(fb3).is_valid()) sprites.emplace_back(fb3);
+		}
 		else
-			buttons[BT_TAKE_OUT] = std::make_unique<AreaButton>(Point<int16_t>(10, bg_dim.y() - 40), Point<int16_t>(80, 24));
+		{
+			sprites.emplace_back(src["backgrnd"]);
+			sprites.emplace_back(src["backgrnd2"]);
+			sprites.emplace_back(src["backgrnd3"]);
+		}
 
-		nl::node bt_store = src["BtPut"];
-		if (bt_store.size() > 0)
-			buttons[BT_STORE] = std::make_unique<MapleButton>(bt_store);
-		else
-			buttons[BT_STORE] = std::make_unique<AreaButton>(Point<int16_t>(100, bg_dim.y() - 40), Point<int16_t>(80, 24));
+		Texture bg = use_full ? full_bg_tex : Texture(src["backgrnd"]);
+		auto bg_dim = bg.get_dimensions();
 
-		nl::node bt_arrange = src["BtSort"];
-		if (bt_arrange.size() > 0)
-			buttons[BT_ARRANGE] = std::make_unique<MapleButton>(bt_arrange);
+		// Buttons from NX
+		buttons[BT_GET] = std::make_unique<MapleButton>(src["BtGet"]);
+		buttons[BT_PUT] = std::make_unique<MapleButton>(src["BtPut"]);
+		buttons[BT_SORT] = std::make_unique<MapleButton>(src["BtSort"]);
+		buttons[BT_EXIT] = std::make_unique<MapleButton>(src["BtExit"]);
+
+		nl::node bt_incoin = src["BtInCoin"];
+		if (bt_incoin.size() > 0)
+			buttons[BT_IN_COIN] = std::make_unique<MapleButton>(bt_incoin);
 		else
-			buttons[BT_ARRANGE] = std::make_unique<AreaButton>(Point<int16_t>(190, bg_dim.y() - 40), Point<int16_t>(80, 24));
+			buttons[BT_IN_COIN] = std::make_unique<AreaButton>(Point<int16_t>(184, 317), Point<int16_t>(70, 20));
+
+		nl::node bt_outcoin = src["BtOutCoin"];
+		if (bt_outcoin.size() > 0)
+			buttons[BT_OUT_COIN] = std::make_unique<MapleButton>(bt_outcoin);
+		else
+			buttons[BT_OUT_COIN] = std::make_unique<AreaButton>(Point<int16_t>(11, 317), Point<int16_t>(70, 20));
 
 		// Tab buttons
 		nl::node tab_en = src["Tab"]["enabled"];
@@ -86,61 +126,63 @@ namespace ms
 		{
 			buttons[BT_TAB_EQUIP] = std::make_unique<TwoSpriteButton>(tab_dis["0"], tab_en["0"]);
 			buttons[BT_TAB_USE] = std::make_unique<TwoSpriteButton>(tab_dis["1"], tab_en["1"]);
-			buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tab_dis["2"], tab_en["2"]);
-			buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tab_dis["3"], tab_en["3"]);
+			buttons[BT_TAB_ETC] = std::make_unique<TwoSpriteButton>(tab_dis["2"], tab_en["2"]);
+			buttons[BT_TAB_SETUP] = std::make_unique<TwoSpriteButton>(tab_dis["3"], tab_en["3"]);
 			buttons[BT_TAB_CASH] = std::make_unique<TwoSpriteButton>(tab_dis["4"], tab_en["4"]);
 		}
 		else
 		{
-			// Fallback: create area buttons for tabs across the top
-			int16_t tab_w = bg_dim.x() / 5;
+			int16_t tab_w = 55;
+			int16_t tab_x = use_full ? 352 : 7;
 			for (int i = 0; i < 5; i++)
-				buttons[BT_TAB_EQUIP + i] = std::make_unique<AreaButton>(Point<int16_t>(7 + tab_w * i, 28), Point<int16_t>(tab_w - 2, 20));
+				buttons[BT_TAB_EQUIP + i] = std::make_unique<AreaButton>(Point<int16_t>(tab_x + tab_w * i, 75), Point<int16_t>(tab_w - 2, 20));
 		}
 
-		// Item slot buttons (6 visible at a time)
-		int16_t item_y = 70;
-		int16_t item_h = 42;
+		buttons[button_by_tab(InventoryType::Id::EQUIP)]->set_state(Button::State::PRESSED);
 
-		for (int i = 0; i < 6; i++)
-		{
-			Point<int16_t> pos(10, item_y + item_h * i);
-			Point<int16_t> dim(bg_dim.x() - 40, item_h - 4);
-			buttons[BT_SLOT0 + i] = std::make_unique<AreaButton>(pos, dim);
-		}
-
-		// Selection highlight
-		selection = src["select"];
-		tab_selected = src["tabSel"];
+		// Sprites
+		disabled_slot = src["disabled"];
+		meso_icon = nl::nx::ui["UIWindow2.img"]["Shop2"]["meso"];
 
 		// Labels
-		mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
-		slotlabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
+		storage_mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
+		player_mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
 
-		// Slider
-		slider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(70, 70 + item_h * 6), bg_dim.x() - 20, 6, 1,
-			[&](bool upwards)
-			{
-				int16_t shift = upwards ? -1 : 1;
-				int16_t new_offset = offset + shift;
-				int16_t max_offset = static_cast<int16_t>(display_items.size()) - 6;
+		// Grid layout - 36px cells (matching UIItemInventory), 4 cols both panels
+		cell_size = 36;
+		storage_cols = 4;
+		visible_rows = 4;
 
-				if (new_offset >= 0 && new_offset <= max_offset)
-					offset = new_offset;
-			}
-		);
+		// Left panel: storage items below NPC/buttons
+		storage_grid_x = 11;
+		storage_grid_y = 170;
 
+		// Right panel: inventory items below tabs (matches left panel grid Y)
+		panel_divider_x = 347;
+		if (use_full)
+		{
+			inventory_grid_x = panel_divider_x + 18;
+			inventory_grid_y = 170;
+			inventory_cols = 4;
+		}
+		else
+		{
+			inventory_grid_x = 0;
+			inventory_grid_y = 0;
+			inventory_cols = 0;
+		}
+
+		// State
+		current_tab = InventoryType::Id::EQUIP;
+		storage_selection = -1;
+		inventory_selection = -1;
+		drag_source = DRAG_NONE;
 		storage_meso = 0;
 		storage_slots = 0;
 		npc_id = 0;
-		current_tab = InventoryType::Id::EQUIP;
-		offset = 0;
-		selected = -1;
 
 		dimension = bg_dim;
 		dragarea = Point<int16_t>(bg_dim.x(), 20);
-
 		active = false;
 	}
 
@@ -148,159 +190,50 @@ namespace ms
 	{
 		UIElement::draw(alpha);
 
-		// Draw NPC sprite
-		if (npc_sprite.is_valid())
-			npc_sprite.draw(DrawArgument(position + Point<int16_t>(50, 45), true));
-
-		// Draw meso label
-		mesolabel.draw(position + Point<int16_t>(dimension.x() - 30, 48));
-
-		// Draw slot count
-		slotlabel.draw(position + Point<int16_t>(15, 48));
-
-		// Draw items
-		int16_t item_y = 70;
-		int16_t item_h = 42;
-
-		for (int16_t i = 0; i < 6; i++)
+		// Draw storage items (left grid) using Icon objects
+		for (auto& pair : storage_icons)
 		{
-			int16_t idx = i + offset;
-			if (idx < 0 || idx >= static_cast<int16_t>(display_items.size()))
-				break;
-
-			StoredItem* item = display_items[idx];
-			Point<int16_t> itempos = position + Point<int16_t>(12, item_y + item_h * i);
-
-			// Draw selection highlight
-			if (idx == selected && selection.is_valid())
-				selection.draw(itempos + Point<int16_t>(0, 4));
-
-			// Draw item icon
-			if (item->icon.is_valid())
-				item->icon.draw(itempos + Point<int16_t>(2, item_h - 4));
-
-			// Draw item name and count
-			item->namelabel.draw(itempos + Point<int16_t>(40, 6));
-			item->countlabel.draw(itempos + Point<int16_t>(40, 22));
+			if (pair.second)
+			{
+				Point<int16_t> iconpos = position + storage_icon_pos(pair.first);
+				pair.second->draw(iconpos);
+			}
 		}
 
-		// Draw slider
-		slider.draw(position);
+		// Draw inventory items (right grid) using Icon objects
+		for (auto& pair : inv_icons)
+		{
+			if (pair.second)
+			{
+				Point<int16_t> iconpos = position + inventory_icon_pos(pair.first);
+				pair.second->draw(iconpos);
+			}
+		}
+
+		// Draw meso labels
+		if (meso_icon.is_valid())
+		{
+			meso_icon.draw(position + Point<int16_t>(100, 329));
+			if (inventory_cols > 0)
+				meso_icon.draw(position + Point<int16_t>(inventory_grid_x + 100, 329));
+		}
+
+		storage_mesolabel.draw(position + Point<int16_t>(170, 330));
+		if (inventory_cols > 0)
+			player_mesolabel.draw(position + Point<int16_t>(inventory_grid_x + 170, 330));
 	}
 
 	void UIStorage::update()
 	{
-		std::string mesostr = std::to_string(storage_meso);
-		string_format::split_number(mesostr);
-		mesolabel.change_text(mesostr + " meso");
+		int64_t player_meso = inventory.get_meso();
 
-		int16_t used = static_cast<int16_t>(stored_items.size());
-		slotlabel.change_text(std::to_string(used) + "/" + std::to_string(storage_slots));
-	}
+		std::string storage_mesostr = std::to_string(storage_meso);
+		std::string player_mesostr = std::to_string(player_meso);
+		string_format::split_number(storage_mesostr);
+		string_format::split_number(player_mesostr);
 
-	Button::State UIStorage::button_pressed(uint16_t buttonid)
-	{
-		switch (buttonid)
-		{
-		case BT_CLOSE:
-			close_storage();
-			return Button::State::NORMAL;
-
-		case BT_TAKE_OUT:
-		{
-			if (selected >= 0 && selected < static_cast<int16_t>(display_items.size()))
-			{
-				StoredItem* item = display_items[selected];
-
-				// Find this item's position in the current tab's filtered list
-				int8_t tab_slot = 0;
-				for (auto& si : stored_items)
-				{
-					if (si.invtype == current_tab)
-					{
-						if (&si == item)
-							break;
-						tab_slot++;
-					}
-				}
-
-				int8_t invtype_byte = 0;
-				switch (current_tab)
-				{
-				case InventoryType::Id::EQUIP: invtype_byte = 1; break;
-				case InventoryType::Id::USE: invtype_byte = 2; break;
-				case InventoryType::Id::SETUP: invtype_byte = 3; break;
-				case InventoryType::Id::ETC: invtype_byte = 4; break;
-				case InventoryType::Id::CASH: invtype_byte = 5; break;
-				default: break;
-				}
-
-				StorageTakeOutPacket(invtype_byte, tab_slot).dispatch();
-				selected = -1;
-			}
-			return Button::State::NORMAL;
-		}
-
-		case BT_STORE:
-		{
-			// Store currently selected inventory item — for now just send arrange as a placeholder
-			// Real implementation would need a way to select from player inventory
-			// Show notice
-			auto messenger = UI::get().get_element<UIStatusMessenger>();
-			if (messenger)
-				messenger->show_status(Color::Name::WHITE, "Drag an item from your inventory to store it.");
-
-			return Button::State::NORMAL;
-		}
-
-		case BT_ARRANGE:
-			StorageArrangePacket().dispatch();
-			return Button::State::NORMAL;
-
-		case BT_TAB_EQUIP:
-			change_tab(InventoryType::Id::EQUIP);
-			return Button::State::IDENTITY;
-
-		case BT_TAB_USE:
-			change_tab(InventoryType::Id::USE);
-			return Button::State::IDENTITY;
-
-		case BT_TAB_SETUP:
-			change_tab(InventoryType::Id::SETUP);
-			return Button::State::IDENTITY;
-
-		case BT_TAB_ETC:
-			change_tab(InventoryType::Id::ETC);
-			return Button::State::IDENTITY;
-
-		case BT_TAB_CASH:
-			change_tab(InventoryType::Id::CASH);
-			return Button::State::IDENTITY;
-
-		default:
-			if (buttonid >= BT_SLOT0 && buttonid <= BT_SLOT5)
-			{
-				int16_t slot = (buttonid - BT_SLOT0) + offset;
-
-				if (slot >= 0 && slot < static_cast<int16_t>(display_items.size()))
-				{
-					if (slot == selected)
-					{
-						// Double click = take out
-						button_pressed(BT_TAKE_OUT);
-					}
-					else
-					{
-						selected = slot;
-					}
-				}
-
-				return Button::State::NORMAL;
-			}
-			break;
-		}
-
-		return Button::State::NORMAL;
+		storage_mesolabel.change_text(storage_mesostr);
+		player_mesolabel.change_text(player_mesostr);
 	}
 
 	Cursor::State UIStorage::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -308,26 +241,146 @@ namespace ms
 		Point<int16_t> cursoroffset = cursorpos - position;
 		lastcursorpos = cursoroffset;
 
-		if (slider.isenabled())
+		// Show tooltips
+		int16_t sslot = storage_slot_by_cursor(cursoroffset);
+		int16_t islot = inventory_slot_by_cursor(cursoroffset);
+
+		if (sslot >= 0)
 		{
-			Cursor::State sstate = slider.send_cursor(cursoroffset, clicked);
-			if (sstate != Cursor::State::IDLE)
-				return sstate;
+			const auto& items = get_storage_tab(current_tab);
+			if (sslot < static_cast<int16_t>(items.size()))
+				UI::get().show_item(Tooltip::Parent::SHOP, items[sslot].itemid);
+			else
+				clear_tooltip();
+		}
+		else if (islot >= 0)
+		{
+			if (islot < static_cast<int16_t>(inventory_items.size()))
+				UI::get().show_item(Tooltip::Parent::SHOP, inventory_items[islot].itemid);
+			else
+				clear_tooltip();
+		}
+		else
+		{
+			clear_tooltip();
+		}
+
+		// Handle clicks - initiate drag or select
+		if (clicked)
+		{
+			// Check storage grid (left panel)
+			if (sslot >= 0)
+			{
+				const auto& items = get_storage_tab(current_tab);
+				if (sslot < static_cast<int16_t>(items.size()))
+				{
+					auto it = storage_icons.find(sslot);
+					if (it != storage_icons.end() && it->second)
+					{
+						Point<int16_t> slotpos = storage_icon_pos(sslot);
+						it->second->start_drag(cursoroffset - slotpos);
+						UI::get().drag_icon(it->second.get());
+
+						drag_source = DRAG_STORAGE;
+						storage_selection = sslot;
+						inventory_selection = -1;
+						clear_tooltip();
+						return Cursor::State::GRABBING;
+					}
+				}
+				return Cursor::State::CLICKING;
+			}
+
+			// Check inventory grid (right panel)
+			if (islot >= 0)
+			{
+				if (islot < static_cast<int16_t>(inventory_items.size()))
+				{
+					auto it = inv_icons.find(islot);
+					if (it != inv_icons.end() && it->second)
+					{
+						Point<int16_t> slotpos = inventory_icon_pos(islot);
+						it->second->start_drag(cursoroffset - slotpos);
+						UI::get().drag_icon(it->second.get());
+
+						drag_source = DRAG_INVENTORY;
+						inventory_selection = islot;
+						storage_selection = -1;
+						clear_tooltip();
+						return Cursor::State::GRABBING;
+					}
+				}
+				return Cursor::State::CLICKING;
+			}
 		}
 
 		return UIDragElement::send_cursor(clicked, cursorpos);
 	}
 
+	bool UIStorage::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		Point<int16_t> cursoroffset = cursorpos - position;
+
+		// Only allow cross-panel drops:
+		// Storage item (left) dragged to right panel = take out
+		if (drag_source == DRAG_STORAGE && in_right_panel(cursoroffset))
+		{
+			icon.drop_on_items(current_tab, EquipSlot::Id::NONE, 0, false);
+			drag_source = DRAG_NONE;
+			return true;
+		}
+
+		// Inventory item (right) dragged to left panel = store
+		if (drag_source == DRAG_INVENTORY && in_left_panel(cursoroffset))
+		{
+			icon.drop_on_items(current_tab, EquipSlot::Id::NONE, 0, false);
+			drag_source = DRAG_NONE;
+			return true;
+		}
+
+		// Dropped on same panel or outside — cancel
+		drag_source = DRAG_NONE;
+		return true;
+	}
+
 	void UIStorage::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-			close_storage();
+			close_with_packet();
 	}
 
 	void UIStorage::send_scroll(double yoffset)
 	{
-		if (slider.isenabled())
-			slider.send_scroll(yoffset);
+	}
+
+	void UIStorage::rightclick(Point<int16_t> cursorpos)
+	{
+		Point<int16_t> cursoroffset = cursorpos - position;
+
+		int16_t sslot = storage_slot_by_cursor(cursoroffset);
+		if (sslot >= 0)
+		{
+			const auto& items = get_storage_tab(current_tab);
+			if (sslot < static_cast<int16_t>(items.size()))
+			{
+				storage_selection = sslot;
+				inventory_selection = -1;
+				request_take_out(sslot);
+			}
+			return;
+		}
+
+		int16_t islot = inventory_slot_by_cursor(cursoroffset);
+		if (islot >= 0)
+		{
+			if (islot < static_cast<int16_t>(inventory_items.size()))
+			{
+				inventory_selection = islot;
+				storage_selection = -1;
+				const auto& entry = inventory_items[islot];
+				request_store(entry.slot, entry.itemid, entry.count);
+			}
+		}
 	}
 
 	UIElement::Type UIStorage::get_type() const
@@ -335,134 +388,396 @@ namespace ms
 		return TYPE;
 	}
 
-	void UIStorage::set_storage(int32_t npcid, int8_t slots, int32_t meso)
+	Button::State UIStorage::button_pressed(uint16_t buttonid)
 	{
-		npc_id = npcid;
+		clear_tooltip();
+
+		switch (buttonid)
+		{
+		case BT_GET:
+			if (storage_selection >= 0)
+				request_take_out(storage_selection);
+			return Button::State::NORMAL;
+
+		case BT_PUT:
+			if (inventory_selection >= 0 && inventory_selection < static_cast<int16_t>(inventory_items.size()))
+			{
+				const auto& entry = inventory_items[inventory_selection];
+				request_store(entry.slot, entry.itemid, entry.count);
+			}
+			return Button::State::NORMAL;
+
+		case BT_SORT:
+			request_sort();
+			return Button::State::NORMAL;
+
+		case BT_IN_COIN:
+			request_meso_change(true);
+			return Button::State::NORMAL;
+
+		case BT_OUT_COIN:
+			request_meso_change(false);
+			return Button::State::NORMAL;
+
+		case BT_EXIT:
+			close_with_packet();
+			return Button::State::PRESSED;
+
+		case BT_TAB_EQUIP:
+			change_tab(InventoryType::Id::EQUIP);
+			return Button::State::IDENTITY;
+		case BT_TAB_USE:
+			change_tab(InventoryType::Id::USE);
+			return Button::State::IDENTITY;
+		case BT_TAB_ETC:
+			change_tab(InventoryType::Id::ETC);
+			return Button::State::IDENTITY;
+		case BT_TAB_SETUP:
+			change_tab(InventoryType::Id::SETUP);
+			return Button::State::IDENTITY;
+		case BT_TAB_CASH:
+			change_tab(InventoryType::Id::CASH);
+			return Button::State::IDENTITY;
+
+		default:
+			break;
+		}
+
+		return Button::State::NORMAL;
+	}
+
+	void UIStorage::open(int32_t new_npcid, uint8_t slots, int32_t meso)
+	{
+		npc_id = new_npcid;
 		storage_slots = slots;
 		storage_meso = meso;
 
-		stored_items.clear();
-		display_items.clear();
-		offset = 0;
-		selected = -1;
+		storage_selection = -1;
+		inventory_selection = -1;
 
-		// Load NPC sprite
-		std::string strid = string_format::extend_id(npcid, 7);
-		npc_sprite = nl::nx::npc[strid + ".img"]["stand"]["0"];
+		storage_equip.clear();
+		storage_use.clear();
+		storage_setup.clear();
+		storage_etc.clear();
+		storage_cash.clear();
+		storage_icons.clear();
+		inv_icons.clear();
 
-		// Set equip tab as default
 		current_tab = InventoryType::Id::EQUIP;
 
 		for (uint16_t i = BT_TAB_EQUIP; i <= BT_TAB_CASH; i++)
 			buttons[i]->set_state(Button::State::NORMAL);
 
-		buttons[BT_TAB_EQUIP]->set_state(Button::State::PRESSED);
+		buttons[button_by_tab(current_tab)]->set_state(Button::State::PRESSED);
 
+		refresh_inventory_tab();
 		makeactive();
 	}
 
-	void UIStorage::add_stored_item(int8_t invtype_byte, int8_t slot, int32_t itemid, int16_t count)
+	void UIStorage::close()
 	{
-		InventoryType::Id invtype;
-		switch (invtype_byte)
-		{
-		case 1: invtype = InventoryType::Id::EQUIP; break;
-		case 2: invtype = InventoryType::Id::USE; break;
-		case 3: invtype = InventoryType::Id::SETUP; break;
-		case 4: invtype = InventoryType::Id::ETC; break;
-		case 5: invtype = InventoryType::Id::CASH; break;
-		default: invtype = InventoryType::Id::ETC; break;
-		}
-
-		StoredItem si;
-		si.itemid = itemid;
-		si.count = count;
-		si.slot = slot;
-		si.invtype = invtype;
-
-		const ItemData& idata = ItemData::get(itemid);
-		si.icon = idata.get_icon(false);
-
-		std::string name = idata.get_name();
-		if (name.length() > 30)
-			name = name.substr(0, 30) + "..";
-
-		si.namelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT, name);
-
-		if (count > 1)
-			si.countlabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, "x" + std::to_string(count));
-		else
-			si.countlabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
-
-		stored_items.push_back(std::move(si));
+		clear_tooltip();
+		active = false;
+		storage_selection = -1;
+		inventory_selection = -1;
+		storage_icons.clear();
+		inv_icons.clear();
 	}
 
-	void UIStorage::update_meso(int32_t meso)
+	void UIStorage::set_items_for_all(InventoryType::Id types[], size_t ntypes,
+		std::vector<ItemEntry> items_by_type[])
+	{
+		for (size_t i = 0; i < ntypes; i++)
+			get_storage_tab(types[i]) = items_by_type[i];
+
+		refresh_storage_icons();
+		refresh_inventory_icons();
+	}
+
+	void UIStorage::set_items_for_tab(InventoryType::Id type, const std::vector<ItemEntry>& items)
+	{
+		get_storage_tab(type) = items;
+
+		if (type == current_tab)
+		{
+			refresh_storage_icons();
+			refresh_inventory_tab();
+		}
+	}
+
+	void UIStorage::set_slots(uint8_t value)
+	{
+		storage_slots = value;
+	}
+
+	void UIStorage::set_meso(int32_t meso)
 	{
 		storage_meso = meso;
 	}
 
-	void UIStorage::refresh_items()
+	void UIStorage::modify(InventoryType::Id type)
 	{
-		change_tab(current_tab);
+		if (type == current_tab)
+			refresh_inventory_tab();
 	}
 
-	void UIStorage::close_storage()
+	void UIStorage::clear_tooltip()
 	{
-		StorageClosePacket().dispatch();
-		deactivate();
+		UI::get().clear_tooltip(Tooltip::Parent::SHOP);
+	}
+
+	void UIStorage::refresh_storage_icons()
+	{
+		storage_icons.clear();
+
+		const auto& items = get_storage_tab(current_tab);
+		for (int16_t i = 0; i < static_cast<int16_t>(items.size()); i++)
+		{
+			int16_t count = (current_tab == InventoryType::Id::EQUIP) ? -1 : items[i].count;
+			const Texture& tex = ItemData::get(items[i].itemid).get_icon(false);
+
+			storage_icons[i] = std::make_unique<Icon>(
+				std::make_unique<StorageItemIcon>(i, current_tab),
+				tex, count
+			);
+		}
+	}
+
+	void UIStorage::refresh_inventory_icons()
+	{
+		inv_icons.clear();
+
+		for (int16_t i = 0; i < static_cast<int16_t>(inventory_items.size()); i++)
+		{
+			const auto& entry = inventory_items[i];
+			int16_t count = (current_tab == InventoryType::Id::EQUIP) ? -1 : entry.count;
+			const Texture& tex = ItemData::get(entry.itemid).get_icon(false);
+
+			inv_icons[i] = std::make_unique<Icon>(
+				std::make_unique<PlayerItemIcon>(entry.slot, entry.itemid, entry.count),
+				tex, count
+			);
+		}
+	}
+
+	void UIStorage::refresh_inventory_tab()
+	{
+		inventory_items.clear();
+
+		int16_t slotmax = inventory.get_slotmax(current_tab);
+		for (int16_t slot = 1; slot <= slotmax; ++slot)
+		{
+			int32_t itemid = inventory.get_item_id(current_tab, slot);
+			if (itemid == 0)
+				continue;
+
+			int16_t count = (current_tab == InventoryType::Id::EQUIP)
+				? 1
+				: inventory.get_item_count(current_tab, slot);
+
+			InventoryEntry entry;
+			entry.itemid = itemid;
+			entry.count = count;
+			entry.slot = slot;
+			inventory_items.push_back(entry);
+		}
+
+		refresh_inventory_icons();
 	}
 
 	void UIStorage::change_tab(InventoryType::Id type)
 	{
-		// Update button states
-		uint16_t old_tab = tab_by_inv(current_tab);
-		if (old_tab > 0)
-			buttons[old_tab]->set_state(Button::State::NORMAL);
+		uint16_t oldtab = button_by_tab(current_tab);
+		uint16_t newtab = button_by_tab(type);
+
+		buttons[oldtab]->set_state(Button::State::NORMAL);
+		buttons[newtab]->set_state(Button::State::PRESSED);
 
 		current_tab = type;
+		storage_selection = -1;
+		inventory_selection = -1;
 
-		uint16_t new_tab = tab_by_inv(current_tab);
-		if (new_tab > 0)
-			buttons[new_tab]->set_state(Button::State::PRESSED);
+		refresh_storage_icons();
+		refresh_inventory_tab();
+	}
 
-		// Filter items by tab
-		display_items.clear();
-		for (auto& si : stored_items)
+	void UIStorage::request_take_out(int16_t index)
+	{
+		const auto& items = get_storage_tab(current_tab);
+		if (index < 0 || index >= static_cast<int16_t>(items.size()))
+			return;
+
+		int8_t invtype_byte = 0;
+		switch (current_tab)
 		{
-			if (si.invtype == current_tab)
-				display_items.push_back(&si);
+		case InventoryType::Id::EQUIP: invtype_byte = 1; break;
+		case InventoryType::Id::USE: invtype_byte = 2; break;
+		case InventoryType::Id::SETUP: invtype_byte = 3; break;
+		case InventoryType::Id::ETC: invtype_byte = 4; break;
+		case InventoryType::Id::CASH: invtype_byte = 5; break;
+		default: break;
 		}
 
-		offset = 0;
-		selected = -1;
-
-		slider.setrows(6, static_cast<int16_t>(display_items.size()));
+		StorageTakeOutPacket(invtype_byte, static_cast<int8_t>(index)).dispatch();
 	}
 
-	int16_t UIStorage::slot_by_position(int16_t y) const
+	void UIStorage::request_store(int16_t inv_slot, int32_t itemid, int16_t count)
 	{
-		int16_t yoff = y - 70;
-		if (yoff < 0)
-			return -1;
+		int16_t max_quantity = std::max<int16_t>(1, count);
 
-		int16_t slot = yoff / 42;
-		if (slot >= 0 && slot < 6)
-			return slot;
+		if (current_tab != InventoryType::Id::EQUIP && max_quantity > 1)
+		{
+			auto on_enter = [inv_slot, itemid](int32_t quantity)
+			{
+				auto shortqty = static_cast<int16_t>(quantity);
+				StorageStorePacket(inv_slot, itemid, shortqty).dispatch();
+			};
 
-		return -1;
+			UI::get().emplace<UIEnterNumber>("How many would you like to store?", on_enter, max_quantity, 1);
+		}
+		else
+		{
+			StorageStorePacket(inv_slot, itemid, 1).dispatch();
+		}
 	}
 
-	uint16_t UIStorage::tab_by_inv(InventoryType::Id type) const
+	void UIStorage::request_sort()
+	{
+		StorageArrangePacket().dispatch();
+	}
+
+	void UIStorage::request_meso_change(bool store_to_storage)
+	{
+		int32_t max_value = 0;
+
+		if (store_to_storage)
+		{
+			int64_t player_meso = inventory.get_meso();
+			max_value = static_cast<int32_t>(std::min<int64_t>(player_meso, 2147483647));
+		}
+		else
+		{
+			max_value = std::max<int32_t>(0, storage_meso);
+		}
+
+		if (max_value <= 0)
+			return;
+
+		auto on_enter = [store_to_storage](int32_t amount)
+		{
+			int32_t signed_amount = store_to_storage ? -amount : amount;
+			StorageMesoPacket(signed_amount).dispatch();
+		};
+
+		const char* question = store_to_storage
+			? "How many mesos would you like to store?"
+			: "How many mesos would you like to take out?";
+
+		UI::get().emplace<UIEnterNumber>(question, on_enter, max_value, 1);
+	}
+
+	void UIStorage::close_with_packet()
+	{
+		close();
+		StorageClosePacket().dispatch();
+	}
+
+	uint16_t UIStorage::button_by_tab(InventoryType::Id type) const
 	{
 		switch (type)
 		{
 		case InventoryType::Id::EQUIP: return BT_TAB_EQUIP;
 		case InventoryType::Id::USE: return BT_TAB_USE;
-		case InventoryType::Id::SETUP: return BT_TAB_SETUP;
 		case InventoryType::Id::ETC: return BT_TAB_ETC;
+		case InventoryType::Id::SETUP: return BT_TAB_SETUP;
 		case InventoryType::Id::CASH: return BT_TAB_CASH;
-		default: return 0;
+		default: return BT_TAB_EQUIP;
+		}
+	}
+
+	bool UIStorage::in_left_panel(Point<int16_t> cursoroffset) const
+	{
+		return cursoroffset.x() >= 0 && cursoroffset.x() < panel_divider_x
+			&& cursoroffset.y() >= 0 && cursoroffset.y() < dimension.y();
+	}
+
+	bool UIStorage::in_right_panel(Point<int16_t> cursoroffset) const
+	{
+		if (inventory_cols <= 0) return false;
+		return cursoroffset.x() >= panel_divider_x
+			&& cursoroffset.y() >= 0 && cursoroffset.y() < dimension.y();
+	}
+
+	Point<int16_t> UIStorage::storage_icon_pos(int16_t index) const
+	{
+		int16_t col = index % storage_cols;
+		int16_t row = index / storage_cols;
+		return Point<int16_t>(storage_grid_x + col * cell_size, storage_grid_y + row * cell_size);
+	}
+
+	Point<int16_t> UIStorage::inventory_icon_pos(int16_t index) const
+	{
+		if (inventory_cols <= 0) return Point<int16_t>(0, 0);
+		int16_t col = index % inventory_cols;
+		int16_t row = index / inventory_cols;
+		return Point<int16_t>(inventory_grid_x + col * cell_size, inventory_grid_y + row * cell_size);
+	}
+
+	int16_t UIStorage::storage_slot_by_cursor(Point<int16_t> cursoroffset) const
+	{
+		int16_t x = cursoroffset.x() - storage_grid_x;
+		int16_t y = cursoroffset.y() - storage_grid_y;
+
+		if (x < 0 || y < 0) return -1;
+
+		int16_t col = x / cell_size;
+		int16_t row = y / cell_size;
+
+		if (col >= storage_cols || row >= visible_rows) return -1;
+
+		return row * storage_cols + col;
+	}
+
+	int16_t UIStorage::inventory_slot_by_cursor(Point<int16_t> cursoroffset) const
+	{
+		if (inventory_cols <= 0) return -1;
+
+		int16_t x = cursoroffset.x() - inventory_grid_x;
+		int16_t y = cursoroffset.y() - inventory_grid_y;
+
+		if (x < 0 || y < 0) return -1;
+
+		int16_t col = x / cell_size;
+		int16_t row = y / cell_size;
+
+		if (col >= inventory_cols || row >= visible_rows) return -1;
+
+		return row * inventory_cols + col;
+	}
+
+	std::vector<UIStorage::ItemEntry>& UIStorage::get_storage_tab(InventoryType::Id type)
+	{
+		switch (type)
+		{
+		case InventoryType::Id::EQUIP: return storage_equip;
+		case InventoryType::Id::USE: return storage_use;
+		case InventoryType::Id::SETUP: return storage_setup;
+		case InventoryType::Id::ETC: return storage_etc;
+		case InventoryType::Id::CASH: return storage_cash;
+		default: return storage_etc;
+		}
+	}
+
+	const std::vector<UIStorage::ItemEntry>& UIStorage::get_storage_tab(InventoryType::Id type) const
+	{
+		switch (type)
+		{
+		case InventoryType::Id::EQUIP: return storage_equip;
+		case InventoryType::Id::USE: return storage_use;
+		case InventoryType::Id::SETUP: return storage_setup;
+		case InventoryType::Id::ETC: return storage_etc;
+		case InventoryType::Id::CASH: return storage_cash;
+		default: return storage_etc;
 		}
 	}
 }

@@ -28,7 +28,7 @@
 
 namespace ms
 {
-	UIGuild::UIGuild() : UIDragElement<PosGUILD>(), tab(0), scroll_offset(0)
+	UIGuild::UIGuild() : UIDragElement<PosGUILD>(Point<int16_t>(300, 20)), tab(0), scroll_offset(0)
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["UserList"];
 		nl::node main = src["Main"];

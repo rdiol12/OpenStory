@@ -31,7 +31,7 @@
 namespace ms
 {
 	UIQuestHelper::UIQuestHelper(const QuestLog& ql) :
-		UIDragElement<PosQUESTHELPER>(), questlog(ql),
+		UIDragElement<PosQUESTHELPER>(Point<int16_t>(200, 20)), questlog(ql),
 		tracked_questid(-1), minimized(false), show_messenger(false)
 	{
 		// === QuestAlarm (UIWindow.img — v83 primary) ===

@@ -501,7 +501,14 @@ namespace ms
 			{
 				if (!clicked)
 				{
-					dragged = nullptr;
+					// Only reset dragged when mouse is actually released,
+					// not on idle cursor movement while held
+					if (!UI::get().is_mouse_held())
+						dragged = nullptr;
+
+					// If still dragging (mouse held), continue the drag
+					if (dragged)
+						return dragged->send_cursor(true, cursorpos);
 
 					if (auto front = get_front(cursorpos))
 					{

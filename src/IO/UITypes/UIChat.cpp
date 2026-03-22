@@ -28,7 +28,7 @@
 
 namespace ms
 {
-	UIChat::UIChat() : UIDragElement<PosMAPLECHAT>()
+	UIChat::UIChat() : UIDragElement<PosMAPLECHAT>(Point<int16_t>(250, 20))
 	{
 		show_weekly = Configuration::get().get_show_weekly();
 
@@ -123,7 +123,7 @@ namespace ms
 		deactivate();
 	}
 
-	UIRank::UIRank() : UIDragElement<PosMAPLECHAT>()
+	UIRank::UIRank() : UIDragElement<PosMAPLECHAT>(Point<int16_t>(250, 20))
 	{
 		Configuration::get().set_show_weekly(false);
 

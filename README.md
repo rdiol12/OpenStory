@@ -82,6 +82,29 @@ A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenCli
 
 ## Recent Changes
 
+### GM Dark Sight Transparency
+- GMs with DARKSIGHT buff render at 50% opacity instead of being fully hidden
+- Local player sees themselves semi-transparent when hidden via `has_buff(DARKSIGHT)`
+- Other GMs see hidden GMs as semi-transparent via `GiveForeignBuff` DARKSIGHT bit detection
+- `CancelForeignBuff` properly restores full opacity when dark sight ends
+
+### Storage System
+- Full storage packet parsing for Cosmic v83 (open, take-out, store, arrange, meso)
+- Fixed packet stack underflow errors (modes 0x09/0x0D don't include meso field, mode 0x0F mask is writeByte not writeShort)
+- Storage UI with item grid, tab switching, meso deposit/withdraw
+- Fixed item replication on drag-drop between inventory and storage panels
+- Right panel item positioning aligned with left panel
+
+### OtherChar / Bot Movement
+- Smooth interpolation for other characters instead of snapping between positions
+- One movement consumed per frame with lerp fill when queue is empty
+- Proper hspeed/vspeed set during interpolation so walking animation plays
+- Removed update_fh() calls that caused warping to wrong footholds
+
+### Window Dragging
+- Fixed UIDragElement dragging using mouse held state and dragarea values
+- All draggable UI windows properly respond to click-and-drag
+
 ### Fullscreen Support
 - Borderless windowed fullscreen stretches to fill any monitor resolution (including 16:10)
 - Cursor mapping adjusted for viewport scaling
@@ -120,7 +143,7 @@ A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenCli
 
 ### Not Yet Implemented
 - **Cash Shop purchases** -- UI exists but purchase flow incomplete
-- **Storage UI** -- handler/UI stubbed but not fully wired
+- **Storage UI** -- functional but may need polish (item positioning, edge cases)
 - **Trade UI** -- player-to-player trade stubbed
 - **Guild UI** -- stub files created, not wired up
 - **Messenger / Party Search** -- stub files created, not wired up

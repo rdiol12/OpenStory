@@ -217,6 +217,16 @@ namespace ms
 				return;
 
 			iter->second.reset();
+
+			// Move NPC horizontally when in a walk/move state
+			if (stance == "move" || stance == "walk")
+			{
+				phobj.hspeed = flip ? 1.0 : -1.0;
+			}
+			else
+			{
+				phobj.hspeed = 0.0;
+			}
 		}
 	}
 

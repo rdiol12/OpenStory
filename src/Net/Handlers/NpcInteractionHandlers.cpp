@@ -63,6 +63,8 @@ namespace ms
 
 		int16_t size = recv.read_short();
 
+		std::cout << "[Shop] npcid=" << npcid << " items=" << size << std::endl;
+
 		for (int16_t i = 0; i < size; i++)
 		{
 			int32_t itemid = recv.read_int();
@@ -73,6 +75,8 @@ namespace ms
 			recv.skip(4);
 
 			bool norecharge = recv.read_short() == 1;
+
+			std::cout << "[Shop] item[" << i << "] id=" << itemid << " price=" << price << " pitch=" << pitch << " norecharge=" << norecharge << std::endl;
 
 			if (norecharge)
 			{

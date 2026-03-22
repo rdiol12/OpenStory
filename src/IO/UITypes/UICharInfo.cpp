@@ -30,7 +30,7 @@
 
 namespace ms
 {
-	UICharInfo::UICharInfo(int32_t cid) : UIDragElement<PosCHARINFO>(), is_loading(true), timestep(Constants::TIMESTEP), personality_enabled(false), collect_enabled(false), damage_enabled(false), item_enabled(false)
+	UICharInfo::UICharInfo(int32_t cid) : UIDragElement<PosCHARINFO>(Point<int16_t>(250, 20)), is_loading(true), timestep(Constants::TIMESTEP), personality_enabled(false), collect_enabled(false), damage_enabled(false), item_enabled(false)
 	{
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
 		nl::node UserInfo = nl::nx::ui["UIWindow2.img"]["UserInfo"];

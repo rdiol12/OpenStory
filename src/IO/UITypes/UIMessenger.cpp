@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIMessenger::UIMessenger() : UIDragElement<PosMESSENGER>()
+	UIMessenger::UIMessenger() : UIDragElement<PosMESSENGER>(Point<int16_t>(200, 20))
 	{
 		nl::node src = nl::nx::ui["UIWindow.img"]["Messenger"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

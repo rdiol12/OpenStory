@@ -77,6 +77,8 @@ namespace ms
 
 		// Check whether the player is invincible
 		bool is_invincible() const override;
+		// Check whether the player is hidden (GM dark sight)
+		bool is_hidden() const override;
 		// Handle an attack to the player
 		MobAttackResult damage(const MobAttack& attack);
 

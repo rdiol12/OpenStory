@@ -32,7 +32,7 @@
 
 namespace ms
 {
-	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>()
+	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>(Point<int16_t>(200, 20))
 	{
 		uint8_t selected_world = Configuration::get().get_worldid();
 		current_channel = Configuration::get().get_channelid();

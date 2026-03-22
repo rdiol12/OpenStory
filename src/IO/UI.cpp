@@ -146,6 +146,7 @@ namespace ms
 
 	void UI::send_cursor(bool pressed)
 	{
+		mouse_held = pressed;
 		Cursor::State cursorstate = (pressed && enabled) ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		Point<int16_t> cursorpos = cursor.get_position();
 		send_cursor(cursorpos, cursorstate);
@@ -165,8 +166,12 @@ namespace ms
 
 	void UI::send_cursor(Point<int16_t> pos)
 	{
-		// Position updates are not clicks — always send as IDLE
 		send_cursor(pos, Cursor::State::IDLE);
+	}
+
+	bool UI::is_mouse_held() const
+	{
+		return mouse_held;
 	}
 
 	void UI::rightclick()

@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIGuildMark::UIGuildMark() : UIDragElement<PosGUILDMARK>()
+	UIGuildMark::UIGuildMark() : UIDragElement<PosGUILDMARK>(Point<int16_t>(200, 20))
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["GuildMark"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

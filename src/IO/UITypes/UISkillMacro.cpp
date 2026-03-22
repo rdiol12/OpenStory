@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UISkillMacro::UISkillMacro() : UIDragElement<PosSKILLMACRO>()
+	UISkillMacro::UISkillMacro() : UIDragElement<PosSKILLMACRO>(Point<int16_t>(250, 20))
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["SkillMacro"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];

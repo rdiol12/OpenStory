@@ -57,7 +57,10 @@ namespace ms
 			WHITE,
 			RED,
 			BLUE,
-			YELLOW
+			YELLOW,
+			PINK,
+			LIGHTBLUE,
+			GREEN
 		};
 
 		struct PartyMember
@@ -79,6 +82,7 @@ namespace ms
 		void set_position(Point<int16_t> pos);
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		void send_scroll(double yoffset) override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;

@@ -27,7 +27,7 @@
 
 namespace ms
 {
-	UIPartySearch::UIPartySearch() : UIDragElement<PosPARTYSEARCH>(),
+	UIPartySearch::UIPartySearch() : UIDragElement<PosPARTYSEARCH>(Point<int16_t>(300, 20)),
 		is_searching(false), scroll_offset(0)
 	{
 		nl::node src = nl::nx::ui["UIWindow.img"]["PartySearch"];

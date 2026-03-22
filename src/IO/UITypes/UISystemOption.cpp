@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	UISystemOption::UISystemOption() : UIDragElement<PosSYSTEMOPTION>(), dragging(DRAG_NONE)
+	UISystemOption::UISystemOption() : UIDragElement<PosSYSTEMOPTION>(Point<int16_t>(250, 20)), dragging(DRAG_NONE)
 	{
 		nl::node SystemOption = nl::nx::ui["UIWindow2.img"]["SystemOption"];
 

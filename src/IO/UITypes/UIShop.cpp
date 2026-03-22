@@ -36,7 +36,7 @@
 
 namespace ms
 {
-	UIShop::UIShop(const CharLook& in_charlook, const Inventory& in_inventory) : UIDragElement<PosSHOP>(), charlook(in_charlook), inventory(in_inventory)
+	UIShop::UIShop(const CharLook& in_charlook, const Inventory& in_inventory) : UIDragElement<PosSHOP>(Point<int16_t>(400, 20)), charlook(in_charlook), inventory(in_inventory)
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["Shop2"];
 
@@ -561,7 +561,8 @@ namespace ms
 			namelabel.change_text(item.get_name());
 		}
 
-		std::string mesostr = std::to_string(price);
+		int32_t display_price = (chargeprice > 0 && price == 0) ? chargeprice : price;
+		std::string mesostr = std::to_string(display_price);
 		string_format::split_number(mesostr);
 		pricelabel.change_text(mesostr + "meso");
 	}

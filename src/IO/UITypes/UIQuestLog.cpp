@@ -40,7 +40,7 @@
 namespace ms
 {
 	UIQuestLog::UIQuestLog(const QuestLog& ql) :
-		UIDragElement<PosQUEST>(), questlog(ql), offset(0),
+		UIDragElement<PosQUEST>(Point<int16_t>(280, 20)), questlog(ql), offset(0),
 		selected_entry(-1), hover_entry(-1), selected_from_recommended(false), show_detail(false),
 		detail_scroll(0), detail_content_height(0),
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),

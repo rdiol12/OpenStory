@@ -90,6 +90,8 @@ namespace ms
 			CREAM,
 			SMALT,
 			PRUSSIANBLUE,
+			PINK,
+			LIGHTBLUE,
 			NUM_COLORS
 		};
 
@@ -136,7 +138,9 @@ namespace ms
 			{ 0.94f, 0.00f, 0.20f }, // Torch Red
 			{ 1.00f, 1.00f, 0.80f }, // Cream
 			{ 0.00f, 0.23f, 0.56f }, // Smalt
-			{ 0.01f, 0.19f, 0.28f }  // Prussian Blue
+			{ 0.01f, 0.19f, 0.28f }, // Prussian Blue
+			{ 1.00f, 0.50f, 0.75f }, // Pink (Server message type 5)
+			{ 0.53f, 0.81f, 0.98f }  // Light Blue (Server message type 6)
 		};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

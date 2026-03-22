@@ -68,6 +68,10 @@ namespace ms
 
 		// Check whether the character is invincible
 		virtual bool is_invincible() const;
+		// Check whether the character is hidden (GM dark sight)
+		virtual bool is_hidden() const;
+		// Set hidden state (GM dark sight transparency)
+		void set_hidden(bool hidden);
 		// Return the character's level
 		virtual uint16_t get_level() const = 0;
 		// Return the a skill's level from the character
@@ -174,6 +178,7 @@ namespace ms
 		Afterimage afterimage;
 		TimedBool invincible;
 		TimedBool ironbody;
+		bool hidden = false;
 		std::list<DamageNumber> damagenumbers;
 
 		static EnumMap<CharEffect::Id, Animation> chareffects;
