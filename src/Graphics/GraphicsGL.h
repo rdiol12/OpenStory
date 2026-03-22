@@ -24,6 +24,14 @@
 
 #include "../Util/QuadTree.h"
 
+#ifdef PLATFORM_IOS
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
+#else
+#define GLEW_STATIC
+#include <glew.h>
+#endif
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
 

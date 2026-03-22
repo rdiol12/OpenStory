@@ -38,12 +38,15 @@ file(GLOB SRC_IO_CORE
 	"${OPENSTORY_SRC}/IO/Keyboard.h"
 	"${OPENSTORY_SRC}/IO/KeyAction.h"
 	"${OPENSTORY_SRC}/IO/KeyType.h"
+	"${OPENSTORY_SRC}/IO/Messages.cpp"
+	"${OPENSTORY_SRC}/IO/Messages.h"
 )
 file(GLOB_RECURSE SRC_IO_COMPONENTS "${OPENSTORY_SRC}/IO/Components/*.cpp" "${OPENSTORY_SRC}/IO/Components/*.h")
 file(GLOB_RECURSE SRC_IO_UITYPES "${OPENSTORY_SRC}/IO/UITypes/*.cpp" "${OPENSTORY_SRC}/IO/UITypes/*.h")
 
 file(GLOB SRC_GRAPHICS
 	"${OPENSTORY_SRC}/Graphics/GraphicsGL.h"
+	"${OPENSTORY_SRC}/Graphics/GraphicsGL.cpp"
 	"${OPENSTORY_SRC}/Graphics/Animation.cpp"
 	"${OPENSTORY_SRC}/Graphics/Animation.h"
 	"${OPENSTORY_SRC}/Graphics/Color.cpp"
@@ -53,6 +56,7 @@ file(GLOB SRC_GRAPHICS
 	"${OPENSTORY_SRC}/Graphics/DrawArgument.h"
 	"${OPENSTORY_SRC}/Graphics/EffectLayer.cpp"
 	"${OPENSTORY_SRC}/Graphics/EffectLayer.h"
+	"${OPENSTORY_SRC}/Graphics/Geometry.cpp"
 	"${OPENSTORY_SRC}/Graphics/Geometry.h"
 	"${OPENSTORY_SRC}/Graphics/RecurringEffect.h"
 	"${OPENSTORY_SRC}/Graphics/Sprite.cpp"
