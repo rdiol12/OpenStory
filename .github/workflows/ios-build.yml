@@ -101,13 +101,13 @@ jobs:
         mkdir -p libs/ios/include
         curl -sL https://raw.githubusercontent.com/nothings/stb/master/stb_image.h -o libs/ios/include/stb_image.h
 
-    - name: Download Roboto fonts
+    - name: Setup fonts
       run: |
         mkdir -p resources/fonts
-        curl -sL "https://github.com/googlefonts/roboto/releases/download/v2.138/roboto-android.zip" -o /tmp/roboto.zip
-        cd /tmp && unzip -q roboto.zip
-        cp /tmp/Roboto-Regular.ttf $GITHUB_WORKSPACE/resources/fonts/
-        cp /tmp/Roboto-Bold.ttf $GITHUB_WORKSPACE/resources/fonts/
+        # Use macOS system fonts (available on CI runner)
+        cp /System/Library/Fonts/Supplemental/Arial.ttf resources/fonts/Roboto-Regular.ttf
+        cp "/System/Library/Fonts/Supplemental/Arial Bold.ttf" resources/fonts/Roboto-Bold.ttf
+        ls -la resources/fonts/
 
     - name: Generate Xcode project
       run: |
