@@ -26,6 +26,7 @@
 #ifdef PLATFORM_IOS
 #include <string>
 #include <sys/stat.h>
+#include <unistd.h>
 
 static std::string get_ios_nx_directory()
 {
