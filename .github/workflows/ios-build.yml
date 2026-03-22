@@ -69,10 +69,8 @@ jobs:
 
     - name: Build NoLifeNx for iOS
       run: |
-        # Clone NoLifeNx
-        git clone --depth 1 https://github.com/NoLifeDev/NoLifeNx.git /tmp/NoLifeNx
-
-        cd /tmp/NoLifeNx
+        # Use vendor copy which has custom additions (mapLatest, mapPretty, map001)
+        cd $GITHUB_WORKSPACE/vendor/NoLifeNx/nlnx
 
         IPHONEOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
         CXX="xcrun --sdk iphoneos clang++"
