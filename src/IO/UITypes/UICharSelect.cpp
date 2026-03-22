@@ -37,8 +37,10 @@
 
 #include "../../Net/Packets/SelectCharPackets.h"
 
+#ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#endif
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -781,7 +783,9 @@ namespace ms
 			{
 				std::string url = Configuration::get().get_resetpic();
 
+#ifdef _WIN32
 				ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#endif
 				break;
 			}
 			case Buttons::EDITCHARLIST:
