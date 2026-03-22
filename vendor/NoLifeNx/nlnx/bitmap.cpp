@@ -32,7 +32,7 @@ namespace nl {
     bitmap::operator bool() const {
         return m_data ? true : false;
     }
-    std::vector<char> bitmap_buf;
+    std::vector<char> bitmap_buf = std::vector<char>(8 * 1024 * 1024);
     void const * bitmap::data() const {
         if (!m_data)
             return nullptr;
