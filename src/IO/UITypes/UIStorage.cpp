@@ -167,9 +167,11 @@ namespace ms
 		}
 		else
 		{
-			inventory_grid_x = 0;
-			inventory_grid_y = 0;
-			inventory_cols = 0;
+			// No FullBackgrnd — still set up a right panel next to the left panel
+			panel_divider_x = bg_dim.x();
+			inventory_grid_x = panel_divider_x + 10;
+			inventory_grid_y = storage_grid_y;
+			inventory_cols = 4;
 		}
 
 		// State
@@ -181,8 +183,16 @@ namespace ms
 		storage_slots = 0;
 		npc_id = 0;
 
-		dimension = bg_dim;
-		dragarea = Point<int16_t>(bg_dim.x(), 20);
+		// Ensure dimension covers both panels including the inventory grid
+		int16_t min_width = bg_dim.x();
+		if (inventory_cols > 0)
+		{
+			int16_t right_edge = inventory_grid_x + inventory_cols * cell_size + 10;
+			min_width = std::max(min_width, right_edge);
+		}
+
+		dimension = Point<int16_t>(min_width, bg_dim.y());
+		dragarea = Point<int16_t>(min_width, 20);
 		active = false;
 	}
 
@@ -234,6 +244,13 @@ namespace ms
 
 		storage_mesolabel.change_text(storage_mesostr);
 		player_mesolabel.change_text(player_mesostr);
+	}
+
+	bool UIStorage::is_in_range(Point<int16_t> cursorpos) const
+	{
+		auto drawpos = get_draw_position();
+		auto bounds = Rectangle<int16_t>(drawpos, drawpos + dimension);
+		return bounds.contains(cursorpos);
 	}
 
 	Cursor::State UIStorage::send_cursor(bool clicked, Point<int16_t> cursorpos)

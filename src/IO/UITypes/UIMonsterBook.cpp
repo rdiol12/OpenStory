@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIMonsterBook.h"
 
+#include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "UINotice.h"
 
 #include "../../Configuration.h"
 #include "../../Data/ItemData.h"
@@ -65,6 +67,9 @@ namespace ms
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
+
+		card_level_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "");
+		card_name_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, "");
 
 		load_cards();
 		update_buttons();
@@ -139,14 +144,14 @@ namespace ms
 
 						// Draw card level stars below icon
 						std::string level_str = "Lv." + std::to_string(entry.level);
-						Text level_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, level_str);
-						level_text.draw(slot_pos + Point<int16_t>(35, 70));
+						card_level_text.change_text(level_str);
+						card_level_text.draw(slot_pos + Point<int16_t>(35, 70));
 					}
 
 					// Draw card name
 					const std::string& name = idata.is_valid() ? idata.get_name() : "???";
-					Text name_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, name);
-					name_text.draw(slot_pos + Point<int16_t>(35, 82));
+					card_name_text.change_text(name);
+					card_name_text.draw(slot_pos + Point<int16_t>(35, 82));
 				}
 			}
 
@@ -173,13 +178,13 @@ namespace ms
 						idata.get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(16, 16)));
 
 						std::string level_str = "Lv." + std::to_string(entry.level);
-						Text level_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, level_str);
-						level_text.draw(slot_pos + Point<int16_t>(35, 70));
+						card_level_text.change_text(level_str);
+						card_level_text.draw(slot_pos + Point<int16_t>(35, 70));
 					}
 
 					const std::string& name = idata.is_valid() ? idata.get_name() : "???";
-					Text name_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, name);
-					name_text.draw(slot_pos + Point<int16_t>(35, 82));
+					card_name_text.change_text(name);
+					card_name_text.draw(slot_pos + Point<int16_t>(35, 82));
 				}
 			}
 		}
@@ -238,6 +243,38 @@ namespace ms
 
 			return Button::State::NORMAL;
 		case Buttons::BT_SEARCH:
+			UI::get().emplace<UIEnterText>(
+				"Enter monster card name:",
+				[this](const std::string& query)
+				{
+					if (query.empty())
+						return;
+
+					std::string lower_query = query;
+					std::transform(lower_query.begin(), lower_query.end(), lower_query.begin(), ::tolower);
+
+					for (int16_t i = 0; i < static_cast<int16_t>(sorted_cards.size()); i++)
+					{
+						const ItemData& idata = ItemData::get(sorted_cards[i].full_itemid);
+
+						if (idata.is_valid())
+						{
+							std::string name = idata.get_name();
+							std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+							if (name.find(lower_query) != std::string::npos)
+							{
+								int16_t page = (i / CARDS_PER_PAGE) + 1;
+								set_page(page);
+								return;
+							}
+						}
+					}
+
+					UI::get().emplace<UIOk>("No matching card found.", [](bool) {});
+				},
+				20
+			);
 			break;
 		case Buttons::BT_TAB0:
 		case Buttons::BT_TAB1:

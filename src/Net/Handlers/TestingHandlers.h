@@ -122,6 +122,12 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Report player result (SUE_CHARACTER_RESULT)
+	class SueCharacterResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Set gender packet
 	class SetGenderHandler : public PacketHandler
 	{

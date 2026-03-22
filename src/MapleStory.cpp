@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include <iostream>
+#include <thread>
 
 #include "Gameplay/Stage.h"
 #include "IO/UI.h"
@@ -34,8 +35,12 @@ namespace ms
 {
 	Error init()
 	{
+		std::cout << "[Init] Connecting to server..." << std::endl;
+
 		if (Error error = Session::get().init())
 			return error;
+
+		std::cout << "[Init] Loading game files..." << std::endl;
 
 #ifdef USE_NX
 		if (Error error = NxFiles::init())
@@ -45,8 +50,12 @@ namespace ms
 			return error;
 #endif
 
+		std::cout << "[Init] Creating window..." << std::endl;
+
 		if (Error error = Window::get().init())
 			return error;
+
+		std::cout << "[Init] Initializing audio..." << std::endl;
 
 		if (Error error = Sound::init())
 			return error;
@@ -54,11 +63,15 @@ namespace ms
 		if (Error error = Music::init())
 			return error;
 
+		std::cout << "[Init] Loading game data..." << std::endl;
+
 		Char::init();
 		DamageNumber::init();
 		MapPortals::init();
 		Stage::get().init();
 		UI::get().init();
+
+		std::cout << "[Init] Ready." << std::endl;
 
 		return Error::NONE;
 	}
@@ -99,8 +112,13 @@ namespace ms
 
 		bool show_fps = Configuration::get().get_show_fps();
 
+		// 120 FPS cap: ~8333 microseconds per frame
+		constexpr int64_t FRAME_CAP_US = 1000000 / 120;
+
 		while (running())
 		{
+			auto frame_start = std::chrono::high_resolution_clock::now();
+
 			int64_t elapsed = Timer::get().stop();
 
 			// Update game with constant timestep as many times as possible.
@@ -124,6 +142,13 @@ namespace ms
 					samples = 0;
 				}
 			}
+
+			// Cap framerate to 120 FPS
+			auto frame_end = std::chrono::high_resolution_clock::now();
+			auto frame_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+
+			if (frame_us < FRAME_CAP_US)
+				std::this_thread::sleep_for(std::chrono::microseconds(FRAME_CAP_US - frame_us));
 		}
 
 		Sound::close();
@@ -134,13 +159,24 @@ namespace ms
 		// Initialize and check for errors
 		if (Error error = init())
 		{
+			std::cerr << "[Error] " << error.get_message() << error.get_args() << std::endl;
+
 			bool can_retry = error.can_retry();
 
-			std::string command;
-			std::cin >> command;
+			if (can_retry)
+			{
+				std::cout << "Type 'retry' to try again: ";
+				std::string command;
+				std::cin >> command;
 
-			if (can_retry && command == "retry")
-				start();
+				if (command == "retry")
+					start();
+			}
+			else
+			{
+				std::cout << "Press Enter to exit...";
+				std::cin.get();
+			}
 		}
 		else
 		{

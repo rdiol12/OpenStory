@@ -16,7 +16,9 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIMessenger.h"
+#include "UINotice.h"
 
+#include "../UI.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Net/Packets/SocialPackets.h"
@@ -170,7 +172,13 @@ namespace ms
 			deactivate();
 			break;
 		case Buttons::BT_ENTER:
-			// TODO: Open invite dialog to enter a player name
+			UI::get().emplace<UIEnterText>(
+				"Enter the name of the player to invite:",
+				[](const std::string& name)
+				{
+					MessengerInvitePacket(name).dispatch();
+				}
+			);
 			break;
 		default:
 			break;

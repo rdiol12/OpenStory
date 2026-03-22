@@ -140,11 +140,18 @@ namespace ms
 
 			text.draw(position + Point<int16_t>(166, 48 - y_adj));
 		}
+
+		// Draw text input field for SENDGETTEXT
+		if (type == TalkType::SENDGETTEXT)
+			input_field.draw(position);
 	}
 
 	void UINpcTalk::update()
 	{
 		UIElement::update();
+
+		if (type == TalkType::SENDGETTEXT)
+			input_field.update(position);
 
 		if (draw_text)
 		{
@@ -242,7 +249,15 @@ namespace ms
 			}
 			case TalkType::SENDGETTEXT:
 			{
-				// msgtype 2 — text input (not yet implemented)
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, 0).dispatch();
+						break;
+					case Buttons::OK:
+						NpcTalkMorePacket(input_field.get_text()).dispatch();
+						break;
+				}
 				break;
 			}
 			case TalkType::SENDGETNUMBER:
@@ -284,6 +299,14 @@ namespace ms
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
+
+		// Handle text input field cursor for SENDGETTEXT
+		if (type == TalkType::SENDGETTEXT)
+		{
+			Cursor::State tstate = input_field.send_cursor(cursor_relative, clicked);
+			if (tstate != Cursor::State::IDLE)
+				return tstate;
+		}
 
 		if (show_slider && slider.isenabled())
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
@@ -734,6 +757,21 @@ namespace ms
 
 				buttons[Buttons::QAFTER]->set_position(Point<int16_t>(389 + 65, y_cord));
 				buttons[Buttons::QAFTER]->set_active(true);
+				break;
+			}
+			case TalkType::SENDGETTEXT:
+			{
+				// Text input field below the NPC text
+				int16_t field_y = y_cord - 25;
+				input_field = Textfield(
+					Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK,
+					Rectangle<int16_t>(Point<int16_t>(166, field_y), Point<int16_t>(460, field_y + 18)),
+					50
+				);
+				input_field.set_state(Textfield::State::FOCUSED);
+
+				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::OK]->set_active(true);
 				break;
 			}
 			case TalkType::SENDGETNUMBER:

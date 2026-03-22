@@ -45,60 +45,47 @@ namespace ms
 
 		alliance_name = "";
 		notice = "";
+
+		// Pre-allocate draw objects
+		bg_box = ColorBox(300, 300, Color::Name::JAMBALAYA, 0.85f);
+		title_bar = ColorBox(300, 20, Color::Name::EMPEROR, 1.0f);
+		close_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "X");
+		name_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE);
+		cap_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
+		no_alliance_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "No Alliance");
+		notice_header = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Notice:");
+		guild_header = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Member Guilds:");
+		invite_box = ColorBox(100, 20, Color::Name::EMPEROR, 0.8f);
+		invite_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Invite");
+		leave_box = ColorBox(100, 20, Color::Name::EMPEROR, 0.8f);
+		leave_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Leave");
 	}
 
 	void UIAlliance::draw(float inter) const
 	{
-		// Draw background
-		ColorBox bg_box(300, 300, Color::Name::JAMBALAYA, 0.85f);
 		bg_box.draw(DrawArgument(position));
-
-		// Title bar
-		ColorBox title_bar(300, 20, Color::Name::EMPEROR, 1.0f);
 		title_bar.draw(DrawArgument(position));
-
-		// Title text
 		title_label.draw(position + Point<int16_t>(150, 3));
-
-		// Close button "X" indicator
-		Text close_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "X");
 		close_text.draw(position + Point<int16_t>(284, 3));
 
-		// Alliance name
 		if (!alliance_name.empty())
 		{
-			Text name_text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, alliance_name);
 			name_text.draw(position + Point<int16_t>(150, 30));
-
-			// Capacity info
-			std::string cap_str = "Guilds: " + std::to_string(guilds.size()) + "/" + std::to_string(capacity);
-			Text cap_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, cap_str);
 			cap_text.draw(position + Point<int16_t>(15, 50));
 		}
 		else
 		{
-			Text no_alliance(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "No Alliance");
-			no_alliance.draw(position + Point<int16_t>(150, 30));
+			no_alliance_text.draw(position + Point<int16_t>(150, 30));
 		}
 
-		// Notice section
 		if (!notice.empty())
 		{
-			Text notice_header(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Notice:");
 			notice_header.draw(position + Point<int16_t>(15, 70));
-
 			notice_label.draw(position + Point<int16_t>(15, 88));
 		}
 
-		// Guild list separator line
-		ColorLine sep_line(270, Color::Name::DUSTYGRAY, 0.7f, false);
-		sep_line.draw(DrawArgument(position + Point<int16_t>(15, 110)));
-
-		// Guild list header
-		Text guild_header(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Member Guilds:");
 		guild_header.draw(position + Point<int16_t>(15, 115));
 
-		// Draw guild entries
 		for (size_t i = 0; i < guilds.size(); i++)
 		{
 			int16_t row_y = static_cast<int16_t>(135 + i * 22);
@@ -110,18 +97,9 @@ namespace ms
 			guild_label.draw(position + Point<int16_t>(25, row_y));
 		}
 
-		// Invite button area
-		ColorBox invite_box(100, 20, Color::Name::EMPEROR, 0.8f);
 		invite_box.draw(DrawArgument(position + Point<int16_t>(30, 265)));
-
-		Text invite_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Invite");
 		invite_text.draw(position + Point<int16_t>(80, 267));
-
-		// Leave button area
-		ColorBox leave_box(100, 20, Color::Name::EMPEROR, 0.8f);
 		leave_box.draw(DrawArgument(position + Point<int16_t>(170, 265)));
-
-		Text leave_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Leave");
 		leave_text.draw(position + Point<int16_t>(220, 267));
 
 		UIElement::draw_buttons(inter);
@@ -171,6 +149,8 @@ namespace ms
 		rank = r;
 		capacity = cap;
 		title_label.change_text("Alliance - " + name);
+		name_text.change_text(name);
+		cap_text.change_text("Guilds: " + std::to_string(guilds.size()) + "/" + std::to_string(cap));
 	}
 
 	void UIAlliance::add_guild(const std::string& guild_name, int32_t guild_id)

@@ -129,6 +129,9 @@ namespace ms
 			/// RPS Game
 			RPS_ACTION = 231,
 
+			/// Report
+			REPORT = 106,
+
 			/// Party Search
 			PARTY_SEARCH_REGISTER = 221,
 			PARTY_SEARCH_START = 222,

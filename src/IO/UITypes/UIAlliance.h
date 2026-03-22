@@ -19,6 +19,7 @@
 
 #include "../UIDragElement.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
@@ -68,5 +69,19 @@ namespace ms
 		Text title_label;
 		Text notice_label;
 		mutable Text guild_label;
+
+		// Pre-allocated draw objects (avoid per-frame GPU allocations)
+		ColorBox bg_box;
+		ColorBox title_bar;
+		Text close_text;
+		Text name_text;
+		Text cap_text;
+		Text no_alliance_text;
+		Text notice_header;
+		Text guild_header;
+		ColorBox invite_box;
+		Text invite_text;
+		ColorBox leave_box;
+		Text leave_text;
 	};
 }

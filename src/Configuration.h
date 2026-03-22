@@ -615,6 +615,18 @@ namespace ms
 		PosALLIANCE() : PointEntry("PosALLIANCE", "(200, 80)") {}
 	};
 
+	// The default position of UIWhisper
+	struct PosWHISPER : public Configuration::PointEntry
+	{
+		PosWHISPER() : PointEntry("PosWHISPER", "(300, 200)") {}
+	};
+
+	// The default position of UIReport
+	struct PosREPORT : public Configuration::PointEntry
+	{
+		PosREPORT() : PointEntry("PosREPORT", "(300, 200)") {}
+	};
+
 	// The default type of UIMiniMap
 	struct MiniMapType : public Configuration::ByteEntry
 	{

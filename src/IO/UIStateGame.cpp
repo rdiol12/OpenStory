@@ -65,6 +65,13 @@
 #include "UITypes/UIMonsterCarnival.h"
 #include "UITypes/UIRPSGame.h"
 #include "UITypes/UISystemOption.h"
+#include "UITypes/UIStorage.h"
+#include "UITypes/UITrade.h"
+#include "UITypes/UIAlliance.h"
+#include "UITypes/UIComboCounter.h"
+#include "UITypes/UIMTS.h"
+#include "UITypes/UIWhisper.h"
+#include "UITypes/UIReport.h"
 
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Session.h"
@@ -414,6 +421,56 @@ namespace ms
 							case KeyAction::Id::MONSTERBOOK:
 							{
 								emplace<UIMonsterBook>();
+								break;
+							}
+							case KeyAction::Id::WHISPER:
+							{
+								emplace<UIWhisper>();
+								break;
+							}
+							case KeyAction::Id::SAY:
+							{
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+								{
+									chatbar->set_chat_target(UIChatBar::CHT_ALL);
+									chatbar->toggle_chatfield(true);
+								}
+								break;
+							}
+							case KeyAction::Id::PARTYCHAT:
+							{
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+								{
+									chatbar->set_chat_target(UIChatBar::CHT_PARTY);
+									chatbar->toggle_chatfield(true);
+								}
+								break;
+							}
+							case KeyAction::Id::FRIENDSCHAT:
+							{
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+								{
+									chatbar->set_chat_target(UIChatBar::CHT_BUDDY);
+									chatbar->toggle_chatfield(true);
+								}
+								break;
+							}
+							case KeyAction::Id::GUILDCHAT:
+							{
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+								{
+									chatbar->set_chat_target(UIChatBar::CHT_GUILD);
+									chatbar->toggle_chatfield(true);
+								}
+								break;
+							}
+							case KeyAction::Id::ALLIANCECHAT:
+							{
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+								{
+									chatbar->set_chat_target(UIChatBar::CHT_ALLIANCE);
+									chatbar->toggle_chatfield(true);
+								}
 								break;
 							}
 							case KeyAction::Id::CHANGECHANNEL:

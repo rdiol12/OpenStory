@@ -264,5 +264,19 @@ namespace ms
 
 		// QuestIcon (UIWindow.img/QuestIcon) — animated status icons 0-11
 		std::vector<Animation> quest_status_icons;
+
+		// Pre-allocated draw objects (avoid per-frame GPU allocations)
+		ColorBox tab_bg_active;
+		ColorBox tab_bg_inactive;
+		mutable Text tab_label_text;
+		ColorBox hover_bg_recommend;
+		ColorBox sel_bg_recommend;
+		ColorBox hover_bg_normal;
+		ColorBox sel_bg_normal;
+		ColorBox sep_line_box;
+		ColorBox header_sep_box;
+		mutable Text say_preview_text;
+		mutable Text medal_text;
+		mutable Text time_text;
 	};
 }

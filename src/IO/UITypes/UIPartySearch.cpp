@@ -19,6 +19,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/SocialPackets.h"
 
 #ifdef USE_NX
@@ -161,8 +162,14 @@ namespace ms
 			set_searching(false);
 			break;
 		case Buttons::BT_REG:
-			// TODO: Register for auto-search
+		{
+			int16_t player_level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
+			int8_t min_lvl = static_cast<int8_t>(std::max(1, player_level - 10));
+			int8_t max_lvl = static_cast<int8_t>(std::min(200, player_level + 10));
+			PartySearchRegisterPacket(0, min_lvl, max_lvl).dispatch();
+			status_label.change_text("Registered for party search!");
 			break;
+		}
 		case Buttons::BT_CANCEL:
 			deactivate();
 			break;

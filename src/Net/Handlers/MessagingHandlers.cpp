@@ -27,6 +27,7 @@
 #include "../../IO/UITypes/UIQuestHelper.h"
 #include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../IO/UITypes/UIWhisper.h"
 
 namespace ms
 {
@@ -429,6 +430,9 @@ namespace ms
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(line, from_admin ? UIChatBar::LineType::WHITE : UIChatBar::LineType::RED);
+
+			if (auto whisper = UI::get().get_element<UIWhisper>())
+				whisper->recv_whisper(from, message, from_admin);
 		}
 		else if (mode == 10) // Find reply — "X is on channel Y"
 		{

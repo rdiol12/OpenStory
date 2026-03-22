@@ -19,6 +19,7 @@
 
 #include "../UIDragElement.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Data/ItemData.h"
 
 namespace ms
@@ -126,5 +127,14 @@ namespace ms
 		Text page_label;
 		Text cash_label;
 		Text status_label;
+
+		// Pre-allocated draw objects
+		ColorBox bg;
+		ColorBox titlebar;
+		ColorBox sel_highlight;
+		mutable Text tab_buy;
+		mutable Text tab_sell;
+		mutable Text tab_cart;
+		Text tab_search;
 	};
 }

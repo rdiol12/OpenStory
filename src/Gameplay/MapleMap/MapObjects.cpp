@@ -17,29 +17,16 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapObjects.h"
 
-#include "../../Constants.h"
-
 namespace ms
 {
 	void MapObjects::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
-		int16_t vw = Constants::Constants::get().get_viewwidth();
-		int16_t vh = Constants::Constants::get().get_viewheight();
-
 		for (auto& oid : layers[layer])
 		{
 			auto mmo = get(oid);
 
 			if (mmo && mmo->is_active())
-			{
-				Point<int16_t> pos = mmo->get_position();
-				int16_t px = static_cast<int16_t>(pos.x() - viewx);
-				int16_t py = static_cast<int16_t>(pos.y() - viewy);
-
-				// Skip objects well outside the viewport (256px margin for large sprites)
-				if (px > -256 && px < vw + 256 && py > -256 && py < vh + 256)
-					mmo->draw(viewx, viewy, alpha);
-			}
+				mmo->draw(viewx, viewy, alpha);
 		}
 	}
 

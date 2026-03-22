@@ -78,6 +78,15 @@ namespace ms
 		cash_label = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::YELLOW, "NX: 0");
 		status_label = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::YELLOW, "Loading...");
 
+		// Pre-allocate draw objects
+		bg = ColorBox(dimension.x(), dimension.y(), Color::Name::BLACK, 0.85f);
+		titlebar = ColorBox(dimension.x(), 20, Color::Name::ENDEAVOUR, 1.0f);
+		sel_highlight = ColorBox(dimension.x() - 20, 40, Color::Name::ENDEAVOUR, 0.5f);
+		tab_buy = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "Browse");
+		tab_sell = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "My Sales");
+		tab_cart = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "Cart");
+		tab_search = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Search");
+
 		active = true;
 	}
 
@@ -87,11 +96,9 @@ namespace ms
 		auto pos = position;
 
 		// Background fill
-		ColorBox bg(dimension.x(), dimension.y(), Color::Name::BLACK, 0.85f);
 		bg.draw(DrawArgument(pos));
 
 		// Title bar
-		ColorBox titlebar(dimension.x(), 20, Color::Name::ENDEAVOUR, 1.0f);
 		titlebar.draw(DrawArgument(pos));
 		title_label.draw(pos + Point<int16_t>(dimension.x() / 2, 3));
 
@@ -101,10 +108,13 @@ namespace ms
 		Color::Name sell_color = (current_tab == TAB_SELL) ? Color::Name::YELLOW : Color::Name::WHITE;
 		Color::Name cart_color = (current_tab == TAB_CART) ? Color::Name::YELLOW : Color::Name::WHITE;
 
-		Text(Text::Font::A11B, Text::Alignment::CENTER, buy_color, "Browse").draw(pos + Point<int16_t>(50, tab_y));
-		Text(Text::Font::A11B, Text::Alignment::CENTER, sell_color, "My Sales").draw(pos + Point<int16_t>(135, tab_y));
-		Text(Text::Font::A11B, Text::Alignment::CENTER, cart_color, "Cart").draw(pos + Point<int16_t>(220, tab_y));
-		Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Search").draw(pos + Point<int16_t>(300, tab_y));
+		tab_buy.change_color(buy_color);
+		tab_sell.change_color(sell_color);
+		tab_cart.change_color(cart_color);
+		tab_buy.draw(pos + Point<int16_t>(50, tab_y));
+		tab_sell.draw(pos + Point<int16_t>(135, tab_y));
+		tab_cart.draw(pos + Point<int16_t>(220, tab_y));
+		tab_search.draw(pos + Point<int16_t>(300, tab_y));
 
 		// Cash display
 		cash_label.draw(pos + Point<int16_t>(dimension.x() - 10, 28));
@@ -131,10 +141,7 @@ namespace ms
 
 			// Highlight selected
 			if (static_cast<int8_t>(i) == selected_index)
-			{
-				ColorBox sel(dimension.x() - 20, item_h - 2, Color::Name::ENDEAVOUR, 0.5f);
-				sel.draw(DrawArgument(item_pos));
-			}
+				sel_highlight.draw(DrawArgument(item_pos));
 
 			// Item icon
 			if (item.icon.is_valid())
@@ -260,7 +267,13 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_SEARCH:
-			// TODO: text input for search
+			UI::get().emplace<UIEnterText>(
+				"Enter search keyword:",
+				[this](const std::string& search)
+				{
+					MTSSearchPacket(current_tab, current_type, 0, search).dispatch();
+				}
+			);
 			return Button::State::NORMAL;
 
 		case BT_CLOSE:
@@ -268,7 +281,10 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_SELL:
-			// TODO: sell UI from inventory
+			UI::get().emplace<UIOk>(
+				"Drag an item from your inventory to the MTS window to sell it.",
+				[](bool) {}
+			);
 			return Button::State::NORMAL;
 
 		default:

@@ -318,6 +318,103 @@ namespace ms
 		buttons[Buttons::OK]->set_state(Button::State::NORMAL);
 	}
 
+	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string&)> th, int32_t maxlength) : UINotice(message, NoticeType::ENTERNUMBER)
+	{
+		texthandler = th;
+
+		int16_t belowtext = box2offset(true) - 21;
+		int16_t pos_y = belowtext + 35;
+
+		nl::node src = nl::nx::ui["Basic.img"];
+
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 156, pos_y);
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel4"], 198, pos_y);
+
+		textfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY, Rectangle<int16_t>(24, 232, belowtext, belowtext + 20), maxlength);
+
+		textfield.set_enter_callback(
+			[&](std::string str)
+			{
+				if (!str.empty())
+				{
+					texthandler(str);
+					deactivate();
+				}
+			}
+		);
+
+		textfield.set_key_callback(
+			KeyAction::Id::ESCAPE,
+			[&]()
+			{
+				deactivate();
+			}
+		);
+
+		textfield.set_state(Textfield::State::FOCUSED);
+	}
+
+	void UIEnterText::draw(float alpha) const
+	{
+		UINotice::draw(true);
+		UIElement::draw(alpha);
+
+		textfield.draw(position);
+	}
+
+	void UIEnterText::update()
+	{
+		UIElement::update();
+
+		textfield.update(position);
+	}
+
+	Cursor::State UIEnterText::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		if (textfield.get_state() == Textfield::State::NORMAL)
+		{
+			Cursor::State nstate = textfield.send_cursor(cursorpos, clicked);
+
+			if (nstate != Cursor::State::IDLE)
+				return nstate;
+		}
+
+		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIEnterText::send_key(int32_t keycode, bool pressed, bool escape)
+	{
+		if (pressed && escape)
+			deactivate();
+	}
+
+	UIElement::Type UIEnterText::get_type() const
+	{
+		return TYPE;
+	}
+
+	Button::State UIEnterText::button_pressed(uint16_t buttonid)
+	{
+		switch (buttonid)
+		{
+		case Buttons::OK:
+		{
+			std::string str = textfield.get_text();
+			if (!str.empty())
+			{
+				texthandler(str);
+				deactivate();
+			}
+			break;
+		}
+		case Buttons::CANCEL:
+			deactivate();
+			break;
+		}
+
+		return Button::State::NORMAL;
+	}
+
 	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh) : UINotice(message, NoticeType::OK)
 	{
 		okhandler = oh;

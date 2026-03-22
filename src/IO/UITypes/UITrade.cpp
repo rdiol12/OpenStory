@@ -97,6 +97,11 @@ namespace ms
 		partner_confirmed = false;
 		selected_slot = -1;
 
+		// Pre-allocate draw objects
+		confirmed_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::GREEN, "Confirmed");
+		confirm_btn_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Confirm");
+		cancel_btn_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Cancel");
+
 		dimension = bg_dim;
 		dragarea = Point<int16_t>(bg_dim.x(), 20);
 
@@ -151,15 +156,9 @@ namespace ms
 		// Draw confirmation status
 		int16_t status_y = meso_y + 20;
 		if (my_confirmed)
-		{
-			Text confirmed_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::GREEN, "Confirmed");
 			confirmed_text.draw(position + Point<int16_t>(left_x, status_y));
-		}
 		if (partner_confirmed)
-		{
-			Text confirmed_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::GREEN, "Confirmed");
 			confirmed_text.draw(position + Point<int16_t>(right_x, status_y));
-		}
 
 		// Draw status
 		status_label.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() - 50));
@@ -167,10 +166,8 @@ namespace ms
 		// Draw button labels if using AreaButtons
 		if (background.get_dimensions().x() == 0)
 		{
-			Text confirm_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Confirm");
-			Text cancel_text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Cancel");
-			confirm_text.draw(position + Point<int16_t>(dimension.x() / 2 - 45, dimension.y() - 30));
-			cancel_text.draw(position + Point<int16_t>(dimension.x() / 2 + 45, dimension.y() - 30));
+			confirm_btn_text.draw(position + Point<int16_t>(dimension.x() / 2 - 45, dimension.y() - 30));
+			cancel_btn_text.draw(position + Point<int16_t>(dimension.x() / 2 + 45, dimension.y() - 30));
 		}
 	}
 

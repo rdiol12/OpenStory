@@ -88,5 +88,9 @@ namespace ms
 		std::vector<CardEntry> sorted_cards;
 		int16_t cur_page;
 		int16_t num_pages;
+
+		// Pre-allocated draw objects (avoid per-frame GPU allocations)
+		mutable Text card_level_text;
+		mutable Text card_name_text;
 	};
 }

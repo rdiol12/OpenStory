@@ -95,6 +95,8 @@ namespace ms
 			resolution_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Resolution:");
 			ok_label = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "OK");
 			cancel_label = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "Cancel");
+			ok_bg = ColorBox(80, 26, Color::Name::EMPEROR, 0.9f);
+			cancel_bg = ColorBox(80, 26, Color::Name::EMPEROR, 0.9f);
 
 			dimension = Point<int16_t>(menu_w, menu_h);
 			dragarea = Point<int16_t>(menu_w, 24);
@@ -176,8 +178,6 @@ namespace ms
 			resolution_label.draw(position + Point<int16_t>(15, 40));
 
 			// Draw OK / Cancel button areas
-			ColorBox ok_bg(80, 26, Color::Name::EMPEROR, 0.9f);
-			ColorBox cancel_bg(80, 26, Color::Name::EMPEROR, 0.9f);
 			ok_bg.draw(DrawArgument(position + Point<int16_t>(50, 160)));
 			cancel_bg.draw(DrawArgument(position + Point<int16_t>(150, 160)));
 			ok_label.draw(position + Point<int16_t>(90, 164));

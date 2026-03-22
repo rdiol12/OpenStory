@@ -38,6 +38,8 @@
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UIWorldMap.h"
+#include "UITypes/UIWhisper.h"
+#include "UITypes/UIReport.h"
 #include "UITypes/UILogin.h"
 #include "../Net/Packets/LoginPackets.h"
 
@@ -265,8 +267,8 @@ namespace ms
 			auto rank = UI::get().get_element<UIRank>();
 			auto quit = UI::get().get_element<UIQuit>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
-			//auto report = UI::get().get_element<UIReport>();
-			//auto whisper = UI::get().get_element<UIWhisper>();
+			auto report = UI::get().get_element<UIReport>();
+			auto whisper = UI::get().get_element<UIWhisper>();
 
 			if (npctalk && npctalk->is_active())
 			{
@@ -311,6 +313,16 @@ namespace ms
 			else if (quit && quit->is_active())
 			{
 				quit->send_key(mapping.action, pressed, escape);
+				sent = true;
+			}
+			else if (whisper && whisper->is_active())
+			{
+				whisper->send_key(mapping.action, pressed, escape);
+				sent = true;
+			}
+			else if (report && report->is_active())
+			{
+				report->send_key(mapping.action, pressed, escape);
 				sent = true;
 			}
 			else

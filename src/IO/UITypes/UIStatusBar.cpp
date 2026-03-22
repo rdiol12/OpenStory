@@ -39,6 +39,7 @@
 #include "UISystemOption.h"
 #include "UIChat.h"
 #include "UIFarmChat.h"
+#include "UIWhisper.h"
 
 #include "../../Net/OutPacket.h"
 #include "../../Net/Session.h"
@@ -71,6 +72,8 @@ namespace ms
 		show_menu = false;
 		show_system = false;
 		show_quickslot = false;
+		menu_bg = ColorBox(69, 220, Color::Name::BLACK, 0.75f);
+		sys_bg = ColorBox(69, 220, Color::Name::BLACK, 0.75f);
 		chat_open = false;
 		chat_target_id = 0;
 
@@ -500,7 +503,6 @@ namespace ms
 		if (show_menu)
 		{
 			auto menu_bounds = buttons.at(BT_MENU_STAT)->bounds(position);
-			ColorBox menu_bg(69, 220, Color::Name::BLACK, 0.75f);
 			menu_bg.draw(DrawArgument(Point<int16_t>(menu_bounds.get_left_top().x() - 2, menu_bounds.get_left_top().y() - 2)));
 		}
 
@@ -508,7 +510,6 @@ namespace ms
 		if (show_system)
 		{
 			auto sys_bounds = buttons.at(BT_SYS_CHANNEL)->bounds(position);
-			ColorBox sys_bg(69, 220, Color::Name::BLACK, 0.75f);
 			sys_bg.draw(DrawArgument(Point<int16_t>(sys_bounds.get_left_top().x() - 2, sys_bounds.get_left_top().y() - 2)));
 		}
 
@@ -561,7 +562,7 @@ namespace ms
 		switch (id)
 		{
 		case BT_WHISPER:
-			UI::get().emplace<UIChat>();
+			UI::get().emplace<UIWhisper>();
 			return Button::State::NORMAL;
 
 		case BT_FARM:
@@ -834,8 +835,8 @@ namespace ms
 	{
 		int16_t vwidth = Constants::Constants::get().get_viewwidth();
 
-		// Extend upward when menu or system sub-panel is open
-		int16_t extra_height = (show_menu || show_system) ? 300 : 0;
+		// Extend upward when menu, system sub-panel, or quick slot is open
+		int16_t extra_height = (show_menu || show_system || show_quickslot) ? 300 : 0;
 
 		Rectangle<int16_t> bounds(
 			Point<int16_t>(0, position.y() - 84 - extra_height),

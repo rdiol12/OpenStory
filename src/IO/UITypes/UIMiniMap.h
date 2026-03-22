@@ -65,6 +65,7 @@ namespace ms
 		void toggle_buttons();
 		void update_text();
 		void update_canvas();
+		Point<int16_t> scale_map_pos(Point<int16_t> world_pos) const;
 		void draw_movable_markers(Point<int16_t> init_pos, float alpha) const;
 		Point<int16_t> get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const;
 		void update_static_markers();
@@ -140,6 +141,17 @@ namespace ms
 
 		// Additional minimap marks
 		std::unordered_map<std::string, Texture> mark_textures;
+
+		// Pre-allocated draw objects
+		mutable Animation portal_marker_anim;
+		mutable Animation npc_marker_anim;
+		ColorBox npc_highlight;
+
+		// Drag-to-resize state
+		bool drag_resize;
+		float zoom_scale;
+		int16_t drag_start_y;
+		float drag_start_zoom;
 
 		const CharStats& stats;
 	};
