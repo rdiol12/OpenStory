@@ -98,7 +98,7 @@ namespace ms
 			channel[false].draw(DrawArgument(position.x() + current_channel_x, position.y() + current_channel_y));
 		}
 
-		for each (auto sprite in ch)
+		for (auto sprite : ch)
 			sprite.draw(position, inter);
 	}
 
@@ -106,7 +106,7 @@ namespace ms
 	{
 		UIElement::update();
 
-		for each (auto sprite in ch)
+		for (auto sprite : ch)
 			sprite.update();
 	}
 
