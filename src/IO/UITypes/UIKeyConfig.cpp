@@ -191,8 +191,8 @@ namespace ms
 		// Apply offset to align key positions with the NX background
 		Point<int16_t> key_offset = Point<int16_t>(-15, -60);
 
-		for (auto& [key, pos] : keys_pos)
-			pos += key_offset;
+		for (auto [key, pos_ref] : keys_pos)
+			pos_ref += key_offset;
 	}
 
 	void UIKeyConfig::load_unbound_actions_pos()
@@ -259,8 +259,8 @@ namespace ms
 		// Apply same offset as keys to align with NX background
 		Point<int16_t> action_offset = Point<int16_t>(-15, -60);
 
-		for (auto& [action, pos] : unbound_actions_pos)
-			pos += action_offset;
+		for (auto [action, pos_ref] : unbound_actions_pos)
+			pos_ref += action_offset;
 	}
 
 	void UIKeyConfig::load_key_textures()
