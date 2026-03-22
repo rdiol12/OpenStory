@@ -28,17 +28,18 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#import <Foundation/Foundation.h>
+// Defined in platform/ios/NxPathIOS.mm
+extern std::string ios_get_bundle_resource_path();
+extern std::string ios_get_documents_path();
 
 // Returns the directory containing NX files on iOS.
 // Checks app bundle first (bundled resources), then Documents folder.
 static std::string get_ios_nx_directory()
 {
 	// 1. Check inside the app bundle (for bundled NX files)
-	NSString* bundlePath = [[NSBundle mainBundle] resourcePath];
-	if (bundlePath)
+	std::string bundleDir = ios_get_bundle_resource_path();
+	if (!bundleDir.empty())
 	{
-		std::string bundleDir = [bundlePath UTF8String];
 		std::string testFile = bundleDir + "/Base.nx";
 		struct stat st;
 		if (stat(testFile.c_str(), &st) == 0)
@@ -46,10 +47,9 @@ static std::string get_ios_nx_directory()
 	}
 
 	// 2. Check the Documents directory (user-transferred via Files app)
-	NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	if ([paths count] > 0)
+	std::string docs = ios_get_documents_path();
+	if (!docs.empty())
 	{
-		std::string docs = [[paths firstObject] UTF8String];
 		std::string testFile = docs + "/Base.nx";
 		struct stat st;
 		if (stat(testFile.c_str(), &st) == 0)

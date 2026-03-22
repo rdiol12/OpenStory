@@ -126,6 +126,7 @@ set(IOS_SOURCES
 	${CMAKE_SOURCE_DIR}/platform/ios/WindowIOS.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/FontPathIOS.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/AudioIOS.mm
+	${CMAKE_SOURCE_DIR}/platform/ios/NxPathIOS.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/VirtualControls.h
 	${CMAKE_SOURCE_DIR}/platform/ios/VirtualControls.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/HardwareInfoIOS.h
