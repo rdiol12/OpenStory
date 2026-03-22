@@ -28,17 +28,34 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#import <Foundation/Foundation.h>
+
+// Returns the directory containing NX files on iOS.
+// Checks app bundle first (bundled resources), then Documents folder.
 static std::string get_ios_nx_directory()
 {
-	// Look in the app's Documents directory first (user can transfer files via iTunes/Files)
-	const char* home = getenv("HOME");
-	if (home)
+	// 1. Check inside the app bundle (for bundled NX files)
+	NSString* bundlePath = [[NSBundle mainBundle] resourcePath];
+	if (bundlePath)
 	{
-		std::string docs = std::string(home) + "/Documents";
+		std::string bundleDir = [bundlePath UTF8String];
+		std::string testFile = bundleDir + "/Base.nx";
 		struct stat st;
-		if (stat(docs.c_str(), &st) == 0)
+		if (stat(testFile.c_str(), &st) == 0)
+			return bundleDir + "/";
+	}
+
+	// 2. Check the Documents directory (user-transferred via Files app)
+	NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+	if ([paths count] > 0)
+	{
+		std::string docs = [[paths firstObject] UTF8String];
+		std::string testFile = docs + "/Base.nx";
+		struct stat st;
+		if (stat(testFile.c_str(), &st) == 0)
 			return docs + "/";
 	}
+
 	return "";
 }
 #endif
@@ -52,9 +69,10 @@ namespace ms
 #ifdef PLATFORM_IOS
 			std::string nx_dir = get_ios_nx_directory();
 
-			// Change working directory to where NX files are
-			if (!nx_dir.empty())
-				chdir(nx_dir.c_str());
+			if (nx_dir.empty())
+				return Error(Error::Code::MISSING_FILE, "NX files not found in app bundle or Documents folder");
+
+			chdir(nx_dir.c_str());
 #endif
 
 			for (auto filename : filenames)

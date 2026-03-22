@@ -141,6 +141,15 @@ set(IOS_RESOURCES
 	${CMAKE_SOURCE_DIR}/resources/fonts/Roboto-Bold.ttf
 )
 
+# Optionally bundle NX data files if present in resources/nx/
+file(GLOB NX_DATA_FILES "${CMAKE_SOURCE_DIR}/resources/nx/*.nx")
+if(NX_DATA_FILES)
+	list(APPEND IOS_RESOURCES ${NX_DATA_FILES})
+	message(STATUS "Bundling NX files: ${NX_DATA_FILES}")
+else()
+	message(STATUS "No NX files found in resources/nx/ — app will look in Documents folder at runtime")
+endif()
+
 ###############################################################################
 # App target
 ###############################################################################
