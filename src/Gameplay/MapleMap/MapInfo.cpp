@@ -34,7 +34,7 @@ namespace ms
 			mapborders = borders;
 		}
 
-		std::string bgmpath = info["bgm"];
+		std::string bgmpath = (std::string)info["bgm"];
 		size_t split = bgmpath.find('/');
 		bgm = bgmpath.substr(0, split) + ".img/" + bgmpath.substr(split + 1);
 

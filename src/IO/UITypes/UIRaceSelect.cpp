@@ -489,7 +489,7 @@ namespace ms
 			if (selected_class == Classes::KINESIS)
 			{
 				nl::node node = bgm[selected_class];
-				std::string found_bgm = node["bgm"];
+				std::string found_bgm = (std::string)node["bgm"];
 				std::size_t found_img = found_bgm.find(".img");
 
 				if (found_img == std::string::npos)

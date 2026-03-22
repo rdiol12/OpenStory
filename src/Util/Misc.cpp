@@ -147,7 +147,7 @@ namespace ms
 				for (nl::node life : portal["life"])
 				{
 					int64_t life_id = life["id"];
-					std::string life_type = life["type"];
+					std::string life_type = (std::string)life["type"];
 
 					if (life_type == "m")
 					{

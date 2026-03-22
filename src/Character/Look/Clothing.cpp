@@ -124,7 +124,7 @@ namespace ms
 						continue;
 
 					Clothing::Layer z = chlayer;
-					std::string zs = partnode["z"];
+					std::string zs = (std::string)partnode["z"];
 
 					if (part == "mailArm")
 					{

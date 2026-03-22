@@ -104,7 +104,7 @@ namespace ms
 		nl::node src = nl::nx::npc[strid];
 		nl::node strsrc = nl::nx::string["Npc.img"][std::to_string(id)];
 
-		std::string link = src["info"]["link"];
+		std::string link = (std::string)src["info"]["link"];
 
 		if (link.size() > 0)
 		{
@@ -129,11 +129,11 @@ namespace ms
 			}
 
 			for (auto speaknode : npcnode["speak"])
-				lines[state].push_back(strsrc[speaknode.get_string()]);
+				lines[state].push_back((std::string)strsrc[speaknode.get_string()]);
 		}
 
-		name = strsrc["name"];
-		func = strsrc["func"];
+		name = (std::string)strsrc["name"];
+		func = (std::string)strsrc["func"];
 
 		namelabel = Text(Text::Font::A13B, Text::Alignment::CENTER, Color::Name::YELLOW, Text::Background::NAMETAG, name);
 		funclabel = Text(Text::Font::A13B, Text::Alignment::CENTER, Color::Name::YELLOW, Text::Background::NAMETAG, func);

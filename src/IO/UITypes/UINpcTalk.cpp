@@ -430,7 +430,7 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
-						std::string name = nl::nx::string["Npc.img"][id_str]["name"];
+						std::string name = (std::string)nl::nx::string["Npc.img"][id_str]["name"];
 						result += name.empty() ? ("NPC " + id_str) : name;
 					}
 					i = end;
@@ -452,7 +452,7 @@ namespace ms
 						while (padded.size() < 9)
 							padded.insert(0, 1, '0');
 
-						std::string name = nl::nx::string["Map.img"][padded]["mapName"];
+						std::string name = (std::string)nl::nx::string["Map.img"][padded]["mapName"];
 						result += name.empty() ? ("Map " + id_str) : name;
 					}
 					i = end;
@@ -469,7 +469,7 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
-						std::string name = nl::nx::string["Mob.img"][id_str]["name"];
+						std::string name = (std::string)nl::nx::string["Mob.img"][id_str]["name"];
 						result += name.empty() ? ("Mob " + id_str) : name;
 					}
 					i = end;
@@ -647,7 +647,7 @@ namespace ms
 
 			speaker = nl::nx::npc[strid]["stand"]["0"];
 
-			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
+			std::string namestr = (std::string)nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);
 		}
 		else
