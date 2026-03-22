@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <vector>
+
 #include "../Graphics/Texture.h"
 #include "../Template/Cache.h"
 
