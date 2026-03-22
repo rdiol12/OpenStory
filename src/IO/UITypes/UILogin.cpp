@@ -30,7 +30,9 @@
 
 #include "../../Net/Packets/LoginPackets.h"
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -256,7 +258,9 @@ namespace ms
 				return;
 		}
 
+#ifdef _WIN32
 		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#endif
 	}
 
 	Button::State UILogin::button_pressed(uint16_t id)
