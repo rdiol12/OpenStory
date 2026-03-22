@@ -49,7 +49,7 @@ namespace ms
 
 					if (part != "delay" && part != "face")
 					{
-						std::string z = partnode["z"];
+						std::string z = (std::string)partnode["z"];
 						Body::Layer layer = layer_by_name(z);
 
 						if (layer == Body::Layer::NONE)

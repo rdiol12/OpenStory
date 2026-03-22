@@ -37,8 +37,8 @@ namespace ms
 				continue;
 
 			Portal::Type type = Portal::typebyid(sub["pt"]);
-			std::string name = sub["pn"];
-			std::string target_name = sub["tn"];
+			std::string name = (std::string)sub["pn"];
+			std::string target_name = (std::string)sub["tn"];
 			int32_t target_id = sub["tm"];
 			Point<int16_t> position = { sub["x"], sub["y"] };
 

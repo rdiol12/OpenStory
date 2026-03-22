@@ -78,8 +78,8 @@ namespace ms
 			cashitem = src["cash"].get_bool();
 			gender = get_item_gender(itemid);
 
-			name = strsrc["name"];
-			desc = strsrc["desc"];
+			name = (std::string)strsrc["name"];
+			desc = (std::string)strsrc["desc"];
 
 			valid = true;
 		}

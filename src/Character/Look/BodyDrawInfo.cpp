@@ -68,7 +68,7 @@ namespace ms
 
 						if (part != "delay" && part != "face")
 						{
-							std::string zstr = partnode["z"];
+							std::string zstr = (std::string)partnode["z"];
 							Body::Layer z = Body::layer_by_name(zstr);
 
 							for (auto mapnode : partnode["map"])

@@ -33,7 +33,7 @@ namespace ms
 
 			if (src.root() == nl::nx::map001)
 			{
-				const std::string& _outlink = src["_outlink"];
+				const std::string _outlink = (std::string)src["_outlink"];
 
 				if (!_outlink.empty())
 				{
