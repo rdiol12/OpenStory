@@ -61,33 +61,33 @@ namespace ms
 		if (!src)
 			return 0;
 
-		size_t id = src.resolve().data_id();
-		auto iter = samples.find(id);
+		nl::audio ad = src;
+		auto data = reinterpret_cast<const void*>(ad.data());
 
-		if (iter != samples.end())
-			return id;
-
-		// Get audio data from NX
-		auto audio = src.resolve().get_audio();
-
-		if (audio.data() && audio.length() > 0)
+		if (data)
 		{
+			size_t id = ad.id();
+
+			if (samples.find(id) != samples.end())
+				return id;
+
 			ALuint buffer;
 			alGenBuffers(1, &buffer);
 
-			// NX audio is typically 44100Hz 16-bit mono PCM
-			// The header is 82 bytes, actual PCM data starts after
-			const void* pcm_data = static_cast<const uint8_t*>(audio.data()) + 82;
-			size_t pcm_length = audio.length() - 82;
+			// NX audio has 82-byte header, actual PCM data starts after
+			const void* pcm_data = static_cast<const uint8_t*>(data) + 82;
+			size_t pcm_length = ad.length() - 82;
 
 			if (pcm_length > 0)
 			{
 				alBufferData(buffer, AL_FORMAT_MONO16, pcm_data, static_cast<ALsizei>(pcm_length), 44100);
 				samples[id] = buffer;
 			}
+
+			return id;
 		}
 
-		return id;
+		return 0;
 	}
 
 	void Sound::add_sound(Name name, nl::node src)
