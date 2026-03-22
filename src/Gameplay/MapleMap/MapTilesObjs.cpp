@@ -21,7 +21,7 @@ namespace ms
 {
 	TilesObjs::TilesObjs(nl::node src)
 	{
-		auto tileset = src["info"]["tS"] + ".img";
+		auto tileset = (std::string)src["info"]["tS"] + ".img";
 
 		for (auto tilenode : src["tile"])
 		{
