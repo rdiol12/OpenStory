@@ -403,10 +403,10 @@ namespace ms
 		// Button visual positions (must match constructor set_helper_btn offsets)
 		struct BtnHit { uint16_t id; int16_t x; };
 		BtnHit btn_hits[] = {
-			{ Buttons::BT_MIN, dimension.x() - 18 },
-			{ Buttons::BT_MAX, dimension.x() - 18 },
-			{ Buttons::BT_AUTO, dimension.x() - 40 },
-			{ Buttons::BT_Q, dimension.x() - 62 },
+			{ Buttons::BT_MIN, static_cast<int16_t>(dimension.x() - 18) },
+			{ Buttons::BT_MAX, static_cast<int16_t>(dimension.x() - 18) },
+			{ Buttons::BT_AUTO, static_cast<int16_t>(dimension.x() - 40) },
+			{ Buttons::BT_Q, static_cast<int16_t>(dimension.x() - 62) },
 		};
 
 		for (auto& bh : btn_hits)
