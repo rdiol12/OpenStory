@@ -15,6 +15,7 @@
 CMakeCache.txt
 
 *.nx
+!resources/nx/*.nx
 *.wz
 Settings
 
