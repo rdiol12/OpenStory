@@ -192,11 +192,9 @@ namespace
 		}
 		else
 		{
-			// Cursor movement in game area
-			if (!vcontrols.is_in_controls_area(pos.x(), pos.y()))
-			{
-				ms::UI::get().send_cursor(pos);
-			}
+			// Cursor movement in game area — always update position during drag
+			// Use CLICKING state so the UI drag system knows finger is still held
+			ms::UI::get().send_cursor(pos, ms::Cursor::State::CLICKING);
 		}
 	}
 }
