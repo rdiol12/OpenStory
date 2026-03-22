@@ -21,7 +21,12 @@
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
 #include "Window.h"
+
+#ifdef PLATFORM_IOS
 #include "KeyCodes.h"
+#else
+#include <glfw3.h>
+#endif
 
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"

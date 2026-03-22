@@ -17,7 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Keyboard.h"
 
+#ifdef PLATFORM_IOS
 #include "KeyCodes.h"
+#else
+#include <glfw3.h>
+#endif
 
 namespace ms
 {

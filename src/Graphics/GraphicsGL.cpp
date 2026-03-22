@@ -279,6 +279,8 @@ namespace ms
 			}
 		);
 
+		quads.reserve(4096);
+
 		return Error::Code::NONE;
 	}
 
@@ -586,6 +588,10 @@ namespace ms
 		ay = font.linespace();
 		width = 0;
 		endy = 0;
+
+		lines.reserve(16);
+		words.reserve(32);
+		advances.reserve(128);
 
 		if (maxwidth == 0)
 			maxwidth = 800;
