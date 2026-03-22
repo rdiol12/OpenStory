@@ -103,7 +103,7 @@ set(SHARED_SOURCES
 list(FILTER SHARED_SOURCES EXCLUDE REGEX "Window\\.cpp$")
 list(FILTER SHARED_SOURCES EXCLUDE REGEX "Window\\.h$")
 list(FILTER SHARED_SOURCES EXCLUDE REGEX "Audio\\.cpp$")
-list(FILTER SHARED_SOURCES EXCLUDE REGEX "GraphicsGL\\.cpp$")
+# GraphicsGL.cpp now has #ifdef PLATFORM_IOS guards — keep it in the build
 list(FILTER SHARED_SOURCES EXCLUDE REGEX "SocketWinsock\\.(cpp|h)$")
 list(FILTER SHARED_SOURCES EXCLUDE REGEX "MapleStory\\.cpp$")
 
@@ -119,18 +119,22 @@ set(IOS_SOURCES
 	${CMAKE_SOURCE_DIR}/platform/ios/GameViewController.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/TouchInput.h
 	${CMAKE_SOURCE_DIR}/platform/ios/TouchInput.mm
-	${CMAKE_SOURCE_DIR}/platform/ios/WindowIOS.h
 	${CMAKE_SOURCE_DIR}/platform/ios/WindowIOS.mm
-	${CMAKE_SOURCE_DIR}/platform/ios/GraphicsGLES.cpp
+	${CMAKE_SOURCE_DIR}/platform/ios/FontPathIOS.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/AudioIOS.mm
+	${CMAKE_SOURCE_DIR}/platform/ios/VirtualControls.h
+	${CMAKE_SOURCE_DIR}/platform/ios/VirtualControls.mm
 	${CMAKE_SOURCE_DIR}/platform/ios/HardwareInfoIOS.h
 	${CMAKE_SOURCE_DIR}/platform/ios/ScreenResolutionIOS.h
 	${CMAKE_SOURCE_DIR}/platform/shared/GLCompat.h
 	${CMAKE_SOURCE_DIR}/platform/shared/PlatformConfig.h
+	${CMAKE_SOURCE_DIR}/platform/shared/KeyCodes.h
 )
 
 set(IOS_RESOURCES
 	${CMAKE_SOURCE_DIR}/platform/ios/LaunchScreen.storyboard
+	${CMAKE_SOURCE_DIR}/resources/fonts/Roboto-Regular.ttf
+	${CMAKE_SOURCE_DIR}/resources/fonts/Roboto-Bold.ttf
 )
 
 ###############################################################################

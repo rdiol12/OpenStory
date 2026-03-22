@@ -21,6 +21,7 @@
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
 #include "Window.h"
+#include "KeyCodes.h"
 
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"

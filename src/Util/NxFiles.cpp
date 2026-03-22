@@ -23,12 +23,39 @@
 #include <nlnx/node.hpp>
 #include <nlnx/nx.hpp>
 
+#ifdef PLATFORM_IOS
+#include <string>
+#include <sys/stat.h>
+
+static std::string get_ios_nx_directory()
+{
+	// Look in the app's Documents directory first (user can transfer files via iTunes/Files)
+	const char* home = getenv("HOME");
+	if (home)
+	{
+		std::string docs = std::string(home) + "/Documents";
+		struct stat st;
+		if (stat(docs.c_str(), &st) == 0)
+			return docs + "/";
+	}
+	return "";
+}
+#endif
+
 namespace ms
 {
 	namespace NxFiles
 	{
 		Error init()
 		{
+#ifdef PLATFORM_IOS
+			std::string nx_dir = get_ios_nx_directory();
+
+			// Change working directory to where NX files are
+			if (!nx_dir.empty())
+				chdir(nx_dir.c_str());
+#endif
+
 			for (auto filename : filenames)
 				if (std::ifstream{ filename }.good() == false)
 					return Error(Error::Code::MISSING_FILE, filename);
@@ -43,11 +70,6 @@ namespace ms
 
 				return Error(Error::Code::NLNX, message.c_str());
 			}
-
-			//constexpr const char* POSTCHAOS_BITMAP = "Login.img/WorldSelect/BtChannel/layer:bg";
-
-			// if (nl::nx::ui.resolve(POSTCHAOS_BITMAP).data_type() != nl::node::type::bitmap)
-			// 	return Error::Code::WRONG_UI_FILE;
 
 			return Error::Code::NONE;
 		}

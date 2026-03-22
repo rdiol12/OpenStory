@@ -116,6 +116,11 @@
 	ms::Stage::get().init();
 	ms::UI::get().init();
 
+	// Initialize virtual touch controls
+	int16_t vw = ms::Constants::Constants::get().get_viewwidth();
+	int16_t vh = ms::Constants::Constants::get().get_viewheight();
+	[TouchInput initControls:vw height:vh];
+
 	ms::Timer::get().start();
 
 	self.gameInitialized = YES;
@@ -158,6 +163,7 @@
 	ms::Window::get().begin();
 	ms::Stage::get().draw(alpha);
 	ms::UI::get().draw(alpha);
+	[TouchInput controls].draw();
 	ms::Window::get().end();
 }
 
