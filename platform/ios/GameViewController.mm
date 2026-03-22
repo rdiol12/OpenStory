@@ -12,7 +12,7 @@
 #include "Audio/Audio.h"
 #include "Character/Char.h"
 #include "Gameplay/MapleMap/MapPortals.h"
-#include "Graphics/DamageNumber.h"
+#include "Gameplay/Combat/DamageNumber.h"
 #include "Timer.h"
 #include "Constants.h"
 #include "Configuration.h"
