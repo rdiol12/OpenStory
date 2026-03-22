@@ -41,7 +41,7 @@ namespace ms
 		cloud = info["cloud"].get_bool();
 		fieldlimit = info["fieldLimit"];
 		hideminimap = info["hideMinimap"].get_bool();
-		mapmark = info["mapMark"];
+		mapmark = (std::string)info["mapMark"];
 		swim = info["swim"].get_bool();
 		town = info["town"].get_bool();
 
