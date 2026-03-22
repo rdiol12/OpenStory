@@ -208,6 +208,9 @@ namespace ms
 		if (buttons.count(Buttons::BT_MAX))
 			buttons[Buttons::BT_MAX]->set_active(false);
 
+		title_text = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, "", 170, false);
+		no_quest_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "No quest tracked", 170, false);
+
 		// Auto-track first available quest
 		auto_track();
 	}
@@ -262,7 +265,7 @@ namespace ms
 		{
 			int16_t tracked_count = (tracked_questid > 0) ? 1 : 0;
 			std::string title = "Quest Helper (" + std::to_string(tracked_count) + "/5)";
-			Text title_text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, title, 170, false);
+			title_text.change_text(title);
 			title_text.draw(content_pos + Point<int16_t>(8, 1));
 		}
 
@@ -303,8 +306,7 @@ namespace ms
 		}
 		else
 		{
-			static Text no_quest(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "No quest tracked", 170, false);
-			no_quest.draw(content_pos + Point<int16_t>(15, 22));
+			no_quest_text.draw(content_pos + Point<int16_t>(15, 22));
 		}
 
 		// Draw quest messenger notification below the helper

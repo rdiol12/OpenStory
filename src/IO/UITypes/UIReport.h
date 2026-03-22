@@ -18,59 +18,82 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "../Components/Textfield.h"
 
-#include "../Components/MapleComboBox.h"
-#include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
-	class UIOptionMenu : public UIDragElement<PosOPTIONMENU>
+	class UIReport : public UIDragElement<PosREPORT>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::OPTIONMENU;
+		static constexpr Type TYPE = UIElement::Type::REPORT;
 		static constexpr bool FOCUSED = true;
-		static constexpr bool TOGGLED = false;
+		static constexpr bool TOGGLED = true;
 
-		UIOptionMenu();
+		UIReport(const std::string& target = "");
 
 		void draw(float inter) const override;
+		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
+		void set_target(const std::string& name);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void change_tab(uint16_t tabid);
+		void send_report();
 
 		enum Buttons : uint16_t
 		{
-			TAB0,
-			TAB1,
-			TAB2,
-			TAB3,
-			TAB4,
-			CANCEL,
-			OK,
-			UIRESET,
-			SELECT_RES
+			BT_CLOSE,
+			BT_SEND,
+			BT_REASON0,
+			BT_REASON1,
+			BT_REASON2,
+			BT_REASON3,
+			BT_REASON4
 		};
 
-		uint16_t selected_tab;
-		Texture tab_background[Buttons::CANCEL];
+		static constexpr int16_t WIDTH = 280;
+		static constexpr int16_t HEADER_HEIGHT = 25;
+		static constexpr int16_t BODY_HEIGHT = 200;
+		static constexpr int16_t INPUT_HEIGHT = 60;
 
-		bool nx_missing;
+		static constexpr int NUM_REASONS = 5;
+		static constexpr const char* REASON_LABELS[NUM_REASONS] = {
+			"Hacking/Botting",
+			"Scamming",
+			"Inappropriate Name",
+			"Harassment",
+			"Other"
+		};
+
+		std::string target_name;
+		Textfield namefield;
+		Textfield descfield;
+		int16_t selected_reason;
+
 		ColorBox background;
-		ColorBox title_bar;
+		ColorBox header_bg;
+		ColorBox input_bg;
 		Text title_text;
-		Text resolution_label;
-		Text ok_label;
-		Text cancel_label;
-		ColorBox ok_bg;
-		ColorBox cancel_bg;
+
+		// Pre-allocated draw objects
+		Text close_x;
+		Text name_label;
+		Text reason_label;
+		Text desc_label;
+		ColorBox reason_bgs[NUM_REASONS];
+		Text reason_texts[NUM_REASONS];
+		ColorBox selected_reason_bg;
+		ColorBox btn_bg;
+		Text btn_text;
 	};
 }

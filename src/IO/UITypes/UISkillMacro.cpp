@@ -114,7 +114,7 @@ namespace ms
 				if (skillid > 0)
 				{
 					const SkillData& data = SkillData::get(skillid);
-					Texture icon = data.get_icon(SkillData::Icon::NORMAL);
+					const Texture& icon = data.get_icon(SkillData::Icon::NORMAL);
 
 					if (icon.is_valid())
 						icon.draw(DrawArgument(slot_pos + Point<int16_t>(2, 2)));

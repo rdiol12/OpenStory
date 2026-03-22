@@ -101,5 +101,10 @@ namespace ms
 		int8_t selected_slot;  // -1 = none
 
 		Texture background;
+
+		// Pre-allocated draw objects
+		Text confirmed_text;
+		Text confirm_btn_text;
+		Text cancel_btn_text;
 	};
 }

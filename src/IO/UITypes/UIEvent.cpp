@@ -113,7 +113,7 @@ namespace ms
 				for (size_t f = 0; f < 5; f++)
 				{
 					const ItemData& item_data = ItemData::get(2000000 + f);
-					Texture icon = item_data.get_icon(true);
+					const Texture& icon = item_data.get_icon(true);
 
 					if (f == 2)
 						x_adj = 2;
@@ -212,6 +212,7 @@ namespace ms
 		{
 		case Buttons::CLOSE:
 			close();
+			break;
 		default:
 			break;
 		}

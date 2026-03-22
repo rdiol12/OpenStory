@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIMapleChat.h"
+#include "UIUserList.h"
+#include "UIGuild.h"
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -87,7 +89,10 @@ namespace ms
 			close();
 			break;
 		case BT_FRIEND:
+			UI::get().emplace<UIUserList>(UIUserList::Tab::FRIEND);
+			break;
 		case BT_GUILD:
+			UI::get().emplace<UIGuild>();
 			break;
 		default:
 			break;

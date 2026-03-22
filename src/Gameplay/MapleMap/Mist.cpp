@@ -28,6 +28,23 @@ namespace ms
 		  skill_id(skill_id), skill_level(skill_level), mist_type(mist_type)
 	{
 		active = true;
+
+		int16_t w = static_cast<int16_t>(bottomright.x() - topleft.x());
+		int16_t h = static_cast<int16_t>(bottomright.y() - topleft.y());
+
+		if (w > 0 && h > 0)
+		{
+			Color::Name color;
+
+			if (mist_type == 1)
+				color = Color::Name::LEMONGRASS;
+			else if (mist_type == 2)
+				color = Color::Name::WHITE;
+			else
+				color = Color::Name::VIOLET;
+
+			mist_box = ColorBox(w, h, color, 0.3f);
+		}
 	}
 
 	void Mist::draw(double viewx, double viewy, float alpha) const
@@ -35,30 +52,12 @@ namespace ms
 		if (!active)
 			return;
 
-		int16_t w = static_cast<int16_t>(bottomright.x() - topleft.x());
-		int16_t h = static_cast<int16_t>(bottomright.y() - topleft.y());
-
-		if (w <= 0 || h <= 0)
-			return;
-
-		// Pick color based on mist type
-		Color::Name color;
-
-		if (mist_type == 1) // Poison mist
-			color = Color::Name::LEMONGRASS;
-		else if (mist_type == 2) // Smoke screen
-			color = Color::Name::WHITE;
-		else // Mob mist
-			color = Color::Name::VIOLET;
-
-		ColorBox box(w, h, color, 0.3f);
-
 		Point<int16_t> absp(
 			static_cast<int16_t>(topleft.x() + viewx),
 			static_cast<int16_t>(topleft.y() + viewy)
 		);
 
-		box.draw(DrawArgument(absp));
+		mist_box.draw(DrawArgument(absp));
 	}
 
 	int8_t Mist::update(const Physics& physics)

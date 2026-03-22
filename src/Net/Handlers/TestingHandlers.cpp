@@ -611,6 +611,26 @@ namespace ms
 			recv.read_byte(); // 1 = enabled
 	}
 
+	void SueCharacterResultHandler::handle(InPacket& recv) const
+	{
+		if (!recv.available())
+			return;
+
+		int8_t mode = recv.read_byte();
+
+		std::string message;
+		switch (mode)
+		{
+		case 0: message = "You have successfully reported the user."; break;
+		case 1: message = "Unable to locate the user."; break;
+		case 2: message = "You may only report users 10 times a day."; break;
+		case 3: message = "You have been reported to the GMs by a user."; break;
+		default: message = "Your report request did not go through."; break;
+		}
+
+		UI::get().emplace<UIOk>(message, [](bool) {});
+	}
+
 	void SetGenderHandler::handle(InPacket& recv) const
 	{
 		// Gender confirmation from server after gender selection

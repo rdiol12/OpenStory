@@ -37,6 +37,10 @@ namespace ms
 		scroll_locked = false;
 		has_map = false;
 		listNpc_enabled = false;
+		drag_resize = false;
+		zoom_scale = 1.0f;
+		drag_start_y = 0;
+		drag_start_zoom = 1.0f;
 		listNpc_dimensions = Point<int16_t>(150, 170);
 		listNpc_offset = 0;
 		selected = -1;
@@ -69,6 +73,9 @@ namespace ms
 
 		player_marker = Animation(marker["user"]);
 		selected_marker = Animation(MiniMap["iconNpc"]);
+		portal_marker_anim = Animation(marker["portal"]);
+		npc_marker_anim = Animation(marker["npc"]);
+		npc_highlight = ColorBox(LISTNPC_ITEM_WIDTH, LISTNPC_ITEM_HEIGHT, Color::Name::YELLOW, 1.0f);
 
 		// Load additional mark textures from MiniMap.img
 		nl::node minimap_marks = nl::nx::ui["MiniMap.img"];
@@ -100,10 +107,9 @@ namespace ms
 			if (has_map)
 			{
 				Point<int16_t> scroll_off = get_scroll_offset(normal_dimensions, 0);
-				Animation portal_marker = Animation(marker["portal"]);
 
 				for (auto sprite : static_marker_info)
-					portal_marker.draw(position + sprite.second + scroll_off, alpha);
+					portal_marker_anim.draw(position + sprite.second + scroll_off, alpha);
 
 				draw_movable_markers(position + scroll_off, alpha);
 
@@ -122,10 +128,9 @@ namespace ms
 			if (has_map)
 			{
 				Point<int16_t> scroll_off = get_scroll_offset(max_dimensions, MAX_ADJ);
-				Animation portal_marker(marker["portal"]);
 
 				for (auto sprite : static_marker_info)
-					portal_marker.draw(position + sprite.second + Point<int16_t>(0, MAX_ADJ) + scroll_off, alpha);
+					portal_marker_anim.draw(position + sprite.second + Point<int16_t>(0, MAX_ADJ) + scroll_off, alpha);
 
 				draw_movable_markers(position + Point<int16_t>(0, MAX_ADJ) + scroll_off, alpha);
 
@@ -212,6 +217,54 @@ namespace ms
 
 	Cursor::State UIMiniMap::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		// Handle drag-to-resize on the bottom edge (only in NORMAL/MAX mode)
+		if (type != Type::MIN && has_map)
+		{
+			Point<int16_t> cursor_relative = cursorpos - position;
+			int16_t bottom_y = dimension.y();
+			int16_t right_x = dimension.x();
+
+			// 8px resize zone on bottom and bottom-right corner
+			bool on_bottom = cursor_relative.y() >= bottom_y - 8 && cursor_relative.y() <= bottom_y + 4
+				&& cursor_relative.x() >= 0 && cursor_relative.x() <= right_x;
+
+			if (drag_resize)
+			{
+				if (clicked)
+				{
+					// Use cursor Y movement from drag start to compute zoom change
+					int16_t delta_y = cursorpos.y() - drag_start_y;
+					float new_zoom = drag_start_zoom + static_cast<float>(delta_y) / 100.0f;
+					new_zoom = std::max(0.5f, std::min(4.0f, new_zoom));
+
+					if (new_zoom != zoom_scale)
+					{
+						zoom_scale = new_zoom;
+						update_canvas();
+						update_static_markers();
+						toggle_buttons();
+					}
+
+					return Cursor::State::CLICKING;
+				}
+				else
+				{
+					drag_resize = false;
+				}
+			}
+			else if (on_bottom && clicked)
+			{
+				drag_resize = true;
+				drag_start_y = cursorpos.y();
+				drag_start_zoom = zoom_scale;
+				return Cursor::State::CLICKING;
+			}
+			else if (on_bottom)
+			{
+				return Cursor::State::VSCROLL;
+			}
+		}
+
 		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
 
 		if (dragged)
@@ -247,7 +300,7 @@ namespace ms
 
 		for (auto npc = npcs->begin(); npc != npcs->end(); npc++)
 		{
-			Point<int16_t> npc_pos = (npc->second->get_position() + center_offset) / scale + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
+			Point<int16_t> npc_pos = scale_map_pos(npc->second->get_position()) + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
 			Rectangle<int16_t> marker_spot = Rectangle<int16_t>(npc_pos - Point<int16_t>(4, 8), npc_pos);
 
 			if (type == Type::MAX)
@@ -499,24 +552,28 @@ namespace ms
 		map_sprite = Texture(Map["miniMap"]["canvas"]);
 		Point<int16_t> map_dimensions = map_sprite.get_dimensions();
 
+		// Apply zoom scale to get the effective display size of the map
+		int16_t zoomed_w = static_cast<int16_t>(map_dimensions.x() * zoom_scale);
+		int16_t zoomed_h = static_cast<int16_t>(map_dimensions.y() * zoom_scale);
+
 		// 48 (offset for text) + longer text's width + 10 (space for right side border)
 		int16_t mark_text_width = 48 + std::max(region_text.width(), town_text.width()) + 10;
 		int16_t c_stretch, ur_x_offset, m_stretch, down_y_offset;
-		int16_t window_width = std::max(178, std::max((int)mark_text_width, map_dimensions.x() + 20));
+		int16_t window_width = std::max(178, std::max((int)mark_text_width, zoomed_w + 20));
 
 		c_stretch = std::max(0, window_width - 128);
 		ur_x_offset = CENTER_START_X + c_stretch;
-		map_draw_origin_x = std::max(10, window_width / 2 - map_dimensions.x() / 2);
+		map_draw_origin_x = std::max(10, window_width / 2 - zoomed_w / 2);
 
-		if (map_dimensions.y() <= 20)
+		if (zoomed_h <= 20)
 		{
 			m_stretch = 5;
 			down_y_offset = 17 + m_stretch;
-			map_draw_origin_y = 10 + m_stretch - map_dimensions.y();
+			map_draw_origin_y = 10 + m_stretch - zoomed_h;
 		}
 		else
 		{
-			m_stretch = map_dimensions.y() - 17;
+			m_stretch = zoomed_h - 17;
 			down_y_offset = 17 + m_stretch;
 			map_draw_origin_y = 20;
 		}
@@ -557,7 +614,7 @@ namespace ms
 		normal_sprites.emplace_back(MiddleCenter, DrawArgument(Point<int16_t>(7, 10), Point<int16_t>(c_stretch + 114, m_stretch + 27)));
 
 		if (has_map)
-			normal_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y)));
+			normal_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y), zoom_scale, zoom_scale));
 
 		normal_sprites.emplace_back(Normal[MiddleLeft], DrawArgument(Point<int16_t>(0, ML_MR_Y), Point<int16_t>(0, m_stretch)));
 		normal_sprites.emplace_back(Normal[MiddleRight], DrawArgument(Point<int16_t>(middle_right_x, ML_MR_Y), Point<int16_t>(0, m_stretch)));
@@ -574,7 +631,7 @@ namespace ms
 		max_sprites.emplace_back(MiddleCenter, DrawArgument(Point<int16_t>(7, 50), Point<int16_t>(c_stretch + 114, m_stretch + 27)));
 
 		if (has_map)
-			max_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y + MAX_ADJ)));
+			max_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y + MAX_ADJ), zoom_scale, zoom_scale));
 
 		max_sprites.emplace_back(Max[MiddleLeft], DrawArgument(Point<int16_t>(0, ML_MR_Y + MAX_ADJ), Point<int16_t>(0, m_stretch)));
 		max_sprites.emplace_back(Max[MiddleRight], DrawArgument(Point<int16_t>(middle_right_x, ML_MR_Y + MAX_ADJ), Point<int16_t>(0, m_stretch)));
@@ -589,6 +646,15 @@ namespace ms
 		max_dimensions = normal_dimensions + Point<int16_t>(0, MAX_ADJ);
 	}
 
+	Point<int16_t> UIMiniMap::scale_map_pos(Point<int16_t> world_pos) const
+	{
+		Point<int16_t> map_pos = (world_pos + center_offset) / scale;
+		return Point<int16_t>(
+			static_cast<int16_t>(map_pos.x() * zoom_scale),
+			static_cast<int16_t>(map_pos.y() * zoom_scale)
+		);
+	}
+
 	void UIMiniMap::draw_movable_markers(Point<int16_t> init_pos, float alpha) const
 	{
 		if (!has_map)
@@ -596,6 +662,7 @@ namespace ms
 
 		Animation marker_sprite;
 		Point<int16_t> sprite_offset;
+		Point<int16_t> origin(map_draw_origin_x, map_draw_origin_y);
 
 		/// NPCs
 		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
@@ -605,7 +672,7 @@ namespace ms
 		for (auto npc = npcs->begin(); npc != npcs->end(); ++npc)
 		{
 			Point<int16_t> npc_pos = npc->second.get()->get_position();
-			marker_sprite.draw((npc_pos + center_offset) / scale - sprite_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y) + init_pos, alpha);
+			marker_sprite.draw(scale_map_pos(npc_pos) - sprite_offset + origin + init_pos, alpha);
 		}
 
 		/// Other characters
@@ -616,13 +683,13 @@ namespace ms
 		for (auto chr = chars->begin(); chr != chars->end(); ++chr)
 		{
 			Point<int16_t> chr_pos = chr->second.get()->get_position();
-			marker_sprite.draw((chr_pos + center_offset) / scale - sprite_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y) + init_pos, alpha);
+			marker_sprite.draw(scale_map_pos(chr_pos) - sprite_offset + origin + init_pos, alpha);
 		}
 
 		/// Player
 		Point<int16_t> player_pos = Stage::get().get_player().get_position();
 		sprite_offset = player_marker.get_dimensions() / Point<int16_t>(2, 0);
-		player_marker.draw((player_pos + center_offset) / scale - sprite_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y) + init_pos, alpha);
+		player_marker.draw(scale_map_pos(player_pos) - sprite_offset + origin + init_pos, alpha);
 	}
 
 	Point<int16_t> UIMiniMap::get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const
@@ -632,7 +699,7 @@ namespace ms
 
 		// Calculate where the player would be drawn on the minimap
 		Point<int16_t> player_pos = Stage::get().get_player().get_position();
-		Point<int16_t> player_on_map = (player_pos + center_offset) / scale + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
+		Point<int16_t> player_on_map = scale_map_pos(player_pos) + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
 
 		// The visible area center (approximate center of the minimap view)
 		int16_t view_center_x = view_dims.x() / 2;
@@ -643,10 +710,12 @@ namespace ms
 
 		// Clamp so the map doesn't scroll past its edges
 		Point<int16_t> map_dims = map_sprite.get_dimensions();
+		int16_t zoomed_mx = static_cast<int16_t>(map_dims.x() * zoom_scale);
+		int16_t zoomed_my = static_cast<int16_t>(map_dims.y() * zoom_scale);
 		int16_t max_offset_x = 0;
-		int16_t min_offset_x = std::min(0, (int)view_dims.x() - map_dims.x() - map_draw_origin_x * 2);
+		int16_t min_offset_x = std::min(0, (int)view_dims.x() - zoomed_mx - map_draw_origin_x * 2);
 		int16_t max_offset_y = 0;
-		int16_t min_offset_y = std::min(0, (int)(view_dims.y() - y_adj) - map_dims.y() - map_draw_origin_y);
+		int16_t min_offset_y = std::min(0, (int)(view_dims.y() - y_adj) - zoomed_my - map_draw_origin_y);
 
 		offset = Point<int16_t>(
 			static_cast<int16_t>(std::max((int)min_offset_x, std::min((int)max_offset_x, (int)offset.x()))),
@@ -676,7 +745,7 @@ namespace ms
 
 			if (portal_type == 2)
 			{
-				Point<int16_t> marker_pos = (Point<int16_t>(portal["x"], portal["y"]) + center_offset) / scale - marker_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
+				Point<int16_t> marker_pos = scale_map_pos(Point<int16_t>(portal["x"], portal["y"])) - marker_offset + Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
 				static_marker_info.emplace_back(portal.name(), marker_pos);
 			}
 		}
@@ -790,7 +859,6 @@ namespace ms
 
 	void UIMiniMap::draw_npclist(Point<int16_t> minimap_dims, float alpha) const
 	{
-		Animation npc_marker = Animation(marker["npc"]);
 
 		for (Sprite sprite : listNpc_sprites)
 			sprite.draw(position, alpha);
@@ -800,12 +868,9 @@ namespace ms
 		for (int8_t i = 0; i + listNpc_offset < listNpc_list.size() && i < 8; i++)
 		{
 			if (selected - listNpc_offset == i)
-			{
-				ColorBox highlight = ColorBox(LISTNPC_ITEM_WIDTH - (listNpc_slider.isenabled() ? 0 : 30), LISTNPC_ITEM_HEIGHT, Color::Name::YELLOW, 1.0f);
-				highlight.draw(listNpc_pos);
-			}
+				npc_highlight.draw(listNpc_pos);
 
-			npc_marker.draw(DrawArgument(listNpc_pos + Point<int16_t>(0, 2), false, npc_marker.get_dimensions() / 2), alpha);
+			npc_marker_anim.draw(DrawArgument(listNpc_pos + Point<int16_t>(0, 2), false, npc_marker_anim.get_dimensions() / 2), alpha);
 			listNpc_names[listNpc_offset + i].draw(DrawArgument(listNpc_pos + Point<int16_t>(14, -2)));
 
 			listNpc_pos.shift_y(LISTNPC_ITEM_HEIGHT);
@@ -817,8 +882,8 @@ namespace ms
 		if (selected >= 0)
 		{
 			Point<int16_t> npc_pos =
-				(listNpc_list[selected]->get_position() + center_offset) / scale +
-				Point<int16_t>(map_draw_origin_x, map_draw_origin_y - npc_marker.get_dimensions().y() + (type == Type::MAX ? MAX_ADJ : 0));
+				scale_map_pos(listNpc_list[selected]->get_position()) +
+				Point<int16_t>(map_draw_origin_x, map_draw_origin_y - npc_marker_anim.get_dimensions().y() + (type == Type::MAX ? MAX_ADJ : 0));
 
 			selected_marker.draw(position + npc_pos, 0.5f);
 		}

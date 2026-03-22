@@ -119,7 +119,7 @@ namespace ms
 
 	int32_t Keyboard::rightctrlcode() const
 	{
-		return GLFW_KEY_LEFT_CONTROL;
+		return GLFW_KEY_RIGHT_CONTROL;
 	}
 
 	std::map<int32_t, Keyboard::Mapping> Keyboard::get_maplekeys() const

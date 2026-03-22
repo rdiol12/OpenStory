@@ -321,6 +321,20 @@ namespace ms
 			dimension = Point<int16_t>(280, 400);
 
 		dragarea = Point<int16_t>(dimension.x(), 20);
+
+		// Pre-allocate draw objects
+		tab_bg_active = ColorBox(60, 20, Color::Name::ENDEAVOUR, 1.0f);
+		tab_bg_inactive = ColorBox(60, 20, Color::Name::MINESHAFT, 0.6f);
+		tab_label_text = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "Weekly", 60, false);
+		hover_bg_recommend = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::YELLOW, 0.12f);
+		sel_bg_recommend = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::MALIBU, 0.2f);
+		hover_bg_normal = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::WHITE, 0.15f);
+		sel_bg_normal = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::MEDIUMBLUE, 0.15f);
+		sep_line_box = ColorBox(260, 1, Color::Name::DUSTYGRAY, 0.4f);
+		header_sep_box = ColorBox(260, 1, Color::Name::DUSTYGRAY, 0.4f);
+		say_preview_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, "", 250, true);
+		medal_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "", 240, false);
+		time_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ORANGE, "", 200, false);
 	}
 
 	void UIQuestLog::set_btn_active(uint16_t id, bool active)
@@ -1304,12 +1318,11 @@ namespace ms
 				float tab_opacity = is_weekly_active ? 1.0f : 0.6f;
 				Color::Name tab_color = is_weekly_active ? Color::Name::WHITE : Color::Name::DUSTYGRAY;
 
-				ColorBox tab_bg(tab3_bounds.width(), tab3_bounds.height(),
-					is_weekly_active ? Color::Name::ENDEAVOUR : Color::Name::MINESHAFT, tab_opacity);
-				tab_bg.draw(DrawArgument(tab3_bounds.get_left_top()));
+				const ColorBox& cur_tab_bg = is_weekly_active ? tab_bg_active : tab_bg_inactive;
+				cur_tab_bg.draw(DrawArgument(tab3_bounds.get_left_top()));
 
-				Text tab_label(Text::Font::A11B, Text::Alignment::CENTER, tab_color, "Weekly", 60, false);
-				tab_label.draw(Point<int16_t>(
+				tab_label_text.change_color(tab_color);
+				tab_label_text.draw(Point<int16_t>(
 					tab3_bounds.get_left_top().x() + tab3_bounds.width() / 2,
 					tab3_bounds.get_left_top().y() + 3
 				));
@@ -1387,19 +1400,11 @@ namespace ms
 					if (entry_index < 0 || (size_t)entry_index >= recommended_entries.size())
 						continue;
 
-					// Hover highlight
 					if (hover_entry == virtual_row)
-					{
-						ColorBox hover_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::YELLOW, 0.12f);
-						hover_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-					}
+						hover_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
-					// Selection highlight
 					if (selected_entry == virtual_row)
-					{
-						ColorBox sel_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::MALIBU, 0.2f);
-						sel_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-					}
+						sel_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
 					quest_icon_anim.draw(DrawArgument(position + Point<int16_t>(14, entry_y + 4)), alpha);
 					recommended_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y + 5));
@@ -1409,19 +1414,11 @@ namespace ms
 					if (entry_index < 0 || (size_t)entry_index >= available_entries.size())
 						continue;
 
-					// Hover highlight
 					if (hover_entry == virtual_row)
-					{
-						ColorBox hover_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::WHITE, 0.15f);
-						hover_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-					}
+						hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
-					// Selection highlight
 					if (selected_entry == virtual_row)
-					{
-						ColorBox sel_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::MEDIUMBLUE, 0.15f);
-						sel_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-					}
+						sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
 					quest_icon_anim.draw(DrawArgument(position + Point<int16_t>(14, entry_y + 4)), alpha);
 					available_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y + 5));
@@ -1443,19 +1440,11 @@ namespace ms
 
 				int16_t entry_y = LIST_Y + i * ROW_HEIGHT;
 
-				// Draw hover highlight
 				if (hover_entry >= 0 && (size_t)hover_entry == idx)
-				{
-					ColorBox hover_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::WHITE, 0.15f);
-					hover_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-				}
+					hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
-				// Draw selection highlight
 				if (selected_entry >= 0 && (size_t)selected_entry == idx)
-				{
-					ColorBox sel_bg(dimension.x() - 30, ROW_HEIGHT, Color::Name::MEDIUMBLUE, 0.15f);
-					sel_bg.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
-				}
+					sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
 
 				// Draw animated lightbulb icon on each quest row
 				Point<int16_t> icon_pos = position + Point<int16_t>(14, entry_y + 4);
@@ -1563,17 +1552,14 @@ namespace ms
 			// === NPC Dialog preview (first line only, compact) ===
 			if (!detail_say_lines.empty())
 			{
-				Text say_preview(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, detail_say_lines[0].text, 250, true);
+				say_preview_text.change_text(detail_say_lines[0].text);
 				if (IN_VIEW(y_offset))
-					say_preview.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
-				int16_t say_h = std::min(say_preview.height(), (int16_t)48);
+					say_preview_text.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
+				int16_t say_h = std::min(say_preview_text.height(), (int16_t)48);
 				y_offset += say_h + 8;
 
 				if (IN_VIEW(y_offset))
-				{
-					ColorBox say_sep(260, 1, Color::Name::DUSTYGRAY, 0.3f);
-					say_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
-				}
+					sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
 				y_offset += 8;
 			}
 
@@ -1629,10 +1615,7 @@ namespace ms
 			if (!detail_requirements.empty())
 			{
 				if (IN_VIEW(y_offset))
-				{
-					ColorBox sep_line(260, 1, Color::Name::DUSTYGRAY, 0.4f);
-					sep_line.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
-				}
+					sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
 				y_offset += 8;
 
 				if (IN_VIEW(y_offset))
@@ -1688,7 +1671,7 @@ namespace ms
 
 				if (IN_VIEW(y_offset))
 				{
-					Text medal_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, detail_medal, 240, false);
+					medal_text.change_text(detail_medal);
 					medal_text.draw(detail_pos + Point<int16_t>(25, DETAIL_Y(y_offset)));
 				}
 				y_offset += 18;
@@ -1727,10 +1710,7 @@ namespace ms
 
 			// === Quest description ===
 			if (IN_VIEW(y_offset))
-			{
-				ColorBox sep2(260, 1, Color::Name::DUSTYGRAY, 0.4f);
-				sep2.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
-			}
+				sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
 			y_offset += 8;
 
 			if (basic_texture.is_valid() && IN_VIEW(y_offset))
@@ -1752,10 +1732,7 @@ namespace ms
 				y_offset += desc_h + 8;
 
 				if (IN_VIEW(y_offset))
-				{
-					ColorBox time_sep(260, 1, Color::Name::DUSTYGRAY, 0.4f);
-					time_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
-				}
+					sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
 				y_offset += 6;
 
 				if (IN_VIEW(y_offset))
@@ -1766,7 +1743,7 @@ namespace ms
 					int32_t seconds = detail_time_limit % 60;
 					std::string time_str = "Time Limit: " + std::to_string(minutes) + ":" +
 						(seconds < 10 ? "0" : "") + std::to_string(seconds);
-					Text time_text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ORANGE, time_str, 200, false);
+					time_text.change_text(time_str);
 					time_text.draw(detail_pos + Point<int16_t>(35, DETAIL_Y(y_offset) + 2));
 				}
 
@@ -1813,8 +1790,7 @@ namespace ms
 			}
 			detail_npc_name.draw(detail_pos + Point<int16_t>(230, 96));
 
-			ColorBox header_sep(260, 1, Color::Name::DUSTYGRAY, 0.4f);
-			header_sep.draw(DrawArgument(detail_pos + Point<int16_t>(15, header_h - 4)));
+			header_sep_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, header_h - 4)));
 
 			// Draw detail panel buttons manually with detail_pos as parentpos
 			auto draw_detail_btn = [&](uint16_t id) {

@@ -25,6 +25,7 @@
 #include "../../Character/CharStats.h"
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Animation.h"
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
@@ -212,5 +213,9 @@ namespace ms
 
 		// Event shortcut icons
 		Texture event_backgrnd;
+
+		// Pre-allocated draw objects
+		ColorBox menu_bg;
+		ColorBox sys_bg;
 	};
 }

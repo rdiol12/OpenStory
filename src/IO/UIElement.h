@@ -108,6 +108,8 @@ namespace ms
 			MAPLECHAT,
 			SOCIALCHAT,
 			COMBO,
+			WHISPER,
+			REPORT,
 			NUM_TYPES
 		};
 

@@ -20,6 +20,7 @@
 #include "../UIElement.h"
 
 #include "../Components/Slider.h"
+#include "../Components/Textfield.h"
 
 #include "../../Graphics/Text.h"
 
@@ -122,6 +123,8 @@ namespace ms
 		std::vector<Selection> selections;
 		int16_t selection_top;
 		int32_t hovered_selection;
+
+		Textfield input_field;
 
 		std::function<void(bool)> onmoved;
 	};

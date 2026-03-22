@@ -38,7 +38,7 @@ if(WIN32)
     
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/freetype/win64/freetype.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/bass24/c/x64/bass.lib)
-    target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/x64/Debug/NoLifeNx.lib)
+    target_link_libraries(OpenStory optimized ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/x64/Release/NoLifeNx.lib debug ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/x64/Debug/NoLifeNx.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/glew-2.1.0/lib/Release/x64/glew32s.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/glfw-3.3.2.bin.WIN64/lib-vc2019/glfw3.lib)
     target_link_libraries(OpenStory Iphlpapi.lib)

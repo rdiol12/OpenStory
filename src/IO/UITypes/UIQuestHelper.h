@@ -117,5 +117,9 @@ namespace ms
 		Text quest_name;
 		Text quest_progress;
 		std::vector<Text> requirement_lines;
+
+		// Pre-allocated draw objects (avoid per-frame GPU allocations)
+		mutable Text title_text;
+		Text no_quest_text;
 	};
 }

@@ -114,6 +114,34 @@ namespace ms
 		}
 	};
 
+	// --- Report Packets ---
+
+	// Report a player (type 0 = illegal program, type 1 = conversation)
+	// Opcode: REPORT(106)
+	class ReportPacket : public OutPacket
+	{
+	public:
+		ReportPacket(int8_t type, const std::string& victim, int8_t reason, const std::string& description)
+			: OutPacket(OutPacket::Opcode::REPORT)
+		{
+			write_byte(type);
+			write_string(victim);
+			write_byte(reason);
+			write_string(description);
+		}
+
+		// Conversation report includes chat log
+		ReportPacket(const std::string& victim, int8_t reason, const std::string& description, const std::string& chatlog)
+			: OutPacket(OutPacket::Opcode::REPORT)
+		{
+			write_byte(1);  // conversation report
+			write_string(victim);
+			write_byte(reason);
+			write_string(description);
+			write_string(chatlog);
+		}
+	};
+
 	// --- Minigame Packets ---
 
 	// Place a piece (Omok) or flip a card (Memory)

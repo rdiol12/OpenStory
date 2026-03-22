@@ -74,6 +74,7 @@ namespace ms
 		SHOW_STATUS_INFO = 39,  // 0x27
 		CLAIM_STATUS_CHANGED = 47, // 0x2F
 		QUEST_CLEAR = 49,          // 0x31
+		SUE_CHARACTER_RESULT = 55, // 0x37
 
 		SET_GENDER = 58,        // 0x3A
 
@@ -455,6 +456,7 @@ namespace ms
 		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();
 		emplace<LAST_CONNECTED_WORLD, LastConnectedWorldHandler>();
 		emplace<CLAIM_STATUS_CHANGED, ClaimStatusChangedHandler>();
+		emplace<SUE_CHARACTER_RESULT, SueCharacterResultHandler>();
 		emplace<SET_GENDER, SetGenderHandler>();
 		emplace<FAMILY_PRIVILEGE_LIST, FamilyPrivilegeListHandler>();
 		emplace<ADMIN_RESULT, AdminResultHandler>();

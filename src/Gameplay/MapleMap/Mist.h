@@ -18,6 +18,7 @@
 #pragma once
 
 #include "MapObject.h"
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
@@ -38,5 +39,6 @@ namespace ms
 		int32_t skill_id;
 		int8_t skill_level;
 		int8_t mist_type;
+		ColorBox mist_box;
 	};
 }
