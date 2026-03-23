@@ -60,6 +60,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **EXP gain**: Fixed "not handled" message appearing for in-chat EXP notifications
 - **SHOW_ITEM_GAIN_INCHAT**: Proper v83 mode switch for all 24 effect types
 - **Notice button**: Changed from broken button to static sprite matching v83 client
+- **added snow effect but needs refrance to all the effects maple has now iam just fixing how i thing it should looks like
 
 ## License
 
