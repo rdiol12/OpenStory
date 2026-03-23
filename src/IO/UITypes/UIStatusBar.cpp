@@ -82,10 +82,12 @@ namespace ms
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
 
+		has_notification = false;
+
 		// === Background ===
 		bar_backgrnd = Texture(mainbar["backgrnd"]);
 		sprites.emplace_back(mainbar["gaugeBackgrd"]);
-		sprites.emplace_back(mainbar["notice"]);
+		notice_sprite = Texture(mainbar["notice"]);
 		sprites.emplace_back(mainbar["lvBacktrnd"]);
 		sprites.emplace_back(mainbar["lvCover"]);
 
@@ -191,7 +193,8 @@ namespace ms
 		// === Additional main bar buttons ===
 		buttons[BT_CHANNEL]    = std::make_unique<MapleButton>(mainbar["BtChannel"], Point<int16_t>(53, 0));
 		buttons[BT_KEYSETTING] = std::make_unique<MapleButton>(mainbar["BtKeysetting"], Point<int16_t>(53, 0));
-		sprites.emplace_back(mainbar["notice"]);
+		buttons[BT_NOTICE]     = std::make_unique<MapleButton>(mainbar["BtNotice"]);
+		buttons[BT_NOTICE]->set_active(false);
 		buttons[BT_FARM]       = std::make_unique<MapleButton>(mainbar["BtFarm"]);
 		buttons[BT_EXITDUNGEON] = std::make_unique<MapleButton>(mainbar["BtExitDungeon"]);
 		buttons[BF_BT_CASHSHOP] = std::make_unique<MapleButton>(mainbar["BfBtCashShop"]);
@@ -486,6 +489,10 @@ namespace ms
 		joblabel.draw(position + Point<int16_t>(-435, -21));
 		namelabel.draw(position + Point<int16_t>(-435, -36));
 
+		// Draw notice sprite when there are pending notifications
+		if (has_notification && notice_sprite.is_valid())
+			notice_sprite.draw(DrawArgument(position));
+
 		// Draw cooltime return indicator (NX origin positions it)
 		if (cooltime_return.is_valid())
 			cooltime_return.draw(DrawArgument(position));
@@ -682,6 +689,13 @@ namespace ms
 				Stage::get().get_player().get_skills()
 			);
 			remove_menus();
+			return Button::State::NORMAL;
+
+		case BT_NOTICE:
+			clear_notification();
+			UI::get().emplace<UIQuestLog>(
+				Stage::get().get_player().get_quests()
+			);
 			return Button::State::NORMAL;
 
 		case BT_CHANNEL:
@@ -964,5 +978,21 @@ namespace ms
 		int32_t maxmp = stats.get_total(EquipStat::Id::MP);
 
 		return static_cast<float>(mp) / maxmp;
+	}
+
+	void UIStatusBar::notify()
+	{
+		has_notification = true;
+
+		if (buttons.count(BT_NOTICE))
+			buttons[BT_NOTICE]->set_active(true);
+	}
+
+	void UIStatusBar::clear_notification()
+	{
+		has_notification = false;
+
+		if (buttons.count(BT_NOTICE))
+			buttons[BT_NOTICE]->set_active(false);
 	}
 }

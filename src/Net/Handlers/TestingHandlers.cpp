@@ -30,6 +30,7 @@
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIQuestLog.h"
+#include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UITrade.h"
 #include "../../IO/UITypes/UINotice.h"
@@ -251,6 +252,10 @@ namespace ms
 
 		// Play quest complete sound
 		Sound(Sound::Name::QUESTCOMPLETE).play();
+
+		// Show notice button alert
+		if (auto statusbar = UI::get().get_element<UIStatusBar>())
+			statusbar->notify();
 
 		// Refresh quest log UI if open
 		if (auto questlog_ui = UI::get().get_element<UIQuestLog>())

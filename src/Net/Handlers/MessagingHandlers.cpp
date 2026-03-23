@@ -26,6 +26,7 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIQuestHelper.h"
 #include "../../IO/UITypes/UIQuestLog.h"
+#include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UIWhisper.h"
 
@@ -144,6 +145,10 @@ namespace ms
 				quests.add_completed(qid, time);
 				show_status(Color::Name::WHITE, "Quest completed!");
 				Sound(Sound::Name::QUESTCOMPLETE).play();
+
+				// Show notice button alert
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->notify();
 			}
 
 			// Refresh NPC quest marks after any quest state change

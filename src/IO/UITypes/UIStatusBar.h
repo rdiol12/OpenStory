@@ -50,6 +50,8 @@ namespace ms
 		void toggle_menu();
 		void remove_menus();
 		bool is_menu_active();
+		void notify();
+		void clear_notification();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -76,6 +78,7 @@ namespace ms
 			BT_SKILL,
 			BT_CHANNEL,
 			BT_KEYSETTING,
+			BT_NOTICE,
 			BT_FARM,
 			BT_EXITDUNGEON,
 			BF_BT_CASHSHOP,
@@ -212,6 +215,10 @@ namespace ms
 
 		// Event shortcut icons
 		Texture event_backgrnd;
+
+		// Notice/notification state
+		bool has_notification;
+		Texture notice_sprite;
 
 		// Pre-allocated draw objects
 		ColorBox menu_bg;
