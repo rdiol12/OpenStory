@@ -223,6 +223,10 @@ namespace ms
 
 			chatbox.draw(DrawArgument(Point<int16_t>(0, getchattop() + 2)));
 
+			int16_t chattop = getchattop();
+			int16_t chatbottom = chattop + chatrows * CHATROWHEIGHT;
+			Range<int16_t> chatclip(chattop + 2, chatbottom);
+
 			int16_t chatheight = CHATROWHEIGHT * chatrows;
 			int16_t yshift = -chatheight;
 
@@ -241,7 +245,12 @@ namespace ms
 					textheight--;
 				}
 
-				rowtexts.at(rowid).draw(Point<int16_t>(4, getchattop() - yshift - 1));
+				int16_t msgy = chattop - yshift - 1;
+
+				if (msgy < chattop)
+					continue;
+
+				rowtexts.at(rowid).draw(DrawArgument(Point<int16_t>(4, msgy)), chatclip);
 			}
 
 			slider.draw(Point<int16_t>(position.x(), getchattop() + 5));

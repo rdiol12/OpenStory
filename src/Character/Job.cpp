@@ -238,6 +238,30 @@ namespace ms
 			case 2111:
 			case 2112:
 				return "Aran";
+			case 600:
+				return "Sage";
+			case 610:
+				return "Elementalist";
+			case 611:
+				return "Arcanum";
+			case 612:
+				return "Archsage";
+			case 700:
+				return "Necromancer";
+			case 710:
+				return "Dark Acolyte";
+			case 711:
+				return "Soul Reaper";
+			case 712:
+				return "Lich King";
+			case 800:
+				return "Summoner";
+			case 810:
+				return "Beastmaster";
+			case 811:
+				return "Warcaller";
+			case 812:
+				return "Primal Alpha";
 			case 900:
 				return "GM";
 			case 910:
@@ -252,6 +276,9 @@ namespace ms
 		switch (id / 100)
 		{
 			case 2:
+			case 6:  // Sage
+			case 7:  // Necromancer
+			case 8:  // Summoner
 				return EquipStat::Id::INT;
 			case 3:
 				return EquipStat::Id::DEX;
@@ -269,6 +296,9 @@ namespace ms
 		switch (id / 100)
 		{
 			case 2:
+			case 6:  // Sage
+			case 7:  // Necromancer
+			case 8:  // Summoner
 				return EquipStat::Id::LUK;
 			case 3:
 				return EquipStat::Id::STR;
