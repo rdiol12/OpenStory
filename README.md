@@ -62,6 +62,19 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **Notice button**: Changed from broken button to static sprite matching v83 client
 - **Snow effect**: Added snow effect (WIP — needs reference for all MapleStory effects)
 - **Quest Helper**: Rewritten to support multi-quest tracking (up to 5), collapsible entries, per-quest close button (BtDelete sprite), live item/mob progress from server quest data, auto-refresh on quest updates
+- **Quest drag-and-drop**: Drag quests from the Quest Log into the Quest Helper to track them; drag tracked quests to reorder
+- **Chat clipping**: Chat messages no longer render above the black chat background
+- **Custom jobs**: Added Sage (600), Necromancer (700), and Summoner (800) job trees with INT/LUK stats
+
+## Quest Helper
+
+Track up to 5 quests at once with live progress updates.
+
+- **Add a quest**: Open the Quest Log (Q), go to In-Progress, click and drag a quest into the Quest Helper
+- **Remove a quest**: Click the X button next to the quest name
+- **Reorder**: Drag a quest name up or down within the Quest Helper
+- **Collapse/Expand**: Click a quest name to toggle its requirements
+- **Auto-track**: Click the AUTO button to fill the helper with your active quests
 
 ## License
 
