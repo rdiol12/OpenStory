@@ -53,6 +53,9 @@ namespace ms
 			SELECT_CHAR_PIC = 30,
 			LOGIN_START = 35, // Custom name
 
+			/// Monster Book
+			MONSTER_BOOK_COVER = 57, // 0x39
+
 			/// Gameplay 1
 			CHANGEMAP = 38,
 			CHANGE_CHANNEL = 39,
@@ -96,6 +99,7 @@ namespace ms
 			/// Gameplay 2
 			PARTY_OPERATION = 124,
 			DENY_PARTY_REQUEST = 125,
+			DENY_GUILD_REQUEST = 127,
 			ADMIN_COMMAND = 128,
 			MOVE_MONSTER = 188,
 			PICKUP_ITEM = 202,

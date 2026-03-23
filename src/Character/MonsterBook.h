@@ -35,6 +35,9 @@ namespace ms
 		int8_t get_card_level(int16_t cardid) const;
 		const std::map<int16_t, int8_t>& get_cards() const;
 		int16_t get_total_cards() const;
+		int32_t get_book_level() const;
+		int32_t get_normal_cards() const;
+		int32_t get_special_cards() const;
 
 	private:
 		int32_t cover;

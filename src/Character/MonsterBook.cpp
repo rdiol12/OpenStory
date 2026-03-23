@@ -54,4 +54,51 @@ namespace ms
 	{
 		return static_cast<int16_t>(cards.size());
 	}
+
+	int32_t MonsterBook::get_book_level() const
+	{
+		int32_t collection_exp = static_cast<int32_t>(cards.size());
+		int32_t level = 0;
+		int32_t exp_to_next = 1;
+
+		while (collection_exp >= exp_to_next)
+		{
+			level++;
+			exp_to_next += level * 10;
+		}
+
+		return level;
+	}
+
+	int32_t MonsterBook::get_normal_cards() const
+	{
+		int32_t count = 0;
+
+		for (auto& [cardid, level] : cards)
+		{
+			// Normal cards: full item id / 1000 < 2388
+			int32_t full_id = 2380000 + cardid;
+
+			if (full_id / 1000 < 2388)
+				count++;
+		}
+
+		return count;
+	}
+
+	int32_t MonsterBook::get_special_cards() const
+	{
+		int32_t count = 0;
+
+		for (auto& [cardid, level] : cards)
+		{
+			// Special cards: full item id / 1000 >= 2388
+			int32_t full_id = 2380000 + cardid;
+
+			if (full_id / 1000 >= 2388)
+				count++;
+		}
+
+		return count;
+	}
 }

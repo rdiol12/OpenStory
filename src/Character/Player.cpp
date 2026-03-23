@@ -18,6 +18,7 @@
 #include "Player.h"
 
 #include "PlayerStates.h"
+#include "SkillId.h"
 
 #include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
@@ -244,7 +245,26 @@ namespace ms
 		if (has_cooldown(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_COOLDOWN;
 
-		int32_t level = skillbook.get_level(move.get_id());
+		int32_t moveid = move.get_id();
+
+		// Three Snails requires snail shell items as ammo
+		if (moveid == SkillId::THREE_SNAILS)
+		{
+			int32_t level = skillbook.get_level(moveid);
+			int32_t shellid = 0;
+
+			switch (level)
+			{
+			case 1: shellid = 4000019; break; // Blue Snail Shell
+			case 2: shellid = 4000000; break; // Snail Shell
+			case 3: shellid = 4000016; break; // Red Snail Shell
+			}
+
+			if (shellid == 0 || inventory.get_total_item_count(shellid) <= 0)
+				return SpecialMove::ForbidReason::FBR_BULLETCOST;
+		}
+
+		int32_t level = skillbook.get_level(moveid);
 		Weapon::Type weapon = get_weapontype();
 		const Job& job = stats.get_job();
 		uint16_t hp = stats.get_stat(MapleStat::Id::HP);

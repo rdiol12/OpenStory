@@ -252,6 +252,29 @@ namespace ms
 		}
 	};
 
+	// Accept guild invite
+	class AcceptGuildInvitePacket : public OutPacket
+	{
+	public:
+		AcceptGuildInvitePacket(int32_t guild_id, int32_t char_id) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		{
+			write_byte(GuildOperationPacket::Operation::ACCEPT);
+			write_int(guild_id);
+			write_int(char_id);
+		}
+	};
+
+	// Deny guild invite
+	class DenyGuildInvitePacket : public OutPacket
+	{
+	public:
+		DenyGuildInvitePacket(const std::string& inviter) : OutPacket(OutPacket::Opcode::DENY_GUILD_REQUEST)
+		{
+			write_byte(0);
+			write_string(inviter);
+		}
+	};
+
 	// Leave guild
 	class GuildLeavePacket : public GuildOperationPacket
 	{

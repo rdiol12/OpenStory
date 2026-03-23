@@ -22,6 +22,8 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
+#include "../../Character/CharEffect.h"
+
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UIMonsterBook.h"
@@ -197,17 +199,24 @@ namespace ms
 
 	void UpdateSkillHandler::handle(InPacket& recv) const
 	{
-		recv.skip(3);
+		recv.read_byte(); // enableActions
+		int16_t count = recv.read_short();
 
-		int32_t skillid = recv.read_int();
-		int32_t level = recv.read_int();
-		int32_t masterlevel = recv.read_int();
-		int64_t expire = recv.read_long();
+		for (int16_t i = 0; i < count; i++)
+		{
+			int32_t skillid = recv.read_int();
+			int32_t level = recv.read_int();
+			int32_t masterlevel = recv.read_int();
+			int64_t expire = recv.read_long();
 
-		Stage::get().get_player().change_skill(skillid, level, masterlevel, expire);
+			Stage::get().get_player().change_skill(skillid, level, masterlevel, expire);
 
-		if (auto skillbook = UI::get().get_element<UISkillBook>())
-			skillbook->update_skills(skillid);
+			if (auto skillbook = UI::get().get_element<UISkillBook>())
+				skillbook->update_skills(skillid);
+		}
+
+		if (recv.available())
+			recv.read_byte(); // trailing byte (Cosmic sends writeByte(4))
 
 		UI::get().enable();
 	}
@@ -254,15 +263,17 @@ namespace ms
 
 	void MonsterBookCardHandler::handle(InPacket& recv) const
 	{
-		int8_t full = recv.read_byte(); // 0 = card maxed (level 5), 1 = not full
-		int32_t cardid = recv.read_int();
-		int32_t level = recv.read_int();
+		int8_t full = recv.read_byte();      // 0 = book full, 1 = not full
+		int32_t cardid = recv.read_int();    // monsterBookId from mob data
+		int32_t level = recv.read_int();     // card level (1-5)
 
-		// Card IDs in the book are stored as cardid % 10000
 		int16_t card_short = static_cast<int16_t>(cardid % 10000);
 		int8_t card_level = static_cast<int8_t>(level);
 
 		Stage::get().get_player().get_monsterbook().add_card(card_short, card_level);
+
+		// Play card acquisition effect
+		Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
 
 		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
 			monsterbook->update_card(card_short, card_level);

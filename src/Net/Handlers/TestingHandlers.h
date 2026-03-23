@@ -88,6 +88,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// GM notices, event announcements
+	// Opcode: BROADCAST_MSG(212)
+	class BroadcastMsgHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class CatchMonsterHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
