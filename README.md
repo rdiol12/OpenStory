@@ -40,7 +40,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Recent Fixes
-- **Cygnus Knight skills**: Fixed 8-digit skill ID lookup for effects, buffs, passive stats, and afterimages
+- **skills buff and animation now showing 
 - **Skill sounds**: Fixed duplicate sample bug preventing skill sounds from playing
 - **Quest system**: Completed quests now properly removed from active list; NPC quest bubbles refresh on state changes
 - **Quest packets**: Full v83 quest handler coverage -- QUEST_CLEAR effect/sound, UPDATE_QUEST_INFO error sub-types (0x0A-0x0F), scripted quest action packets
