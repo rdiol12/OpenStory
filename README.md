@@ -47,7 +47,6 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **EXP gain**: Fixed "not handled" message appearing for in-chat EXP notifications
 - **SHOW_ITEM_GAIN_INCHAT**: Proper v83 mode switch for all 24 effect types
 - **Notice button**: Changed from broken button to static sprite matching v83 client
-- **Character select**: Updated info panel coordinates to match JourneyClient layout
 
 ## License
 
