@@ -191,7 +191,7 @@ namespace ms
 		// === Additional main bar buttons ===
 		buttons[BT_CHANNEL]    = std::make_unique<MapleButton>(mainbar["BtChannel"], Point<int16_t>(53, 0));
 		buttons[BT_KEYSETTING] = std::make_unique<MapleButton>(mainbar["BtKeysetting"], Point<int16_t>(53, 0));
-		buttons[BT_NOTICE]     = std::make_unique<MapleButton>(mainbar["BtNotice"]);
+		sprites.emplace_back(mainbar["notice"]);
 		buttons[BT_FARM]       = std::make_unique<MapleButton>(mainbar["BtFarm"]);
 		buttons[BT_EXITDUNGEON] = std::make_unique<MapleButton>(mainbar["BtExitDungeon"]);
 		buttons[BF_BT_CASHSHOP] = std::make_unique<MapleButton>(mainbar["BfBtCashShop"]);
@@ -688,10 +688,6 @@ namespace ms
 		case BT_SYS_CHANNEL:
 			UI::get().emplace<UIChannel>();
 			remove_menus();
-			return Button::State::NORMAL;
-
-		case BT_NOTICE:
-			ReportPacket(0, "", 0, "").dispatch();
 			return Button::State::NORMAL;
 
 		case BT_SYS_GAMEQUIT:

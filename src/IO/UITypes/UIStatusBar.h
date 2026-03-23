@@ -76,7 +76,6 @@ namespace ms
 			BT_SKILL,
 			BT_CHANNEL,
 			BT_KEYSETTING,
-			BT_NOTICE,
 			BT_FARM,
 			BT_EXITDUNGEON,
 			BF_BT_CASHSHOP,
