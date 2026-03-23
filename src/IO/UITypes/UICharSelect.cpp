@@ -57,11 +57,11 @@ namespace ms
 
 		pagepos = Point<int16_t>(247, 462);
 		worldpos = Point<int16_t>(586, 46);
-		charinfopos = Point<int16_t>(671, 339);
+		charinfopos = Point<int16_t>(662, 305);
 
-		Point<int16_t> character_sel_pos = Point<int16_t>(601, 420);
+		Point<int16_t> character_sel_pos = charinfopos + Point<int16_t>(-76, 72);
 		Point<int16_t> character_new_pos = Point<int16_t>(200, 495);
-		Point<int16_t> character_del_pos = Point<int16_t>(316, 495);
+		Point<int16_t> character_del_pos = Point<int16_t>(320, 495);
 
 		selected_character = Setting<DefaultCharacter>::get().load();
 		selected_page = selected_character / PAGESIZE;
@@ -142,21 +142,38 @@ namespace ms
 		buttons[Buttons::CHARACTER_SELECT] = std::make_unique<MapleButton>(CharSelect["BtSelect"], character_sel_pos);
 		buttons[Buttons::CHARACTER_NEW] = std::make_unique<MapleButton>(CharSelect["BtNew"], character_new_pos);
 		buttons[Buttons::CHARACTER_DELETE] = std::make_unique<MapleButton>(CharSelect["BtDelete"], character_del_pos);
-		buttons[Buttons::PAGELEFT] = std::make_unique<MapleButton>(CharSelect["pageL"], Point<int16_t>(98, 491));
-		buttons[Buttons::PAGERIGHT] = std::make_unique<MapleButton>(CharSelect["pageR"], Point<int16_t>(485, 491));
-		buttons[Buttons::CHANGEPIC] = std::make_unique<MapleButton>(Common["BtChangePIC"], Point<int16_t>(0, 80));
-		buttons[Buttons::RESETPIC] = std::make_unique<MapleButton>(Login["WorldSelect"]["BtResetPIC"], Point<int16_t>(0, 115));
-		buttons[Buttons::EDITCHARLIST] = std::make_unique<MapleButton>(CharSelect["EditCharList"]["BtCharacter"], Point<int16_t>(-1, 47));
-		buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(-20, 565));
+		buttons[Buttons::PAGELEFT] = std::make_unique<MapleButton>(CharSelect["pageL"], Point<int16_t>(100, 490));
+		buttons[Buttons::PAGERIGHT] = std::make_unique<MapleButton>(CharSelect["pageR"], Point<int16_t>(490, 490));
 
-		for (size_t i = 0; i < PAGESIZE; i++)
-			buttons[Buttons::CHARACTER_SLOT0 + i] = std::make_unique<AreaButton>(get_character_slot_pos(i, 305, 144), Point<int16_t>(50, 90));
-
-		if (require_pic == 0)
+		if (Common["BtChangePIC"])
 		{
+			buttons[Buttons::CHANGEPIC] = std::make_unique<MapleButton>(Common["BtChangePIC"], Point<int16_t>(0, 80));
 			buttons[Buttons::CHANGEPIC]->set_active(false);
+		}
+
+		if (Login["WorldSelect"]["BtResetPIC"])
+		{
+			buttons[Buttons::RESETPIC] = std::make_unique<MapleButton>(Login["WorldSelect"]["BtResetPIC"], Point<int16_t>(0, 115));
 			buttons[Buttons::RESETPIC]->set_active(false);
 		}
+
+		if (CharSelect["EditCharList"]["BtCharacter"])
+		{
+			buttons[Buttons::EDITCHARLIST] = std::make_unique<MapleButton>(CharSelect["EditCharList"]["BtCharacter"], Point<int16_t>(-1, 47));
+			buttons[Buttons::EDITCHARLIST]->set_active(false);
+		}
+
+		if (Common["BtStart"])
+		{
+			buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(-20, 565));
+			buttons[Buttons::BACK]->set_active(false);
+		}
+
+		for (size_t i = 0; i < PAGESIZE; i++)
+			buttons[Buttons::CHARACTER_SLOT0 + i] = std::make_unique<AreaButton>(
+				Point<int16_t>(105 + (120 * (i % 4)), 170 + (200 * (i > 3))),
+				Point<int16_t>(50, 80)
+			);
 
 		levelset = Charset(CharSelect["lv"], Charset::Alignment::CENTER);
 		namelabel = OutlinedText(Text::Font::A14B, Text::Alignment::CENTER, Color::Name::WHITE, Color::Name::IRISHCOFFEE);
@@ -237,20 +254,19 @@ namespace ms
 				{
 					selectedslot_effect[1].draw(charpos + Point<int16_t>(-5, 16), inter);
 
-					int8_t lvy = -115;
-					Point<int16_t> pos_adj = drawpos + Point<int16_t>(662, 365);
+					Point<int16_t> infopos = drawpos + charinfopos;
 
-					charinfo.draw(drawpos + charinfopos);
+					charinfo.draw(infopos);
 
 					std::string levelstr = std::to_string(character_stats.stats[MapleStat::Id::LEVEL]);
-					int16_t lvx = levelset.draw(levelstr, pos_adj + Point<int16_t>(12, lvy));
-					levelset.draw('l', pos_adj + Point<int16_t>(1 - lvx / 2, lvy));
+					int16_t lvx = levelset.draw(levelstr, infopos + Point<int16_t>(23, -93));
+					levelset.draw('l', infopos + Point<int16_t>(-7 - lvx / 2, -93));
 
-					namelabel.draw(pos_adj + Point<int16_t>(10, -103));
+					namelabel.draw(infopos + Point<int16_t>(0, -85));
 
 					for (size_t i = 0; i < InfoLabel::NUM_LABELS; i++)
 					{
-						Point<int16_t> labelpos = pos_adj + get_infolabel_pos(i);
+						Point<int16_t> labelpos = infopos + get_infolabel_pos(i);
 						infolabels[i].draw(labelpos);
 					}
 				}
@@ -925,15 +941,15 @@ namespace ms
 		switch (index)
 		{
 			case InfoLabel::JOB:
-				return Point<int16_t>(73, -71);
+				return Point<int16_t>(72, -48);
 			case InfoLabel::STR:
-				return Point<int16_t>(1, -47);
+				return Point<int16_t>(-5, 26);
 			case InfoLabel::DEX:
-				return Point<int16_t>(1, -24);
+				return Point<int16_t>(-5, 48);
 			case InfoLabel::INT:
-				return Point<int16_t>(72, -47);
+				return Point<int16_t>(72, 26);
 			case InfoLabel::LUK:
-				return Point<int16_t>(72, -24);
+				return Point<int16_t>(72, 48);
 			case InfoLabel::NUM_LABELS:
 				break;
 			default:

@@ -38,7 +38,8 @@ namespace ms
 		else
 			strid = std::to_string(skillid);
 
-		nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
+		std::string jobid = std::to_string(skillid / 10000);
+		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
 
 		projectile = true;
 		overregular = false;
