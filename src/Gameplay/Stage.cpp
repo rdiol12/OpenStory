@@ -144,6 +144,7 @@ namespace ms
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
 		environments.draw(viewx, viewy, alpha);
 		effect.draw();
+		weather.draw(alpha);
 	}
 
 	void Stage::update()
@@ -155,6 +156,7 @@ namespace ms
 		backgrounds.update();
 		environments.update();
 		effect.update();
+		weather.update();
 		tilesobjs.update();
 
 		reactors.update(physics);
@@ -384,6 +386,18 @@ namespace ms
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
+	}
+
+	void Stage::set_weather(const std::string& path, const std::string& message)
+	{
+		nl::node src = nl::nx::map.resolve(path);
+
+		weather.set(src, path, message);
+	}
+
+	void Stage::clear_weather()
+	{
+		weather.clear();
 	}
 
 	void Stage::toggle_environment(const std::string& name, int32_t mode)

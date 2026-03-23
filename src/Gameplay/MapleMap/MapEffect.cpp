@@ -27,9 +27,16 @@ namespace ms
 {
 	MapEffect::MapEffect(std::string path) : active(false)
 	{
-		nl::node Effect = nl::nx::map["Effect.img"];
+		nl::node resolved;
 
-		effect = Effect.resolve(path);
+		// Weather/effect paths like "Map/MapHelper.img/weather/snow" start with "Map/"
+		// Strip the "Map/" prefix and resolve from the map NX root
+		if (path.substr(0, 4) == "Map/")
+			resolved = nl::nx::map.resolve(path.substr(4));
+		else
+			resolved = nl::nx::map["Effect.img"].resolve(path);
+
+		effect = resolved;
 
 		int16_t width = Constants::Constants::get().get_viewwidth();
 

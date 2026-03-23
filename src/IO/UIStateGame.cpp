@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateGame.h"
 
+
 #include "UI.h"
 #include "../Constants.h"
 
@@ -152,9 +153,13 @@ namespace ms
 	bool UIStateGame::drop_icon(const Icon& icon, Point<int16_t> pos)
 	{
 		if (UIElement* front = get_front(pos))
+		{
 			return front->send_icon(icon, pos);
+		}
 		else
+		{
 			icon.drop_on_stage();
+		}
 
 		return true;
 	}
@@ -416,6 +421,11 @@ namespace ms
 							case KeyAction::Id::GUILD:
 							{
 								emplace<UIGuild>();
+								break;
+							}
+							case KeyAction::Id::FAMILY:
+							{
+								emplace<UIFamily>();
 								break;
 							}
 							case KeyAction::Id::MONSTERBOOK:

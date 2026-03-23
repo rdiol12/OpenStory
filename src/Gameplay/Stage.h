@@ -24,6 +24,7 @@
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapMists.h"
 #include "MapleMap/MapEffect.h"
+#include "MapleMap/MapWeather.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapPortals.h"
 #include "MapleMap/MapDragons.h"
@@ -98,6 +99,10 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// Weather
+		void set_weather(const std::string& path, const std::string& message);
+		void clear_weather();
+
 		// Toggle a map environment object (gates, platforms in PQs)
 		void toggle_environment(const std::string& name, int32_t mode);
 
@@ -166,6 +171,7 @@ namespace ms
 		MapDoors doors;
 		MapMists mists;
 		MapEffect effect;
+		MapWeather weather;
 
 		Combat combat;
 

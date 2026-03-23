@@ -30,7 +30,7 @@ namespace ms
 {
 	UIOptionMenu::UIOptionMenu() : UIDragElement<PosOPTIONMENU>(Point<int16_t>(200, 20)), selected_tab(0), nx_missing(false)
 	{
-		nl::node OptionMenu = nl::nx::ui["StatusBar2.img"]["OptionMenu"];
+		nl::node OptionMenu = nl::nx::ui["UIWindow2.img"]["OptionMenu"];
 		nl::node backgrnd = OptionMenu["backgrnd"];
 
 		nx_missing = !OptionMenu;

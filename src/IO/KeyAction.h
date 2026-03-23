@@ -69,6 +69,7 @@ namespace ms
 			MONSTERCOLLECTION = 39,
 			SOULWEAPON = 40,
 			MAPLENEWS = 41,
+			FAMILY = 42,
 			// Game actions (type 5)
 			PICKUP = 50,
 			SIT = 51,

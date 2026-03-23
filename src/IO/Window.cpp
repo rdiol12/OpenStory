@@ -18,6 +18,7 @@
 #include "Window.h"
 
 #include "UI.h"
+#include "Gamepad.h"
 
 #include "../Configuration.h"
 #include "../Constants.h"
@@ -289,6 +290,8 @@ namespace ms
 		}
 
 		glfwPollEvents();
+
+		Gamepad::get().poll();
 	}
 
 	void Window::begin() const

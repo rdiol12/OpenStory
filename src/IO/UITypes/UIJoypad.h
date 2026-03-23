@@ -35,7 +35,9 @@ namespace ms
 		UIJoypad();
 
 		void draw(float inter) const override;
+		void update() override;
 
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -46,6 +48,9 @@ namespace ms
 	private:
 		void cancel();
 		void save();
+		void load_from_gamepad();
+		void refresh_texts();
+		int16_t row_by_position(int16_t y) const;
 
 		enum Buttons : uint16_t
 		{
@@ -53,9 +58,6 @@ namespace ms
 			CANCEL,
 			OK
 		};
-
-		bool alternative_settings;
-		BoolPair<Texture> backgrnd;
 
 		enum Setting : uint8_t
 		{
@@ -79,6 +81,15 @@ namespace ms
 			SETTING_NUM
 		};
 
+		bool alternative_settings;
+		BoolPair<Texture> backgrnd;
+
 		Text key_text[UIJoypad::Setting::SETTING_NUM];
+
+		int8_t selected_row;
+		bool waiting_for_input;
+
+		// Gamepad button assigned to each setting slot (excluding NAME)
+		int32_t assigned_button[SETTING_NUM];
 	};
 }

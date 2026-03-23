@@ -44,25 +44,30 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void cancel();
+		int8_t channel_by_pos(Point<int16_t> cursorpos) const;
 		void change_channel();
-		void update_selected_channel_position();
 
 		enum Buttons : uint16_t
 		{
-			CANCEL,
-			CHANGE,
-			CH
+			BT_CANCEL,
+			BT_CHANGE
 		};
+
+		static constexpr int16_t WIDTH = 370;
+		static constexpr int16_t HEIGHT = 168;
+		static constexpr uint8_t COLS = 5;
+		static constexpr uint8_t ROWS = 4;
+		static constexpr int16_t STRIDE_HORIZ = 70;
+		static constexpr int16_t STRIDE_VERT = 20;
+		static constexpr int16_t DRAG_HEIGHT = 20;
 
 		uint8_t current_channel;
 		uint8_t selected_channel;
 		uint8_t channel_count;
-		BoolPair<Texture> channel;
-		std::vector<Sprite> ch;
-		int16_t current_channel_x;
-		int16_t current_channel_y;
-		int16_t selected_channel_x;
-		int16_t selected_channel_y;
+		BoolPair<Texture> channel_cover;
+		std::vector<Sprite> ch_sprites;
+
+		static constexpr Point<int16_t> CH_SPRITE_OFFSET = Point<int16_t>(21, 61);
+		static constexpr Point<int16_t> COVER_OFFSET = Point<int16_t>(12, 56);
 	};
 }

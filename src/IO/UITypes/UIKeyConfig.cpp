@@ -40,39 +40,30 @@ namespace ms
 		keyboard = &UI::get().get_keyboard();
 		staged_mappings = keyboard->get_maplekeys();
 
-		nl::node KeyConfig = nl::nx::ui["UIWindow.img"]["KeyConfig"];
+		nl::node KeyConfig = nl::nx::ui["UIWindow2.img"]["KeyConfig"];
 
 		icon = KeyConfig["icon"];
-		key = KeyConfig["key"];
 
-		Texture bg1 = Texture(KeyConfig["backgrnd"]);
-		Texture bg2 = Texture(KeyConfig["backgrnd2"]);
-		Texture bg3 = Texture(KeyConfig["backgrnd3"]);
-		Point<int16_t> bg_dimensions = bg1.get_dimensions();
+		sprites.emplace_back(KeyConfig["backgrnd"]);
+		sprites.emplace_back(KeyConfig["backgrnd2"]);
+		sprites.emplace_back(KeyConfig["backgrnd3"]);
 
-		sprites.emplace_back(KeyConfig["backgrnd"], DrawArgument(bg1.get_origin()));
-		sprites.emplace_back(KeyConfig["backgrnd2"], DrawArgument(bg2.get_origin()));
-		sprites.emplace_back(KeyConfig["backgrnd3"], DrawArgument(bg3.get_origin()));
-
-		nl::node BtClose = nl::nx::ui["Basic.img"]["BtClose"];
-		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(BtClose, Point<int16_t>(bg_dimensions.x() - 12, 9));
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(KeyConfig["BtCancel"]);
 		buttons[Buttons::DEFAULT] = std::make_unique<MapleButton>(KeyConfig["BtDefault"]);
 		buttons[Buttons::DELETE] = std::make_unique<MapleButton>(KeyConfig["BtDelete"]);
 		buttons[Buttons::KEYSETTING] = std::make_unique<MapleButton>(KeyConfig["BtQuickSlot"]);
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(KeyConfig["BtOK"]);
 
-		dimension = bg_dimensions;
-		dragarea = Point<int16_t>(bg_dimensions.x(), 20);
+		dimension = Point<int16_t>(622, 374);
+		dragarea = Point<int16_t>(622, 20);
 
 		// Center on screen
 		int16_t screen_w = Constants::Constants::get().get_viewwidth();
 		int16_t screen_h = Constants::Constants::get().get_viewheight();
-		position = Point<int16_t>((screen_w - bg_dimensions.x()) / 2, (screen_h - bg_dimensions.y()) / 2);
+		position = Point<int16_t>((screen_w - 622) / 2, (screen_h - 374) / 2);
 
 		load_keys_pos();
 		load_unbound_actions_pos();
-		load_key_textures();
 		load_action_mappings();
 		load_action_icons();
 		load_item_icons();
@@ -84,125 +75,106 @@ namespace ms
 	/// Load
 	void UIKeyConfig::load_keys_pos()
 	{
-		int16_t slot_width = 33;
-		int16_t slot_width_lg = 98;
-		int16_t slot_height = 33;
+		// Positions from LibreMaple — hardcoded per-key to match the background image exactly
 
-		int16_t row_y = 126;
-		int16_t row_special_y = row_y - slot_height - 5;
+		// F-key row (y=28)
+		keys_pos[KeyConfig::Key::ESCAPE] = Point<int16_t>(11, 28);
+		keys_pos[KeyConfig::Key::F1] = Point<int16_t>(79, 28);
+		keys_pos[KeyConfig::Key::F2] = Point<int16_t>(113, 28);
+		keys_pos[KeyConfig::Key::F3] = Point<int16_t>(147, 28);
+		keys_pos[KeyConfig::Key::F4] = Point<int16_t>(181, 28);
+		keys_pos[KeyConfig::Key::F5] = Point<int16_t>(223, 28);
+		keys_pos[KeyConfig::Key::F6] = Point<int16_t>(257, 28);
+		keys_pos[KeyConfig::Key::F7] = Point<int16_t>(291, 28);
+		keys_pos[KeyConfig::Key::F8] = Point<int16_t>(325, 28);
+		keys_pos[KeyConfig::Key::F9] = Point<int16_t>(367, 28);
+		keys_pos[KeyConfig::Key::F10] = Point<int16_t>(401, 28);
+		keys_pos[KeyConfig::Key::F11] = Point<int16_t>(435, 28);
+		keys_pos[KeyConfig::Key::F12] = Point<int16_t>(469, 28);
 
-		int16_t row_quickslot_x = 535;
+		// Number row (y=65)
+		keys_pos[KeyConfig::Key::GRAVE_ACCENT] = Point<int16_t>(11, 65);
+		keys_pos[KeyConfig::Key::NUM1] = Point<int16_t>(45, 65);
+		keys_pos[KeyConfig::Key::NUM2] = Point<int16_t>(79, 65);
+		keys_pos[KeyConfig::Key::NUM3] = Point<int16_t>(113, 65);
+		keys_pos[KeyConfig::Key::NUM4] = Point<int16_t>(147, 65);
+		keys_pos[KeyConfig::Key::NUM5] = Point<int16_t>(181, 65);
+		keys_pos[KeyConfig::Key::NUM6] = Point<int16_t>(215, 65);
+		keys_pos[KeyConfig::Key::NUM7] = Point<int16_t>(249, 65);
+		keys_pos[KeyConfig::Key::NUM8] = Point<int16_t>(283, 65);
+		keys_pos[KeyConfig::Key::NUM9] = Point<int16_t>(317, 65);
+		keys_pos[KeyConfig::Key::NUM0] = Point<int16_t>(351, 65);
+		keys_pos[KeyConfig::Key::MINUS] = Point<int16_t>(385, 65);
+		keys_pos[KeyConfig::Key::EQUAL] = Point<int16_t>(419, 65);
 
-		int16_t row_one_x = 31;
-		int16_t row_two_x = 80;
-		int16_t row_three_x = 96;
-		int16_t row_four_x = 55;
-		int16_t row_five_x = 39;
+		// QWERTY row (y=99)
+		keys_pos[KeyConfig::Key::Q] = Point<int16_t>(61, 99);
+		keys_pos[KeyConfig::Key::W] = Point<int16_t>(95, 99);
+		keys_pos[KeyConfig::Key::E] = Point<int16_t>(129, 99);
+		keys_pos[KeyConfig::Key::R] = Point<int16_t>(163, 99);
+		keys_pos[KeyConfig::Key::T] = Point<int16_t>(197, 99);
+		keys_pos[KeyConfig::Key::Y] = Point<int16_t>(231, 99);
+		keys_pos[KeyConfig::Key::U] = Point<int16_t>(265, 99);
+		keys_pos[KeyConfig::Key::I] = Point<int16_t>(299, 99);
+		keys_pos[KeyConfig::Key::O] = Point<int16_t>(333, 99);
+		keys_pos[KeyConfig::Key::P] = Point<int16_t>(367, 99);
+		keys_pos[KeyConfig::Key::LEFT_BRACKET] = Point<int16_t>(401, 99);
+		keys_pos[KeyConfig::Key::RIGHT_BRACKET] = Point<int16_t>(435, 99);
+		keys_pos[KeyConfig::Key::BACKSLASH] = Point<int16_t>(469, 99);
 
-		int16_t row_special_x = row_one_x;
+		// ASDF row (y=132)
+		keys_pos[KeyConfig::Key::A] = Point<int16_t>(78, 132);
+		keys_pos[KeyConfig::Key::S] = Point<int16_t>(112, 132);
+		keys_pos[KeyConfig::Key::D] = Point<int16_t>(146, 132);
+		keys_pos[KeyConfig::Key::F] = Point<int16_t>(180, 132);
+		keys_pos[KeyConfig::Key::G] = Point<int16_t>(214, 132);
+		keys_pos[KeyConfig::Key::H] = Point<int16_t>(248, 132);
+		keys_pos[KeyConfig::Key::J] = Point<int16_t>(282, 132);
+		keys_pos[KeyConfig::Key::K] = Point<int16_t>(316, 132);
+		keys_pos[KeyConfig::Key::L] = Point<int16_t>(350, 132);
+		keys_pos[KeyConfig::Key::SEMICOLON] = Point<int16_t>(384, 132);
+		keys_pos[KeyConfig::Key::APOSTROPHE] = Point<int16_t>(418, 132);
 
-		keys_pos[KeyConfig::Key::ESCAPE] = Point<int16_t>(row_one_x, row_special_y);
+		// ZXCV row (y=165)
+		keys_pos[KeyConfig::Key::LEFT_SHIFT] = Point<int16_t>(36, 165);
+		keys_pos[KeyConfig::Key::Z] = Point<int16_t>(95, 165);
+		keys_pos[KeyConfig::Key::X] = Point<int16_t>(129, 165);
+		keys_pos[KeyConfig::Key::C] = Point<int16_t>(163, 165);
+		keys_pos[KeyConfig::Key::V] = Point<int16_t>(197, 165);
+		keys_pos[KeyConfig::Key::B] = Point<int16_t>(231, 165);
+		keys_pos[KeyConfig::Key::N] = Point<int16_t>(265, 165);
+		keys_pos[KeyConfig::Key::M] = Point<int16_t>(299, 165);
+		keys_pos[KeyConfig::Key::COMMA] = Point<int16_t>(333, 165);
+		keys_pos[KeyConfig::Key::PERIOD] = Point<int16_t>(367, 165);
+		keys_pos[KeyConfig::Key::RIGHT_SHIFT] = Point<int16_t>(407, 165);
 
-		row_special_x += slot_width * 2;
+		// Bottom row (y=198)
+		keys_pos[KeyConfig::Key::LEFT_CONTROL] = Point<int16_t>(19, 198);
+		keys_pos[KeyConfig::Key::LEFT_ALT] = Point<int16_t>(120, 198);
+		keys_pos[KeyConfig::Key::SPACE] = Point<int16_t>(231, 198);
+		keys_pos[KeyConfig::Key::RIGHT_ALT] = Point<int16_t>(362, 198);
+		keys_pos[KeyConfig::Key::RIGHT_CONTROL] = Point<int16_t>(453, 198);
 
-		for (size_t i = KeyConfig::Key::F1; i <= KeyConfig::Key::F12; i++)
-		{
-			KeyConfig::Key id = KeyConfig::actionbyid(i);
+		// Quickslot keys
+		keys_pos[KeyConfig::Key::INSERT] = Point<int16_t>(511, 65);
+		keys_pos[KeyConfig::Key::HOME] = Point<int16_t>(545, 65);
+		keys_pos[KeyConfig::Key::PAGE_UP] = Point<int16_t>(579, 65);
+		keys_pos[KeyConfig::Key::DELETE] = Point<int16_t>(511, 99);
+		keys_pos[KeyConfig::Key::END] = Point<int16_t>(545, 99);
+		keys_pos[KeyConfig::Key::PAGE_DOWN] = Point<int16_t>(579, 99);
 
-			keys_pos[id] = Point<int16_t>(row_special_x, row_special_y);
-
-			row_special_x += slot_width;
-
-			if (id == KeyConfig::Key::F4 || id == KeyConfig::Key::F8)
-				row_special_x += 17;
-		}
-
-		keys_pos[KeyConfig::Key::SCROLL_LOCK] = Point<int16_t>(row_quickslot_x + (slot_width * 1), row_special_y);
-
-		keys_pos[KeyConfig::Key::GRAVE_ACCENT] = Point<int16_t>(row_one_x + (slot_width * 0), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM1] = Point<int16_t>(row_one_x + (slot_width * 1), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM2] = Point<int16_t>(row_one_x + (slot_width * 2), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM3] = Point<int16_t>(row_one_x + (slot_width * 3), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM4] = Point<int16_t>(row_one_x + (slot_width * 4), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM5] = Point<int16_t>(row_one_x + (slot_width * 5), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM6] = Point<int16_t>(row_one_x + (slot_width * 6), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM7] = Point<int16_t>(row_one_x + (slot_width * 7), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM8] = Point<int16_t>(row_one_x + (slot_width * 8), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM9] = Point<int16_t>(row_one_x + (slot_width * 9), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::NUM0] = Point<int16_t>(row_one_x + (slot_width * 10), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::MINUS] = Point<int16_t>(row_one_x + (slot_width * 11), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::EQUAL] = Point<int16_t>(row_one_x + (slot_width * 12), row_y + (slot_height * 0));
-
-		for (size_t i = KeyConfig::Key::Q; i <= KeyConfig::Key::RIGHT_BRACKET; i++)
-		{
-			KeyConfig::Key id = KeyConfig::actionbyid(i);
-
-			keys_pos[id] = Point<int16_t>(row_two_x + (slot_width * (i - KeyConfig::Key::Q)), row_y + (slot_height * 1));
-		}
-
-		row_two_x += 9;
-
-		keys_pos[KeyConfig::Key::BACKSLASH] = Point<int16_t>(row_two_x + (slot_width * 12), row_y + (slot_height * 1));
-
-		for (size_t i = KeyConfig::Key::A; i <= KeyConfig::Key::APOSTROPHE; i++)
-		{
-			KeyConfig::Key id = KeyConfig::actionbyid(i);
-
-			keys_pos[id] = Point<int16_t>(row_three_x + (slot_width * (i - KeyConfig::Key::A)), row_y + (slot_height * 2));
-		}
-
-		keys_pos[KeyConfig::Key::LEFT_SHIFT] = Point<int16_t>(row_four_x + (slot_width * 0), row_y + (slot_height * 3));
-
-		row_four_x += 24;
-
-		for (size_t i = KeyConfig::Key::Z; i <= KeyConfig::Key::PERIOD; i++)
-		{
-			KeyConfig::Key id = KeyConfig::actionbyid(i);
-
-			keys_pos[id] = Point<int16_t>(row_four_x + (slot_width * (i - KeyConfig::Key::Z + 1)), row_y + (slot_height * 3));
-		}
-
-		row_four_x += 24;
-
-		keys_pos[KeyConfig::Key::RIGHT_SHIFT] = Point<int16_t>(row_four_x + (slot_width * 11), row_y + (slot_height * 3));
-
-		keys_pos[KeyConfig::Key::LEFT_CONTROL] = Point<int16_t>(row_five_x + (slot_width_lg * 0), row_y + (slot_height * 4));
-		keys_pos[KeyConfig::Key::LEFT_ALT] = Point<int16_t>(row_five_x + (slot_width_lg * 1), row_y + (slot_height * 4));
-
-		row_five_x += 24;
-
-		keys_pos[KeyConfig::Key::SPACE] = Point<int16_t>(row_five_x + (slot_width_lg * 2), row_y + (slot_height * 4));
-
-		row_five_x += 27;
-
-		keys_pos[KeyConfig::Key::RIGHT_ALT] = Point<int16_t>(row_five_x + (slot_width_lg * 3), row_y + (slot_height * 4));
-
-		row_five_x += 2;
-
-		keys_pos[KeyConfig::Key::RIGHT_CONTROL] = Point<int16_t>(row_five_x + (slot_width_lg * 4), row_y + (slot_height * 4));
-
-		keys_pos[KeyConfig::Key::INSERT] = Point<int16_t>(row_quickslot_x + (slot_width * 0), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::HOME] = Point<int16_t>(row_quickslot_x + (slot_width * 1), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::PAGE_UP] = Point<int16_t>(row_quickslot_x + (slot_width * 2), row_y + (slot_height * 0));
-		keys_pos[KeyConfig::Key::DELETE] = Point<int16_t>(row_quickslot_x + (slot_width * 0), row_y + (slot_height * 1));
-		keys_pos[KeyConfig::Key::END] = Point<int16_t>(row_quickslot_x + (slot_width * 1), row_y + (slot_height * 1));
-		keys_pos[KeyConfig::Key::PAGE_DOWN] = Point<int16_t>(row_quickslot_x + (slot_width * 2), row_y + (slot_height * 1));
-
-		// Apply offset to align key positions with the NX background
-		Point<int16_t> key_offset = Point<int16_t>(-15, -60);
-
-		for (auto [key, pos_ref] : keys_pos)
-			pos_ref += key_offset;
+		keys_pos[KeyConfig::Key::SCROLL_LOCK] = Point<int16_t>(511, 28);
 	}
 
 	void UIKeyConfig::load_unbound_actions_pos()
 	{
-		int16_t row_x = 26;
-		int16_t row_y = 307;
+		int16_t row_x = 5;
+		int16_t row_y = 267;
 
-		int16_t slot_width = 36;
-		int16_t slot_height = 36;
+		int16_t slot_width = 34;
+		int16_t slot_height = 34;
 
+		// Row 0
 		unbound_actions_pos[KeyAction::Id::MAPLECHAT] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::TOGGLECHAT] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::WHISPER] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 0));
@@ -221,6 +193,7 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::INTERACT_HARVEST] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 0));
 
+		// Row 1
 		unbound_actions_pos[KeyAction::Id::SAY] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::PARTYCHAT] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::FRIENDSCHAT] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 1));
@@ -239,15 +212,22 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::MINIMAP] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 1));
 		unbound_actions_pos[KeyAction::Id::KEYBINDINGS] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 1));
 
+		// Row 2
 		unbound_actions_pos[KeyAction::Id::GUILDCHAT] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 2));
 		unbound_actions_pos[KeyAction::Id::ALLIANCECHAT] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 2));
 		unbound_actions_pos[KeyAction::Id::CASHSHOP] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 2));
 		unbound_actions_pos[KeyAction::Id::MAINMENU] = Point<int16_t>(row_x + (slot_width * 3), row_y + (slot_height * 2));
 		unbound_actions_pos[KeyAction::Id::SCREENSHOT] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MEDALS] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::BOSSPARTY] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 2));
-		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::FAMILY] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::SILENTCRUSADE] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MANAGELEGION] = Point<int16_t>(row_x + (slot_width * 7), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::BATTLEANALYSIS] = Point<int16_t>(row_x + (slot_width * 8), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::GUIDE] = Point<int16_t>(row_x + (slot_width * 9), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::ENHANCEEQUIP] = Point<int16_t>(row_x + (slot_width * 10), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MONSTERCOLLECTION] = Point<int16_t>(row_x + (slot_width * 11), row_y + (slot_height * 2));
+		unbound_actions_pos[KeyAction::Id::MAPLENEWS] = Point<int16_t>(row_x + (slot_width * 12), row_y + (slot_height * 2));
 
+		// Row 3: Faces
 		unbound_actions_pos[KeyAction::Id::FACE1] = Point<int16_t>(row_x + (slot_width * 0), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE2] = Point<int16_t>(row_x + (slot_width * 1), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE3] = Point<int16_t>(row_x + (slot_width * 2), row_y + (slot_height * 3));
@@ -255,102 +235,6 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::FACE5] = Point<int16_t>(row_x + (slot_width * 4), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE6] = Point<int16_t>(row_x + (slot_width * 5), row_y + (slot_height * 3));
 		unbound_actions_pos[KeyAction::Id::FACE7] = Point<int16_t>(row_x + (slot_width * 6), row_y + (slot_height * 3));
-
-		// Apply same offset as keys to align with NX background
-		Point<int16_t> action_offset = Point<int16_t>(-15, -60);
-
-		for (auto [action, pos_ref] : unbound_actions_pos)
-			pos_ref += action_offset;
-	}
-
-	void UIKeyConfig::load_key_textures()
-	{
-		key_textures[KeyConfig::Key::ESCAPE] = key[1];
-		key_textures[KeyConfig::Key::NUM1] = key[2];
-		key_textures[KeyConfig::Key::NUM2] = key[3];
-		key_textures[KeyConfig::Key::NUM3] = key[4];
-		key_textures[KeyConfig::Key::NUM4] = key[5];
-		key_textures[KeyConfig::Key::NUM5] = key[6];
-		key_textures[KeyConfig::Key::NUM6] = key[7];
-		key_textures[KeyConfig::Key::NUM7] = key[8];
-		key_textures[KeyConfig::Key::NUM8] = key[9];
-		key_textures[KeyConfig::Key::NUM9] = key[10];
-		key_textures[KeyConfig::Key::NUM0] = key[11];
-		key_textures[KeyConfig::Key::MINUS] = key[12];
-		key_textures[KeyConfig::Key::EQUAL] = key[13];
-
-		key_textures[KeyConfig::Key::Q] = key[16];
-		key_textures[KeyConfig::Key::W] = key[17];
-		key_textures[KeyConfig::Key::E] = key[18];
-		key_textures[KeyConfig::Key::R] = key[19];
-		key_textures[KeyConfig::Key::T] = key[20];
-		key_textures[KeyConfig::Key::Y] = key[21];
-		key_textures[KeyConfig::Key::U] = key[22];
-		key_textures[KeyConfig::Key::I] = key[23];
-		key_textures[KeyConfig::Key::O] = key[24];
-		key_textures[KeyConfig::Key::P] = key[25];
-		key_textures[KeyConfig::Key::LEFT_BRACKET] = key[26];
-		key_textures[KeyConfig::Key::RIGHT_BRACKET] = key[27];
-
-		key_textures[KeyConfig::Key::LEFT_CONTROL] = key[29];
-		key_textures[KeyConfig::Key::RIGHT_CONTROL] = key[29];
-
-		key_textures[KeyConfig::Key::A] = key[30];
-		key_textures[KeyConfig::Key::S] = key[31];
-		key_textures[KeyConfig::Key::D] = key[32];
-		key_textures[KeyConfig::Key::F] = key[33];
-		key_textures[KeyConfig::Key::G] = key[34];
-		key_textures[KeyConfig::Key::H] = key[35];
-		key_textures[KeyConfig::Key::J] = key[36];
-		key_textures[KeyConfig::Key::K] = key[37];
-		key_textures[KeyConfig::Key::L] = key[38];
-		key_textures[KeyConfig::Key::SEMICOLON] = key[39];
-		key_textures[KeyConfig::Key::APOSTROPHE] = key[40];
-		key_textures[KeyConfig::Key::GRAVE_ACCENT] = key[41];
-
-		key_textures[KeyConfig::Key::LEFT_SHIFT] = key[42];
-		key_textures[KeyConfig::Key::RIGHT_SHIFT] = key[42];
-
-		key_textures[KeyConfig::Key::BACKSLASH] = key[43];
-		key_textures[KeyConfig::Key::Z] = key[44];
-		key_textures[KeyConfig::Key::X] = key[45];
-		key_textures[KeyConfig::Key::C] = key[46];
-		key_textures[KeyConfig::Key::V] = key[47];
-		key_textures[KeyConfig::Key::B] = key[48];
-		key_textures[KeyConfig::Key::N] = key[49];
-		key_textures[KeyConfig::Key::M] = key[50];
-		key_textures[KeyConfig::Key::COMMA] = key[51];
-		key_textures[KeyConfig::Key::PERIOD] = key[52];
-
-		key_textures[KeyConfig::Key::LEFT_ALT] = key[56];
-		key_textures[KeyConfig::Key::RIGHT_ALT] = key[56];
-
-		key_textures[KeyConfig::Key::SPACE] = key[57];
-
-		key_textures[KeyConfig::Key::F1] = key[59];
-		key_textures[KeyConfig::Key::F2] = key[60];
-		key_textures[KeyConfig::Key::F3] = key[61];
-		key_textures[KeyConfig::Key::F4] = key[62];
-		key_textures[KeyConfig::Key::F5] = key[63];
-		key_textures[KeyConfig::Key::F6] = key[64];
-		key_textures[KeyConfig::Key::F7] = key[65];
-		key_textures[KeyConfig::Key::F8] = key[66];
-		key_textures[KeyConfig::Key::F9] = key[67];
-		key_textures[KeyConfig::Key::F10] = key[68];
-
-		key_textures[KeyConfig::Key::SCROLL_LOCK] = key[70];
-		key_textures[KeyConfig::Key::HOME] = key[71];
-
-		key_textures[KeyConfig::Key::PAGE_UP] = key[73];
-
-		key_textures[KeyConfig::Key::END] = key[79];
-
-		key_textures[KeyConfig::Key::PAGE_DOWN] = key[81];
-		key_textures[KeyConfig::Key::INSERT] = key[82];
-		key_textures[KeyConfig::Key::DELETE] = key[83];
-
-		key_textures[KeyConfig::Key::F11] = key[87];
-		key_textures[KeyConfig::Key::F12] = key[88];
 	}
 
 	void UIKeyConfig::load_action_mappings()
@@ -397,6 +281,7 @@ namespace ms
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MONSTERCOLLECTION), KeyAction::Id::MONSTERCOLLECTION));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SOULWEAPON), KeyAction::Id::SOULWEAPON));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::MAPLENEWS), KeyAction::Id::MAPLENEWS));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FAMILY), KeyAction::Id::FAMILY));
 		// Game actions (type 5)
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::PICKUP), KeyAction::Id::PICKUP));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SIT), KeyAction::Id::SIT));
@@ -459,6 +344,7 @@ namespace ms
 			{ KeyAction::Id::MONSTERCOLLECTION, 39 },
 			{ KeyAction::Id::SOULWEAPON, 40 },
 			{ KeyAction::Id::MAPLENEWS, 41 },
+			{ KeyAction::Id::FAMILY, 42 },
 		};
 
 		for (auto& [action, idx] : menu_actions)
@@ -529,92 +415,55 @@ namespace ms
 	{
 		UIElement::draw(inter);
 
+		Point<int16_t> icon_offset(0, 0);
+
 		for (auto const& iter : staged_mappings)
 		{
-			int32_t maplekey = iter.first;
+			KeyConfig::Key key_slot = KeyConfig::actionbyid(iter.first);
 			Keyboard::Mapping mapping = iter.second;
 
-			Icon* ficon = NULL;
+			Icon* ficon = nullptr;
 
 			if (mapping.type == KeyType::Id::ITEM)
 			{
-				int32_t item_id = mapping.action;
-				ficon = item_icons.at(item_id).get();
+				auto it = item_icons.find(mapping.action);
+				if (it != item_icons.end())
+					ficon = it->second.get();
 			}
 			else if (mapping.type == KeyType::Id::SKILL)
 			{
-				int32_t skill_id = mapping.action;
-				ficon = skill_icons.at(skill_id).get();
+				auto it = skill_icons.find(mapping.action);
+				if (it != skill_icons.end())
+					ficon = it->second.get();
 			}
 			else if (is_action_mapping(mapping))
 			{
 				KeyAction::Id action = KeyAction::actionbyid(mapping.action);
 
-				if (action)
+				for (auto const& it : action_icons)
 				{
-					for (auto const& it : action_icons)
+					if (it.first == action)
 					{
-						if (it.first == action)
-						{
-							ficon = it.second.get();
-							break;
-						}
+						ficon = it.second.get();
+						break;
 					}
 				}
-			}
-			else
-			{
-				continue;
 			}
 
 			if (ficon)
 			{
-				if (maplekey != -1)
-				{
-					KeyConfig::Key fkey = KeyConfig::actionbyid(maplekey);
-
-					if (maplekey == KeyConfig::Key::SPACE)
-					{
-						ficon->draw(position + keys_pos[fkey] - Point<int16_t>(2, 3));
-					}
-					else
-					{
-						if (fkey == KeyConfig::Key::LEFT_CONTROL || fkey == KeyConfig::Key::RIGHT_CONTROL)
-						{
-							ficon->draw(position + keys_pos[KeyConfig::Key::LEFT_CONTROL] - Point<int16_t>(2, 3));
-							ficon->draw(position + keys_pos[KeyConfig::Key::RIGHT_CONTROL] - Point<int16_t>(2, 3));
-						}
-						else if (fkey == KeyConfig::Key::LEFT_ALT || fkey == KeyConfig::Key::RIGHT_ALT)
-						{
-							ficon->draw(position + keys_pos[KeyConfig::Key::LEFT_ALT] - Point<int16_t>(2, 3));
-							ficon->draw(position + keys_pos[KeyConfig::Key::RIGHT_ALT] - Point<int16_t>(2, 3));
-						}
-						else if (fkey == KeyConfig::Key::LEFT_SHIFT || fkey == KeyConfig::Key::RIGHT_SHIFT)
-						{
-							ficon->draw(position + keys_pos[KeyConfig::Key::LEFT_SHIFT] - Point<int16_t>(2, 3));
-							ficon->draw(position + keys_pos[KeyConfig::Key::RIGHT_SHIFT] - Point<int16_t>(2, 3));
-						}
-						else
-						{
-							ficon->draw(position + keys_pos[fkey] - Point<int16_t>(2, 3));
-						}
-					}
-				}
+				ficon->draw(position + keys_pos[key_slot] - icon_offset);
 			}
 		}
 
-		for (auto ubicon : action_icons)
+		Point<int16_t> unbound_center(1, 1); // center 32x32 icon in 34x34 cell
+
+		for (auto const& ubicon : action_icons)
 			if (ubicon.second)
 				if (std::find(bound_actions.begin(), bound_actions.end(), ubicon.first) == bound_actions.end())
-					ubicon.second->draw(position + unbound_actions_pos[ubicon.first]);
+					ubicon.second->draw(position + unbound_actions_pos[ubicon.first] + unbound_center);
 
-		for (auto fkey : key_textures)
-		{
-			KeyConfig::Key key = fkey.first;
-			Texture tx = fkey.second;
 
-			tx.draw(position + keys_pos[key]);
-		}
 	}
 
 	void UIKeyConfig::close()
@@ -774,17 +623,16 @@ namespace ms
 
 	bool UIKeyConfig::send_icon(const Icon& icon, Point<int16_t> cursorpos)
 	{
-		for (auto iter : unbound_actions_pos)
-		{
-			Rectangle<int16_t> icon_rect = Rectangle<int16_t>(
-				position + iter.second,
-				position + iter.second + Point<int16_t>(32, 32)
-				);
+		Point<int16_t> relative = cursorpos - position;
 
-			if (icon_rect.contains(cursorpos))
-				icon.drop_on_bindings(cursorpos, true);
+		// If cursor is in the unbound actions area (below the keyboard), remove the binding
+		if (relative.y() >= 250)
+		{
+			icon.drop_on_bindings(cursorpos, true);
+			return true;
 		}
 
+		// Otherwise try to place on a key
 		KeyConfig::Key fkey = key_by_position(cursorpos);
 
 		if (fkey != KeyConfig::Key::LENGTH)
@@ -1057,7 +905,7 @@ namespace ms
 
 	void UIKeyConfig::bind_staged_action_keys()
 	{
-		for (auto fkey : key_textures)
+		for (auto fkey : keys_pos)
 		{
 			Keyboard::Mapping mapping = get_staged_mapping(fkey.first);
 
@@ -1105,18 +953,28 @@ namespace ms
 
 	KeyConfig::Key UIKeyConfig::key_by_position(Point<int16_t> cursorpos) const
 	{
+		Point<int16_t> relative = cursorpos - position;
+		KeyConfig::Key closest = KeyConfig::Key::LENGTH;
+		int32_t best_dist = 25 * 25;
+
 		for (auto iter : keys_pos)
 		{
-			Rectangle<int16_t> icon_rect = Rectangle<int16_t>(
-				position + iter.second,
-				position + iter.second + Point<int16_t>(32, 32)
-				);
+			if (iter.second.x() == 0 && iter.second.y() == 0)
+				continue;
 
-			if (icon_rect.contains(cursorpos))
-				return iter.first;
+			Point<int16_t> center = iter.second + Point<int16_t>(16, 16);
+			int32_t dx = relative.x() - center.x();
+			int32_t dy = relative.y() - center.y();
+			int32_t dist = dx * dx + dy * dy;
+
+			if (dist < best_dist)
+			{
+				best_dist = dist;
+				closest = iter.first;
+			}
 		}
 
-		return KeyConfig::Key::LENGTH;
+		return closest;
 	}
 
 	KeyAction::Id UIKeyConfig::unbound_action_by_position(Point<int16_t> cursorpos) const
@@ -1128,7 +986,7 @@ namespace ms
 
 			Rectangle<int16_t> icon_rect = Rectangle<int16_t>(
 				position + iter.second,
-				position + iter.second + Point<int16_t>(32, 32)
+				position + iter.second + Point<int16_t>(36, 36)
 				);
 
 			if (icon_rect.contains(cursorpos))

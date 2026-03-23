@@ -17,30 +17,23 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
-
-#include "../Components/Slider.h"
-
-#include "../../Graphics/SpecialText.h"
+#include "../UIElement.h"
+#include "../../Graphics/Texture.h"
 
 namespace ms
 {
-	class UIEvent : public UIDragElement<PosEVENT>
+	class UISystemMenu : public UIElement
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::EVENT;
+		static constexpr Type TYPE = UIElement::Type::SYSTEMMENU;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
 
-		UIEvent();
+		UISystemMenu();
 
 		void draw(float inter) const override;
-		void update() override;
 
-		void remove_cursor() override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-		void send_scroll(double yoffset) override;
 
 		UIElement::Type get_type() const override;
 
@@ -48,28 +41,26 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void close();
-		std::string get_event_title(uint8_t id);
-		std::string get_event_date(uint8_t id);
-		int16_t row_by_position(int16_t y);
-		int16_t col_by_position(int16_t x);
-		void show_item(int16_t row, int16_t col);
-
 		enum Buttons : uint16_t
 		{
-			CLOSE
+			BT_CHANNEL,
+			BT_FARM,
+			BT_KEY_SETTING,
+			BT_GAME_OPTION,
+			BT_SYSTEM_OPTION,
+			BT_QUIT,
+			NUM_BUTTONS
 		};
 
-		int16_t offset;
-		int16_t event_count;
-		ShadowText event_title[3];
-		Text event_date[3];
-		Slider slider;
-		Texture item_reward;
-		Texture text_reward;
-		Texture next;
-		Texture label_on;
-		Texture label_next;
-		std::vector<BoolPair<bool>> events;
+		Texture top;
+		Texture mid;
+		Texture bottom;
+
+		static constexpr int16_t WIDTH = 79;
+		static constexpr int16_t BUTTON_PADDING_HORIZ = 8;
+		static constexpr int16_t PADDING_TOP = 20;
+		static constexpr int16_t STRIDE_VERT = 27;
+		static constexpr int16_t PADDING_BOTTOM = 12;
+		static constexpr int16_t HEIGHT = PADDING_TOP + STRIDE_VERT * NUM_BUTTONS + PADDING_BOTTOM;
 	};
 }

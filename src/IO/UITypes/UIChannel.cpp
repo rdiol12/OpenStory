@@ -18,8 +18,8 @@
 #include "UIChannel.h"
 
 #include "../KeyAction.h"
+#include "../UI.h"
 
-#include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Audio/Audio.h"
@@ -32,73 +32,75 @@
 
 namespace ms
 {
-	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>(Point<int16_t>(200, 20))
+	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>(Point<int16_t>(WIDTH, DRAG_HEIGHT))
 	{
 		uint8_t selected_world = Configuration::get().get_worldid();
 		current_channel = Configuration::get().get_channelid();
 		selected_channel = current_channel;
 		channel_count = 20;
 
-		nl::node Channel = nl::nx::ui["UIWindow2.img"]["Channel"];
+		nl::node source = nl::nx::ui["UIWindow2.img"]["Channel"];
 
-		nl::node backgrnd = Channel["backgrnd"];
-		Texture bg = backgrnd;
+		sprites.emplace_back(source["backgrnd"]);
+		sprites.emplace_back(source["backgrnd2"]);
+		sprites.emplace_back(source["backgrnd3"]);
+		sprites.emplace_back(source["world"][selected_world], DrawArgument(Point<int16_t>(16, 30)));
 
-		sprites.emplace_back(backgrnd, Point<int16_t>(1, 0));
-		sprites.emplace_back(Channel["backgrnd2"]);
-		sprites.emplace_back(Channel["backgrnd3"]);
-		sprites.emplace_back(Channel["world"][selected_world], Point<int16_t>(16, 30));
+		buttons[BT_CANCEL] = std::make_unique<MapleButton>(source["BtCancel"]);
+		buttons[BT_CHANGE] = std::make_unique<MapleButton>(source["BtChange"]);
 
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Channel["BtCancel"]);
-		buttons[Buttons::CHANGE] = std::make_unique<MapleButton>(Channel["BtChange"], Point<int16_t>(-20, 0));
+		channel_cover[true] = source["channel1"];
+		channel_cover[false] = source["channel0"];
 
-		channel[true] = Channel["channel1"];
-		channel[false] = Channel["channel0"];
+		nl::node ch_src = source["ch"];
+		Point<int16_t> ch_pos = CH_SPRITE_OFFSET;
 
-		size_t x = 0;
-		size_t y = 0;
-
-		for (size_t i = 0; i < channel_count; i++)
+		for (uint8_t row = 0; row < ROWS; row++)
 		{
-			if (x >= 5)
+			for (uint8_t col = 0; col < COLS; col++)
 			{
-				x = 0;
-				y++;
+				uint8_t n = row * COLS + col;
+
+				if (n >= channel_count)
+					break;
+
+				ch_sprites.emplace_back(ch_src[n], DrawArgument(ch_pos));
+				ch_pos.shift_x(STRIDE_HORIZ);
 			}
 
-			ch.emplace_back(Channel["ch"][i], Point<int16_t>(19 + 70 * x, 60 + 20 * y));
-			buttons[Buttons::CH + i] = std::make_unique<AreaButton>(Point<int16_t>(11 + 70 * x, 55 + 20 * y), channel[true].get_dimensions());
-
-			if (i == selected_channel)
-			{
-				current_channel_x = 11 + 70 * x;
-				current_channel_y = 55 + 20 * y;
-				selected_channel_x = current_channel_x;
-				selected_channel_y = current_channel_y;
-			}
-
-			x++;
+			ch_pos.set_x(CH_SPRITE_OFFSET.x());
+			ch_pos.shift_y(STRIDE_VERT);
 		}
 
-		dimension = bg.get_dimensions();
-		dragarea = Point<int16_t>(dimension.x(), 20);
+		dimension = Point<int16_t>(WIDTH, HEIGHT);
+		dragarea = Point<int16_t>(WIDTH, DRAG_HEIGHT);
 	}
 
 	void UIChannel::draw(float inter) const
 	{
 		UIElement::draw(inter);
 
-		if (current_channel == selected_channel)
+		Point<int16_t> base_pos = COVER_OFFSET + position;
+
+		// Draw current channel marker
+		Point<int16_t> curr_pos = base_pos + Point<int16_t>(
+			(current_channel % COLS) * STRIDE_HORIZ,
+			(current_channel / COLS) * STRIDE_VERT
+		);
+		channel_cover[false].draw(DrawArgument(curr_pos));
+
+		// Draw selected channel marker (if different)
+		if (selected_channel != current_channel)
 		{
-			channel[true].draw(DrawArgument(position.x() + selected_channel_x, position.y() + selected_channel_y));
-		}
-		else
-		{
-			channel[true].draw(DrawArgument(position.x() + selected_channel_x, position.y() + selected_channel_y));
-			channel[false].draw(DrawArgument(position.x() + current_channel_x, position.y() + current_channel_y));
+			Point<int16_t> sel_pos = base_pos + Point<int16_t>(
+				(selected_channel % COLS) * STRIDE_HORIZ,
+				(selected_channel / COLS) * STRIDE_VERT
+			);
+			channel_cover[true].draw(DrawArgument(sel_pos));
 		}
 
-		for (auto sprite : ch)
+		// Draw channel number sprites
+		for (auto& sprite : ch_sprites)
 			sprite.draw(position, inter);
 	}
 
@@ -106,110 +108,73 @@ namespace ms
 	{
 		UIElement::update();
 
-		for (auto sprite : ch)
+		for (auto& sprite : ch_sprites)
 			sprite.update();
+	}
+
+	int8_t UIChannel::channel_by_pos(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> relative = cursorpos - position - COVER_OFFSET;
+
+		if (relative.x() < 0 || relative.y() < 0)
+			return -1;
+
+		if (relative.x() >= COLS * STRIDE_HORIZ || relative.y() >= ROWS * STRIDE_VERT)
+			return -1;
+
+		int16_t col = relative.x() / STRIDE_HORIZ;
+		int16_t row = relative.y() / STRIDE_VERT;
+		uint8_t ch = row * COLS + col;
+
+		if (ch >= channel_count)
+			return -1;
+
+		return ch;
 	}
 
 	void UIChannel::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed)
+		if (!pressed)
+			return;
+
+		if (escape)
 		{
-			if (escape)
-			{
-				cancel();
-			}
-			else if (keycode == KeyAction::Id::RETURN)
-			{
-				change_channel();
-			}
-			else if (keycode == KeyAction::Id::UP)
-			{
-				if (selected_channel > 4)
-				{
-					selected_channel -= 5;
-				}
-				else
-				{
-					for (size_t i = 0; i < 3; i++)
-						selected_channel += 5;
-				}
+			deactivate();
+			return;
+		}
 
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel > 4)
-					{
-						selected_channel -= 5;
-					}
-					else
-					{
-						for (size_t i = 0; i < 3; i++)
-							selected_channel += 5;
-					}
-				}
+		switch (keycode)
+		{
+		case KeyAction::Id::RETURN:
+			change_channel();
+			break;
+		case KeyAction::Id::UP:
+			if (selected_channel >= COLS)
+				selected_channel -= COLS;
+			else
+				selected_channel += COLS * (ROWS - 1);
 
-				update_selected_channel_position();
-			}
-			else if (keycode == KeyAction::Id::DOWN)
-			{
-				if (selected_channel < 15)
-				{
-					selected_channel += 5;
-				}
-				else
-				{
-					for (size_t i = 0; i < 3; i++)
-						selected_channel -= 5;
-				}
+			if (selected_channel >= channel_count)
+				selected_channel = current_channel;
+			break;
+		case KeyAction::Id::DOWN:
+			selected_channel += COLS;
 
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel < 15)
-					{
-						selected_channel += 5;
-					}
-					else
-					{
-						for (size_t i = 0; i < 3; i++)
-							selected_channel -= 5;
-					}
-				}
-
-				update_selected_channel_position();
-			}
-			else if (keycode == KeyAction::Id::LEFT)
-			{
-				if (selected_channel != 0)
-					selected_channel--;
-				else
-					selected_channel = channel_count - 1;
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel != 0)
-						selected_channel--;
-					else
-						selected_channel = channel_count - 1;
-				}
-
-				update_selected_channel_position();
-			}
-			else if (keycode == KeyAction::Id::RIGHT)
-			{
-				if (selected_channel != channel_count - 1)
-					selected_channel++;
-				else
-					selected_channel = 0;
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel != channel_count - 1)
-						selected_channel++;
-					else
-						selected_channel = 0;
-				}
-
-				update_selected_channel_position();
-			}
+			if (selected_channel >= channel_count)
+				selected_channel %= COLS;
+			break;
+		case KeyAction::Id::LEFT:
+			if (selected_channel > 0)
+				selected_channel--;
+			else
+				selected_channel = channel_count - 1;
+			break;
+		case KeyAction::Id::RIGHT:
+			if (selected_channel < channel_count - 1)
+				selected_channel++;
+			else
+				selected_channel = 0;
+			break;
 		}
 	}
 
@@ -220,54 +185,15 @@ namespace ms
 		if (dragged)
 			return dstate;
 
-		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
-
-		for (size_t i = 0; i < channel_count + Buttons::CH; i++)
+		if (clicked)
 		{
-			if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
-			{
-				if (buttons[i]->get_state() == Button::State::NORMAL)
-				{
-					if (i < Buttons::CH)
-					{
-						Sound(Sound::Name::BUTTONOVER).play();
+			int8_t clicked_ch = channel_by_pos(cursorpos);
 
-						buttons[i]->set_state(Button::State::MOUSEOVER);
-						ret = Cursor::State::CANCLICK;
-					}
-					else
-					{
-						buttons[i]->set_state(Button::State::MOUSEOVER);
-						ret = Cursor::State::IDLE;
-					}
-				}
-				else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
-				{
-					if (clicked)
-					{
-						if (i < Buttons::CH)
-							Sound(Sound::Name::BUTTONCLICK).play();
-
-						buttons[i]->set_state(button_pressed(i));
-
-						ret = Cursor::State::IDLE;
-					}
-					else
-					{
-						if (i < Buttons::CH)
-							ret = Cursor::State::CANCLICK;
-						else
-							ret = Cursor::State::IDLE;
-					}
-				}
-			}
-			else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
-			{
-				buttons[i]->set_state(Button::State::NORMAL);
-			}
+			if (clicked_ch >= 0 && clicked_ch != current_channel)
+				selected_channel = clicked_ch;
 		}
 
-		return ret;
+		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
 	UIElement::Type UIChannel::get_type() const
@@ -277,69 +203,27 @@ namespace ms
 
 	Button::State UIChannel::button_pressed(uint16_t buttonid)
 	{
-		if (buttonid < Buttons::CH)
+		switch (buttonid)
 		{
-			switch (buttonid)
-			{
-			case Buttons::CANCEL:
-				cancel();
-				break;
-			case Buttons::CHANGE:
-				change_channel();
-				break;
-			default:
-				break;
-			}
+		case BT_CANCEL:
+			deactivate();
+			return Button::State::NORMAL;
+		case BT_CHANGE:
+			change_channel();
+			return Button::State::NORMAL;
+		default:
+			return Button::State::NORMAL;
 		}
-		else
-		{
-			if (buttonid - Buttons::CH == current_channel)
-				return Button::State::NORMAL;
-
-			selected_channel = buttonid - Buttons::CH;
-			update_selected_channel_position();
-		}
-
-		return Button::State::NORMAL;
-	}
-
-	void UIChannel::cancel()
-	{
-		deactivate();
-
-		current_channel = Configuration::get().get_channelid();
-		selected_channel = current_channel;
-		selected_channel_x = current_channel_x;
-		selected_channel_y = current_channel_y;
 	}
 
 	void UIChannel::change_channel()
 	{
-		ChangeChannelPacket(selected_channel).dispatch();
-		cancel();
-	}
-
-	void UIChannel::update_selected_channel_position()
-	{
-		size_t x = 0;
-		size_t y = 0;
-
-		for (size_t i = 0; i < channel_count; i++)
+		if (selected_channel != current_channel)
 		{
-			if (x >= 5)
-			{
-				x = 0;
-				y++;
-			}
-
-			if (i == selected_channel)
-			{
-				selected_channel_x = 11 + 70 * x;
-				selected_channel_y = 55 + 20 * y;
-				break;
-			}
-
-			x++;
+			UI::get().disable();
+			ChangeChannelPacket(selected_channel).dispatch();
 		}
+
+		deactivate();
 	}
 }

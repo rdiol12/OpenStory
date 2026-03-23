@@ -74,6 +74,25 @@ A v83 MapleStory client built for Cosmic/private servers. Forked from [HeavenCli
 - Start button repositioned
 - Create/Delete character functionality
 
+### Report System (Call GM)
+- UIReport window with NX background sprite from UIWindow.img/Report
+- Draggable panel with name input, 5 reason categories, description field
+- Sends ReportPacket (opcode 0x6A) to server with type, victim name, reason, description
+- Red text validation feedback when name or reason is missing
+- Confirmation popup on successful report submission
+- BtCallGM status bar button opens UIReport
+- BtNotice sends alert packet directly to server
+
+### System Menu & Game Settings
+- UISystemMenu popup with Channel, Key Setting, Game Option, System Option, Quit buttons
+- UIOptionMenu loads NX sprites from UIWindow2.img/OptionMenu (was incorrectly loading from StatusBar2.img)
+- UIGameSettings for in-game graphics/sound options
+- Resolution picker with combo box (800x600 through 1920x1200)
+
+### Gamepad Support
+- UIJoypad configuration panel for controller input mapping
+- Gamepad button binding with visual layout
+
 ### UI Improvements
 - Bottom row button overlap fixed (CashShop, MTS, Menu, System) with position offsets
 - UIChannel uses actual world/channel from Configuration
