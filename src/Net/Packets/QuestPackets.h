@@ -59,4 +59,41 @@ namespace ms
 			write_short(questid);
 		}
 	};
+
+	// Action 0: Restore lost item
+	class RestoreLostItemPacket : public OutPacket
+	{
+	public:
+		RestoreLostItemPacket(int16_t questid, int32_t itemid) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(0);
+			write_short(questid);
+			write_int(0);
+			write_int(itemid);
+		}
+	};
+
+	// Action 4: Scripted quest start
+	class ScriptedStartQuestPacket : public OutPacket
+	{
+	public:
+		ScriptedStartQuestPacket(int16_t questid, int32_t npcid) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(4);
+			write_short(questid);
+			write_int(npcid);
+		}
+	};
+
+	// Action 5: Scripted quest end
+	class ScriptedEndQuestPacket : public OutPacket
+	{
+	public:
+		ScriptedEndQuestPacket(int16_t questid, int32_t npcid) : OutPacket(OutPacket::Opcode::QUEST_ACTION)
+		{
+			write_byte(5);
+			write_short(questid);
+			write_int(npcid);
+		}
+	};
 }
