@@ -64,6 +64,9 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **Quest Helper**: Rewritten to support multi-quest tracking (up to 5), collapsible entries, per-quest close button (BtDelete sprite), live item/mob progress from server quest data, auto-refresh on quest updates
 - **Quest drag-and-drop**: Drag quests from the Quest Log into the Quest Helper to track them; drag tracked quests to reorder
 - **Chat clipping**: Chat messages no longer render above the black chat background
+
+
+this is for my own server ans the reason i started fixing this client 
 - **Custom jobs**: Added Sage (600), Necromancer (700), and Summoner (800) job trees with INT/LUK stats
 
 ## Quest Helper
