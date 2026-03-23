@@ -366,13 +366,26 @@ namespace ms
 
 	void ShowItemGainInChatHandler::handle(InPacket& recv) const
 	{
-		int8_t mode1 = recv.read_byte();
+		int8_t mode = recv.read_byte();
 
-		if (mode1 == 3)
+		switch (mode)
+		{
+		case 0: // Level up
+			break;
+		case 1: // Skill/buff use effect
+		{
+			if (recv.length() < 4)
+				return;
+
+			int32_t skillid = recv.read_int();
+			Stage::get().get_combat().show_player_buff(skillid);
+			break;
+		}
+		case 3: // Item gain in chat
 		{
 			int8_t mode2 = recv.read_byte();
 
-			if (mode2 == 1) // This is actually 'item gain in chat'
+			if (mode2 == 1)
 			{
 				int32_t itemid = recv.read_int();
 				int32_t qty = recv.read_int();
@@ -389,29 +402,48 @@ namespace ms
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
 					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
 			}
+
+			break;
 		}
-		else if (mode1 == 13) // card effect
-		{
+		case 4: // Pet level up
+			recv.read_byte(); // 0
+			recv.read_byte(); // pet index
+			break;
+		case 6: // Safety charm (exp not lost)
+		case 7: // Enter portal sound
+		case 8: // Job change
+		case 9: // Quest complete
+			break;
+		case 10: // Recovery
+			recv.read_byte(); // heal amount
+			break;
+		case 11: // Buff effect (no data)
+			break;
+		case 13: // Monster book card
 			Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
-		}
-		else if (mode1 == 18) // intro effect
-		{
+			break;
+		case 14: // Monster book pickup
+		case 15: // Equipment level up
+			break;
+		case 16: // Maker skill result
+			recv.read_int(); // 0=success, 1=fail
+			break;
+		case 17: // Buff effect with SFX
 			recv.read_string(); // path
-		}
-		else if (mode1 == 23) // info
-		{
-			recv.read_string();	// path
-			recv.read_int();	// some int
-		}
-		else // Buff effect
-		{
-			if (recv.length() < 4)
-				return;
-
-			int32_t skillid = recv.read_int();
-
-			// More bytes, but we don't need them.
-			Stage::get().get_combat().show_player_buff(skillid);
+			recv.read_int();
+			break;
+		case 18: // Show intro
+			recv.read_string(); // path
+			break;
+		case 21: // Wheel of Destiny
+			recv.read_byte(); // wheels left
+			break;
+		case 23: // Show info
+			recv.read_string(); // path
+			recv.read_int();
+			break;
+		default:
+			break;
 		}
 	}
 

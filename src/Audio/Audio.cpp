@@ -147,7 +147,7 @@ namespace ms
 			size_t id = ad.id();
 
 			if (samples.find(id) != samples.end())
-				return 0;
+				return id;
 
 			samples[id] = BASS_SampleLoad(true, data, 82, (DWORD)ad.length(), 4, BASS_SAMPLE_OVER_POS);
 
