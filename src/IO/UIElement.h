@@ -110,6 +110,8 @@ namespace ms
 			COMBO,
 			WHISPER,
 			REPORT,
+			SYSTEMMENU,
+			GAMESETTINGS,
 			NUM_TYPES
 		};
 

@@ -531,28 +531,48 @@ namespace ms
 
 	void BlowWeatherHandler::handle(InPacket& recv) const
 	{
-		// v83 BLOW_WEATHER: byte active, int itemid, string message
-		// Controls map weather effects (snow, rain, etc.)
-		// Weather item IDs map to Effect.wz paths
+		// [byte: active] [int: itemId] [string: message (only if active=0)]
 		if (!recv.available())
 			return;
 
 		int8_t active = recv.read_byte();
 
-		if (active != 0 && recv.length() >= 4)
+		if (active != 0)
 		{
-			int32_t itemid = recv.read_int();
-			std::string message = recv.available() ? recv.read_string() : "";
-
-			// Map weather item IDs to Effect.wz paths
-			// 5120000 = Snow, 5120001 = Rain, 5120002 = Goldfish, etc.
-			std::string effect_path = "Map/MapHelper.img/weather/" + std::to_string(itemid);
-			Stage::get().add_effect(effect_path);
-
-			// Show the weather message if present
-			if (!message.empty())
-				UI::get().set_scrollnotice(message);
+			Stage::get().clear_weather();
+			return;
 		}
+
+		if (!recv.available())
+			return;
+
+		int32_t itemid = recv.read_int();
+
+		if (itemid == 0)
+			return;
+
+		std::string id_str = "0" + std::to_string(itemid);
+		nl::node item_node = nl::nx::item["Cash"]["0512.img"][id_str];
+		std::string path = item_node["info"]["path"];
+
+		std::string message;
+
+		if (recv.available())
+			message = recv.read_string();
+
+		if (!path.empty())
+		{
+			// Strip "Map/" prefix since set_weather resolves from nl::nx::map
+			std::string resolve_path = path;
+
+			if (resolve_path.substr(0, 4) == "Map/")
+				resolve_path = resolve_path.substr(4);
+
+			Stage::get().set_weather(resolve_path, message);
+		}
+
+		if (!message.empty())
+			UI::get().set_scrollnotice(message);
 	}
 
 	void QuickSlotInitHandler::handle(InPacket& recv) const

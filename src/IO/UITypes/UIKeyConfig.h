@@ -55,7 +55,6 @@ namespace ms
 	private:
 		void load_keys_pos();
 		void load_unbound_actions_pos();
-		void load_key_textures();
 		void load_action_mappings();
 		void load_action_icons();
 		void load_item_icons();
@@ -126,10 +125,8 @@ namespace ms
 
 		Keyboard* keyboard = nullptr;
 
-		nl::node key;
 		nl::node icon;
 
-		EnumMap<KeyConfig::Key, Texture> key_textures;
 		EnumMap<KeyConfig::Key, Point<int16_t>> keys_pos;
 
 		EnumMap<KeyAction::Id, std::unique_ptr<Icon>> action_icons;

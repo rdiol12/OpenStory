@@ -23,18 +23,35 @@
 
 #include "../../Net/Packets/SocialPackets.h"
 
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
+
 namespace ms
 {
+	// Layout constants for 280x300 panel
+	static constexpr int16_t PAD = 8;
+	static constexpr int16_t TITLE_H = 24;
+	static constexpr int16_t NAME_ROW_Y = TITLE_H + 4;
+	static constexpr int16_t NAME_ROW_H = 20;
+	static constexpr int16_t REASON_LABEL_Y = NAME_ROW_Y + NAME_ROW_H + 6;
+	static constexpr int16_t REASON_TOP = REASON_LABEL_Y + 14;
+	static constexpr int16_t REASON_H = 20;
+	static constexpr int16_t REASON_STEP = 22;
+	static constexpr int16_t DESC_LABEL_Y = REASON_TOP + 5 * REASON_STEP + 4;
+	static constexpr int16_t DESC_TOP = DESC_LABEL_Y + 14;
+	static constexpr int16_t BTN_H = 20;
+
 	UIReport::UIReport(const std::string& target) :
-		UIDragElement<PosREPORT>(Point<int16_t>(WIDTH, HEADER_HEIGHT)),
+		UIDragElement<PosREPORT>(Point<int16_t>(280, TITLE_H)),
 		target_name(target),
 		selected_reason(-1)
 	{
-		int16_t total_h = HEADER_HEIGHT + BODY_HEIGHT + INPUT_HEIGHT + 30;
+		background = ColorBox(W, H, Color::Name::BLACK, 0.85f);
 
-		background = ColorBox(WIDTH, total_h, Color::Name::BLACK, 0.85f);
-		header_bg = ColorBox(WIDTH, HEADER_HEIGHT, Color::Name::EMPEROR, 0.9f);
-		input_bg = ColorBox(WIDTH - 10, INPUT_HEIGHT, Color::Name::GALLERY, 1.0f);
+		int16_t desc_h = H - DESC_TOP - BTN_H - 12;
+		int16_t btn_y = H - BTN_H - 6;
+		int16_t btn_w = 70;
 
 		title_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
 
@@ -45,104 +62,107 @@ namespace ms
 
 		// Name input field
 		namefield = Textfield(
-			Text::A11M, Text::LEFT, Color::Name::WHITE,
-			Rectangle<int16_t>(Point<int16_t>(50, 5), Point<int16_t>(WIDTH - 10, 20)),
-			15
+			Text::A11M, Text::LEFT, Color::Name::WHITE, Color::Name::SMALT, 0.75f,
+			Rectangle<int16_t>(
+				Point<int16_t>(45, NAME_ROW_Y + 2),
+				Point<int16_t>(W - PAD, NAME_ROW_Y + NAME_ROW_H)
+			),
+			12
 		);
 
 		if (!target_name.empty())
 			namefield.change_text(target_name);
 
 		// Description text field
+		input_bg = ColorBox(W - PAD * 2, desc_h, Color::Name::GALLERY, 1.0f);
+
 		descfield = Textfield(
 			Text::A11M, Text::LEFT, Color::Name::BLACK,
 			Rectangle<int16_t>(
-				Point<int16_t>(5, HEADER_HEIGHT + BODY_HEIGHT + 5),
-				Point<int16_t>(WIDTH - 10, HEADER_HEIGHT + BODY_HEIGHT + INPUT_HEIGHT)
+				Point<int16_t>(PAD + 2, DESC_TOP + 2),
+				Point<int16_t>(W - PAD - 2, DESC_TOP + desc_h)
 			),
 			200
 		);
 
-		// Close button
+		// Close button (top-right)
 		buttons[BT_CLOSE] = std::make_unique<AreaButton>(
-			Point<int16_t>(WIDTH - 18, 3), Point<int16_t>(15, 15)
+			Point<int16_t>(W - 20, 4), Point<int16_t>(16, 16)
 		);
 
-		// Send button
+		// Send button (bottom center)
 		buttons[BT_SEND] = std::make_unique<AreaButton>(
-			Point<int16_t>(WIDTH / 2 - 40, HEADER_HEIGHT + BODY_HEIGHT + INPUT_HEIGHT + 8),
-			Point<int16_t>(80, 20)
+			Point<int16_t>(W / 2 - btn_w / 2, btn_y),
+			Point<int16_t>(btn_w, BTN_H)
 		);
 
 		// Reason buttons
 		for (int i = 0; i < NUM_REASONS; i++)
 		{
-			int16_t y = HEADER_HEIGHT + 30 + i * 28;
+			int16_t y = REASON_TOP + i * REASON_STEP;
 			buttons[BT_REASON0 + i] = std::make_unique<AreaButton>(
-				Point<int16_t>(10, y), Point<int16_t>(WIDTH - 20, 24)
+				Point<int16_t>(PAD, y), Point<int16_t>(W - PAD * 2, REASON_H)
 			);
 		}
 
-		// Pre-allocate draw objects
+		// Draw objects
 		close_x = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "X");
 		name_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Name:");
 		reason_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW, "Select reason:");
 		desc_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW, "Details (optional):");
-		selected_reason_bg = ColorBox(WIDTH - 20, 24, Color::Name::MALIBU, 0.8f);
-		btn_bg = ColorBox(80, 20, Color::Name::MALIBU, 0.8f);
-		btn_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Submit");
+		selected_reason_bg = ColorBox(W - PAD * 2, REASON_H, Color::Name::MALIBU, 0.8f);
+		btn_bg = ColorBox(btn_w, BTN_H, Color::Name::MALIBU, 0.8f);
+		btn_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Send");
 
 		for (int i = 0; i < NUM_REASONS; i++)
 		{
-			reason_bgs[i] = ColorBox(WIDTH - 20, 24, Color::Name::MINESHAFT, 0.5f);
+			reason_bgs[i] = ColorBox(W - PAD * 2, REASON_H, Color::Name::MINESHAFT, 0.5f);
 			reason_texts[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY, REASON_LABELS[i]);
 		}
 
-		dimension = Point<int16_t>(WIDTH, total_h);
-		dragarea = Point<int16_t>(WIDTH, HEADER_HEIGHT);
+		dimension = Point<int16_t>(W, H);
+		dragarea = Point<int16_t>(W, TITLE_H);
 	}
 
 	void UIReport::draw(float inter) const
 	{
 		background.draw(DrawArgument(position));
-		header_bg.draw(DrawArgument(position));
 
-		title_text.draw(position + Point<int16_t>(5, 5));
-		close_x.draw(position + Point<int16_t>(WIDTH - 10, 5));
+		int16_t desc_h = H - DESC_TOP - BTN_H - 12;
+		int16_t btn_y = H - BTN_H - 6;
+		int16_t btn_w = 70;
+
+		title_text.draw(position + Point<int16_t>(PAD, 5));
+		close_x.draw(position + Point<int16_t>(W - 12, 5));
 
 		if (target_name.empty())
 		{
-			name_label.draw(position + Point<int16_t>(5, 5));
+			name_label.draw(position + Point<int16_t>(PAD, NAME_ROW_Y + 4));
 			namefield.draw(position);
 		}
 
-		reason_label.draw(position + Point<int16_t>(10, HEADER_HEIGHT + 10));
+		reason_label.draw(position + Point<int16_t>(PAD, REASON_LABEL_Y));
 
 		for (int i = 0; i < NUM_REASONS; i++)
 		{
-			int16_t y = HEADER_HEIGHT + 30 + i * 28;
+			int16_t y = REASON_TOP + i * REASON_STEP;
 			bool selected = (selected_reason == i);
 
 			if (selected)
-			{
-				selected_reason_bg.draw(DrawArgument(position + Point<int16_t>(10, y)));
-			}
+				selected_reason_bg.draw(DrawArgument(position + Point<int16_t>(PAD, y)));
 			else
-			{
-				reason_bgs[i].draw(DrawArgument(position + Point<int16_t>(10, y)));
-			}
+				reason_bgs[i].draw(DrawArgument(position + Point<int16_t>(PAD, y)));
 
-			reason_texts[i].draw(position + Point<int16_t>(15, y + 5));
+			reason_texts[i].draw(position + Point<int16_t>(PAD + 5, y + 3));
 		}
 
-		desc_label.draw(position + Point<int16_t>(5, HEADER_HEIGHT + BODY_HEIGHT - 10));
+		desc_label.draw(position + Point<int16_t>(PAD, DESC_LABEL_Y));
 
-		input_bg.draw(DrawArgument(position + Point<int16_t>(5, HEADER_HEIGHT + BODY_HEIGHT + 5)));
+		input_bg.draw(DrawArgument(position + Point<int16_t>(PAD, DESC_TOP)));
 		descfield.draw(position);
 
-		int16_t btn_y = HEADER_HEIGHT + BODY_HEIGHT + INPUT_HEIGHT + 8;
-		btn_bg.draw(DrawArgument(position + Point<int16_t>(WIDTH / 2 - 40, btn_y)));
-		btn_text.draw(position + Point<int16_t>(WIDTH / 2, btn_y + 3));
+		btn_bg.draw(DrawArgument(position + Point<int16_t>(W / 2 - btn_w / 2, btn_y)));
+		btn_text.draw(position + Point<int16_t>(W / 2, btn_y + 3));
 
 		UIElement::draw_buttons(inter);
 	}
@@ -157,58 +177,69 @@ namespace ms
 
 	Cursor::State UIReport::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
+
+		if (dragged)
+			return dstate;
+
 		Point<int16_t> cursoroffset = cursorpos - position;
 
-		if (descfield.get_state() == Textfield::State::FOCUSED)
-		{
-			if (clicked)
-			{
-				Cursor::State tstate = descfield.send_cursor(cursoroffset, clicked);
-				if (tstate != Cursor::State::IDLE)
-					return tstate;
-			}
-		}
+		int16_t desc_h = H - DESC_TOP - BTN_H - 12;
 
-		if (target_name.empty() && namefield.get_state() == Textfield::State::FOCUSED)
+		if (clicked)
 		{
-			if (clicked)
-			{
-				Cursor::State tstate = namefield.send_cursor(cursoroffset, clicked);
-				if (tstate != Cursor::State::IDLE)
-					return tstate;
-			}
-		}
-
-		// Click on description area -> focus it
-		Rectangle<int16_t> desc_rect(
-			Point<int16_t>(5, HEADER_HEIGHT + BODY_HEIGHT + 5),
-			Point<int16_t>(WIDTH - 10, HEADER_HEIGHT + BODY_HEIGHT + INPUT_HEIGHT)
-		);
-
-		if (clicked && desc_rect.contains(cursoroffset))
-		{
-			descfield.set_state(Textfield::State::FOCUSED);
-			UI::get().focus_textfield(&descfield);
-			return Cursor::State::CLICKING;
-		}
-
-		// Click on name area -> focus it
-		if (target_name.empty() && clicked)
-		{
-			Rectangle<int16_t> name_rect(
-				Point<int16_t>(50, 3),
-				Point<int16_t>(WIDTH - 10, 20)
+			// Click on description area -> focus it
+			Rectangle<int16_t> desc_rect(
+				Point<int16_t>(PAD, DESC_TOP),
+				Point<int16_t>(W - PAD, DESC_TOP + desc_h)
 			);
 
-			if (name_rect.contains(cursoroffset))
+			if (desc_rect.contains(cursoroffset))
 			{
-				namefield.set_state(Textfield::State::FOCUSED);
-				UI::get().focus_textfield(&namefield);
+				if (target_name.empty() && namefield.get_state() == Textfield::State::FOCUSED)
+					namefield.set_state(Textfield::State::NORMAL);
+
+				descfield.set_state(Textfield::State::FOCUSED);
 				return Cursor::State::CLICKING;
 			}
+
+			// Click on name area -> focus it
+			if (target_name.empty())
+			{
+				Rectangle<int16_t> name_rect(
+					Point<int16_t>(45, NAME_ROW_Y + 2),
+					Point<int16_t>(W - PAD, NAME_ROW_Y + NAME_ROW_H)
+				);
+
+				if (name_rect.contains(cursoroffset))
+				{
+					if (descfield.get_state() == Textfield::State::FOCUSED)
+						descfield.set_state(Textfield::State::NORMAL);
+
+					namefield.set_state(Textfield::State::FOCUSED);
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			// Click outside both textfields -> unfocus
+			if (descfield.get_state() == Textfield::State::FOCUSED)
+				descfield.set_state(Textfield::State::NORMAL);
+
+			if (namefield.get_state() == Textfield::State::FOCUSED)
+				namefield.set_state(Textfield::State::NORMAL);
 		}
 
-		return UIDragElement::send_cursor(clicked, cursorpos);
+		// Textfield hover cursors
+		if (Cursor::State new_state = descfield.send_cursor(cursorpos, clicked))
+			return new_state;
+
+		if (target_name.empty())
+		{
+			if (Cursor::State new_state = namefield.send_cursor(cursorpos, clicked))
+				return new_state;
+		}
+
+		return dstate;
 	}
 
 	void UIReport::send_key(int32_t keycode, bool pressed, bool escape)
@@ -251,21 +282,27 @@ namespace ms
 			std::string name = namefield.get_text();
 
 			if (name.empty())
+			{
+				title_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::RED, "Enter a name!");
 				return;
+			}
 
 			target_name = name;
-			title_text.change_text("Report: " + target_name);
+			title_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, "Report: " + target_name);
 		}
 
 		if (selected_reason < 0)
+		{
+			reason_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::RED, "Select a reason!");
 			return;
+		}
 
 		std::string desc = descfield.get_text();
 		ReportPacket(0, target_name, static_cast<int8_t>(selected_reason), desc).dispatch();
 
 		deactivate();
 
-		UI::get().emplace<UIOk>("Your report for '" + target_name + "' has been submitted.", [](bool) {});
+		UI::get().emplace<UIOk>("Report for '" + target_name + "' sent to GMs.", [](bool) {});
 	}
 
 	void UIReport::set_target(const std::string& name)

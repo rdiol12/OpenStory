@@ -61,16 +61,14 @@ namespace ms
 			BT_REASON4
 		};
 
-		static constexpr int16_t WIDTH = 280;
-		static constexpr int16_t HEADER_HEIGHT = 25;
-		static constexpr int16_t BODY_HEIGHT = 200;
-		static constexpr int16_t INPUT_HEIGHT = 60;
+		static constexpr int16_t W = 280;
+		static constexpr int16_t H = 300;
 
 		static constexpr int NUM_REASONS = 5;
 		static constexpr const char* REASON_LABELS[NUM_REASONS] = {
 			"Hacking/Botting",
 			"Scamming",
-			"Inappropriate Name",
+			"Bad Name",
 			"Harassment",
 			"Other"
 		};
@@ -80,12 +78,10 @@ namespace ms
 		Textfield descfield;
 		int16_t selected_reason;
 
+		Texture backgrnd;
 		ColorBox background;
-		ColorBox header_bg;
-		ColorBox input_bg;
-		Text title_text;
 
-		// Pre-allocated draw objects
+		Text title_text;
 		Text close_x;
 		Text name_label;
 		Text reason_label;
@@ -93,6 +89,7 @@ namespace ms
 		ColorBox reason_bgs[NUM_REASONS];
 		Text reason_texts[NUM_REASONS];
 		ColorBox selected_reason_bg;
+		ColorBox input_bg;
 		ColorBox btn_bg;
 		Text btn_text;
 	};

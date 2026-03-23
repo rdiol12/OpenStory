@@ -19,6 +19,7 @@
 
 #include "../../Graphics/Geometry.h"
 #include "UIBuddyList.h"
+#include "UIGameSettings.h"
 #include "UIChannel.h"
 #include "UIEquipInventory.h"
 #include "UIEvent.h"
@@ -28,6 +29,9 @@
 #include "UIKeyConfig.h"
 #include "UIQuestLog.h"
 #include "UINotice.h"
+#include "UIReport.h"
+
+#include "../../Net/Packets/SocialPackets.h"
 #include "UIOptionMenu.h"
 #include "UIQuit.h"
 #include "UISkillBook.h"
@@ -53,7 +57,6 @@
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 
-#include <fstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -72,8 +75,7 @@ namespace ms
 		show_menu = false;
 		show_system = false;
 		show_quickslot = false;
-		menu_bg = ColorBox(69, 220, Color::Name::BLACK, 0.75f);
-		sys_bg = ColorBox(69, 220, Color::Name::BLACK, 0.75f);
+		// menu_bg and sys_bg are initialized after sub-panel buttons are created (sizes computed there)
 		chat_open = false;
 		chat_target_id = 0;
 
@@ -260,87 +262,88 @@ namespace ms
 		nl::node qs = mainbar["quickSlot"];
 		quickslot_bg = Texture(qs["quickSlot"]);
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
-		buttons[BT_QS_OPEN]->set_active(false);
+		buttons[BT_QS_OPEN]->set_active(true);
 		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"]);
 		buttons[BT_QS_CLOSE]->set_active(false);
 
 		// === Menu sub-panel ===
-		// NX menu_backgrnd is invalid in this version, use ColorBox instead
 		nl::node menu_node = mainbar["Menu"];
 
-		// Position buttons above the bar in a vertical column
-		// Menu button is around x=699 on screen, bar top is y=684
-		// Each button ~63x25, stack upward with 2px gap
-		int16_t menu_x = 188;  // 700 - 512 (parent x)
-		int16_t menu_y_start = -111; // first button top: 768 - 111 = 657
-		int16_t menu_step = -27;     // each button 27px apart going up
+		// Menu buttons stack top-to-bottom above the bar.
+		// Bar top is at -84 relative to position. Panel sits just above that.
+		// v83-visible: Stat, Skill, Quest, Item, Equip, Community, Event, Rank, EpisodBook (9 buttons)
+		constexpr int16_t MENU_STEP = 24;
+		constexpr int16_t MENU_VISIBLE = 9;
+		constexpr int16_t MENU_PANEL_H = MENU_VISIBLE * MENU_STEP + 8;
 
-		buttons[BT_MENU_STAT]          = std::make_unique<MapleButton>(menu_node["BtStat"],      Point<int16_t>(menu_x, menu_y_start));
-		buttons[BT_MENU_SKILL]         = std::make_unique<MapleButton>(menu_node["BtSkill"],     Point<int16_t>(menu_x, menu_y_start + menu_step));
-		buttons[BT_MENU_QUEST]         = std::make_unique<MapleButton>(menu_node["BtQuest"],     Point<int16_t>(menu_x, menu_y_start + menu_step * 2));
-		buttons[BT_MENU_ITEM]          = std::make_unique<MapleButton>(menu_node["BtItem"],      Point<int16_t>(menu_x, menu_y_start + menu_step * 3));
-		buttons[BT_MENU_EQUIP]         = std::make_unique<MapleButton>(menu_node["BtEquip"],     Point<int16_t>(menu_x, menu_y_start + menu_step * 4));
-		buttons[BT_MENU_COMMUNITY]     = std::make_unique<MapleButton>(menu_node["BtCommunity"], Point<int16_t>(menu_x, menu_y_start + menu_step * 5));
-		buttons[BT_MENU_EVENT]         = std::make_unique<MapleButton>(menu_node["BtEvent"],     Point<int16_t>(menu_x, menu_y_start + menu_step * 6));
-		buttons[BT_MENU_RANK]          = std::make_unique<MapleButton>(menu_node["BtRank"],      Point<int16_t>(menu_x, menu_y_start + menu_step * 7));
-		buttons[BT_MENU_EPISODBOOK]    = std::make_unique<MapleButton>(menu_node["BtEpisodBook"],    Point<int16_t>(menu_x, menu_y_start + menu_step * 8));
-		buttons[BT_MENU_MONSTERBATTLE] = std::make_unique<MapleButton>(menu_node["BtMonsterBattle"], Point<int16_t>(menu_x, menu_y_start + menu_step * 9));
-		buttons[BT_MENU_MONSTERLIFE]   = std::make_unique<MapleButton>(menu_node["BtMonsterLife"],   Point<int16_t>(menu_x, menu_y_start + menu_step * 10));
-		buttons[BT_MENU_MSN]           = std::make_unique<MapleButton>(menu_node["BtMSN"],           Point<int16_t>(menu_x, menu_y_start + menu_step * 11));
-		buttons[BT_MENU_AFREECATV]     = std::make_unique<MapleButton>(menu_node["BtAfreecaTV"],     Point<int16_t>(menu_x, menu_y_start + menu_step * 12));
+		int16_t menu_x = 188;
+		int16_t menu_panel_top = -(84 + MENU_PANEL_H);
+		int16_t menu_y = menu_panel_top + 4;
 
-		// Menu buttons hidden until menu is toggled
-		buttons[BT_MENU_STAT]->set_active(false);
-		buttons[BT_MENU_SKILL]->set_active(false);
-		buttons[BT_MENU_QUEST]->set_active(false);
-		buttons[BT_MENU_ITEM]->set_active(false);
-		buttons[BT_MENU_EQUIP]->set_active(false);
-		buttons[BT_MENU_COMMUNITY]->set_active(false);
-		buttons[BT_MENU_EVENT]->set_active(false);
-		buttons[BT_MENU_RANK]->set_active(false);
-		buttons[BT_MENU_EPISODBOOK]->set_active(false);
-		buttons[BT_MENU_MONSTERBATTLE]->set_active(false);
-		buttons[BT_MENU_MONSTERLIFE]->set_active(false);
-		buttons[BT_MENU_MSN]->set_active(false);
-		buttons[BT_MENU_AFREECATV]->set_active(false);
+		buttons[BT_MENU_STAT]          = std::make_unique<MapleButton>(menu_node["BtStat"],      Point<int16_t>(menu_x, menu_y));
+		buttons[BT_MENU_SKILL]         = std::make_unique<MapleButton>(menu_node["BtSkill"],     Point<int16_t>(menu_x, menu_y + MENU_STEP));
+		buttons[BT_MENU_QUEST]         = std::make_unique<MapleButton>(menu_node["BtQuest"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 2));
+		buttons[BT_MENU_ITEM]          = std::make_unique<MapleButton>(menu_node["BtItem"],      Point<int16_t>(menu_x, menu_y + MENU_STEP * 3));
+		buttons[BT_MENU_EQUIP]         = std::make_unique<MapleButton>(menu_node["BtEquip"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 4));
+		buttons[BT_MENU_COMMUNITY]     = std::make_unique<MapleButton>(menu_node["BtCommunity"], Point<int16_t>(menu_x, menu_y + MENU_STEP * 5));
+		buttons[BT_MENU_EVENT]         = std::make_unique<MapleButton>(menu_node["BtEvent"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 6));
+		buttons[BT_MENU_RANK]          = std::make_unique<MapleButton>(menu_node["BtRank"],      Point<int16_t>(menu_x, menu_y + MENU_STEP * 7));
+		buttons[BT_MENU_EPISODBOOK]    = std::make_unique<MapleButton>(menu_node["BtEpisodBook"],    Point<int16_t>(menu_x, menu_y + MENU_STEP * 8));
 
-		// === System sub-panel ===
-		nl::node sys_node = mainbar["System"];
+		// Post-BB buttons — created but disabled and never shown
+		buttons[BT_MENU_MONSTERBATTLE] = std::make_unique<MapleButton>(menu_node["BtMonsterBattle"], Point<int16_t>(menu_x, menu_y + MENU_STEP * 9));
+		buttons[BT_MENU_MONSTERLIFE]   = std::make_unique<MapleButton>(menu_node["BtMonsterLife"],   Point<int16_t>(menu_x, menu_y + MENU_STEP * 10));
+		buttons[BT_MENU_MSN]           = std::make_unique<MapleButton>(menu_node["BtMSN"],           Point<int16_t>(menu_x, menu_y + MENU_STEP * 11));
+		buttons[BT_MENU_AFREECATV]     = std::make_unique<MapleButton>(menu_node["BtAfreecaTV"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 12));
 
-		// Position buttons above the bar, right of Menu panel
-		// System button is around x=776 on screen
-		int16_t sys_x = 264;  // 776 - 512 (parent x)
-		int16_t sys_y_start = -111;
-		int16_t sys_step = -27;
+		// All menu buttons hidden until menu is toggled
+		for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_AFREECATV; i++)
+			buttons[i]->set_active(false);
 
-		buttons[BT_SYS_CHANNEL]      = std::make_unique<MapleButton>(sys_node["BtChannel"],      Point<int16_t>(sys_x, sys_y_start));
-		buttons[BT_SYS_GAMEOPTION]   = std::make_unique<MapleButton>(sys_node["BtGameOption"],   Point<int16_t>(sys_x, sys_y_start + sys_step));
-		buttons[BT_SYS_GAMEQUIT]     = std::make_unique<MapleButton>(sys_node["BtGameQuit"],     Point<int16_t>(sys_x, sys_y_start + sys_step * 2));
-		buttons[BT_SYS_JOYPAD]       = std::make_unique<MapleButton>(sys_node["BtJoyPad"],       Point<int16_t>(sys_x, sys_y_start + sys_step * 3));
-		buttons[BT_SYS_KEYSETTING]   = std::make_unique<MapleButton>(sys_node["BtKeySetting"],   Point<int16_t>(sys_x, sys_y_start + sys_step * 4));
-		buttons[BT_SYS_MONSTERLIFE]  = std::make_unique<MapleButton>(sys_node["BtMonsterLife"],  Point<int16_t>(sys_x, sys_y_start + sys_step * 5));
-		buttons[BT_SYS_OPTION]       = std::make_unique<MapleButton>(sys_node["BtOption"],       Point<int16_t>(sys_x, sys_y_start + sys_step * 6));
-		buttons[BT_SYS_ROOMCHANGE]   = std::make_unique<MapleButton>(sys_node["BtRoomChange"],   Point<int16_t>(sys_x, sys_y_start + sys_step * 7));
-		buttons[BT_SYS_SYSTEMOPTION] = std::make_unique<MapleButton>(sys_node["BtSystemOption"], Point<int16_t>(sys_x, sys_y_start + sys_step * 8));
-
-		// System buttons hidden until system menu is toggled
-		buttons[BT_SYS_CHANNEL]->set_active(false);
-		buttons[BT_SYS_GAMEOPTION]->set_active(false);
-		buttons[BT_SYS_GAMEQUIT]->set_active(false);
-		buttons[BT_SYS_JOYPAD]->set_active(false);
-		buttons[BT_SYS_KEYSETTING]->set_active(false);
-		buttons[BT_SYS_MONSTERLIFE]->set_active(false);
-		buttons[BT_SYS_OPTION]->set_active(false);
-		buttons[BT_SYS_ROOMCHANGE]->set_active(false);
-		buttons[BT_SYS_SYSTEMOPTION]->set_active(false);
-
-		// Disable v83-incompatible buttons (post-BB features)
+		// Disable post-BB buttons permanently
 		buttons[BT_MENU_MONSTERBATTLE]->set_state(Button::State::DISABLED);
 		buttons[BT_MENU_MONSTERLIFE]->set_state(Button::State::DISABLED);
 		buttons[BT_MENU_MSN]->set_state(Button::State::DISABLED);
 		buttons[BT_MENU_AFREECATV]->set_state(Button::State::DISABLED);
-		buttons[BT_MENU_EPISODBOOK]->set_state(Button::State::DISABLED);
+
+		// Menu background sized to cover visible buttons
+		menu_bg = ColorBox(69, MENU_PANEL_H, Color::Name::BLACK, 0.75f);
+
+		// === System sub-panel ===
+		nl::node sys_node = mainbar["System"];
+
+		// 8 visible buttons (MonsterLife skipped in layout)
+		constexpr int16_t SYS_STEP = 24;
+		constexpr int16_t SYS_VISIBLE = 8;
+		constexpr int16_t SYS_PANEL_H = SYS_VISIBLE * SYS_STEP + 8;
+
+		int16_t sys_x = 264;
+		int16_t sys_panel_top = -(84 + SYS_PANEL_H);
+		int16_t sys_y = sys_panel_top + 4;
+
+		int16_t si = 0;
+		buttons[BT_SYS_CHANNEL]      = std::make_unique<MapleButton>(sys_node["BtChannel"],      Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_GAMEOPTION]   = std::make_unique<MapleButton>(sys_node["BtGameOption"],   Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_GAMEQUIT]     = std::make_unique<MapleButton>(sys_node["BtGameQuit"],     Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_JOYPAD]       = std::make_unique<MapleButton>(sys_node["BtJoyPad"],       Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_KEYSETTING]   = std::make_unique<MapleButton>(sys_node["BtKeySetting"],   Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_OPTION]       = std::make_unique<MapleButton>(sys_node["BtOption"],       Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		buttons[BT_SYS_ROOMCHANGE]   = std::make_unique<MapleButton>(sys_node["BtRoomChange"],   Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		if (sys_node["BtSystemOption"].size() > 0)
+			buttons[BT_SYS_SYSTEMOPTION] = std::make_unique<MapleButton>(sys_node["BtSystemOption"], Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+		else
+			buttons[BT_SYS_SYSTEMOPTION] = std::make_unique<MapleButton>(sys_node["BtGameOption"], Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
+
+		// MonsterLife — created but never shown (no position slot)
+		buttons[BT_SYS_MONSTERLIFE]  = std::make_unique<MapleButton>(sys_node["BtMonsterLife"],  Point<int16_t>(sys_x, sys_y + SYS_STEP * si));
 		buttons[BT_SYS_MONSTERLIFE]->set_state(Button::State::DISABLED);
+
+		// All system buttons hidden until toggled
+		for (uint16_t i = BT_SYS_CHANNEL; i <= BT_SYS_SYSTEMOPTION; i++)
+			buttons[i]->set_active(false);
+
+		// System background sized to cover visible buttons
+		sys_bg = ColorBox(69, SYS_PANEL_H, Color::Name::BLACK, 0.75f);
 
 		// === readyZero ===
 		nl::node rz = mainbar["readyZero"];
@@ -499,18 +502,18 @@ namespace ms
 		if (sp > 0)
 			sp_notify.draw(DrawArgument(position), alpha);
 
-		// Draw menu sub-panel background (positioned to align with menu buttons)
+		// Draw menu sub-panel background (anchored at topmost button, extending down)
 		if (show_menu)
 		{
-			auto menu_bounds = buttons.at(BT_MENU_STAT)->bounds(position);
-			menu_bg.draw(DrawArgument(Point<int16_t>(menu_bounds.get_left_top().x() - 2, menu_bounds.get_left_top().y() - 2)));
+			auto top_btn = buttons.at(BT_MENU_STAT)->bounds(position);
+			menu_bg.draw(DrawArgument(Point<int16_t>(top_btn.get_left_top().x() - 3, top_btn.get_left_top().y() - 3)));
 		}
 
-		// Draw system sub-panel background (positioned to align with system buttons)
+		// Draw system sub-panel background (anchored at topmost button, extending down)
 		if (show_system)
 		{
-			auto sys_bounds = buttons.at(BT_SYS_CHANNEL)->bounds(position);
-			sys_bg.draw(DrawArgument(Point<int16_t>(sys_bounds.get_left_top().x() - 2, sys_bounds.get_left_top().y() - 2)));
+			auto top_btn = buttons.at(BT_SYS_CHANNEL)->bounds(position);
+			sys_bg.draw(DrawArgument(Point<int16_t>(top_btn.get_left_top().x() - 3, top_btn.get_left_top().y() - 3)));
 		}
 
 		// Draw quick slot panel
@@ -563,6 +566,10 @@ namespace ms
 		{
 		case BT_WHISPER:
 			UI::get().emplace<UIWhisper>();
+			return Button::State::NORMAL;
+
+		case BT_CALLGM:
+			UI::get().emplace<UIReport>();
 			return Button::State::NORMAL;
 
 		case BT_FARM:
@@ -623,32 +630,11 @@ namespace ms
 		}
 
 		case BT_MENU:
-		{
-			std::ofstream dbg("menu_debug.txt", std::ios::app);
-			dbg << "BT_MENU clicked, show_menu=" << show_menu << std::endl;
 			toggle_menu();
-			dbg << "After toggle, show_menu=" << show_menu << std::endl;
-			dbg << "menu_backgrnd valid=" << menu_backgrnd.is_valid() << std::endl;
-			if (show_menu)
-			{
-				// Dump sub-panel button positions
-				auto stat_bounds = buttons[BT_MENU_STAT]->bounds(position);
-				dbg << "BT_MENU_STAT active=" << buttons[BT_MENU_STAT]->is_active()
-					<< " bounds=(" << stat_bounds.get_left_top().x() << "," << stat_bounds.get_left_top().y()
-					<< ")-(" << stat_bounds.get_right_bottom().x() << "," << stat_bounds.get_right_bottom().y() << ")" << std::endl;
-				auto skill_bounds = buttons[BT_MENU_SKILL]->bounds(position);
-				dbg << "BT_MENU_SKILL active=" << buttons[BT_MENU_SKILL]->is_active()
-					<< " bounds=(" << skill_bounds.get_left_top().x() << "," << skill_bounds.get_left_top().y()
-					<< ")-(" << skill_bounds.get_right_bottom().x() << "," << skill_bounds.get_right_bottom().y() << ")" << std::endl;
-			}
-			dbg.close();
 			return Button::State::NORMAL;
-		}
 
 		case BT_OPTIONS:
 		{
-			std::ofstream dbg("menu_debug.txt", std::ios::app);
-			dbg << "BT_OPTIONS clicked, show_system=" << show_system << std::endl;
 			if (show_system)
 			{
 				show_system = false;
@@ -680,8 +666,6 @@ namespace ms
 				buttons[BT_SYS_ROOMCHANGE]->set_active(true);
 				buttons[BT_SYS_SYSTEMOPTION]->set_active(true);
 			}
-			dbg << "After toggle, show_system=" << show_system << std::endl;
-			dbg.close();
 			return Button::State::NORMAL;
 		}
 
@@ -707,6 +691,7 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_NOTICE:
+			ReportPacket(0, "", 0, "").dispatch();
 			return Button::State::NORMAL;
 
 		case BT_SYS_GAMEQUIT:
@@ -715,13 +700,17 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_SYS_GAMEOPTION:
+			UI::get().emplace<UIGameSettings>();
+			remove_menus();
+			return Button::State::NORMAL;
+
 		case BT_SYS_OPTION:
 			UI::get().emplace<UIOptionMenu>();
 			remove_menus();
 			return Button::State::NORMAL;
 
 		case BT_SYS_SYSTEMOPTION:
-			UI::get().emplace<UISystemOption>();
+			UI::get().emplace<UIOptionMenu>();
 			remove_menus();
 			return Button::State::NORMAL;
 
@@ -920,8 +909,9 @@ namespace ms
 			buttons[BT_MENU_COMMUNITY]->set_active(true);
 			buttons[BT_MENU_EVENT]->set_active(true);
 			buttons[BT_MENU_RANK]->set_active(true);
-			// Post-BB buttons stay disabled
-			// BT_MENU_EPISODBOOK, BT_MENU_MONSTERBATTLE, BT_MENU_MONSTERLIFE, BT_MENU_MSN, BT_MENU_AFREECATV
+			buttons[BT_MENU_EPISODBOOK]->set_active(true);
+			// Post-BB buttons stay inactive (not visible)
+			// BT_MENU_MONSTERBATTLE, BT_MENU_MONSTERLIFE, BT_MENU_MSN, BT_MENU_AFREECATV
 		}
 	}
 

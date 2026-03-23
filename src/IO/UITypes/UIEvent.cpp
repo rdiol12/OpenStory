@@ -68,19 +68,6 @@ namespace ms
 		label_on = main["label_on"]["0"];
 		label_next = main["label_next"]["0"];
 
-		slider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(86, 449), 396, 3, event_count,
-			[&](bool upwards)
-			{
-				int16_t shift = upwards ? -1 : 1;
-				bool above = offset + shift >= 0;
-				bool below = offset + shift <= event_count - 3;
-
-				if (above && below)
-					offset += shift;
-			}
-		);
-
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 	}
@@ -88,8 +75,6 @@ namespace ms
 	void UIEvent::draw(float inter) const
 	{
 		UIElement::draw(inter);
-
-		slider.draw(position);
 
 		for (size_t i = 0; i < 3; i++)
 		{
@@ -172,17 +157,11 @@ namespace ms
 		UIDragElement::remove_cursor();
 
 		UI::get().clear_tooltip(Tooltip::Parent::EVENT);
-
-		slider.remove_cursor();
 	}
 
 	Cursor::State UIEvent::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;
-
-		if (slider.isenabled())
-			if (Cursor::State new_state = slider.send_cursor(cursoroffset, clicked))
-				return new_state;
 
 		int16_t yoff = cursoroffset.y();
 		int16_t xoff = cursoroffset.x();
@@ -193,6 +172,15 @@ namespace ms
 			show_item(row, col);
 
 		return UIDragElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIEvent::send_scroll(double yoffset)
+	{
+		int16_t shift = (yoffset > 0) ? -1 : 1;
+		int16_t new_offset = offset + shift;
+
+		if (new_offset >= 0 && new_offset <= event_count - 3)
+			offset = new_offset;
 	}
 
 	void UIEvent::send_key(int32_t keycode, bool pressed, bool escape)

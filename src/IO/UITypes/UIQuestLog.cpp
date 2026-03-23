@@ -884,12 +884,12 @@ namespace ms
 		};
 
 		set_detail_btn_pos(Buttons::BT_DETAIL_CLOSE, Point<int16_t>(panel_w - 25, 5));
-		set_detail_btn_pos(Buttons::BT_ACCEPT, Point<int16_t>(10, panel_h - 20));
-		set_detail_btn_pos(Buttons::BT_FINISH, Point<int16_t>(10, panel_h - 20));
-		set_detail_btn_pos(Buttons::GIVEUP, Point<int16_t>(10, panel_h - 20));
-		set_detail_btn_pos(Buttons::MARK_NPC, Point<int16_t>(panel_w - 85, panel_h - 20));
-		set_detail_btn_pos(Buttons::BT_DELIVERY_ACCEPT, Point<int16_t>(10, panel_h - 20));
-		set_detail_btn_pos(Buttons::BT_DELIVERY_COMPLETE, Point<int16_t>(panel_w - 85, panel_h - 20));
+		set_detail_btn_pos(Buttons::BT_ACCEPT, Point<int16_t>(10, panel_h - 30));
+		set_detail_btn_pos(Buttons::BT_FINISH, Point<int16_t>(panel_w - 85, panel_h - 30));
+		set_detail_btn_pos(Buttons::GIVEUP, Point<int16_t>(10, panel_h - 30));
+		set_detail_btn_pos(Buttons::MARK_NPC, Point<int16_t>(panel_w / 2 - 35, panel_h - 30));
+		set_detail_btn_pos(Buttons::BT_DELIVERY_ACCEPT, Point<int16_t>(10, panel_h - 30));
+		set_detail_btn_pos(Buttons::BT_DELIVERY_COMPLETE, Point<int16_t>(panel_w - 85, panel_h - 30));
 
 		// Show/hide detail buttons based on quest state
 		set_btn_active(Buttons::GIVEUP, false);

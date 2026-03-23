@@ -585,6 +585,12 @@ namespace ms
 		PosSYSTEMOPTION() : PointEntry("PosSYSTEMOPTION", "(200, 100)") {}
 	};
 
+	// The default position of UIGameSettings
+	struct PosGAMESETTINGS : public Configuration::PointEntry
+	{
+		PosGAMESETTINGS() : PointEntry("PosGAMESETTINGS", "(300, 200)") {}
+	};
+
 	// The default position of UIChatWindow
 	struct PosCHATWINDOW : public Configuration::PointEntry
 	{
