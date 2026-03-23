@@ -349,8 +349,9 @@ namespace ms
 		bool flip = recv.read_bool();
 		uint16_t fh = recv.read_short();
 
-		recv.read_short(); // 'rx'
-		recv.read_short(); // 'ry'
+		recv.read_short(); // rx0
+		recv.read_short(); // rx1
+		recv.read_byte();  // minimap (1=show on minimap)
 
 		Stage::get().get_npcs().spawn(
 			{ oid, id, position, flip, fh }
@@ -447,9 +448,9 @@ namespace ms
 		int32_t oid = recv.read_int();
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
-		int8_t stance = recv.read_byte(); // Stance byte, may differ from state for animated reactors
-		recv.skip(2); // Padding bytes
-		recv.skip(1); // Frame delay (also defined in WZ data)
+		int8_t stance = recv.read_byte();
+		recv.read_short(); // unknown
+		int8_t frame_delay = recv.read_byte();
 
 		Stage::get().get_reactors().trigger(oid, state);
 	}
@@ -460,10 +461,8 @@ namespace ms
 		int32_t rid = recv.read_int();
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
-
-		// Remaining packet data (fhid, stance) unused by client
-		// uint16_t fhid = recv.read_short();
-		// recv.read_byte()
+		int8_t facing = recv.read_byte();     // facingDirection
+		recv.read_short();                     // padding (0)
 
 		Stage::get().get_reactors().spawn(
 			{ oid, rid, state, point }
@@ -649,19 +648,19 @@ namespace ms
 	void SpawnMistHandler::handle(InPacket& recv) const
 	{
 		int32_t oid = recv.read_int();
-		int32_t mist_type = recv.read_int(); // 0 = mob mist, 1 = poison mist, 2 = smoke screen
+		int32_t mist_type = recv.read_int();  // 0=mob, 1=poison, 2=smokescreen, 4=recovery
 		int32_t owner_id = recv.read_int();
 		int32_t skill_id = recv.read_int();
 		int8_t skill_level = recv.read_byte();
-		recv.read_short(); // skill delay
-		int32_t box_x1 = recv.read_int(); // bounding box
-		int32_t box_y1 = recv.read_int();
-		int32_t box_x2 = recv.read_int();
-		int32_t box_y2 = recv.read_int();
-		recv.read_int(); // 0 padding
+		int16_t delay = recv.read_short();
+		int32_t x1 = recv.read_int();
+		int32_t y1 = recv.read_int();
+		int32_t x2 = recv.read_int();
+		int32_t y2 = recv.read_int();
+		recv.read_int(); // unknown
 
-		Point<int16_t> pos1(static_cast<int16_t>(box_x1), static_cast<int16_t>(box_y1));
-		Point<int16_t> pos2(static_cast<int16_t>(box_x2), static_cast<int16_t>(box_y2));
+		Point<int16_t> pos1(static_cast<int16_t>(x1), static_cast<int16_t>(y1));
+		Point<int16_t> pos2(static_cast<int16_t>(x2), static_cast<int16_t>(y2));
 
 		Stage::get().get_mists().spawn(
 			{ oid, owner_id, pos1, pos2, skill_id, skill_level, static_cast<int8_t>(mist_type) }

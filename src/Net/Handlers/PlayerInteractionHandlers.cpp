@@ -29,58 +29,55 @@ namespace ms
 		int8_t character_level = recv.read_byte();
 		int16_t character_job_id = recv.read_short();
 		int16_t character_fame = recv.read_short();
-		recv.skip_byte(); // character_marriage_ring
+		recv.read_byte(); // married (0/1)
 
 		std::string guild_name = recv.read_string();
 		std::string alliance_name = recv.read_string();
+		recv.read_byte(); // pMedalInfo
 
-		recv.skip_byte();
-
-		int8_t pet_unique_id = recv.read_byte();
-
-		while (pet_unique_id != 0)
+		// Pets — sentinel-terminated (byte != 0 means pet follows, byte 0 ends list)
+		while (recv.read_byte() != 0)
 		{
-			recv.skip_int();	// pet_id
-			recv.skip_string();	// pet_name
-			recv.skip_byte();	// pet_level
-			recv.skip_short();	// pet_closeness
-			recv.skip_byte();	// pet_fullness
-
-			recv.skip_short();
-
-			recv.skip_int(); // pet_inventory_id
-
-			pet_unique_id = recv.read_byte();
+			recv.read_int();    // petItemId
+			recv.read_string(); // petName
+			recv.read_byte();   // petLevel
+			recv.read_short();  // petTameness
+			recv.read_byte();   // petFullness
+			recv.read_short();  // unknown (0)
+			recv.read_int();    // label ring itemId
 		}
 
-		int8_t mount = recv.read_byte();
+		int8_t mount_equipped = recv.read_byte();
 
-		if (mount != 0)
+		if (mount_equipped != 0)
 		{
-			recv.skip_int(); // mount_level
-			recv.skip_int(); // mount_exp
-			recv.skip_int(); // mount_tiredness
+			recv.read_int(); // mountLevel
+			recv.read_int(); // mountExp
+			recv.read_int(); // mountFatigue
 		}
 
-		int8_t wishlist_size = recv.read_byte();
+		int8_t wishlist_count = recv.read_byte();
 
-		for (int8_t sn = 0; sn < wishlist_size; sn++)
-			recv.skip_int(); // wishlist_item
+		for (int8_t w = 0; w < wishlist_count; w++)
+			recv.read_int(); // itemId
 
-		recv.skip_int(); // monster_book_level
-		recv.skip_int(); // monster_book_card_normal
-		recv.skip_int(); // monster_book_card_special
-		recv.skip_int(); // monster_book_cards_total
-		recv.skip_int(); // monster_book_cover
+		recv.read_int(); // monsterBookLevel
+		recv.read_int(); // monsterBookNormals
+		recv.read_int(); // monsterBookSpecials
+		recv.read_int(); // monsterBookTotalCards
+		recv.read_int(); // monsterBookCover
 
-		recv.skip_int(); // medal
+		// Medal info
+		if (recv.available())
+		{
+			recv.read_int(); // medal
 
-		int16_t medal_quests_size = recv.read_short();
+			int16_t medal_quests_size = recv.read_short();
 
-		for (int16_t s = 0; s < medal_quests_size; s++)
-			recv.skip_short(); // medal_quest
+			for (int16_t s = 0; s < medal_quests_size; s++)
+				recv.read_short();
+		}
 
-		// Create (or re-create) the character information window, then update its stats
 		UI::get().emplace<UICharInfo>(character_id);
 
 		if (auto charinfo = UI::get().get_element<UICharInfo>())

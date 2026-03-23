@@ -78,6 +78,17 @@ namespace ms
 		}
 	};
 
+	// Change monster book cover
+	// Opcode: MONSTER_BOOK_COVER(57)
+	class MonsterBookCoverPacket : public OutPacket
+	{
+	public:
+		MonsterBookCoverPacket(int32_t card_item_id) : OutPacket(OutPacket::Opcode::MONSTER_BOOK_COVER)
+		{
+			write_int(card_item_id); // 238xxxx card item ID, or 0 to clear
+		}
+	};
+
 	// Requests the server to change key mappings
 	// Opcode: CHANGE_KEYMAP(135)
 	class ChangeKeyMapPacket : public OutPacket

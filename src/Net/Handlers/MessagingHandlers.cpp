@@ -18,12 +18,14 @@
 #include "MessagingHandlers.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/CharEffect.h"
 #include "../../Data/ItemData.h"
 #include "../../Character/QuestLog.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIQuestHelper.h"
 #include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStatusBar.h"
@@ -145,6 +147,7 @@ namespace ms
 				quests.add_completed(qid, time);
 				show_status(Color::Name::WHITE, "Quest completed!");
 				Sound(Sound::Name::QUESTCOMPLETE).play();
+				Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);
 
 				// Show notice button alert
 				if (auto statusbar = UI::get().get_element<UIStatusBar>())
@@ -279,7 +282,6 @@ namespace ms
 		}
 		case 10: // Triple megaphone (multi-line)
 		{
-			// Message already read above; there may be additional lines
 			if (chatbar)
 				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
 			break;
@@ -504,5 +506,11 @@ namespace ms
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline(line, UIChatBar::LineType::BLUE);
+	}
+
+	void FakeGMNoticeHandler::handle(InPacket& recv) const
+	{
+		std::string message = recv.read_string();
+		UI::get().emplace<UIOk>(message, [](bool) {});
 	}
 }

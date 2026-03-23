@@ -23,7 +23,13 @@
 #include "../../Character/BuddyList.h"
 #include "../../Character/Party.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+
+#include "../Packets/GameplayPackets.h"
+#include "../Packets/SocialPackets.h"
+#include "../Packets/BuddyPackets.h"
 #include "../../IO/UITypes/UIGuild.h"
 #include "../../IO/UITypes/UIGuildBBS.h"
 #include "../../IO/UITypes/UIMessenger.h"
@@ -37,11 +43,6 @@ namespace ms
 {
 	void BuddyListHandler::handle(InPacket& recv) const
 	{
-		// v83: byte operation
-		// 7 = buddy list update
-		// 10 = buddy channel change
-		// 14 = buddy capacity
-		// 18 = buddy added/online
 		if (!recv.available())
 			return;
 
@@ -51,7 +52,7 @@ namespace ms
 		{
 		case 7:
 		{
-			// Buddy list update
+			// Full buddy list update
 			if (!recv.available())
 				break;
 
@@ -68,78 +69,67 @@ namespace ms
 				entry.name = recv.read_padded_string(13);
 				entry.status = recv.read_byte();
 				entry.channel = recv.read_int();
-				entry.group = recv.read_padded_string(17);
+				entry.group = recv.read_padded_string(13);
+				recv.read_int(); // padding (0)
 
 				entries[entry.cid] = entry;
 			}
 
-			Stage::get().get_player().get_buddylist().update(entries);
-			break;
-		}
-		case 10:
-		{
-			// Buddy channel change — same format as op 7
-			if (!recv.available())
-				break;
-
-			int8_t count = recv.read_byte();
-			std::map<int32_t, BuddyEntry> entries;
-
+			// Skip mapId block
 			for (int8_t i = 0; i < count; i++)
 			{
-				if (recv.length() < 4)
-					break;
-
-				BuddyEntry entry;
-				entry.cid = recv.read_int();
-				entry.name = recv.read_padded_string(13);
-				entry.status = recv.read_byte();
-				entry.channel = recv.read_int();
-				entry.group = recv.read_padded_string(17);
-				entries[entry.cid] = entry;
+				if (recv.length() >= 4)
+					recv.read_int();
 			}
 
 			Stage::get().get_player().get_buddylist().update(entries);
 			break;
 		}
-		case 14:
+		case 9:
 		{
-			// Buddy capacity
+			// Incoming friend request — show Yes/No popup
+			if (recv.length() < 4)
+				break;
+
+			int32_t from_cid = recv.read_int();
+			std::string from_name = recv.read_string();
+
+			UI::get().emplace<UIYesNo>(
+				from_name + " wants to be your buddy.",
+				[from_cid](bool yes)
+				{
+					if (yes)
+						AcceptBuddyPacket(from_cid).dispatch();
+					// Decline = do nothing (request stays pending)
+				}
+			);
+
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				statusbar->notify();
+
+			break;
+		}
+		case 0x14:
+		{
+			// Single buddy channel update
+			if (recv.length() < 4)
+				break;
+
+			int32_t cid = recv.read_int();
+			recv.read_byte(); // 0
+			int32_t channel = recv.read_int();
+
+			// TODO: update buddy's channel in the list and show login/logout message
+			break;
+		}
+		case 0x15:
+		{
+			// Buddy capacity changed
 			if (recv.available())
 			{
 				int8_t capacity = recv.read_byte();
 				Stage::get().get_player().get_buddylist().set_capacity(capacity);
 			}
-			break;
-		}
-		case 18:
-		{
-			// Buddy added / online notification — same format as op 7
-			if (!recv.available())
-				break;
-
-			int8_t count = recv.read_byte();
-			std::map<int32_t, BuddyEntry> entries;
-
-			for (int8_t i = 0; i < count; i++)
-			{
-				if (recv.length() < 4)
-					break;
-
-				BuddyEntry entry;
-				entry.cid = recv.read_int();
-				entry.name = recv.read_padded_string(13);
-				entry.status = recv.read_byte();
-				entry.channel = recv.read_int();
-				entry.group = recv.read_padded_string(17);
-				entries[entry.cid] = entry;
-			}
-
-			Stage::get().get_player().get_buddylist().update(entries);
-
-			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
-				messenger->show_status(Color::Name::WHITE, "Your buddy list has been updated.");
-
 			break;
 		}
 		default:
@@ -149,44 +139,51 @@ namespace ms
 
 	void FamilyHandler::handle(InPacket& recv) const
 	{
-		// v83 family packet - show family-related messages
 		if (!recv.available())
 			return;
 
 		int8_t mode = recv.read_byte();
-		auto messenger = UI::get().get_element<UIStatusMessenger>();
 
 		switch (mode)
 		{
-		case 0:
+		case 0x00: // Family chart — tree of members
 		{
-			// Family info update - list of family members
-			// int count, then for each: int cid, string name, short job, short level, int rep
-			if (recv.length() < 4)
-				break;
+			// charId, name, job, level, reputation, totalJuniors per member
+			// Just consume the data
+			while (recv.available())
+				recv.read_byte();
 
-			int32_t count = recv.read_int();
-
-			for (int32_t i = 0; i < count && recv.available(); i++)
-			{
-				recv.read_int();    // cid
-				recv.read_string(); // name
-				recv.read_short();  // job
-				recv.read_short();  // level
-				recv.read_int();    // reputation
-			}
 			break;
 		}
-		case 2:
+		case 0x01: // Family info — senior, juniors, rep
 		{
-			// Family invitation
-			if (recv.available())
-			{
-				std::string from_name = recv.read_string();
+			while (recv.available())
+				recv.read_byte();
 
-				if (messenger)
-					messenger->show_status(Color::Name::YELLOW, from_name + " has invited you to join their family.");
-			}
+			break;
+		}
+		case 0x02: // Use entitlement result
+		{
+			while (recv.available())
+				recv.read_byte();
+
+			break;
+		}
+		case 0x07: // Invite
+		{
+			std::string senior_name = recv.read_string();
+			int32_t senior_cid = recv.read_int();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(senior_name + " has invited you to join their family.", UIChatBar::LineType::YELLOW);
+
+			break;
+		}
+		case 0x0B: // Buff notification from family member
+		{
+			while (recv.available())
+				recv.read_byte();
+
 			break;
 		}
 		default:
@@ -255,15 +252,6 @@ namespace ms
 
 	void PartyOperationHandler::handle(InPacket& recv) const
 	{
-		// v83 party operations:
-		// 7  = silent party update (full party data)
-		// 11 = party created / you joined (full party data)
-		// 12 = invite received
-		// 13 = expel (int partyid, int target_cid, byte new_leader, then full party data if still in)
-		// 14 = member left (int partyid, int target_cid, byte new_leader, then full party data if still in)
-		// 15 = disband (int partyid, int leader_cid)
-		// 22 = leader changed
-		// 25 = member online/channel status changed (full party data)
 		if (!recv.available())
 			return;
 
@@ -272,79 +260,101 @@ namespace ms
 
 		switch (operation)
 		{
-		case 7:
-		case 11:
-		case 25:
+		case 4:
 		{
-			// Full party data update
-			// Op 7 = silent refresh, 11 = joined/created, 25 = member status change
+			// Invite received — show Yes/No popup
+			if (recv.length() < 4)
+				break;
+
+			int32_t partyid = recv.read_int();
+			std::string from_name = recv.read_string();
+
+			// Strip "PS: " prefix from party search invites
+			std::string display_name = from_name;
+			if (display_name.substr(0, 4) == "PS: ")
+				display_name = display_name.substr(4);
+
+			UI::get().emplace<UIYesNo>(
+				display_name + " has invited you to their party.",
+				[partyid, from_name](bool yes)
+				{
+					if (yes)
+						JoinPartyPacket(partyid).dispatch();
+					else
+						DenyPartyInvitePacket(from_name).dispatch();
+				}
+			);
+
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				statusbar->notify();
+
+			break;
+		}
+		case 7:
+		{
+			// Silent update / log on-off
 			if (recv.length() < 4)
 				break;
 
 			int32_t partyid = recv.read_int();
 			parse_party_data(recv, partyid);
-
-			if (operation == 11 && messenger)
-				messenger->show_status(Color::Name::WHITE, "You have joined the party.");
-
 			break;
 		}
-		case 12:
+		case 8:
 		{
-			// Invite received
+			// Party created
 			if (recv.length() < 4)
 				break;
 
-			int32_t from_cid = recv.read_int();
-			std::string from_name = recv.read_string();
+			int32_t partyid = recv.read_int();
+			// 4x int door data
+			recv.read_int(); // townMap
+			recv.read_int(); // areaMap
+			recv.read_int(); // posX
+			recv.read_int(); // posY
 
 			if (messenger)
-				messenger->show_status(Color::Name::YELLOW, from_name + " has invited you to a party.");
+				messenger->show_status(Color::Name::WHITE, "You have created a party.");
 
 			break;
 		}
-		case 13:
+		case 0x0C:
 		{
-			// Member expelled
+			// Leave / Expel / Disband
 			if (recv.length() < 4)
 				break;
 
 			int32_t partyid = recv.read_int();
 			int32_t target_cid = recv.read_int();
+			bool disbanded = recv.read_byte() != 0;
+			bool expelled = recv.read_byte() != 0;
+			std::string target_name = recv.read_string();
 
 			int32_t my_cid = Stage::get().get_player().get_oid();
 
-			if (target_cid == my_cid)
+			if (disbanded)
+			{
+				Stage::get().get_player().get_party().clear();
+
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, "The party has been disbanded.");
+			}
+			else if (expelled && target_cid == my_cid)
 			{
 				Stage::get().get_player().get_party().clear();
 
 				if (messenger)
 					messenger->show_status(Color::Name::RED, "You have been expelled from the party.");
 			}
-			else
+			else if (expelled)
 			{
-				// Skip byte (leader_changed flag) and re-parse party data
-				if (recv.available())
-					recv.read_byte();
-
 				if (recv.length() >= 4 * 6)
 					parse_party_data(recv, partyid);
+
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, target_name + " has been expelled.");
 			}
-
-			break;
-		}
-		case 14:
-		{
-			// Member left
-			if (recv.length() < 4)
-				break;
-
-			int32_t partyid = recv.read_int();
-			int32_t target_cid = recv.read_int();
-
-			int32_t my_cid = Stage::get().get_player().get_oid();
-
-			if (target_cid == my_cid)
+			else if (target_cid == my_cid)
 			{
 				Stage::get().get_player().get_party().clear();
 
@@ -353,53 +363,95 @@ namespace ms
 			}
 			else
 			{
-				if (recv.available())
-					recv.read_byte();
-
 				if (recv.length() >= 4 * 6)
 					parse_party_data(recv, partyid);
+
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, target_name + " has left the party.");
 			}
 
 			break;
 		}
-		case 15:
+		case 0x0F:
 		{
-			// Party disbanded
-			if (recv.length() < 8)
+			// Player joined
+			if (recv.length() < 4)
 				break;
 
-			recv.read_int(); // partyid
-			recv.read_int(); // leader_cid
+			int32_t partyid = recv.read_int();
+			std::string new_member = recv.read_string();
 
-			Stage::get().get_player().get_party().clear();
+			if (recv.length() >= 4 * 6)
+				parse_party_data(recv, partyid);
 
 			if (messenger)
-				messenger->show_status(Color::Name::WHITE, "The party has been disbanded.");
+				messenger->show_status(Color::Name::WHITE, new_member + " has joined the party.");
 
 			break;
 		}
-		case 22:
+		case 0x1B:
 		{
 			// Leader changed
 			if (recv.length() < 4)
 				break;
 
 			int32_t new_leader_cid = recv.read_int();
-
-			Party& party = Stage::get().get_player().get_party();
-			int32_t partyid = party.get_id();
-
-			// Re-parse with same partyid if full data follows
-			if (recv.length() >= 4 * 6)
-			{
-				parse_party_data(recv, partyid);
-			}
+			recv.read_byte(); // always 0
 
 			if (messenger)
 				messenger->show_status(Color::Name::WHITE, "The party leader has changed.");
 
 			break;
 		}
+		case 0x23:
+		{
+			// Door/portal update
+			if (recv.available())
+				recv.read_short();
+			break;
+		}
+		// Error/status codes
+		case 10:
+			if (messenger) messenger->show_status(Color::Name::RED, "A beginner can't create a party.");
+			break;
+		// Note: error code 12 (0x0C) is handled by the Leave/Expel/Disband case above
+		case 13:
+			if (messenger) messenger->show_status(Color::Name::RED, "You are not in a party.");
+			break;
+		case 16:
+			if (messenger) messenger->show_status(Color::Name::RED, "You are already in a party.");
+			break;
+		case 17:
+			if (messenger) messenger->show_status(Color::Name::RED, "The party is full.");
+			break;
+		case 19:
+			if (messenger) messenger->show_status(Color::Name::RED, "Unable to find the player in this channel.");
+			break;
+		case 21:
+			if (messenger) messenger->show_status(Color::Name::RED, "This player is blocking party invitations.");
+			break;
+		case 22:
+		{
+			std::string name = recv.available() ? recv.read_string() : "";
+			if (messenger) messenger->show_status(Color::Name::RED, name + " is already handling another invitation.");
+			break;
+		}
+		case 23:
+		{
+			std::string name = recv.available() ? recv.read_string() : "";
+			if (messenger) messenger->show_status(Color::Name::WHITE, name + " has denied the invitation.");
+			break;
+		}
+		case 25:
+			if (messenger) messenger->show_status(Color::Name::RED, "You cannot kick in this map.");
+			break;
+		case 28:
+		case 29:
+			if (messenger) messenger->show_status(Color::Name::RED, "Leader change only to a nearby party member.");
+			break;
+		case 30:
+			if (messenger) messenger->show_status(Color::Name::RED, "Leader change only on the same channel.");
+			break;
 		default:
 			break;
 		}
@@ -536,41 +588,125 @@ namespace ms
 
 		switch (type)
 		{
-		case 0x26: // Full guild info (show guild window)
+		case 0x05: // Invite received — show Yes/No popup
 		{
-			parse_guild_info(recv);
+			int32_t guild_id = recv.read_int();
+			std::string inviter = recv.read_string();
+
+			int32_t my_cid = Stage::get().get_player().get_oid();
+
+			UI::get().emplace<UIYesNo>(
+				inviter + " has invited you to their guild.",
+				[guild_id, my_cid, inviter](bool yes)
+				{
+					if (yes)
+						AcceptGuildInvitePacket(guild_id, my_cid).dispatch();
+					else
+						DenyGuildInvitePacket(inviter).dispatch();
+				}
+			);
+
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				statusbar->notify();
 			break;
 		}
-		case 0x27: // Guild update (member join)
+		case 0x1A: // Full guild info
 		{
-			parse_guild_info(recv);
+			if (!recv.available())
+				break;
+
+			int8_t in_guild = recv.read_byte();
+
+			if (in_guild == 0)
+			{
+				// Not in a guild — clear UI
+				if (auto guild = UI::get().get_element<UIGuild>())
+				{
+					guild->clear_members();
+					guild->set_guild_info("No Guild", "", 1, 0);
+				}
+
+				Stage::get().get_player().set_guild("");
+			}
+			else
+			{
+				parse_guild_info(recv);
+			}
+			break;
+		}
+		case 0x27: // New member joined
+		{
+			int32_t guild_id = recv.read_int();
+			// Member info follows — re-parse full guild for simplicity
+			// In a full implementation, we'd just append the new member
+			if (recv.length() >= 4)
+				parse_guild_info(recv);
 
 			if (messenger)
 				messenger->show_status(Color::Name::WHITE, "A new member has joined the guild.");
 			break;
 		}
-		case 0x28: // Member left
+		case 0x2C: // Member left
 		{
 			int32_t guild_id = recv.read_int();
 			int32_t cid = recv.read_int();
 			std::string name = recv.read_string();
 
-			if (messenger)
-				messenger->show_status(Color::Name::WHITE, name + " has left the guild.");
+			int32_t my_cid = Stage::get().get_player().get_oid();
+
+			if (cid == my_cid)
+			{
+				if (auto guild = UI::get().get_element<UIGuild>())
+				{
+					guild->clear_members();
+					guild->set_guild_info("No Guild", "", 1, 0);
+					guild->deactivate();
+				}
+				Stage::get().get_player().set_guild("");
+
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, "You have left the guild.");
+			}
+			else
+			{
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, name + " has left the guild.");
+			}
 			break;
 		}
-		case 0x29: // Member expelled
+		case 0x2F: // Member expelled
 		{
 			int32_t guild_id = recv.read_int();
 			int32_t cid = recv.read_int();
 			std::string name = recv.read_string();
 
-			if (messenger)
-				messenger->show_status(Color::Name::RED, name + " has been expelled from the guild.");
+			int32_t my_cid = Stage::get().get_player().get_oid();
+
+			if (cid == my_cid)
+			{
+				if (auto guild = UI::get().get_element<UIGuild>())
+				{
+					guild->clear_members();
+					guild->set_guild_info("No Guild", "", 1, 0);
+					guild->deactivate();
+				}
+				Stage::get().get_player().set_guild("");
+
+				if (messenger)
+					messenger->show_status(Color::Name::RED, "You have been expelled from the guild.");
+			}
+			else
+			{
+				if (messenger)
+					messenger->show_status(Color::Name::RED, name + " has been expelled from the guild.");
+			}
 			break;
 		}
-		case 0x2A: // Guild disbanded
+		case 0x32: // Guild disbanded
 		{
+			int32_t guild_id = recv.read_int();
+			recv.read_byte(); // always 1
+
 			if (auto guild = UI::get().get_element<UIGuild>())
 			{
 				guild->clear_members();
@@ -584,57 +720,94 @@ namespace ms
 				messenger->show_status(Color::Name::WHITE, "The guild has been disbanded.");
 			break;
 		}
-		case 0x2C: // Guild invitation
+		case 0x3A: // Capacity changed
 		{
 			int32_t guild_id = recv.read_int();
-			std::string inviter = recv.read_string();
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Guild] " + inviter + " has invited you to join their guild.", UIChatBar::LineType::YELLOW);
+			int32_t new_capacity = recv.read_int();
 			break;
 		}
-		case 0x32: // Rank title change
+		case 0x3C: // Member level/job update
 		{
-			// Re-parse full guild data
-			parse_guild_info(recv);
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			int32_t level = recv.read_int();
+			int32_t job_id = recv.read_int();
 			break;
 		}
-		case 0x3C: // Member online/offline status change
+		case 0x3D: // Member online/offline
 		{
 			int32_t guild_id = recv.read_int();
 			int32_t cid = recv.read_int();
 			bool online = recv.read_byte() != 0;
-			// Full guild re-request would be needed for UI update
 			break;
 		}
-		case 0x3E: // Guild notice changed
+		case 0x3E: // Rank titles changed
 		{
-			std::string new_notice = recv.read_string();
+			int32_t guild_id = recv.read_int();
+			for (int i = 0; i < 5; i++)
+				recv.read_string();
+			break;
+		}
+		case 0x40: // Member rank changed
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			int8_t new_rank = recv.read_byte();
+			break;
+		}
+		case 0x42: // Emblem changed
+		{
+			int32_t guild_id = recv.read_int();
+			recv.read_short(); // bg
+			recv.read_byte();  // bgColor
+			recv.read_short(); // logo
+			recv.read_byte();  // logoColor
+			break;
+		}
+		case 0x44: // Notice changed
+		{
+			int32_t guild_id = recv.read_int();
+			std::string notice = recv.read_string();
 
 			if (auto guild = UI::get().get_element<UIGuild>())
-				guild->set_guild_info("", new_notice, 0, 0);
+				guild->set_guild_info("", notice, 0, 0);
 
 			if (messenger)
 				messenger->show_status(Color::Name::WHITE, "The guild notice has been updated.");
 			break;
 		}
-		case 0x44: // Guild GP changed
+		case 0x48: // GP updated
 		{
 			int32_t guild_id = recv.read_int();
 			int32_t gp = recv.read_int();
 			break;
 		}
-		case 0x48: // Guild level up
+		// Error codes
+		case 0x28:
+			if (messenger) messenger->show_status(Color::Name::RED, "The player is already in a guild.");
+			break;
+		case 0x2A:
+			if (messenger) messenger->show_status(Color::Name::RED, "The player is not in this channel.");
+			break;
+		case 0x2D:
+			if (messenger) messenger->show_status(Color::Name::RED, "You are not in a guild.");
+			break;
+		case 0x2E:
+			if (messenger) messenger->show_status(Color::Name::RED, "Guild invite not found.");
+			break;
+		case 0x36:
 		{
-			int32_t guild_id = recv.read_int();
-			int32_t new_level = recv.read_int();
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Guild] The guild has leveled up to Lv." + std::to_string(new_level) + "!", UIChatBar::LineType::YELLOW);
+			std::string name = recv.available() ? recv.read_string() : "";
+			if (messenger) messenger->show_status(Color::Name::RED, name + " is already handling another invitation.");
+			break;
+		}
+		case 0x37:
+		{
+			std::string name = recv.available() ? recv.read_string() : "";
+			if (messenger) messenger->show_status(Color::Name::WHITE, name + " has denied the invitation.");
 			break;
 		}
 		default:
-			// Unhandled guild operation type
 			break;
 		}
 	}
@@ -729,37 +902,35 @@ namespace ms
 
 		switch (mode)
 		{
-		case 0x00: // Add player
+		case 0x00: // addMessengerPlayer — player joined the messenger
 		{
 			int8_t slot = recv.read_byte();
-			// Parse CharLook data (skip it - we don't render avatars in messenger)
+			// Parse CharLook data
 			LoginParser::parse_look(recv);
 			std::string name = recv.read_string();
 			recv.read_byte(); // channel
-			recv.read_byte(); // whisper flag
+			recv.read_byte(); // 0
 
 			if (auto msger = UI::get().get_element<UIMessenger>())
 				msger->add_player(slot, name);
+
 			break;
 		}
-		case 0x01: // Join / self position
+		case 0x01: // joinMessenger — position assignment
 		{
 			int8_t slot = recv.read_byte();
-			UI::get().emplace<UIMessenger>();
-
-			if (auto msger = UI::get().get_element<UIMessenger>())
-				msger->add_player(slot, Stage::get().get_player().get_name());
 			break;
 		}
-		case 0x02: // Remove player
+		case 0x02: // removeMessengerPlayer — leave
 		{
 			int8_t slot = recv.read_byte();
 
 			if (auto msger = UI::get().get_element<UIMessenger>())
 				msger->remove_player(slot);
+
 			break;
 		}
-		case 0x03: // Invite
+		case 0x03: // messengerInvite — invite received
 		{
 			std::string from = recv.read_string();
 			recv.read_byte(); // 0
@@ -768,16 +939,26 @@ namespace ms
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
+
 			break;
 		}
-		case 0x06: // Chat
+		case 0x05: // messengerNote — decline/note
+		{
+			std::string text = recv.read_string();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(text, UIChatBar::LineType::RED);
+
+			break;
+		}
+		case 0x06: // messengerChat — chat message
 		{
 			std::string text = recv.read_string();
 
 			if (auto msger = UI::get().get_element<UIMessenger>())
 			{
-				// Text format is "name : message"
 				size_t sep = text.find(" : ");
+
 				if (sep != std::string::npos)
 					msger->add_chat(text.substr(0, sep), text.substr(sep + 3));
 				else
@@ -786,10 +967,10 @@ namespace ms
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline("[Messenger] " + text, UIChatBar::LineType::BLUE);
+
 			break;
 		}
 		default:
-			break;
 			break;
 		}
 	}
@@ -905,21 +1086,48 @@ namespace ms
 
 		if (auto family = UI::get().get_element<UIFamily>())
 		{
-			// Parse entries - each has: cid, parent_id, name, job info
 			for (int32_t i = 0; i < entry_count && recv.available(); i++)
 			{
 				int32_t cid = recv.read_int();
 				int32_t parent_id = recv.read_int();
+				recv.read_short();  // job id
+				recv.read_byte();   // level
+				recv.read_bool();   // isOnline
+				recv.read_int();    // current rep
+				recv.read_int();    // total rep
+				recv.read_int();    // reps to senior
+				recv.read_int();    // todays rep
+				recv.read_int();    // channel
+				recv.read_int();    // time online (minutes)
 				std::string name = recv.read_string();
 
-				// Add as junior if not the viewed player
 				if (cid != viewed_id)
 					family->add_junior(name);
 			}
 		}
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] Family chart loaded with " + std::to_string(entry_count) + " members.", UIChatBar::LineType::YELLOW);
+		// Post-entry data: member info counts
+		if (recv.available())
+		{
+			int32_t member_info_count = recv.read_int();
+			for (int32_t i = 0; i < member_info_count && recv.available(); i++)
+			{
+				recv.read_int(); // id or flag
+				recv.read_int(); // count
+			}
+			// Entitlements used loop
+			if (recv.available())
+			{
+				int32_t entitlement_count = recv.read_int();
+				for (int32_t i = 0; i < entitlement_count && recv.available(); i++)
+				{
+					recv.read_int(); // entitlement index
+					recv.read_int(); // times used
+				}
+			}
+			if (recv.available())
+				recv.read_short(); // add button flag
+		}
 	}
 
 	void FamilyInfoResultHandler::handle(InPacket& recv) const
@@ -933,6 +1141,17 @@ namespace ms
 		int32_t leader_id = recv.read_int();
 		std::string family_name = recv.read_string();
 		std::string message = recv.read_string();
+
+		// Entitlement data
+		if (recv.available())
+		{
+			int32_t entitlement_count = recv.read_int();
+			for (int32_t i = 0; i < entitlement_count && recv.available(); i++)
+			{
+				recv.read_int(); // entitlement ordinal
+				recv.read_int(); // used count
+			}
+		}
 
 		if (auto family = UI::get().get_element<UIFamily>())
 			family->set_family_info(family_name, current_rep, total_rep);

@@ -82,8 +82,8 @@ namespace ms
 		SKILL_LEARN_ITEM_RESULT = 51, // 0x33
 
 		/// Monster Book
-		MONSTER_BOOK_SET_CARD = 83, // 0x53
-		MONSTER_BOOK_SET_COVER = 84, // 0x54
+		MONSTER_BOOK_SET_CARD = 215, // 0xD7
+		MONSTER_BOOK_SET_COVER = 216, // 0xD8
 
 		/// Player Interaction
 		CHAR_INFO = 61,         // 0x3D
@@ -124,6 +124,7 @@ namespace ms
 		FAMILY_SUMMON_REQUEST = 104, // 0x68
 		NOTIFY_LEVELUP = 105,   // 0x69
 		NOTIFY_JOB_CHANGE = 107, // 0x6B
+		FAKE_GM_NOTICE = 116,       // 0x74
 		SET_AVATAR_MEGAPHONE = 111, // 0x6F
 		CLEAR_AVATAR_MEGAPHONE = 112, // 0x70
 		NEW_YEAR_CARD = 118,    // 0x76
@@ -208,6 +209,7 @@ namespace ms
 
 		/// Quest
 		UPDATE_QUEST_INFO = 211, // 0xD3
+		BROADCAST_MSG = 212,    // 0xD4
 		PLAYER_HINT = 214,      // 0xD6
 
 		/// Player
@@ -412,6 +414,7 @@ namespace ms
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
+		emplace<FAKE_GM_NOTICE, FakeGMNoticeHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
 		emplace<WHISPER, WhisperHandler>();
@@ -452,6 +455,7 @@ namespace ms
 		emplace<FORCED_STAT_SET, ForcedStatSetHandler>();
 		emplace<NPC_ACTION, NpcActionHandler>();
 		emplace<PLAYER_HINT, YellowTipHandler>();
+		emplace<BROADCAST_MSG, BroadcastMsgHandler>();
 		emplace<CATCH_MONSTER, CatchMonsterHandler>();
 		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();
 		emplace<LAST_CONNECTED_WORLD, LastConnectedWorldHandler>();

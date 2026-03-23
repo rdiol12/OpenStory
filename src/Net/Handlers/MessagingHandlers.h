@@ -81,4 +81,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Fake GM notice — same format as type 1 popup
+	// Opcode: FAKE_GM_NOTICE(116)
+	class FakeGMNoticeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

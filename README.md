@@ -40,7 +40,20 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Recent Fixes
-- **skills buff and animation now showing 
+- **Quest complete effect**: Fixed QuestClear animation path (`Quest/clear` -> `QuestClear`) to match NX data; quest complete light pillar now shows from both SHOW_STATUS_INFO and QUEST_CLEAR handlers
+- **Three Snails ammo check**: Skill now blocked if player lacks required snail shell items, preventing ghost MP drain
+- **Packet handler fixes (Cosmic compatibility)**: Fixed critical packet format mismatches causing stream corruption:
+  - SpawnMistHandler: added mist_type/ownerId fields, fixed box coords from short to int
+  - MoveMonsterResponseHandler: fixed field types (bool/short/byte/byte)
+  - HitReactorHandler: fixed stance read type and added missing fields
+  - MonsterBookCardHandler: added missing full-flag byte
+  - UpdateSkillHandler: added trailing byte consumption
+  - CharInfoHandler: changed pet parsing from count-based to sentinel-based
+  - MessengerHandler: remapped mode values to match Cosmic (chat=0x06, invite=0x03)
+  - FamilyChartResultHandler: reads all 12 pedigree entry fields
+  - FamilyInfoResultHandler: reads trailing entitlement data
+  - SpawnReactorHandler: fixed trailing read from string to short
+- **Skills buff and animation**: Now showing correctly
 - **Skill sounds**: Fixed duplicate sample bug preventing skill sounds from playing
 - **Quest system**: Completed quests now properly removed from active list; NPC quest bubbles refresh on state changes
 - **Quest packets**: Full v83 quest handler coverage -- QUEST_CLEAR effect/sound, UPDATE_QUEST_INFO error sub-types (0x0A-0x0F), scripted quest action packets

@@ -309,47 +309,30 @@ namespace ms
 		}
 		case 1:
 		{
-			// Error: already famed today
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "You have already given fame to this character today.");
-			break;
-		}
-		case 2:
-		{
-			// Error: level too low
-			if (messenger)
-				messenger->show_status(Color::Name::RED, "You must be at least level 15 to give fame.");
-			break;
-		}
-		case 3:
-		{
-			// Error: can't fame yourself
+			// Error: can't raise/lower own fame
 			if (messenger)
 				messenger->show_status(Color::Name::RED, "You can't raise or lower your own fame.");
 			break;
 		}
-		case 4:
+		case 2:
 		{
-			// Error: target not in the map
+			// Error: already famed this person today
 			if (messenger)
-				messenger->show_status(Color::Name::RED, "That character is not in this map.");
+				messenger->show_status(Color::Name::RED, "You have already given fame to this character today.");
+			break;
+		}
+		case 3:
+		{
+			// Error: target level too low
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "That character's level is too low.");
 			break;
 		}
 		case 5:
 		{
-			// Received fame from someone
-			if (recv.available())
-			{
-				std::string charname = recv.read_string();
-				int8_t type = recv.read_byte();
-
-				std::string msg = (type == 1)
-					? charname + " has raised your fame."
-					: charname + " has lowered your fame.";
-
-				if (messenger)
-					messenger->show_status(Color::Name::YELLOW, msg);
-			}
+			// Error: too low level to fame
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "You must be at least level 15 to give fame.");
 			break;
 		}
 		default:
@@ -377,12 +360,6 @@ namespace ms
 
 	void ClockHandler::handle(InPacket& recv) const
 	{
-		// v83: byte type
-		// type 0: remove clock
-		// type 1: map clock - byte hour, byte min, byte sec
-		// type 2: countdown timer - int seconds
-		// type 3: real-time clock (wedding, etc.) - byte hour, byte min, byte sec
-		// Some servers also use this opcode for FORCED_MAP_EQUIP (type > 10)
 		if (!recv.available())
 			return;
 
@@ -390,16 +367,8 @@ namespace ms
 
 		switch (type)
 		{
-		case 0:
+		case 1: // Game clock — byte hour, byte min, byte sec
 		{
-			// Remove clock
-			Stage::get().clear_clock();
-			break;
-		}
-		case 1:
-		case 3:
-		{
-			// Map world clock (1) or real-time clock (3)
 			if (recv.length() < 3)
 				break;
 
@@ -411,9 +380,8 @@ namespace ms
 			UI::get().emplace<UIClock>();
 			break;
 		}
-		case 2:
+		case 2: // Countdown timer — int secondsRemaining
 		{
-			// Countdown timer
 			if (recv.length() < 4)
 				break;
 
@@ -423,9 +391,12 @@ namespace ms
 			UI::get().emplace<UIClock>();
 			break;
 		}
+		case 3: // Remove timer
+		{
+			Stage::get().clear_clock();
+			break;
+		}
 		default:
-			// Some servers reuse this opcode for other purposes (e.g. forced equip display)
-			// Silently ignore unknown types
 			break;
 		}
 	}
@@ -539,20 +510,24 @@ namespace ms
 
 	void YellowTipHandler::handle(InPacket& recv) const
 	{
-		// v83: byte type, string message
-		// Shows a yellow scrolling notice at the top of the screen
 		if (!recv.available())
 			return;
 
+		std::string message = recv.read_string();
+
+		// Show yellow text notification at bottom of screen (like quest updates)
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+	}
+
+	void BroadcastMsgHandler::handle(InPacket& recv) const
+	{
 		int8_t type = recv.read_byte();
+		std::string message = recv.read_string();
 
-		if (recv.available())
-		{
-			std::string message = recv.read_string();
-
-			// Show as scrolling notice at top of screen
-			UI::get().set_scrollnotice(message);
-		}
+		// GM notices, event announcements
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
 	}
 
 	void CatchMonsterHandler::handle(InPacket& recv) const
@@ -581,38 +556,28 @@ namespace ms
 
 	void BlowWeatherHandler::handle(InPacket& recv) const
 	{
-		// [byte: active] [int: itemId] [string: message (only if active=0)]
 		if (!recv.available())
 			return;
 
-		int8_t active = recv.read_byte();
-
-		if (active != 0)
-		{
-			Stage::get().clear_weather();
-			return;
-		}
-
-		if (!recv.available())
-			return;
-
-		int32_t itemid = recv.read_int();
-
-		if (itemid == 0)
-			return;
-
-		std::string id_str = "0" + std::to_string(itemid);
-		nl::node item_node = nl::nx::item["Cash"]["0512.img"][id_str];
-		std::string path = item_node["info"]["path"];
-
+		int8_t type = recv.read_byte(); // 0=no weather, 1=snow, 2=rain
+		int32_t itemid = recv.read_int(); // 0 if none, or cash weather item
 		std::string message;
 
 		if (recv.available())
 			message = recv.read_string();
 
+		if (type == 0 || itemid == 0)
+		{
+			Stage::get().clear_weather();
+			return;
+		}
+
+		std::string id_str = "0" + std::to_string(itemid);
+		nl::node item_node = nl::nx::item["Cash"]["0512.img"][id_str];
+		std::string path = item_node["info"]["path"];
+
 		if (!path.empty())
 		{
-			// Strip "Map/" prefix since set_weather resolves from nl::nx::map
 			std::string resolve_path = path;
 
 			if (resolve_path.substr(0, 4) == "Map/")

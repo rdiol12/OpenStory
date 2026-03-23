@@ -153,7 +153,7 @@ namespace ms
 			account.set_state(Textfield::State::FOCUSED);
 		}
 
-		
+
 	}
 
 	void UILogin::draw(float alpha) const
@@ -185,7 +185,7 @@ namespace ms
 		// 			Configuration::get().get_auto_pass()
 		// 		).dispatch();
 		// }
-		
+
 		UIElement::update();
 
 		account.update(get_draw_position());
