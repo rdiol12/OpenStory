@@ -176,17 +176,10 @@ namespace ms
 
 			std::string message = "You have gained experience (+" + std::to_string(gain) + ")";
 
-			if (inchat)
-			{
-				show_status(Color::Name::RED, "Mode: 3, inchat is not handled.");
-			}
-			else
-			{
-				show_status(white ? Color::Name::WHITE : Color::Name::YELLOW, message);
+			show_status(white ? Color::Name::WHITE : Color::Name::YELLOW, message);
 
-				if (bonus1 > 0)
-					show_status(Color::Name::YELLOW, "+ Bonus EXP (+" + std::to_string(bonus1) + ")");
-			}
+			if (bonus1 > 0)
+				show_status(Color::Name::YELLOW, "+ Bonus EXP (+" + std::to_string(bonus1) + ")");
 		}
 		else if (mode == 4)
 		{
