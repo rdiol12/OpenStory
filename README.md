@@ -60,7 +60,8 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **EXP gain**: Fixed "not handled" message appearing for in-chat EXP notifications
 - **SHOW_ITEM_GAIN_INCHAT**: Proper v83 mode switch for all 24 effect types
 - **Notice button**: Changed from broken button to static sprite matching v83 client
-- **added snow effect but needs refrance to all the effects maple has now iam just fixing how i thing it should looks like
+- **Snow effect**: Added snow effect (WIP — needs reference for all MapleStory effects)
+- **Quest Helper**: Rewritten to support multi-quest tracking (up to 5), collapsible entries, per-quest close button (BtDelete sprite), live item/mob progress from server quest data, auto-refresh on quest updates
 
 ## License
 

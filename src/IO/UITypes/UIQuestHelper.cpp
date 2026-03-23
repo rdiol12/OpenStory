@@ -32,7 +32,7 @@ namespace ms
 {
 	UIQuestHelper::UIQuestHelper(const QuestLog& ql) :
 		UIDragElement<PosQUESTHELPER>(Point<int16_t>(200, 20)), questlog(ql),
-		tracked_questid(-1), minimized(false), show_messenger(false)
+		minimized(false), show_messenger(false), hovered_close_questid(-1)
 	{
 		// === QuestAlarm (UIWindow.img — v83 primary) ===
 		nl::node alarm1 = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
@@ -56,7 +56,6 @@ namespace ms
 		nl::node alarm2 = nl::nx::ui["UIWindow2.img"]["QuestAlarm"];
 		if (alarm2)
 		{
-			// Load extra buttons only if v83 ones didn't load
 			if (!bg_min.is_valid())
 			{
 				bg_min = Texture(alarm2["backgrndmin"]);
@@ -92,9 +91,18 @@ namespace ms
 			}
 		}
 
-		// QuestBulb removed — not used
+		// === Per-quest close button textures ===
+		nl::node btdel_src = alarm2 ? alarm2["BtDelete"] : nl::node();
+		if (!btdel_src)
+			btdel_src = alarm1 ? alarm1["BtDelete"] : nl::node();
+		if (btdel_src)
+		{
+			close_btn_normal = Texture(btdel_src["normal"]["0"]);
+			close_btn_mouseover = Texture(btdel_src["mouseOver"]["0"]);
+			close_btn_pressed = Texture(btdel_src["pressed"]["0"]);
+		}
 
-		// === QuestMessenger (UIWindow2.img) ===
+		// === QuestMessenger ===
 		nl::node alice = nl::nx::ui["UIWindow2.img"]["QuestMessengerAlice"];
 		if (alice)
 		{
@@ -109,27 +117,23 @@ namespace ms
 			messenger_thomas_notice = Texture(thomas["notice"]);
 		}
 
-		// === QuestGuide marks (UIWindow2.img) ===
+		// === QuestGuide marks ===
 		nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
 		if (guide)
 		{
 			quest_mark = Animation(guide["QuestMark"]);
 
 			nl::node repeat = guide["RepeatQuestMark"];
-			if (repeat)
-				repeat_quest_mark = Animation(repeat["forMiniMap"]);
+			if (repeat) repeat_quest_mark = Animation(repeat["forMiniMap"]);
 
 			nl::node high = guide["HighLVQuestMark"];
-			if (high)
-				high_lv_mark = Animation(high["forMiniMap"]);
+			if (high) high_lv_mark = Animation(high["forMiniMap"]);
 
 			nl::node low = guide["LowLVQuestMark"];
-			if (low)
-				low_lv_mark = Animation(low["forMiniMap"]);
+			if (low) low_lv_mark = Animation(low["forMiniMap"]);
 
 			nl::node low_repeat = guide["LowLVRepeatQuestMark"];
-			if (low_repeat)
-				low_lv_repeat_mark = Animation(low_repeat["forMiniMap"]);
+			if (low_repeat) low_lv_repeat_mark = Animation(low_repeat["forMiniMap"]);
 		}
 
 		// === StatusBar3/Quest ===
@@ -153,7 +157,7 @@ namespace ms
 			}
 		}
 
-		// === Extended QuestIcon (UIWindow2.img/QuestIcon 12-29) ===
+		// === Extended QuestIcon ===
 		nl::node qicon2 = nl::nx::ui["UIWindow2.img"]["QuestIcon"];
 		if (qicon2)
 		{
@@ -167,7 +171,7 @@ namespace ms
 			}
 		}
 
-		// Set dimension — stack all three pieces vertically
+		// Set dimension
 		if (bg_min.is_valid())
 		{
 			int16_t w = bg_min.get_dimensions().x();
@@ -180,11 +184,9 @@ namespace ms
 			dimension = Point<int16_t>(200, 60);
 
 		expanded_dimension = dimension;
-
 		dragarea = Point<int16_t>(dimension.x(), 15);
 
-		// Button positions: draw_buttons uses `position` as parentpos, background
-		// draws at position - origin. Compensate with -origin + tex_origin.
+		// Button positions
 		Point<int16_t> bg_origin = bg_min.is_valid() ? bg_min.get_origin() : Point<int16_t>();
 		Point<int16_t> bo = bg_origin * -1;
 
@@ -198,51 +200,99 @@ namespace ms
 		set_helper_btn(Buttons::BT_MAX, Point<int16_t>(dimension.x() - 18, 2));
 		set_helper_btn(Buttons::BT_AUTO, Point<int16_t>(dimension.x() - 40, 2));
 		set_helper_btn(Buttons::BT_Q, Point<int16_t>(dimension.x() - 62, 2));
-		// BT_DELETE is drawn manually per-quest, not through draw_buttons
+
 		if (buttons.count(Buttons::BT_DELETE))
 		{
 			buttons[Buttons::BT_DELETE]->set_position(Point<int16_t>());
 			buttons[Buttons::BT_DELETE]->set_active(false);
 		}
-		// Start expanded: show MIN, hide MAX
+
 		if (buttons.count(Buttons::BT_MAX))
 			buttons[Buttons::BT_MAX]->set_active(false);
 
 		title_text = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, "", 170, false);
 		no_quest_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "No quest tracked", 170, false);
 
-		// Auto-track first available quest
 		auto_track();
+	}
+
+	int16_t UIQuestHelper::get_quest_entry_height(const TrackedQuest& tq) const
+	{
+		int16_t h = 18; // header line with bold name
+		if (!tq.collapsed)
+		{
+			if (!tq.requirements.empty())
+				h += static_cast<int16_t>(tq.requirements.size()) * 15;
+			else
+				h += 15; // "In progress..."
+		}
+		return h;
+	}
+
+	int16_t UIQuestHelper::draw_quest_entry(const TrackedQuest& tq, Point<int16_t> pos, float alpha) const
+	{
+		int16_t y = 0;
+
+		// Draw quest name (bold dark) — click to collapse/expand
+		tq.name.draw(pos + Point<int16_t>(0, y));
+
+		// Draw X button (BtDelete sprite) right after quest name
+		if (close_btn_normal.is_valid())
+		{
+			int16_t name_w = tq.name.width();
+			Point<int16_t> x_btn_pos = pos + Point<int16_t>(name_w + 4, y);
+			bool hovered = (tq.questid == hovered_close_questid);
+			const Texture& btn_tex = hovered ? close_btn_mouseover : close_btn_normal;
+			btn_tex.draw(DrawArgument(x_btn_pos));
+		}
+		y += 18;
+
+		if (!tq.collapsed)
+		{
+			if (!tq.requirements.empty())
+			{
+				for (auto& line : tq.requirements)
+				{
+					line.draw(pos + Point<int16_t>(4, y));
+					y += 15;
+				}
+			}
+			else
+			{
+				tq.progress.draw(pos + Point<int16_t>(4, y));
+				y += 15;
+			}
+		}
+
+		return y;
 	}
 
 	void UIQuestHelper::draw(float alpha) const
 	{
 		Point<int16_t> content_pos = position;
 
-		// Draw background — bg_min is the title bar, center+bottom stack below it
 		if (bg_min.is_valid())
 		{
 			bg_min.draw(DrawArgument(position));
 			content_pos = position - bg_min.get_origin();
 		}
+
 		if (!minimized)
 		{
 			int16_t min_h = bg_min.is_valid() ? (bg_min.get_dimensions().y() - bg_min.get_origin().y()) : 20;
 			Point<int16_t> below = position + Point<int16_t>(0, min_h);
 
-			// Calculate content height based on tracked quest info
-			int16_t content_h = 20; // minimum content area
-			if (tracked_questid > 0)
-			{
-				content_h = 22 + 16; // quest name line + gap
-				if (!requirement_lines.empty())
-					content_h += static_cast<int16_t>(requirement_lines.size()) * 16;
-				else
-					content_h += 16; // progress text
-				content_h += 8; // bottom padding
-			}
+			// Calculate total content height
+			int16_t content_h = 8; // top padding
+			for (auto& tq : tracked_quests)
+				content_h += get_quest_entry_height(tq) + 8; // 8px spacing between quests
 
-			// Tile bg_center to fill the content area
+			if (tracked_quests.empty())
+				content_h = 28;
+
+			content_h = std::max(content_h, (int16_t)20);
+
+			// Tile bg_center
 			if (bg_center.is_valid())
 			{
 				int16_t tile_h = bg_center.get_dimensions().y();
@@ -254,76 +304,60 @@ namespace ms
 						bg_center.draw(DrawArgument(below + Point<int16_t>(0, drawn) + bg_center.get_origin()));
 						drawn += tile_h;
 					}
-					// Draw bg_bottom at end of tiled area
 					if (bg_bottom.is_valid())
 						bg_bottom.draw(DrawArgument(below + Point<int16_t>(0, drawn) + bg_bottom.get_origin()));
 				}
 			}
 		}
 
-		// Draw title: "Quest Helper (tracked/5)"
+		// Draw title
 		{
-			int16_t tracked_count = (tracked_questid > 0) ? 1 : 0;
-			std::string title = "Quest Helper (" + std::to_string(tracked_count) + "/5)";
+			int16_t count = static_cast<int16_t>(tracked_quests.size());
+			std::string title = "Quest Helper (" + std::to_string(count) + "/" + std::to_string(MAX_TRACKED) + ")";
 			title_text.change_text(title);
 			title_text.draw(content_pos + Point<int16_t>(8, 1));
 		}
 
-		// Always draw buttons (title bar buttons stay visible even when minimized)
 		UIElement::draw_buttons(alpha);
 
 		if (minimized)
 			return;
 
-		// Draw tracked quest info below title
-		if (tracked_questid > 0)
-		{
-			int16_t y = 20;
-			quest_name.draw(content_pos + Point<int16_t>(10, y));
+		// Draw quest entries
+		quest_hit_areas.clear();
 
-			// Draw BtDelete button to untrack this quest (right side of quest entry)
-			quest_untrack_pos = content_pos + Point<int16_t>(dimension.x() - 18, y - 2);
-			{
-				auto del_it = buttons.find(Buttons::BT_DELETE);
-				if (del_it != buttons.end() && del_it->second)
-				{
-					del_it->second->set_active(true);
-					del_it->second->draw(quest_untrack_pos);
-					del_it->second->set_active(false);
-				}
-			}
-
-			y += 18;
-
-			for (auto& line : requirement_lines)
-			{
-				line.draw(content_pos + Point<int16_t>(15, y));
-				y += 15;
-			}
-
-			if (requirement_lines.empty())
-				quest_progress.draw(content_pos + Point<int16_t>(15, y));
-		}
-		else
+		if (tracked_quests.empty())
 		{
 			no_quest_text.draw(content_pos + Point<int16_t>(15, 22));
 		}
-
-		// Draw quest messenger notification below the helper
-		if (show_messenger && tracked_questid > 0)
+		else
 		{
-			Point<int16_t> msg_pos = position + Point<int16_t>(0, dimension.y() + 5);
-			if (messenger_alice_bg.is_valid())
+			int16_t y = 22;
+			for (auto& tq : tracked_quests)
 			{
-				messenger_alice_bg.draw(DrawArgument(msg_pos));
-				if (messenger_alice_notice.is_valid())
-					messenger_alice_notice.draw(DrawArgument(msg_pos));
-			}
-			else if (messenger_thomas_bg.is_valid())
-			{
-				messenger_thomas_bg.draw(DrawArgument(msg_pos));
-				if (messenger_thomas_notice.is_valid())
-					messenger_thomas_notice.draw(DrawArgument(msg_pos));
+				Point<int16_t> entry_pos = content_pos + Point<int16_t>(8, y);
+				int16_t entry_h = draw_quest_entry(tq, entry_pos, alpha);
+
+				// Store hit areas for click handling
+				QuestHitArea hit;
+				hit.questid = tq.questid;
+				// X button area right after quest name
+				int16_t btn_w = close_btn_normal.is_valid() ? close_btn_normal.get_dimensions().x() : 12;
+				int16_t btn_h = close_btn_normal.is_valid() ? close_btn_normal.get_dimensions().y() : 14;
+				int16_t name_w = tq.name.width();
+				int16_t x_btn_x = name_w + 4;
+				hit.close_btn = Rectangle<int16_t>(
+					entry_pos + Point<int16_t>(x_btn_x, 0),
+					entry_pos + Point<int16_t>(x_btn_x + btn_w, btn_h)
+				);
+				// Header area for collapse toggle: quest name
+				hit.header_area = Rectangle<int16_t>(
+					entry_pos,
+					entry_pos + Point<int16_t>(name_w, 16)
+				);
+				quest_hit_areas.push_back(hit);
+
+				y += entry_h + 8; // 8px spacing between quests
 			}
 		}
 	}
@@ -334,7 +368,6 @@ namespace ms
 
 		if (active)
 		{
-			// Always open expanded
 			minimized = false;
 			dimension = expanded_dimension;
 			if (buttons.count(Buttons::BT_MIN))
@@ -343,7 +376,8 @@ namespace ms
 				buttons[Buttons::BT_MAX]->set_active(false);
 			if (buttons.count(Buttons::BT_AUTO))
 				buttons[Buttons::BT_AUTO]->set_active(true);
-			auto_track();
+			if (tracked_quests.empty())
+				auto_track();
 		}
 	}
 
@@ -364,45 +398,49 @@ namespace ms
 
 	Cursor::State UIQuestHelper::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
-		// Check per-quest BtDelete untrack button
-		if (tracked_questid > 0 && !minimized)
+		// Check per-quest hit areas (X button and collapse toggle)
+		hovered_close_questid = -1;
+		if (!minimized)
 		{
-			auto del_it = buttons.find(Buttons::BT_DELETE);
-			if (del_it != buttons.end() && del_it->second)
+			for (auto& hit : quest_hit_areas)
 			{
-				// BtDelete is drawn at quest_untrack_pos as parentpos
-				Rectangle<int16_t> del_bounds = del_it->second->bounds(quest_untrack_pos);
-				if (del_bounds.contains(cursorpos))
+				// X button
+				if (hit.close_btn.contains(cursorpos))
 				{
+					hovered_close_questid = hit.questid;
 					if (clicking)
 					{
 						Sound(Sound::Name::BUTTONCLICK).play();
-						tracked_questid = -1;
-						quest_name = Text();
-						quest_progress = Text();
-						requirement_lines.clear();
-						recalc_dimension();
+						untrack_quest(hit.questid);
 						return Cursor::State::IDLE;
 					}
-					else
-					{
-						del_it->second->set_state(Button::State::MOUSEOVER);
-						return Cursor::State::CANCLICK;
-					}
+					return Cursor::State::CANCLICK;
 				}
-				else
+				// Header click = collapse/expand
+				if (hit.header_area.contains(cursorpos))
 				{
-					if (del_it->second->get_state() == Button::State::MOUSEOVER)
-						del_it->second->set_state(Button::State::NORMAL);
+					if (clicking)
+					{
+						for (auto& tq : tracked_quests)
+						{
+							if (tq.questid == hit.questid)
+							{
+								tq.collapsed = !tq.collapsed;
+								recalc_dimension();
+								break;
+							}
+						}
+						return Cursor::State::IDLE;
+					}
+					return Cursor::State::CANCLICK;
 				}
 			}
 		}
 
-		// Handle button clicks — use content_pos for hit testing since that's where buttons visually are
+		// Title bar buttons
 		Point<int16_t> bg_origin = bg_min.is_valid() ? bg_min.get_origin() : Point<int16_t>();
 		Point<int16_t> content_pos = position - bg_origin;
 
-		// Button visual positions (must match constructor set_helper_btn offsets)
 		struct BtnHit { uint16_t id; int16_t x; };
 		BtnHit btn_hits[] = {
 			{ Buttons::BT_MIN, static_cast<int16_t>(dimension.x() - 18) },
@@ -417,7 +455,6 @@ namespace ms
 			if (it == buttons.end() || !it->second || !it->second->is_active())
 				continue;
 
-			// Hit area: 20x16 at the visual button position
 			Rectangle<int16_t> hit(
 				content_pos + Point<int16_t>(bh.x, 0),
 				content_pos + Point<int16_t>(bh.x + 20, 16)
@@ -445,7 +482,7 @@ namespace ms
 			}
 		}
 
-		// Handle dragging (skip base class to avoid its button processing)
+		// Dragging
 		if (dragged)
 		{
 			if (clicking)
@@ -461,7 +498,6 @@ namespace ms
 		}
 		else if (clicking)
 		{
-			// Only start drag if in drag area
 			Point<int16_t> bg_org = bg_min.is_valid() ? bg_min.get_origin() : Point<int16_t>();
 			Point<int16_t> drag_tl = position - bg_org;
 			Rectangle<int16_t> drag_bounds(drag_tl, drag_tl + Point<int16_t>(dragarea.x(), dragarea.y()));
@@ -483,7 +519,6 @@ namespace ms
 
 	bool UIQuestHelper::is_in_range(Point<int16_t> cursorpos) const
 	{
-		// Background draws at position - bg_min origin
 		Point<int16_t> bg_origin = bg_min.is_valid() ? bg_min.get_origin() : Point<int16_t>();
 		Point<int16_t> topleft = position - bg_origin;
 		Rectangle<int16_t> bounds(topleft, topleft + dimension);
@@ -492,8 +527,34 @@ namespace ms
 
 	void UIQuestHelper::track_quest(int16_t questid)
 	{
-		tracked_questid = questid;
-		refresh_quest_info();
+		if (questid <= 0)
+			return;
+
+		// Don't track duplicates
+		for (auto& tq : tracked_quests)
+			if (tq.questid == questid)
+				return;
+
+		// Max limit
+		if (static_cast<int>(tracked_quests.size()) >= MAX_TRACKED)
+			return;
+
+		TrackedQuest tq;
+		tq.questid = questid;
+		tq.collapsed = false;
+		refresh_quest_info(tq);
+		tracked_quests.push_back(std::move(tq));
+		recalc_dimension();
+	}
+
+	void UIQuestHelper::untrack_quest(int16_t questid)
+	{
+		tracked_quests.erase(
+			std::remove_if(tracked_quests.begin(), tracked_quests.end(),
+				[questid](const TrackedQuest& tq) { return tq.questid == questid; }),
+			tracked_quests.end()
+		);
+		recalc_dimension();
 	}
 
 	void UIQuestHelper::auto_track()
@@ -502,32 +563,40 @@ namespace ms
 
 		if (started.empty())
 		{
-			tracked_questid = -1;
-			quest_name = Text();
-			quest_progress = Text();
-			requirement_lines.clear();
+			tracked_quests.clear();
 			recalc_dimension();
 			return;
 		}
 
-		// Track the most recently started quest
-		tracked_questid = started.rbegin()->first;
-		refresh_quest_info();
+		// Track all started quests (up to MAX_TRACKED) if none are tracked
+		if (tracked_quests.empty())
+		{
+			int count = 0;
+			for (auto it = started.rbegin(); it != started.rend() && count < MAX_TRACKED; ++it, ++count)
+			{
+				TrackedQuest tq;
+				tq.questid = it->first;
+				tq.collapsed = false;
+				refresh_quest_info(tq);
+				tracked_quests.push_back(std::move(tq));
+			}
+			recalc_dimension();
+		}
 	}
 
-	void UIQuestHelper::refresh_quest_info()
+	void UIQuestHelper::refresh_quest_info(TrackedQuest& tq)
 	{
-		requirement_lines.clear();
+		tq.requirements.clear();
 
-		if (tracked_questid <= 0)
+		if (tq.questid <= 0)
 			return;
 
 		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
 		nl::node quest_check = nl::nx::quest["Check.img"];
 
-		std::string qid_str = std::to_string(tracked_questid);
+		std::string qid_str = std::to_string(tq.questid);
 
-		// Get quest name
+		// Quest name — bold dark
 		nl::node qnode = quest_info[qid_str];
 		std::string name;
 		if (qnode)
@@ -535,9 +604,9 @@ namespace ms
 		if (name.empty())
 			name = "Quest " + qid_str;
 
-		quest_name = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, name, 140, false);
+		tq.name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::MINESHAFT, name, 0, false);
 
-		// Get progress requirements
+		// Requirements
 		nl::node check = quest_check[qid_str];
 		if (!check) return;
 
@@ -560,29 +629,49 @@ namespace ms
 				item_name = "Item " + std::to_string(itemid);
 
 			std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(count);
-			Color::Name color = (have >= count) ? Color::Name::CHARTREUSE : Color::Name::BLACK;
+			Color::Name color = Color::Name::BLACK;
 
-			requirement_lines.push_back(
-				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 160, false)
+			tq.requirements.push_back(
+				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
 			);
 		}
 
-		// Mob requirements
+		// Mob requirements — parse progress from quest data string
+		// v83 format: each mob has a 3-digit zero-padded kill count in the quest data string
+		std::string qdata;
+		{
+			auto it = questlog.get_started().find(tq.questid);
+			if (it != questlog.get_started().end())
+				qdata = it->second;
+		}
+
+		int mob_idx = 0;
 		for (auto mob_node : end_check["mob"])
 		{
 			int32_t mobid = mob_node["id"].get_integer();
 			int32_t count = mob_node["count"].get_integer();
 			if (mobid <= 0) continue;
 
+			// Parse kill count from quest data string (3 chars per mob)
+			int32_t killed = 0;
+			size_t offset = static_cast<size_t>(mob_idx) * 3;
+			if (offset + 3 <= qdata.size())
+			{
+				try { killed = std::stoi(qdata.substr(offset, 3)); }
+				catch (...) { killed = 0; }
+			}
+
 			std::string mob_name = nl::nx::string["Mob.img"][std::to_string(mobid)]["name"].get_string();
 			if (mob_name.empty())
 				mob_name = "Monster " + std::to_string(mobid);
 
-			// We don't have kill count client-side, just show requirement
-			std::string line = mob_name + " 0/" + std::to_string(count);
-			requirement_lines.push_back(
-				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, line, 160, false)
+			std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(count);
+			Color::Name color = Color::Name::BLACK;
+
+			tq.requirements.push_back(
+				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
 			);
+			mob_idx++;
 		}
 
 		// NPC requirement
@@ -592,19 +681,23 @@ namespace ms
 			std::string npc_name = nl::nx::string["Npc.img"][std::to_string(end_npc)]["name"].get_string();
 			if (!npc_name.empty())
 			{
-				requirement_lines.push_back(
-					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MALIBU, "Talk to " + npc_name, 160, false)
+				tq.requirements.push_back(
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Talk to " + npc_name, 145, false)
 				);
 			}
 		}
 
-		// Summary progress text
-		if (requirement_lines.empty())
-			quest_progress = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "In progress...", 160, false);
+		// Progress fallback
+		if (tq.requirements.empty())
+			tq.progress = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "In progress...", 145, false);
 		else
-			quest_progress = Text();
+			tq.progress = Text();
+	}
 
-		// Recalculate dimension based on content
+	void UIQuestHelper::refresh_all()
+	{
+		for (auto& tq : tracked_quests)
+			refresh_quest_info(tq);
 		recalc_dimension();
 	}
 
@@ -616,33 +709,25 @@ namespace ms
 		int16_t w = bg_min.get_dimensions().x();
 		int16_t min_h = bg_min.get_dimensions().y() - bg_min.get_origin().y();
 
-		if (tracked_questid > 0)
+		int16_t content_h = 8; // top padding
+		if (!tracked_quests.empty())
 		{
-			int16_t content_h = 22 + 16; // quest name + gap
-			if (!requirement_lines.empty())
-				content_h += static_cast<int16_t>(requirement_lines.size()) * 16;
-			else
-				content_h += 16;
-			content_h += 8; // padding
-
-			// Tile to nearest bg_center tile height
-			int16_t tile_h = bg_center.is_valid() ? bg_center.get_dimensions().y() : 1;
-			int16_t tiles = (content_h + tile_h - 1) / tile_h;
-			int16_t tiled_h = tiles * tile_h;
-			int16_t bottom_h = bg_bottom.is_valid() ? bg_bottom.get_dimensions().y() : 0;
-
-			expanded_dimension = Point<int16_t>(w, min_h + tiled_h + bottom_h);
+			for (auto& tq : tracked_quests)
+				content_h += get_quest_entry_height(tq) + 8; // 8px spacing
 		}
 		else
 		{
-			// Minimal content area for "No quest tracked"
-			int16_t tile_h = bg_center.is_valid() ? bg_center.get_dimensions().y() : 1;
-			int16_t tiles = (28 + tile_h - 1) / tile_h;
-			int16_t tiled_h = tiles * tile_h;
-			int16_t bottom_h = bg_bottom.is_valid() ? bg_bottom.get_dimensions().y() : 0;
-
-			expanded_dimension = Point<int16_t>(w, min_h + tiled_h + bottom_h);
+			content_h = 28;
 		}
+
+		content_h = std::max(content_h, (int16_t)20);
+
+		int16_t tile_h = bg_center.is_valid() ? bg_center.get_dimensions().y() : 1;
+		int16_t tiles = (content_h + tile_h - 1) / tile_h;
+		int16_t tiled_h = tiles * tile_h;
+		int16_t bottom_h = bg_bottom.is_valid() ? bg_bottom.get_dimensions().y() : 0;
+
+		expanded_dimension = Point<int16_t>(w, min_h + tiled_h + bottom_h);
 
 		if (!minimized)
 			dimension = expanded_dimension;
@@ -660,14 +745,8 @@ namespace ms
 			break;
 		}
 		case Buttons::BT_AUTO:
+			tracked_quests.clear();
 			auto_track();
-			break;
-		case Buttons::BT_DELETE:
-			tracked_questid = -1;
-			quest_name = Text();
-			quest_progress = Text();
-			requirement_lines.clear();
-			recalc_dimension();
 			break;
 		case Buttons::BT_MAX:
 			minimized = false;

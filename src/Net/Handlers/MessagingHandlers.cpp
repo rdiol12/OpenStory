@@ -161,11 +161,12 @@ namespace ms
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
 				questlog_ui->load_quests();
 
-			// Auto-track newly started quest in quest helper
-			if (status == 1)
+			// Refresh quest helper on any quest update
+			if (auto helper = UI::get().get_element<UIQuestHelper>())
 			{
-				if (auto helper = UI::get().get_element<UIQuestHelper>())
+				if (status == 1)
 					helper->track_quest(qid);
+				helper->refresh_all();
 			}
 		}
 		else if (mode == 3)

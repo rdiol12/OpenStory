@@ -25,14 +25,13 @@
 
 namespace ms
 {
-	// Quest helper/tracker widget — shows active quest progress on screen
-	// Uses QuestAlarm NX nodes from UIWindow.img and UIWindow2.img
 	class UIQuestHelper : public UIDragElement<PosQUESTHELPER>
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::QUESTHELPER;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
+		static constexpr int MAX_TRACKED = 5;
 
 		UIQuestHelper(const QuestLog& questLog);
 
@@ -45,17 +44,30 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		// Track a specific quest
 		void track_quest(int16_t questid);
-		// Auto-select a quest to track
+		void untrack_quest(int16_t questid);
 		void auto_track();
+		void refresh_all();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void refresh_quest_info();
+		struct TrackedQuest
+		{
+			int16_t questid;
+			Text name;
+			Text progress;
+			std::vector<Text> requirements;
+			bool collapsed;
+
+			TrackedQuest() : questid(-1), collapsed(false) {}
+		};
+
+		void refresh_quest_info(TrackedQuest& tq);
 		void recalc_dimension();
+		int16_t draw_quest_entry(const TrackedQuest& tq, Point<int16_t> pos, float alpha) const;
+		int16_t get_quest_entry_height(const TrackedQuest& tq) const;
 
 		enum Buttons : uint16_t
 		{
@@ -70,7 +82,7 @@ namespace ms
 
 		const QuestLog& questlog;
 
-		// QuestAlarm backgrounds (scalable)
+		// QuestAlarm backgrounds
 		Texture bg_min;
 		Texture bg_center;
 		Texture bg_bottom;
@@ -86,14 +98,19 @@ namespace ms
 		Texture messenger_thomas_bg;
 		Texture messenger_thomas_notice;
 
-		// QuestGuide marks (forMiniMap variants for UI display)
+		// Per-quest close button textures (from BtDelete)
+		Texture close_btn_normal;
+		Texture close_btn_mouseover;
+		Texture close_btn_pressed;
+
+		// QuestGuide marks
 		Animation quest_mark;
 		Animation repeat_quest_mark;
 		Animation high_lv_mark;
 		Animation low_lv_mark;
 		Animation low_lv_repeat_mark;
 
-		// StatusBar3/Quest nodes
+		// StatusBar3/Quest
 		Texture sb_checkarlim_box;
 		Texture sb_checkarlim_check;
 		Texture sb_quest_info_bg;
@@ -101,24 +118,26 @@ namespace ms
 		Texture sb_quest_info_bg3;
 		Texture sb_quest_info_tip;
 
-		// Extended QuestIcon (UIWindow2.img/QuestIcon 12-29)
+		// Extended QuestIcon
 		std::vector<Animation> extended_quest_icons;
 
-		// Tracked quest state
-		int16_t tracked_questid;
+		// Multi-quest tracking
+		std::vector<TrackedQuest> tracked_quests;
 		bool minimized;
 		bool show_messenger;
 		Point<int16_t> expanded_dimension;
 
-		// Position of the X untrack button (set during draw)
-		mutable Point<int16_t> quest_untrack_pos;
+		// Hit test positions for per-quest X buttons and collapse toggles (set during draw)
+		struct QuestHitArea
+		{
+			int16_t questid;
+			Rectangle<int16_t> close_btn;
+			Rectangle<int16_t> header_area;
+		};
+		mutable std::vector<QuestHitArea> quest_hit_areas;
+		int16_t hovered_close_questid;
 
-		// Quest display info
-		Text quest_name;
-		Text quest_progress;
-		std::vector<Text> requirement_lines;
-
-		// Pre-allocated draw objects (avoid per-frame GPU allocations)
+		// Pre-allocated draw objects
 		mutable Text title_text;
 		Text no_quest_text;
 	};
