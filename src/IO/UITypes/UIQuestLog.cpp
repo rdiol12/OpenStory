@@ -46,7 +46,8 @@ namespace ms
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),
 		detail_area(0), detail_order(0), detail_auto_start(false),
 		detail_auto_complete(false), filter_my_level(true),
-		filter_my_location(false), show_recommended(true), show_quest_alarm(false)
+		filter_my_location(false), show_recommended(true), show_quest_alarm(false),
+		drag_quest_id(-1), drag_started(false)
 	{
 		tab = Buttons::TAB0;
 
@@ -778,6 +779,24 @@ namespace ms
 
 		for (auto& anim : quest_status_icons)
 			anim.update();
+
+		// Clean up quest drag when mouse is released
+		if (drag_started && !UI::get().is_mouse_held())
+		{
+			// Drop on quest helper if cursor is over it
+			if (auto helper = UI::get().get_element<UIQuestHelper>())
+			{
+				if (helper->is_in_range(last_cursor_pos))
+					helper->track_quest(drag_quest_id);
+			}
+			UIQuestHelper::quest_drag.end();
+			drag_started = false;
+			drag_quest_id = -1;
+		}
+		else if (drag_quest_id >= 0 && !drag_started && !UI::get().is_mouse_held())
+		{
+			drag_quest_id = -1;
+		}
 	}
 
 	void UIQuestLog::toggle_active()
@@ -1826,6 +1845,14 @@ namespace ms
 			}
 			quest_alarm_anim.draw(DrawArgument(alarm_pos + Point<int16_t>(10, 5)), alpha);
 		}
+
+		// Draw quest drag overlay
+		if (drag_started && UIQuestHelper::quest_drag.active)
+		{
+			Text drag_label(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK,
+				UIQuestHelper::quest_drag.quest_name, 0, false);
+			drag_label.draw(DrawArgument(UIQuestHelper::quest_drag.cursor_pos + Point<int16_t>(12, -8)));
+		}
 	}
 
 	void UIQuestLog::send_key(int32_t keycode, bool pressed, bool escape)
@@ -1870,6 +1897,29 @@ namespace ms
 	Cursor::State UIQuestLog::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
 		last_cursor_pos = cursorpos;
+
+		// Handle pending drag (clicked on quest, check if moved past threshold)
+		if (drag_quest_id >= 0 && !drag_started && clicking)
+		{
+			int16_t dx = cursorpos.x() - drag_start_pos.x();
+			int16_t dy = cursorpos.y() - drag_start_pos.y();
+			if ((dx * dx + dy * dy) > (QUEST_DRAG_THRESHOLD * QUEST_DRAG_THRESHOLD))
+			{
+				drag_started = true;
+				UIQuestHelper::quest_drag.start(drag_quest_id, drag_quest_name);
+			}
+		}
+
+		// Update drag cursor position
+		if (drag_started)
+		{
+			UIQuestHelper::quest_drag.cursor_pos = cursorpos;
+			return Cursor::State::CLICKING;
+		}
+
+		// Released without dragging
+		if (drag_quest_id >= 0 && !clicking)
+			drag_quest_id = -1;
 
 		if (Cursor::State new_state = search.send_cursor(cursorpos, clicking))
 			return new_state;
@@ -1935,6 +1985,15 @@ namespace ms
 						if (clicking)
 						{
 							select_quest(static_cast<int16_t>(idx));
+
+							// Record drag candidate for in-progress quests
+							if (tab == Buttons::TAB1 && idx < entries.size())
+							{
+								drag_quest_id = entries[idx].id;
+								drag_quest_name = entries[idx].name.get_text();
+								drag_start_pos = cursorpos;
+							}
+
 							return Cursor::State::CLICKING;
 						}
 

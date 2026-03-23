@@ -30,9 +30,12 @@
 
 namespace ms
 {
+	QuestDragState UIQuestHelper::quest_drag;
+
 	UIQuestHelper::UIQuestHelper(const QuestLog& ql) :
 		UIDragElement<PosQUESTHELPER>(Point<int16_t>(200, 20)), questlog(ql),
-		minimized(false), show_messenger(false), hovered_close_questid(-1)
+		minimized(false), show_messenger(false), hovered_close_questid(-1),
+		reorder_drag_index(-1)
 	{
 		// === QuestAlarm (UIWindow.img — v83 primary) ===
 		nl::node alarm1 = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
@@ -212,6 +215,7 @@ namespace ms
 
 		title_text = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, "", 170, false);
 		no_quest_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "No quest tracked", 170, false);
+		drag_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK, "", 0, false);
 
 		auto_track();
 	}
@@ -360,6 +364,23 @@ namespace ms
 				y += entry_h + 8; // 8px spacing between quests
 			}
 		}
+
+		// Draw drag overlay — quest being dragged from quest log or reordered
+		if (quest_drag.active)
+		{
+			drag_text.change_text(quest_drag.quest_name);
+			drag_text.draw(DrawArgument(quest_drag.cursor_pos + Point<int16_t>(12, -8)));
+		}
+		else if (reorder_drag_index >= 0 && reorder_drag_index < static_cast<int16_t>(tracked_quests.size()))
+		{
+			int16_t dx = reorder_cursor_pos.x() - reorder_start_pos.x();
+			int16_t dy = reorder_cursor_pos.y() - reorder_start_pos.y();
+			if ((dx * dx + dy * dy) > (DRAG_THRESHOLD * DRAG_THRESHOLD))
+			{
+				drag_text.change_text(tracked_quests[reorder_drag_index].name.get_text());
+				drag_text.draw(DrawArgument(reorder_cursor_pos + Point<int16_t>(12, -8)));
+			}
+		}
 	}
 
 	void UIQuestHelper::toggle_active()
@@ -398,12 +419,72 @@ namespace ms
 
 	Cursor::State UIQuestHelper::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
-		// Check per-quest hit areas (X button and collapse toggle)
+		// While quest is being dragged from quest log, show grabbing cursor
+		if (quest_drag.active)
+		{
+			quest_drag.cursor_pos = cursorpos;
+			return Cursor::State::GRABBING;
+		}
+
+		// Handle internal reorder drag
+		if (reorder_drag_index >= 0)
+		{
+			reorder_cursor_pos = cursorpos;
+			int16_t dx = cursorpos.x() - reorder_start_pos.x();
+			int16_t dy = cursorpos.y() - reorder_start_pos.y();
+			bool moved = (dx * dx + dy * dy) > (DRAG_THRESHOLD * DRAG_THRESHOLD);
+
+			if (!clicking)
+			{
+				int16_t idx = reorder_drag_index;
+				reorder_drag_index = -1;
+
+				if (!moved)
+				{
+					// Short click — collapse/expand
+					if (idx >= 0 && idx < static_cast<int16_t>(tracked_quests.size()))
+					{
+						tracked_quests[idx].collapsed = !tracked_quests[idx].collapsed;
+						recalc_dimension();
+					}
+					return Cursor::State::IDLE;
+				}
+
+				// Find drop target by cursor Y position
+				int16_t drop_index = -1;
+				for (size_t i = 0; i < quest_hit_areas.size(); i++)
+				{
+					if (quest_hit_areas[i].header_area.contains(cursorpos) ||
+						quest_hit_areas[i].close_btn.contains(cursorpos))
+					{
+						drop_index = static_cast<int16_t>(i);
+						break;
+					}
+				}
+
+				if (drop_index >= 0 && drop_index != idx &&
+					drop_index < static_cast<int16_t>(tracked_quests.size()))
+				{
+					TrackedQuest moved_q = std::move(tracked_quests[idx]);
+					tracked_quests.erase(tracked_quests.begin() + idx);
+					tracked_quests.insert(tracked_quests.begin() + drop_index, std::move(moved_q));
+					recalc_dimension();
+				}
+
+				return Cursor::State::IDLE;
+			}
+
+			return moved ? Cursor::State::GRABBING : Cursor::State::CANCLICK;
+		}
+
+		// Check per-quest hit areas (X button and collapse/reorder)
 		hovered_close_questid = -1;
 		if (!minimized)
 		{
-			for (auto& hit : quest_hit_areas)
+			for (size_t i = 0; i < quest_hit_areas.size(); i++)
 			{
+				auto& hit = quest_hit_areas[i];
+
 				// X button
 				if (hit.close_btn.contains(cursorpos))
 				{
@@ -416,21 +497,16 @@ namespace ms
 					}
 					return Cursor::State::CANCLICK;
 				}
-				// Header click = collapse/expand
+				// Header: click to collapse, hold and drag to reorder
 				if (hit.header_area.contains(cursorpos))
 				{
 					if (clicking)
 					{
-						for (auto& tq : tracked_quests)
-						{
-							if (tq.questid == hit.questid)
-							{
-								tq.collapsed = !tq.collapsed;
-								recalc_dimension();
-								break;
-							}
-						}
-						return Cursor::State::IDLE;
+						// Start reorder drag (or click-to-collapse if no movement)
+						reorder_drag_index = static_cast<int16_t>(i);
+						reorder_start_pos = cursorpos;
+						reorder_cursor_pos = cursorpos;
+						return Cursor::State::CLICKING;
 					}
 					return Cursor::State::CANCLICK;
 				}
@@ -482,7 +558,7 @@ namespace ms
 			}
 		}
 
-		// Dragging
+		// Window dragging
 		if (dragged)
 		{
 			if (clicking)

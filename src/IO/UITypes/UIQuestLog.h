@@ -164,6 +164,13 @@ namespace ms
 		Point<int16_t> last_cursor_pos;
 		bool selected_from_recommended;
 
+		// Quest drag-to-helper state
+		int16_t drag_quest_id;
+		std::string drag_quest_name;
+		Point<int16_t> drag_start_pos;
+		bool drag_started;
+		static constexpr int16_t QUEST_DRAG_THRESHOLD = 8;
+
 		// Returns total virtual row count for TAB0 (headers + entries)
 		uint16_t get_available_row_count() const;
 		// Maps a virtual row index to what it represents

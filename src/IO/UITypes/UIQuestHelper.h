@@ -25,6 +25,31 @@
 
 namespace ms
 {
+	// Shared drag state for quest drag-and-drop between UIQuestLog and UIQuestHelper
+	struct QuestDragState
+	{
+		bool active;
+		int16_t questid;
+		std::string quest_name;
+		Point<int16_t> cursor_pos;
+
+		QuestDragState() : active(false), questid(-1) {}
+
+		void start(int16_t qid, const std::string& name)
+		{
+			active = true;
+			questid = qid;
+			quest_name = name;
+		}
+
+		void end()
+		{
+			active = false;
+			questid = -1;
+			quest_name.clear();
+		}
+	};
+
 	class UIQuestHelper : public UIDragElement<PosQUESTHELPER>
 	{
 	public:
@@ -32,6 +57,9 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
 		static constexpr int MAX_TRACKED = 5;
+
+		// Global quest drag state — shared between quest log and helper
+		static QuestDragState quest_drag;
 
 		UIQuestHelper(const QuestLog& questLog);
 
@@ -137,8 +165,15 @@ namespace ms
 		mutable std::vector<QuestHitArea> quest_hit_areas;
 		int16_t hovered_close_questid;
 
+		// Internal reorder drag
+		int16_t reorder_drag_index;
+		Point<int16_t> reorder_start_pos;
+		Point<int16_t> reorder_cursor_pos;
+		static constexpr int16_t DRAG_THRESHOLD = 5;
+
 		// Pre-allocated draw objects
 		mutable Text title_text;
+		mutable Text drag_text;
 		Text no_quest_text;
 	};
 }
