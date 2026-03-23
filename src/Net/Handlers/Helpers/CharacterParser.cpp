@@ -105,7 +105,6 @@ namespace ms
 			{
 				int16_t qidl = quests.get_last_started();
 				quests.add_in_progress(qidl, qid, qdata);
-				//i--; // This was causing issues
 			}
 			else
 			{

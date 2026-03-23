@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "TestingHandlers.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Npc.h"
 #include "../../IO/UI.h"
@@ -177,11 +178,49 @@ namespace ms
 
 			break;
 		}
+		case 0x0A:
+		{
+			// Quest error — requirements not met
+			int16_t questid = recv.read_short();
+			(void)questid;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Quest] You don't meet the requirements for this quest.", UIChatBar::LineType::RED);
+
+			break;
+		}
+		case 0x0B:
+		{
+			// Quest failure — not enough mesos
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Quest] You don't have enough mesos.", UIChatBar::LineType::RED);
+
+			break;
+		}
+		case 0x0D:
+		{
+			// Quest failure — equipment is currently worn
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Quest] Item is currently worn by character.", UIChatBar::LineType::RED);
+
+			break;
+		}
+		case 0x0E:
+		{
+			// Quest failure — missing required item
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Quest] You don't have the required item.", UIChatBar::LineType::RED);
+
+			break;
+		}
 		case 0x0F:
 		{
 			// Quest expired
 			int16_t questid = recv.read_short();
 			Stage::get().get_player().get_quests().forfeit(questid);
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Quest] The quest has expired.", UIChatBar::LineType::RED);
 
 			// Refresh quest log UI if open
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())
@@ -206,6 +245,12 @@ namespace ms
 
 		int16_t questid = recv.read_short();
 		(void)questid;
+
+		// Play quest clear effect on player (light pillar)
+		Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);
+
+		// Play quest complete sound
+		Sound(Sound::Name::QUESTCOMPLETE).play();
 
 		// Refresh quest log UI if open
 		if (auto questlog_ui = UI::get().get_element<UIQuestLog>())

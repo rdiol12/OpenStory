@@ -31,6 +31,8 @@ namespace ms
 
 	void QuestLog::add_completed(int16_t qid, int64_t time)
 	{
+		started.erase(qid);
+		in_progress.erase(qid);
 		completed[qid] = time;
 	}
 
