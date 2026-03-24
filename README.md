@@ -1,5 +1,7 @@
 # OpenStory
 
+quest system is fully implemented 
+
 A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient).
 
 **Status: Playable** -- functional for gameplay, UI polish ongoing.
