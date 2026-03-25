@@ -68,8 +68,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **Chat clipping**: Chat messages no longer render above the black chat background
 
 
-this is for my own server ans the reason i started fixing this client 
-- **Custom jobs**: Added Sage (600), Necromancer (700), and Summoner (800) job trees with INT/LUK stats
+
 
 ## Quest Helper
 
