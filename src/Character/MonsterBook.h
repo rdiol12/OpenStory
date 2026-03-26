@@ -29,11 +29,11 @@ namespace ms
 		MonsterBook();
 
 		void set_cover(int32_t cov);
-		void add_card(int16_t cardid, int8_t level);
+		void add_card(int32_t cardid, int8_t level);
 
 		int32_t get_cover() const;
-		int8_t get_card_level(int16_t cardid) const;
-		const std::map<int16_t, int8_t>& get_cards() const;
+		int8_t get_card_level(int32_t cardid) const;
+		const std::map<int32_t, int8_t>& get_cards() const;
 		int16_t get_total_cards() const;
 		int32_t get_book_level() const;
 		int32_t get_normal_cards() const;
@@ -41,6 +41,6 @@ namespace ms
 
 	private:
 		int32_t cover;
-		std::map<int16_t, int8_t> cards;
+		std::map<int32_t, int8_t> cards;
 	};
 }

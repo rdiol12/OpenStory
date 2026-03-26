@@ -18,8 +18,11 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "../Components/Gauge.h"
 
+#include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
 
 #include <vector>
 
@@ -42,7 +45,7 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		void update_card(int16_t cardid, int8_t level);
+		void update_card(int32_t cardid, int8_t level);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -51,6 +54,10 @@ namespace ms
 		void set_page(int16_t page);
 		void update_buttons();
 		void load_cards();
+		void set_tab(int16_t tab);
+		void select_card(int16_t idx);
+		int16_t card_at_cursor(Point<int16_t> cursorpos) const;
+		void draw_number(Point<int16_t> pos, int32_t number, bool large) const;
 
 		enum Buttons : uint16_t
 		{
@@ -58,6 +65,7 @@ namespace ms
 			BT_ARROW_LEFT,
 			BT_ARROW_RIGHT,
 			BT_SEARCH,
+			BT_SETEFFECT,
 			BT_TAB0,
 			BT_TAB1,
 			BT_TAB2,
@@ -70,27 +78,70 @@ namespace ms
 			NUM_BUTTONS
 		};
 
-		static constexpr int16_t CARDS_PER_PAGE = 8;
+		// Each page side fits a 5x6 grid of 31x42 cards within the 174x256 cardSlot
+	static constexpr int16_t COLS_PER_SIDE = 5;
+	static constexpr int16_t ROWS_PER_SIDE = 6;
+	static constexpr int16_t CARDS_PER_SIDE = COLS_PER_SIDE * ROWS_PER_SIDE; // 30
+	static constexpr int16_t CARDS_PER_PAGE = CARDS_PER_SIDE * 2; // 60 per spread
 
 		struct CardEntry
 		{
-			int16_t cardid;
+			int32_t cardid;
 			int8_t level;
-			int32_t full_itemid;
+			int32_t mobid = 0;
+			Texture mob_icon;
+			std::string mob_name;
+			int32_t mob_level = 0;
+			int32_t mob_hp = 0;
+			int32_t mob_mp = 0;
+			int32_t mob_watk = 0;
+			int32_t mob_wdef = 0;
+			int32_t mob_matk = 0;
+			int32_t mob_mdef = 0;
+			int32_t mob_exp = 0;
+			std::vector<std::pair<int32_t, Texture>> drops; // itemid, icon
 		};
 
+		// NX sprites
 		Texture cover;
 		Texture card_slot;
+		Texture select_tex;
+		Texture full_mark;
+		Texture info_page;
+		Texture book_info0;
+		Texture book_info1;
+		Texture monster_info;
+		Texture marks[5];
+		Texture num_large[10];
+		Texture num_small[11];
+		Texture card_category[10];
 
 		Text page_text;
 		Text card_count_text;
+		Text book_level_text;
+		Text normal_count_text;
+		Text special_count_text;
 
 		std::vector<CardEntry> sorted_cards;
+		std::vector<CardEntry> filtered_cards;
 		int16_t cur_page;
 		int16_t num_pages;
+		int16_t cur_tab;
+		int16_t hovered_card;
+		int16_t selected_card = -1;
 
-		// Pre-allocated draw objects (avoid per-frame GPU allocations)
-		mutable Text card_level_text;
+		// Detail page state
+		mutable Animation detail_stand;
+		mutable Animation detail_move;
+		mutable Animation detail_die;
+		int8_t detail_anim_state = 0; // 0=stand, 1=move, 2=die
+
+		Gauge detail_hp_gauge;
+		Gauge detail_mp_gauge;
+
+		// Pre-allocated draw objects
 		mutable Text card_name_text;
+		mutable Text mob_name_text;
+		mutable Text mob_stat_text;
 	};
 }

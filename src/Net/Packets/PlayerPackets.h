@@ -89,6 +89,19 @@ namespace ms
 		}
 	};
 
+	// Sends idle HP/MP regen request to the server
+	// Opcode: HEAL_OVER_TIME(89)
+	class HealOverTimePacket : public OutPacket
+	{
+	public:
+		HealOverTimePacket(int16_t heal_hp, int16_t heal_mp) : OutPacket(OutPacket::Opcode::HEAL_OVER_TIME)
+		{
+			skip(8); // timestamp + unknown
+			write_short(heal_hp);
+			write_short(heal_mp);
+		}
+	};
+
 	// Requests the server to change key mappings
 	// Opcode: CHANGE_KEYMAP(135)
 	class ChangeKeyMapPacket : public OutPacket

@@ -378,6 +378,11 @@ namespace ms
 						UseItemPacket(slot, item_id).dispatch();
 						break;
 					}
+					case InventoryType::Id::SETUP:
+					{
+						Stage::get().get_player().use_item(item_id);
+						break;
+					}
 				}
 			}
 		}

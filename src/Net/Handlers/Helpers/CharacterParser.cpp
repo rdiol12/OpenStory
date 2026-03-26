@@ -189,7 +189,9 @@ namespace ms
 			int16_t cid = recv.read_short();
 			int8_t mblv = recv.read_byte();
 
-			monsterbook.add_card(cid, mblv);
+			// Server sends short card offset at login, convert to full item ID
+			int32_t full_cardid = 2380000 + cid;
+			monsterbook.add_card(full_cardid, mblv);
 		}
 	}
 

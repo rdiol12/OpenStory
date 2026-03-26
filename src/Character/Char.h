@@ -112,6 +112,8 @@ namespace ms
 		void show_iron_body();
 		// Display damage over the characters head
 		void show_damage(int32_t damage);
+		// Display heal number over the characters head (green/blue floating number)
+		void show_heal(int32_t amount);
 		// Display a chat bubble with the specified line in it
 		void speak(const std::string& line);
 		// Change a part of the character's look

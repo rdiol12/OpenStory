@@ -209,6 +209,17 @@ namespace ms
 		invincible.set_for(2000);
 	}
 
+	void Char::show_heal(int32_t amount)
+	{
+		if (amount <= 0)
+			return;
+
+		int16_t start_y = phobj.get_y() - 60;
+		int16_t x = phobj.get_x();
+
+		damagenumbers.emplace_back(DamageNumber::Type::HEAL, amount, start_y, x);
+	}
+
 	void Char::speak(const std::string& line)
 	{
 		chatballoon.change_text(line);

@@ -93,6 +93,28 @@ namespace ms
 		}
 	};
 
+	// A packet which requests sitting in a chair
+	// Opcode: USE_CHAIR(43)
+	class UseChairPacket : public OutPacket
+	{
+	public:
+		UseChairPacket(int32_t itemid) : OutPacket(OutPacket::Opcode::USE_CHAIR)
+		{
+			write_int(itemid);
+		}
+	};
+
+	// A packet which requests getting up from a chair
+	// Opcode: CANCEL_CHAIR(42)
+	class CancelChairPacket : public OutPacket
+	{
+	public:
+		CancelChairPacket() : OutPacket(OutPacket::Opcode::CANCEL_CHAIR)
+		{
+			write_short(-1);
+		}
+	};
+
 	// Requests using a scroll on an equip 
 	// Opcode: SCROLL_EQUIP(86)
 	class ScrollEquipPacket : public OutPacket

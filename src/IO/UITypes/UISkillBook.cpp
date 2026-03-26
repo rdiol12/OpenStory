@@ -28,6 +28,7 @@
 
 #include "../../Net/Packets/PlayerPackets.h"
 
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -531,7 +532,79 @@ namespace ms
 		bookicon = data.get_icon();
 		booktext.change_text(data.get_name());
 
-		for (int32_t skill_id : data.get_skills())
+		// Start with NX skill list (shows all available skills for the job)
+		std::vector<int32_t> skill_ids = data.get_skills();
+
+		// For beginner tab, detect actual beginner prefix from skillbook
+		// (custom jobs map to Explorer 0 but character may be Noblesse/Aran)
+		if (joblevel == Job::Level::BEGINNER)
+		{
+			uint16_t real_beginner = subid;
+			for (auto& entry : skillbook.get_entries())
+			{
+				int32_t prefix = entry.first / 10000;
+				if (prefix == 1000) { real_beginner = 1000; break; }
+				if (prefix == 2000) { real_beginner = 2000; break; }
+			}
+
+			// If actual beginner differs, load NX skills from the right job
+			if (real_beginner != subid)
+			{
+				skill_ids = JobData::get(real_beginner).get_skills();
+				bookicon = JobData::get(real_beginner).get_icon();
+				booktext.change_text(JobData::get(real_beginner).get_name());
+			}
+		}
+
+		// If NX has no skills for this job (custom server jobs),
+		// fall back to skills the player has in this job's ID range
+		if (skill_ids.empty() && subid > 0)
+		{
+			for (auto& entry : skillbook.get_entries())
+			{
+				if (entry.first / 10000 == static_cast<int32_t>(subid))
+					skill_ids.push_back(entry.first);
+			}
+		}
+
+		// Also add any server-sent skills not already in the NX list
+		for (auto& entry : skillbook.get_entries())
+		{
+			int32_t sid = entry.first;
+			int32_t prefix = sid / 10000;
+			bool matches = (prefix == static_cast<int32_t>(subid));
+
+			if (joblevel == Job::Level::BEGINNER)
+			{
+				// Check against all beginner prefixes
+				matches = (prefix == 0 || prefix == 1000 || prefix == 2000);
+			}
+
+			if (!matches)
+				continue;
+
+			// Skip if already in list (or duplicate base ID for beginners)
+			bool already = false;
+			for (int32_t existing : skill_ids)
+			{
+				if (existing == sid)
+				{
+					already = true;
+					break;
+				}
+				// For beginners, skip if same base ID already present
+				if (joblevel == Job::Level::BEGINNER && existing % 10000 == sid % 10000)
+				{
+					already = true;
+					break;
+				}
+			}
+
+			if (!already)
+				skill_ids.push_back(sid);
+		}
+
+		for (int32_t skill_id : skill_ids)
 		{
 			int32_t level = skillbook.get_level(skill_id);
 			int32_t masterlevel = skillbook.get_masterlevel(skill_id);
@@ -541,13 +614,13 @@ namespace ms
 			if (invisible && masterlevel == 0)
 				continue;
 
-			// Hide skills with no level and no master level (not learned/not learnable)
-			// Unless it's a core beginner skill (Three Snails/Recovery/Nimble Feet variants)
 			if (level == 0 && masterlevel == 0)
 			{
+				// Keep core beginner skills and server-sent skills
 				int32_t base = skill_id % 10000;
-				// 1000=Three Snails, 1001=Recovery, 1002=Nimble Feet
-				if (base != 1000 && base != 1001 && base != 1002)
+				bool is_beginner_core = (base == 1000 || base == 1001 || base == 1002);
+
+				if (!is_beginner_core && !skillbook.has_skill(skill_id))
 					continue;
 			}
 

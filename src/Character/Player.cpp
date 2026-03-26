@@ -27,6 +27,11 @@
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
+#include "../Net/Packets/PlayerPackets.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -82,6 +87,8 @@ namespace ms
 		keysdown.clear();
 		attacking = false;
 		ladder = nullptr;
+		chair_itemid = 0;
+		chair_anim = Animation();
 		nullstate.update_state(*this);
 	}
 
@@ -143,14 +150,42 @@ namespace ms
 		InventoryType::Id type = InventoryType::by_item_id(itemid);
 
 		if (int16_t slot = inventory.find_item(type, itemid))
+		{
 			if (type == InventoryType::Id::USE)
+			{
 				UseItemPacket(slot, itemid).dispatch();
+			}
+			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
+			{
+				if (chair_itemid > 0)
+				{
+					// Already in a chair — stand up
+					set_state(Char::State::STAND);
+				}
+				else
+				{
+					// Sit in chair
+					set_chair(itemid);
+					set_state(Char::State::SIT);
+					UseChairPacket(itemid).dispatch();
+				}
+			}
+		}
 	}
 
 	void Player::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
 		if (layer == get_layer())
+		{
+			if (chair_itemid > 0)
+			{
+				Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+				Point<int16_t> chair_offset = chair_pos + Point<int16_t>(0, -50);
+				chair_anim.draw(DrawArgument(absp + chair_offset, facing_right), alpha);
+			}
+
 			Char::draw(viewx, viewy, alpha);
+		}
 	}
 
 	int8_t Player::update(const Physics& physics)
@@ -187,6 +222,63 @@ namespace ms
 
 		climb_cooldown.update();
 
+		if (chair_itemid > 0)
+			chair_anim.update();
+
+		// Idle HP/MP regen — send HEAL_OVER_TIME every ~10 seconds
+		// Reset and pause counter while attacking, getting hit, in hit stun, or dead
+		if (state == Char::State::DIED || is_invincible() || attacking)
+		{
+			heal_tick_counter = 0;
+		}
+		else
+		{
+			heal_tick_counter++;
+		}
+
+		if (heal_tick_counter >= HEAL_TICK_INTERVAL)
+		{
+			heal_tick_counter = 0;
+
+			int16_t cur_hp = stats.get_stat(MapleStat::Id::HP);
+			int16_t max_hp = stats.get_stat(MapleStat::Id::MAXHP);
+			int16_t cur_mp = stats.get_stat(MapleStat::Id::MP);
+			int16_t max_mp = stats.get_stat(MapleStat::Id::MAXMP);
+
+			if (cur_hp < max_hp || cur_mp < max_mp)
+			{
+				int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+				int16_t int_stat = stats.get_stat(MapleStat::Id::INT);
+
+				// Base regen formula: scales with level
+				// Chair regen is higher (server also has its own chair heal timer)
+				bool sitting = (chair_itemid > 0);
+				int16_t heal_hp = static_cast<int16_t>(std::max(1, level / 5 + 2));
+				int16_t heal_mp = static_cast<int16_t>(std::max(1, level / 5 + int_stat / 20 + 3));
+
+				// Mage Improving MP Recovery (skill 2000000): Level * SkillLevel / 10 extra MP
+				int32_t mp_recovery_level = get_skilllevel(SkillId::Id::IMPROVE_HP_RECOVERY);
+				if (mp_recovery_level > 0)
+					heal_mp += static_cast<int16_t>(level * mp_recovery_level / 10);
+
+				if (sitting)
+				{
+					heal_hp *= 3;
+					heal_mp *= 3;
+				}
+
+				// Cap to not exceed max
+				heal_hp = std::min(heal_hp, static_cast<int16_t>(max_hp - cur_hp));
+				heal_mp = std::min(heal_mp, static_cast<int16_t>(max_mp - cur_mp));
+
+				if (heal_hp < 0) heal_hp = 0;
+				if (heal_mp < 0) heal_mp = 0;
+
+				if (heal_hp > 0 || heal_mp > 0)
+					HealOverTimePacket(heal_hp, heal_mp).dispatch();
+			}
+		}
+
 		return get_layer();
 	}
 
@@ -215,6 +307,13 @@ namespace ms
 	{
 		if (!attacking)
 		{
+			// Clear chair when leaving SIT state
+			if (st != Char::State::SIT && chair_itemid > 0)
+			{
+				set_chair(0);
+				CancelChairPacket().dispatch();
+			}
+
 			Char::set_state(st);
 
 			const PlayerState* pst = get_state(st);
@@ -577,5 +676,37 @@ namespace ms
 	Optional<const Ladder> Player::get_ladder() const
 	{
 		return ladder;
+	}
+
+	void Player::set_chair(int32_t itemid)
+	{
+		chair_itemid = itemid;
+
+		if (itemid > 0)
+		{
+			std::string strprefix = "0" + std::to_string(itemid / 10000);
+			std::string strid = "0" + std::to_string(itemid);
+
+			nl::node item_node = nl::nx::item["Install"][strprefix + ".img"][strid];
+
+			// Chair animation is under the "effect" child node
+			nl::node effect_node = item_node["effect"];
+
+			// Read chair position offset
+			nl::node pos_node = effect_node["pos"];
+			if (pos_node)
+				chair_pos = Point<int16_t>(pos_node["x"], pos_node["y"]);
+			else
+				chair_pos = Point<int16_t>(0, 0);
+
+			if (effect_node)
+				chair_anim = Animation(effect_node);
+			else
+				chair_anim = Animation();
+		}
+		else
+		{
+			chair_anim = Animation();
+		}
 	}
 }

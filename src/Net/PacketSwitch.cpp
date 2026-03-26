@@ -82,8 +82,8 @@ namespace ms
 		SKILL_LEARN_ITEM_RESULT = 51, // 0x33
 
 		/// Monster Book
-		MONSTER_BOOK_SET_CARD = 215, // 0xD7
-		MONSTER_BOOK_SET_COVER = 216, // 0xD8
+		MONSTER_BOOK_SET_CARD = 83, // 0x53
+		MONSTER_BOOK_SET_COVER = 84, // 0x54
 
 		/// Player Interaction
 		CHAR_INFO = 61,         // 0x3D

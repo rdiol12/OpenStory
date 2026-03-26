@@ -180,5 +180,16 @@ namespace ms
 		TimedBool climb_cooldown;
 
 		bool underwater;
+
+		int32_t chair_itemid = 0;
+		Animation chair_anim;
+		Point<int16_t> chair_pos;
+
+		int32_t heal_tick_counter = 0;
+		static constexpr int32_t HEAL_TICK_INTERVAL = 300; // ~10 seconds at 30fps
+
+	public:
+		int32_t get_chair_itemid() const { return chair_itemid; }
+		void set_chair(int32_t itemid);
 	};
 }

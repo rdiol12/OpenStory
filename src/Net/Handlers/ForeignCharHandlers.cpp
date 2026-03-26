@@ -203,6 +203,10 @@ namespace ms
 
 		int32_t cid = recv.read_int();
 
+		// Skip the local player — we manage our own chair state
+		if (Stage::get().is_player(cid))
+			return;
+
 		Optional<Char> character = Stage::get().get_character(cid);
 		if (character)
 			character->set_state(Char::State::STAND);
@@ -236,12 +240,16 @@ namespace ms
 		int32_t charid = recv.read_int();
 		int32_t itemid = recv.read_int();
 
+		// Skip the local player — we manage our own chair state
+		if (Stage::get().is_player(charid))
+			return;
+
 		if (auto other = Stage::get().get_character(charid))
 		{
-			// Set the character's chair state
-			// itemid 0 means get up from chair
 			if (itemid > 0)
-				other->set_direction(false); // face right in chair by default
+				other->set_state(Char::State::SIT);
+			else
+				other->set_state(Char::State::STAND);
 		}
 	}
 

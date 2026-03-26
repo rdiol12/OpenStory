@@ -29,7 +29,7 @@ namespace ms
 		cover = cov;
 	}
 
-	void MonsterBook::add_card(int16_t card, int8_t level)
+	void MonsterBook::add_card(int32_t card, int8_t level)
 	{
 		cards[card] = level;
 	}
@@ -39,13 +39,13 @@ namespace ms
 		return cover;
 	}
 
-	int8_t MonsterBook::get_card_level(int16_t cardid) const
+	int8_t MonsterBook::get_card_level(int32_t cardid) const
 	{
 		auto iter = cards.find(cardid);
 		return (iter != cards.end()) ? iter->second : 0;
 	}
 
-	const std::map<int16_t, int8_t>& MonsterBook::get_cards() const
+	const std::map<int32_t, int8_t>& MonsterBook::get_cards() const
 	{
 		return cards;
 	}
@@ -76,10 +76,7 @@ namespace ms
 
 		for (auto& [cardid, level] : cards)
 		{
-			// Normal cards: full item id / 1000 < 2388
-			int32_t full_id = 2380000 + cardid;
-
-			if (full_id / 1000 < 2388)
+			if (cardid / 1000 < 2388)
 				count++;
 		}
 
@@ -92,10 +89,7 @@ namespace ms
 
 		for (auto& [cardid, level] : cards)
 		{
-			// Special cards: full item id / 1000 >= 2388
-			int32_t full_id = 2380000 + cardid;
-
-			if (full_id / 1000 >= 2388)
+			if (cardid / 1000 >= 2388)
 				count++;
 		}
 
