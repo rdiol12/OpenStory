@@ -80,6 +80,10 @@ namespace ms
 			CHAR_INFO_REQUEST = 97,
 			PLAYER_INTERACTION = 123,
 
+			/// Chair
+			CANCEL_CHAIR = 42,
+			USE_CHAIR = 43,
+
 			/// Inventory
 			GATHER_ITEMS = 69,
 			SORT_ITEMS = 70,
@@ -89,6 +93,7 @@ namespace ms
 
 			/// Player
 			SPEND_AP = 87,
+			HEAL_OVER_TIME = 89,
 			SPEND_SP = 90,
 			CHANGE_KEYMAP = 135,
 

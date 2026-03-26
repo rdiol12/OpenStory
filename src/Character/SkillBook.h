@@ -26,6 +26,13 @@ namespace ms
 	class SkillBook
 	{
 	public:
+		struct SkillEntry
+		{
+			int32_t level;
+			int32_t masterlevel;
+			int64_t expiration;
+		};
+
 		void set_skill(int32_t id, int32_t level, int32_t masterlevel, int64_t expiration);
 
 		bool has_skill(int32_t id) const;
@@ -40,14 +47,10 @@ namespace ms
 		// Return id and level of all required skills
 		std::unordered_map<int32_t, int32_t> collect_required(int32_t id) const;
 
-	private:
-		struct SkillEntry
-		{
-			int32_t level;
-			int32_t masterlevel;
-			int64_t expiration;
-		};
+		// Return all skill entries (for iterating over learned skills)
+		const std::unordered_map<int32_t, SkillEntry>& get_entries() const;
 
+	private:
 		std::unordered_map<int32_t, SkillEntry> skillentries;
 	};
 }

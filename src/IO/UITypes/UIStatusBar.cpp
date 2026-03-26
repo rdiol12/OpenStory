@@ -275,12 +275,12 @@ namespace ms
 		// Menu buttons stack top-to-bottom above the bar.
 		// Bar top is at -84 relative to position. Panel sits just above that.
 		// v83-visible: Stat, Skill, Quest, Item, Equip, Community, Event, Rank, EpisodBook (9 buttons)
-		constexpr int16_t MENU_STEP = 24;
+		constexpr int16_t MENU_STEP = 26;
 		constexpr int16_t MENU_VISIBLE = 9;
 		constexpr int16_t MENU_PANEL_H = MENU_VISIBLE * MENU_STEP + 8;
 
 		int16_t menu_x = 188;
-		int16_t menu_panel_top = -(84 + MENU_PANEL_H);
+		int16_t menu_panel_top = -(80 + MENU_PANEL_H);
 		int16_t menu_y = menu_panel_top + 4;
 
 		buttons[BT_MENU_STAT]          = std::make_unique<MapleButton>(menu_node["BtStat"],      Point<int16_t>(menu_x, menu_y));
@@ -310,7 +310,7 @@ namespace ms
 		buttons[BT_MENU_AFREECATV]->set_state(Button::State::DISABLED);
 
 		// Menu background sized to cover visible buttons
-		menu_bg = ColorBox(69, MENU_PANEL_H, Color::Name::BLACK, 0.75f);
+		menu_bg = ColorBox(130, MENU_PANEL_H, Color::Name::BLACK, 0.75f);
 
 		// === System sub-panel ===
 		nl::node sys_node = mainbar["System"];

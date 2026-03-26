@@ -281,7 +281,8 @@ namespace ms
 				combat.use_move(action);
 				break;
 			case KeyType::Id::ITEM:
-				player.use_item(action);
+				if (down)
+					player.use_item(action);
 				break;
 			case KeyType::Id::FACE:
 				player.set_expression(action);

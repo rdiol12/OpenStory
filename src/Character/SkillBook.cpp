@@ -81,4 +81,9 @@ namespace ms
 
 		return SkillData::get(iter->first).get_reqskills();
 	}
+
+	const std::unordered_map<int32_t, SkillBook::SkillEntry>& SkillBook::get_entries() const
+	{
+		return skillentries;
+	}
 }

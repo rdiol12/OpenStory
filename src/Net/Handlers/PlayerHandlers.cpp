@@ -90,6 +90,15 @@ namespace ms
 		default:
 		{
 			int16_t value = recv.read_short();
+
+			// Show heal number when HP increases from regen
+			if (stat == MapleStat::Id::HP)
+			{
+				int16_t old_hp = player.get_stats().get_stat(MapleStat::Id::HP);
+				if (value > old_hp)
+					player.show_heal(value - old_hp);
+			}
+
 			player.get_stats().set_stat(stat, value);
 			recalculate = true;
 
@@ -264,19 +273,17 @@ namespace ms
 	void MonsterBookCardHandler::handle(InPacket& recv) const
 	{
 		int8_t full = recv.read_byte();      // 0 = book full, 1 = not full
-		int32_t cardid = recv.read_int();    // monsterBookId from mob data
+		int32_t cardid = recv.read_int();    // full card item id (238xxxx)
 		int32_t level = recv.read_int();     // card level (1-5)
-
-		int16_t card_short = static_cast<int16_t>(cardid % 10000);
 		int8_t card_level = static_cast<int8_t>(level);
 
-		Stage::get().get_player().get_monsterbook().add_card(card_short, card_level);
+		Stage::get().get_player().get_monsterbook().add_card(cardid, card_level);
 
 		// Play card acquisition effect
 		Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
 
 		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
-			monsterbook->update_card(card_short, card_level);
+			monsterbook->update_card(cardid, card_level);
 	}
 
 	void MonsterBookCoverHandler::handle(InPacket& recv) const
