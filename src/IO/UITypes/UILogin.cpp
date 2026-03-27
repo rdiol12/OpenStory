@@ -146,7 +146,17 @@ namespace ms
 		if (saveid)
 		{
 			account.change_text(Setting<DefaultAccount>::get().load());
-			password.set_state(Textfield::State::FOCUSED);
+
+			std::string saved_pass = Setting<DefaultPassword>::get().load();
+			if (!saved_pass.empty())
+			{
+				password.change_text(saved_pass);
+				password.set_state(Textfield::State::NORMAL);
+			}
+			else
+			{
+				password.set_state(Textfield::State::FOCUSED);
+			}
 		}
 		else
 		{
@@ -228,6 +238,13 @@ namespace ms
 			return;
 		}
 
+		if (saveid)
+		{
+			Setting<DefaultAccount>::get().save(account_text);
+			Setting<DefaultPassword>::get().save(password_text);
+			Configuration::get().save();
+		}
+
 		UI::get().emplace<UILoginWait>(okhandler);
 
 		auto loginwait = UI::get().get_element<UILoginWait>();
@@ -287,6 +304,7 @@ namespace ms
 				saveid = !saveid;
 
 				Setting<SaveLogin>::get().save(saveid);
+				Configuration::get().save();
 
 				return Button::State::MOUSEOVER;
 			}

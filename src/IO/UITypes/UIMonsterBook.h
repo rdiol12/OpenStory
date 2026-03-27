@@ -41,6 +41,7 @@ namespace ms
 		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -58,6 +59,8 @@ namespace ms
 		void select_card(int16_t idx);
 		int16_t card_at_cursor(Point<int16_t> cursorpos) const;
 		void draw_number(Point<int16_t> pos, int32_t number, bool large) const;
+		void draw_detail(float inter) const;
+		void draw_set_effect(float inter) const;
 
 		enum Buttons : uint16_t
 		{
@@ -75,14 +78,23 @@ namespace ms
 			BT_TAB6,
 			BT_TAB7,
 			BT_TAB8,
+			BT_RTAB0,
+			BT_RTAB1,
+			BT_RTAB2,
+			BT_RTAB3,
+			BT_RTAB4,
+			BT_RTAB5,
+			BT_RTAB6,
+			BT_RTAB7,
+			BT_RTAB8,
 			NUM_BUTTONS
 		};
 
-		// Each page side fits a 5x6 grid of 31x42 cards within the 174x256 cardSlot
+		// Card grid: 5 columns x 5 rows per page side
 	static constexpr int16_t COLS_PER_SIDE = 5;
-	static constexpr int16_t ROWS_PER_SIDE = 6;
-	static constexpr int16_t CARDS_PER_SIDE = COLS_PER_SIDE * ROWS_PER_SIDE; // 30
-	static constexpr int16_t CARDS_PER_PAGE = CARDS_PER_SIDE * 2; // 60 per spread
+	static constexpr int16_t ROWS_PER_SIDE = 5;
+	static constexpr int16_t CARDS_PER_SIDE = COLS_PER_SIDE * ROWS_PER_SIDE; // 25
+	static constexpr int16_t CARDS_PER_PAGE = CARDS_PER_SIDE * 2; // 50 per spread
 
 		struct CardEntry
 		{
@@ -90,6 +102,7 @@ namespace ms
 			int8_t level;
 			int32_t mobid = 0;
 			Texture mob_icon;
+			Texture card_icon;
 			std::string mob_name;
 			int32_t mob_level = 0;
 			int32_t mob_hp = 0;
@@ -115,12 +128,18 @@ namespace ms
 		Texture num_large[10];
 		Texture num_small[11];
 		Texture card_category[10];
+		Texture all_card;
+		Texture set_icon_back;
+		Texture set_info0;
+		Texture set_info1;
 
 		Text page_text;
 		Text card_count_text;
 		Text book_level_text;
 		Text normal_count_text;
 		Text special_count_text;
+
+		int16_t get_card_category(int32_t cardid) const;
 
 		std::vector<CardEntry> sorted_cards;
 		std::vector<CardEntry> filtered_cards;
@@ -129,6 +148,11 @@ namespace ms
 		int16_t cur_tab;
 		int16_t hovered_card;
 		int16_t selected_card = -1;
+
+		// Per-category card counts for cover page
+		int32_t cat_collected[9] = {};
+		int32_t cat_total[9] = {};
+		int32_t total_collected = 0;
 
 		// Detail page state
 		mutable Animation detail_stand;
@@ -139,9 +163,33 @@ namespace ms
 		Gauge detail_hp_gauge;
 		Gauge detail_mp_gauge;
 
+		int16_t detail_drop_offset = 0; // scroll offset for drops
+		int16_t hovered_drop = -1; // hovered drop item index
+
+		// Set effect state
+		bool show_set_page = false;
+		int16_t active_set = -1; // currently active set (-1 = none)
+		int16_t hovered_set = -1; // hovered set row
+		int16_t set_scroll = 0; // scroll offset for set grid
+
+		struct CardSet
+		{
+			std::string name;
+			std::string bonus;
+			std::vector<int32_t> mob_ids; // mobs in this set
+			int32_t collected = 0;
+			int32_t total = 0;
+			Texture icon; // representative icon (first mob's card)
+		};
+
+		std::vector<CardSet> card_sets;
+		void load_sets();
+
 		// Pre-allocated draw objects
 		mutable Text card_name_text;
 		mutable Text mob_name_text;
 		mutable Text mob_stat_text;
+		mutable Text hp_text;
+		mutable Text mp_text;
 	};
 }

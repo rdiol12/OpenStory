@@ -42,7 +42,8 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
-- **Monster Book UI**: Card grid, detail overlay with animated mob sprite, HP/MP gauge bars, drop items, and stats display. Click cards to view details, click sprite area to cycle stand/move/die animations. Tabs for category filtering and search. *Note: Monster Book UI is broken but functional — layout and positioning still need polish.*
+- **Monster Book UI**: Card grid, detail overlay with animated mob sprite, drop items with tooltip on hover, and stats display. Click cards to view details, click sprite area to cycle stand/move/die animations. Tabs for category filtering and search. Home/card view works. *Note: Set Effect menu UI is still broken — layout and positioning need polish.*
+- **Login Remember Me**: The "Save ID" checkbox on the login screen now actually remembers your login credentials between sessions.
 - **Idle HP/MP regen (HEAL_OVER_TIME)**: Client now sends regen packets every ~10 seconds while idle. Formula: HP = level/5 + 2, MP = level/5 + INT/20 + 3. Mage Improving MP Recovery skill adds Level × SkillLevel / 10 extra MP. Chair sitting gives 3x bonus. Regen pauses during attacks, hit stun, invincibility, and death.
 - **Heal floating numbers**: HP regen shows blue floating numbers above the character using the BasicEff heal number sprites.
 - **Chair rendering and animation**: Fixed chair sprite rendering and sit animation when using inventory chair items.

@@ -27,6 +27,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <Windows.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <glfw3native.h>
 
 namespace ms
 {
@@ -112,8 +114,29 @@ namespace ms
 		UI::get().send_cursor(pos);
 	}
 
-	void focus_callback(GLFWwindow*, int focused)
+	void clip_cursor_to_window(GLFWwindow* window)
 	{
+		HWND hwnd = glfwGetWin32Window(window);
+		if (hwnd)
+		{
+			RECT rect;
+			GetClientRect(hwnd, &rect);
+			POINT tl = { rect.left, rect.top };
+			POINT br = { rect.right, rect.bottom };
+			ClientToScreen(hwnd, &tl);
+			ClientToScreen(hwnd, &br);
+			RECT screen_rect = { tl.x, tl.y, br.x, br.y };
+			ClipCursor(&screen_rect);
+		}
+	}
+
+	void focus_callback(GLFWwindow* window, int focused)
+	{
+		if (focused)
+			clip_cursor_to_window(window);
+		else
+			ClipCursor(nullptr);
+
 		UI::get().send_focus(focused);
 	}
 
@@ -218,6 +241,9 @@ namespace ms
 		glfwSetWindowFocusCallback(glwnd, focus_callback);
 		glfwSetScrollCallback(glwnd, scroll_callback);
 		glfwSetWindowCloseCallback(glwnd, close_callback);
+
+		// Confine cursor to window so it can't escape to desktop/taskbar
+		clip_cursor_to_window(glwnd);
 
 		char buf[256];
 		GetCurrentDirectoryA(256, buf);

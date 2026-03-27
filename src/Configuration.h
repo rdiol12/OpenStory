@@ -345,6 +345,12 @@ namespace ms
 		DefaultAccount() : StringEntry("Account", "") {}
 	};
 
+	// The last used password
+	struct DefaultPassword : public Configuration::StringEntry
+	{
+		DefaultPassword() : StringEntry("Password", "") {}
+	};
+
 	// The last used world
 	struct DefaultWorld : public Configuration::ByteEntry
 	{
