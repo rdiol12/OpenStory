@@ -995,4 +995,5 @@ namespace ms
 		if (buttons.count(BT_NOTICE))
 			buttons[BT_NOTICE]->set_active(false);
 	}
+
 }

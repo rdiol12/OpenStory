@@ -27,10 +27,9 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/Misc.h"
-#include "../../Graphics/Geometry.h"
 
 #include <algorithm>
-#include <iostream>
+#include <unordered_map>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -48,8 +47,6 @@ namespace ms
 
 		sprites.emplace_back(backgrnd);
 
-		std::cout << "[MonsterBook] bg_dimensions: " << bg_dimensions.x() << "x" << bg_dimensions.y() << std::endl;
-
 		// Main sprites
 		cover = src["cover"];
 		card_slot = src["cardSlot"];
@@ -57,26 +54,20 @@ namespace ms
 		full_mark = src["fullMark"];
 		info_page = src["infoPage"];
 
-		std::cout << "[MonsterBook] cover: dim=" << cover.get_dimensions().x() << "x" << cover.get_dimensions().y()
-			<< " origin=" << cover.get_origin().x() << "," << cover.get_origin().y() << std::endl;
-		std::cout << "[MonsterBook] card_slot: dim=" << card_slot.get_dimensions().x() << "x" << card_slot.get_dimensions().y()
-			<< " origin=" << card_slot.get_origin().x() << "," << card_slot.get_origin().y() << std::endl;
-		std::cout << "[MonsterBook] info_page: dim=" << info_page.get_dimensions().x() << "x" << info_page.get_dimensions().y()
-			<< " origin=" << info_page.get_origin().x() << "," << info_page.get_origin().y() << std::endl;
-
 		// Page info sprites
 		nl::node page_info = src["pageInfo"];
 		book_info0 = page_info["bookInfo0"];
 		book_info1 = page_info["bookInfo1"];
 		monster_info = page_info["monsterInfo"];
 
-		std::cout << "[MonsterBook] monster_info: dim=" << monster_info.get_dimensions().x() << "x" << monster_info.get_dimensions().y()
-			<< " origin=" << monster_info.get_origin().x() << "," << monster_info.get_origin().y() << std::endl;
-		std::cout << "[MonsterBook] book_info0: dim=" << book_info0.get_dimensions().x() << "x" << book_info0.get_dimensions().y()
-			<< " origin=" << book_info0.get_origin().x() << "," << book_info0.get_origin().y() << std::endl;
-
 		for (int i = 0; i < 10; i++)
 			card_category[i] = page_info["cardCategory"][std::to_string(i)];
+
+		all_card = page_info["allCard"];
+		set_icon_back = page_info["setIconBack"];
+		set_info0 = page_info["setInfo0"];
+		set_info1 = page_info["setInfo1"];
+
 
 		// Level marks (0-4 = 1-5 cards collected)
 		for (int i = 0; i < 5; i++)
@@ -90,17 +81,13 @@ namespace ms
 			num_small[i] = src["numberSmall"][std::to_string(i)];
 
 		// Buttons
-		// Background has origin (14,0), so bg left edge is at position.x - 14
-		// BtClose: top-right corner of the background
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(src["BtClose"], Point<int16_t>(bg_dimensions.x() - 14 - 19, 6));
-		// Arrow buttons have origin (0,0) so need explicit positioning at bottom center
-		buttons[Buttons::BT_ARROW_LEFT] = std::make_unique<MapleButton>(src["arrowLeft"], Point<int16_t>(185, 338));
-		buttons[Buttons::BT_ARROW_RIGHT] = std::make_unique<MapleButton>(src["arrowRight"], Point<int16_t>(260, 338));
-		// BtSearch and BtSetEffect use their NX negative origins for positioning
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(src["BtClose"], Point<int16_t>(bg_dimensions.x() - 14 - 45, 6));
+		buttons[Buttons::BT_ARROW_LEFT] = std::make_unique<MapleButton>(src["arrowLeft"], Point<int16_t>(280, 290));
+		buttons[Buttons::BT_ARROW_RIGHT] = std::make_unique<MapleButton>(src["arrowRight"], Point<int16_t>(400, 290));
 		buttons[Buttons::BT_SEARCH] = std::make_unique<MapleButton>(src["BtSearch"]);
 		buttons[Buttons::BT_SETEFFECT] = std::make_unique<MapleButton>(src["BtSetEffect"]);
 
-		// Left tabs (9 category tabs by monster level range)
+		// Left tabs
 		nl::node left_tab = src["LeftTab"];
 
 		for (uint16_t i = Buttons::BT_TAB0; i <= Buttons::BT_TAB8; i++)
@@ -110,7 +97,6 @@ namespace ms
 
 			if (tab_node.size() > 0)
 			{
-				// Use normal/selected states for TwoSpriteButton
 				nl::node normal_node = tab_node["normal"]["0"];
 				nl::node selected_node = tab_node["selected"]["0"];
 
@@ -119,6 +105,18 @@ namespace ms
 				else
 					buttons[i] = std::make_unique<MapleButton>(tab_node);
 			}
+		}
+
+		// Right tabs (9 category tabs on the right side)
+		nl::node right_tab = src["RightTab"];
+
+		for (uint16_t i = Buttons::BT_RTAB0; i <= Buttons::BT_RTAB8; i++)
+		{
+			uint16_t tabid = i - Buttons::BT_RTAB0;
+			nl::node tab_node = right_tab[std::to_string(tabid)];
+
+			if (tab_node.size() > 0)
+				buttons[i] = std::make_unique<MapleButton>(tab_node);
 		}
 
 		// Text elements
@@ -130,25 +128,12 @@ namespace ms
 		card_name_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, "");
 		mob_name_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, "");
 		mob_stat_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "");
+		hp_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::RED, "");
+		mp_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLUE, "");
 
 		// Load HP/MP gauge sprites from status bar
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 		nl::node gauge_src = mainbar["gauge"];
-
-		std::cout << "[MonsterBook] gauge/hp node size: " << gauge_src["hp"].size() << std::endl;
-		std::cout << "[MonsterBook] gauge/mp node size: " << gauge_src["mp"].size() << std::endl;
-
-		Texture hp0(gauge_src["hp"]["0"]), hp1(gauge_src["hp"]["1"]), hp2(gauge_src["hp"]["2"]);
-		Texture mp0(gauge_src["mp"]["0"]), mp1(gauge_src["mp"]["1"]), mp2(gauge_src["mp"]["2"]);
-
-		std::cout << "[MonsterBook] hp gauge sprites: "
-			<< "0=" << hp0.get_dimensions().x() << "x" << hp0.get_dimensions().y()
-			<< " 1=" << hp1.get_dimensions().x() << "x" << hp1.get_dimensions().y()
-			<< " 2=" << hp2.get_dimensions().x() << "x" << hp2.get_dimensions().y() << std::endl;
-		std::cout << "[MonsterBook] mp gauge sprites: "
-			<< "0=" << mp0.get_dimensions().x() << "x" << mp0.get_dimensions().y()
-			<< " 1=" << mp1.get_dimensions().x() << "x" << mp1.get_dimensions().y()
-			<< " 2=" << mp2.get_dimensions().x() << "x" << mp2.get_dimensions().y() << std::endl;
 
 		detail_hp_gauge = Gauge(Gauge::Type::GAME, gauge_src["hp"]["0"], gauge_src["hp"]["1"], gauge_src["hp"]["2"], 120, 1.0f);
 		detail_mp_gauge = Gauge(Gauge::Type::GAME, gauge_src["mp"]["0"], gauge_src["mp"]["1"], gauge_src["mp"]["2"], 120, 1.0f);
@@ -156,9 +141,28 @@ namespace ms
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
+
+
 		load_cards();
-		set_tab(-1); // Show all cards initially
+		load_sets();
+		set_tab(-1);
 		update_buttons();
+	}
+
+	int16_t UIMonsterBook::get_card_category(int32_t cardid) const
+	{
+		bool is_special = (cardid / 1000 >= 2388);
+
+		if (is_special)
+			return 8;
+
+		int32_t offset = cardid - 2380000;
+		int32_t group = offset / 1000;
+
+		if (group > 7) group = 7;
+		if (group < 0) group = 0;
+
+		return static_cast<int16_t>(group);
 	}
 
 	void UIMonsterBook::load_cards()
@@ -177,13 +181,16 @@ namespace ms
 			entry.level = level;
 
 			// Look up mob ID from the card item's NX data
-			// Cards (238xxxx) are prefix 2 = "Consume" category
 			std::string strprefix = "0" + std::to_string(cardid / 10000);
 			std::string strid = "0" + std::to_string(cardid);
 			nl::node card_info = nl::nx::item["Consume"][strprefix + ".img"][strid]["info"];
 
 			if (card_info)
 				entry.mobid = card_info["mob"];
+
+			// Load card icon (iconRaw)
+			if (card_info)
+				entry.card_icon = Texture(card_info["iconRaw"]);
 
 			// Load mob sprite, name, and stats
 			if (entry.mobid > 0)
@@ -197,17 +204,10 @@ namespace ms
 				else if (mob_src["fly"] && mob_src["fly"]["0"])
 					entry.mob_icon = Texture(mob_src["fly"]["0"]);
 
-				std::cout << "[MonsterBook] card=" << entry.cardid << " mob=" << entry.mobid
-					<< " icon_valid=" << entry.mob_icon.is_valid()
-					<< " icon_dim=" << entry.mob_icon.get_dimensions().x() << "x" << entry.mob_icon.get_dimensions().y()
-					<< " icon_origin=" << entry.mob_icon.get_origin().x() << "," << entry.mob_icon.get_origin().y()
-					<< std::endl;
-
 				nl::node name_node = nl::nx::string["Mob.img"][std::to_string(entry.mobid)];
 				if (name_node["name"])
 					entry.mob_name = (std::string)name_node["name"];
 
-				// Load mob stats from NX info
 				nl::node mob_info = mob_src["info"];
 				if (mob_info)
 				{
@@ -228,6 +228,42 @@ namespace ms
 		std::sort(sorted_cards.begin(), sorted_cards.end(),
 			[](const CardEntry& a, const CardEntry& b) { return a.cardid < b.cardid; });
 
+		// Compute per-category counts
+		for (int i = 0; i < 9; i++)
+		{
+			cat_collected[i] = 0;
+			cat_total[i] = 0;
+		}
+
+		total_collected = static_cast<int32_t>(sorted_cards.size());
+
+		for (auto& entry : sorted_cards)
+		{
+			int16_t cat = get_card_category(entry.cardid);
+			if (cat >= 0 && cat < 9)
+				cat_collected[cat]++;
+		}
+
+		// Count total possible cards per category from NX data
+		nl::node consume_root = nl::nx::item["Consume"];
+		for (auto img : consume_root)
+		{
+			for (auto item : img)
+			{
+				std::string name = item.name();
+				if (name.size() < 7)
+					continue;
+
+				int32_t itemid = std::atoi(name.c_str());
+				if (itemid >= 2380000 && itemid < 2390000)
+				{
+					int16_t cat = get_card_category(itemid);
+					if (cat >= 0 && cat < 9)
+						cat_total[cat]++;
+				}
+			}
+		}
+
 		// Update stats text
 		auto& mb = Stage::get().get_player().get_monsterbook();
 		card_count_text.change_text(std::to_string(mb.get_total_cards()));
@@ -238,28 +274,28 @@ namespace ms
 
 	void UIMonsterBook::set_tab(int16_t tab)
 	{
-		// Deselect previous tab
 		if (cur_tab >= 0 && cur_tab <= 8)
+		{
 			buttons[Buttons::BT_TAB0 + cur_tab]->set_state(Button::State::NORMAL);
+			buttons[Buttons::BT_RTAB0 + cur_tab]->set_state(Button::State::NORMAL);
+		}
 
 		cur_tab = tab;
 
-		// Select new tab
 		if (cur_tab >= 0 && cur_tab <= 8)
+		{
 			buttons[Buttons::BT_TAB0 + cur_tab]->set_state(Button::State::PRESSED);
+			buttons[Buttons::BT_RTAB0 + cur_tab]->set_state(Button::State::PRESSED);
+		}
 
-		// Filter cards by tab category
 		filtered_cards.clear();
 
 		if (cur_tab < 0)
 		{
-			// Show all cards
 			filtered_cards = sorted_cards;
 		}
 		else
 		{
-			// Filter by card ID range (rough level categories)
-			// Tab 8 = special (cardid / 1000 >= 2388 when full_id = 2380000 + cardid)
 			for (auto& entry : sorted_cards)
 			{
 				int32_t full_id = entry.cardid;
@@ -272,10 +308,8 @@ namespace ms
 				}
 				else if (!is_special)
 				{
-					// Split normal cards into 8 roughly equal groups by card ID offset
-					// Card IDs are 238xxxx, so offset = cardid - 2380000
 					int32_t offset = entry.cardid - 2380000;
-					int32_t group = offset / 1000; // rough grouping
+					int32_t group = offset / 1000;
 
 					if (group > 7) group = 7;
 					if (group < 0) group = 0;
@@ -289,7 +323,11 @@ namespace ms
 		}
 
 		int16_t total = static_cast<int16_t>(filtered_cards.size());
-		num_pages = (total > 0) ? ((total - 1) / CARDS_PER_PAGE + 1) + 1 : 1; // +1 for cover page
+		// Page 0 right side shows CARDS_PER_SIDE, then each page after shows CARDS_PER_PAGE
+		if (total <= CARDS_PER_SIDE)
+			num_pages = 1;
+		else
+			num_pages = 1 + ((total - CARDS_PER_SIDE - 1) / CARDS_PER_PAGE + 1);
 
 		cur_page = 0;
 		page_text.change_text(std::to_string(cur_page + 1) + " / " + std::to_string(num_pages));
@@ -298,124 +336,118 @@ namespace ms
 
 	void UIMonsterBook::draw(float inter) const
 	{
-		UIElement::draw_sprites(inter);
-
-		static bool draw_logged = false;
-		if (!draw_logged)
+		// Detail page for selected card
+		if (selected_card >= 0 && selected_card < static_cast<int16_t>(filtered_cards.size()))
 		{
-			std::cout << "[MonsterBook] draw() position=" << position.x() << "," << position.y()
-				<< " dimension=" << dimension.x() << "x" << dimension.y() << std::endl;
-			draw_logged = true;
+			draw_detail(inter);
+			return;
 		}
 
-		// Background origin is (14, 0) — bg left edge is 14px left of position
-		// Positions derived from NX button origins:
-		//   BtSetEffect at bg(108,283) → left page center ≈ bg x=151
-		//   BtSearch at bg(408,32) → right page area
-		//   book_info0 origin(-42,-26) → draw at position places at bg(56,26)
-		// Left cardSlot:  bg x=64, y=27 → position + (50, 27)
-		// Right cardSlot: bg x=261, y=27 → position + (247, 27)
+		// Set effect page
+		if (show_set_page)
+		{
+			draw_set_effect(inter);
+			return;
+		}
+
+		UIElement::draw_sprites(inter);
+
 		Point<int16_t> left_page = position + Point<int16_t>(50, 27);
 		Point<int16_t> right_page = position + Point<int16_t>(247, 27);
 
-		// Cover origin offset — cover/select have origin (2, 40)
 		Point<int16_t> card_origin = cover.get_origin();
 
-		// bg visual center relative to position
 		int16_t bg_center_x = (dimension.x() - 14) / 2;
+
+		// Card drawing lambda
+		int16_t card_w = 35;
+		int16_t card_h = 43;
+		Point<int16_t> card_grid_offset = Point<int16_t>(0, 50); // below search button
+
+		auto draw_card = [&](Point<int16_t> page_origin, int16_t card_index)
+		{
+			if (card_index < 0 || card_index >= static_cast<int16_t>(filtered_cards.size()))
+				return;
+
+			int16_t local = card_index % CARDS_PER_SIDE;
+			int16_t col = local % COLS_PER_SIDE;
+			int16_t row = local / COLS_PER_SIDE;
+
+			Point<int16_t> card_topleft = page_origin + card_grid_offset + Point<int16_t>(col * card_w, row * card_h);
+			Point<int16_t> draw_pos = card_topleft + card_origin;
+
+			auto& entry = filtered_cards[card_index];
+
+			// Draw card icon (iconRaw shows mob on card)
+			Point<int16_t> icon_pos = card_topleft + Point<int16_t>(15, 21);
+
+			if (entry.card_icon.is_valid())
+			{
+				if (hovered_card == card_index)
+					entry.card_icon.draw(DrawArgument(icon_pos, Color(1.3f, 1.3f, 1.3f, 1.0f)));
+				else
+					entry.card_icon.draw(DrawArgument(icon_pos));
+			}
+			else
+			{
+				cover.draw(draw_pos);
+			}
+		};
 
 		if (cur_page == 0)
 		{
-			// Cover page - draw cardSlot backgrounds
-			card_slot.draw(left_page);
-			card_slot.draw(right_page);
+			// Cover page: left = category info, right = first batch of cards
 
-			// book_info0 has negative origin (-42,-26) — drawing at position
-			// auto-places it at the correct left page position
+			// "Crusader Codex" + "Number of Cards" header
 			book_info0.draw(position);
 
-			// Draw stats on right page
-			Point<int16_t> rp_center = right_page + Point<int16_t>(87, 0);
-			card_count_text.draw(rp_center + Point<int16_t>(0, 80));
-			book_level_text.draw(rp_center + Point<int16_t>(0, 100));
-			normal_count_text.draw(right_page + Point<int16_t>(20, 130));
-			special_count_text.draw(right_page + Point<int16_t>(20, 150));
+			// Total cards: large number "collected/total"
+			int32_t total_possible = 0;
+			for (int i = 0; i < 9; i++)
+				total_possible += cat_total[i];
+
+			draw_number(left_page + Point<int16_t>(50, 88), total_collected, true);
+			draw_number(left_page + Point<int16_t>(110, 88), total_possible, true);
+
+			card_name_text.change_text("Cards");
+			card_name_text.draw(left_page + Point<int16_t>(145, 100));
+
+			// 9 category rows (2 columns, 5 rows) with star + collected/total
+			Point<int16_t> cat_start = left_page + Point<int16_t>(0, 132);
+			int16_t row_h = 27;
+			int16_t col_w = 87;
+
+			static const int cat_order[9] = { 1, 2, 3, 4, 5, 6, 7, 8, 0 };
+
+			for (int idx = 0; idx < 9; idx++)
+			{
+				int tab = cat_order[idx];
+				int16_t col = idx % 2;
+				int16_t row = idx / 2;
+				Point<int16_t> cell_pos = cat_start + Point<int16_t>(col * col_w, row * row_h);
+
+				int sprite_idx = (tab == 0) ? 9 : tab;
+				card_category[sprite_idx].draw(cell_pos);
+
+				draw_number(cell_pos + Point<int16_t>(48, 8), cat_collected[tab], false);
+				draw_number(cell_pos + Point<int16_t>(68, 8), cat_total[tab], false);
+			}
+
+			// Right page: first 25 cards below search
+			for (int16_t i = 0; i < CARDS_PER_SIDE && i < static_cast<int16_t>(filtered_cards.size()); i++)
+				draw_card(right_page, i);
 		}
 		else
 		{
-			// Card pages - draw cardSlot backgrounds
-			card_slot.draw(left_page);
-			card_slot.draw(right_page);
+			// Card pages: both panels show cards
+			int16_t card_start;
 
-			int16_t card_start = (cur_page - 1) * CARDS_PER_PAGE;
-			int16_t card_w = 35;
-			int16_t card_h = 43;
+			if (cur_page == 1)
+				card_start = CARDS_PER_SIDE; // page 0 right showed first 25
+			else
+				card_start = CARDS_PER_SIDE + (cur_page - 1) * CARDS_PER_PAGE;
 
-			auto draw_card = [&](Point<int16_t> page_origin, int16_t card_index)
-			{
-				if (card_index >= static_cast<int16_t>(filtered_cards.size()))
-					return;
-
-				int16_t local = card_index % CARDS_PER_SIDE;
-				int16_t col = local % COLS_PER_SIDE;
-				int16_t row = local / COLS_PER_SIDE;
-
-				// Card top-left position within the page
-				Point<int16_t> card_topleft = page_origin + Point<int16_t>(col * card_w, row * card_h);
-
-				// Draw position adds origin so sprite renders with top-left at card_topleft
-				Point<int16_t> draw_pos = card_topleft + card_origin;
-
-				auto& entry = filtered_cards[card_index];
-
-				// Draw card background frame
-				cover.draw(draw_pos);
-
-				// Draw mob sprite in card (card is 31x42)
-				if (entry.mob_icon.is_valid())
-				{
-					// Scale mob to fit within card
-					Point<int16_t> mob_dim = entry.mob_icon.get_dimensions();
-					Point<int16_t> mob_origin = entry.mob_icon.get_origin();
-					float sx = (mob_dim.x() > 0) ? std::min(1.0f, 27.0f / mob_dim.x()) : 0.35f;
-					float sy = (mob_dim.y() > 0) ? std::min(1.0f, 35.0f / mob_dim.y()) : 0.35f;
-					float scale = std::min(sx, sy);
-
-					// Center the scaled sprite within the card
-					int16_t scaled_w = static_cast<int16_t>(mob_dim.x() * scale);
-					int16_t scaled_h = static_cast<int16_t>(mob_dim.y() * scale);
-					int16_t ox = (31 - scaled_w) / 2;
-					int16_t oy = (42 - scaled_h) / 2;
-
-					// Draw position = where we want the top-left + origin offset for the sprite
-					Point<int16_t> draw_pos_mob = card_topleft + Point<int16_t>(
-						ox + static_cast<int16_t>(mob_origin.x() * scale),
-						oy + static_cast<int16_t>(mob_origin.y() * scale)
-					);
-
-					entry.mob_icon.draw(DrawArgument(draw_pos_mob, draw_pos_mob, scale, scale, 1.0f));
-				}
-				else
-				{
-					Point<int16_t> card_center = card_topleft + Point<int16_t>(15, 21);
-					const ItemData& idata = ItemData::get(entry.cardid);
-					if (idata.is_valid())
-						idata.get_icon(false).draw(DrawArgument(card_center));
-				}
-
-				// Draw level marks at bottom of card
-				Point<int16_t> mark_pos = card_topleft + Point<int16_t>(12, 35);
-				if (entry.level >= 5)
-					full_mark.draw(mark_pos);
-				else if (entry.level > 0)
-					marks[entry.level - 1].draw(mark_pos);
-
-				// Draw selection highlight on hover
-				if (hovered_card == card_index)
-					select_tex.draw(draw_pos);
-			};
-
-			// Draw left page cards
+			// Left panel cards
 			for (int16_t i = 0; i < CARDS_PER_SIDE; i++)
 			{
 				int16_t idx = card_start + i;
@@ -423,95 +455,263 @@ namespace ms
 					draw_card(left_page, idx);
 			}
 
-			// Draw right page cards
+			// Right panel cards
 			for (int16_t i = 0; i < CARDS_PER_SIDE; i++)
 			{
 				int16_t idx = card_start + CARDS_PER_SIDE + i;
 				if (idx < static_cast<int16_t>(filtered_cards.size()))
 					draw_card(right_page, idx);
 			}
-
-			// Draw hovered card name at bottom
-			if (hovered_card >= 0 && hovered_card < static_cast<int16_t>(filtered_cards.size()))
-			{
-				auto& entry = filtered_cards[hovered_card];
-				if (!entry.mob_name.empty())
-					card_name_text.change_text(entry.mob_name);
-				card_name_text.draw(position + Point<int16_t>(bg_center_x, dimension.y() - 35));
-			}
 		}
 
-		// Draw selected card info overlay
-		if (selected_card >= 0 && selected_card < static_cast<int16_t>(filtered_cards.size()))
+		// Card name on hover
+		if (hovered_card >= 0 && hovered_card < static_cast<int16_t>(filtered_cards.size()))
 		{
-			auto& entry = filtered_cards[selected_card];
-
-			// monster_info has origin (-45,-32), drawing at position auto-places it
-			monster_info.draw(position);
-
-			Point<int16_t> info_pos = position + Point<int16_t>(45, 32);
-			int16_t right_x = 198; // center of right panel
-
-			// Monster sprite at top of right panel
-			Point<int16_t> mob_draw = info_pos + Point<int16_t>(right_x, 80);
-			switch (detail_anim_state)
-			{
-			case 0: detail_stand.draw(DrawArgument(mob_draw), inter); break;
-			case 1: detail_move.draw(DrawArgument(mob_draw), inter); break;
-			case 2: detail_die.draw(DrawArgument(mob_draw), inter); break;
-			}
-
-			// "Monster Drops" label - use the NX card_category sprite as decorative header
-			mob_name_text.change_text("Monster Drops");
-			mob_name_text.draw(info_pos + Point<int16_t>(right_x, 100));
-
-			// HP bar with label and number
-			mob_stat_text.change_text("HP");
-			mob_stat_text.draw(info_pos + Point<int16_t>(160, 120));
-			detail_hp_gauge.draw(DrawArgument(info_pos + Point<int16_t>(178, 118)));
-			mob_name_text.change_text(std::to_string(entry.mob_hp));
-			mob_name_text.draw(info_pos + Point<int16_t>(240, 120));
-
-			// MP bar with label and number
-			mob_stat_text.change_text("MP");
-			mob_stat_text.draw(info_pos + Point<int16_t>(160, 138));
-			detail_mp_gauge.draw(DrawArgument(info_pos + Point<int16_t>(178, 136)));
-			mob_name_text.change_text(std::to_string(entry.mob_mp));
-			mob_name_text.draw(info_pos + Point<int16_t>(240, 138));
-
-			// Drop items in a 4-column grid below the bars
-			int16_t drop_x0 = 160;
-			int16_t drop_y0 = 158;
-			int16_t drop_cell = 34;
-			int16_t drop_cols = 4;
-			for (size_t i = 0; i < entry.drops.size() && i < 16; i++)
-			{
-				int16_t dx = drop_x0 + static_cast<int16_t>(i % drop_cols) * drop_cell;
-				int16_t dy = drop_y0 + static_cast<int16_t>(i / drop_cols) * drop_cell;
-				entry.drops[i].second.draw(DrawArgument(info_pos + Point<int16_t>(dx, dy)));
-			}
-
-			// Stats on left side of right panel
-			int16_t stat_x = 160;
-			int16_t stat_y = 158 + (std::min(static_cast<int16_t>(entry.drops.size()), static_cast<int16_t>(16)) / drop_cols + 1) * drop_cell;
-			int16_t line_h = 14;
-
-			auto draw_stat = [&](const std::string& text) {
-				mob_stat_text.change_text(text);
-				mob_stat_text.draw(info_pos + Point<int16_t>(stat_x, stat_y));
-				stat_y += line_h;
-			};
-
-			draw_stat("Level: " + std::to_string(entry.mob_level));
-			draw_stat("W.Atk: " + std::to_string(entry.mob_watk));
-			draw_stat("W.Def: " + std::to_string(entry.mob_wdef));
-			draw_stat("M.Atk: " + std::to_string(entry.mob_matk));
-			draw_stat("M.Def: " + std::to_string(entry.mob_mdef));
-			draw_stat("EXP: " + std::to_string(entry.mob_exp));
+			auto& entry = filtered_cards[hovered_card];
+			if (!entry.mob_name.empty())
+				card_name_text.change_text(entry.mob_name);
+			card_name_text.draw(right_page + Point<int16_t>(87, 270));
 		}
 
-		// Page indicator at bottom center of book
-		page_text.draw(position + Point<int16_t>(bg_center_x, dimension.y() - 18));
+		// Page text centered on right panel
+		page_text.draw(right_page + Point<int16_t>(87, 290));
+
+		UIElement::draw_buttons(inter);
+	}
+
+	void UIMonsterBook::draw_detail(float inter) const
+	{
+		UIElement::draw_sprites(inter);
+
+		auto& entry = filtered_cards[selected_card];
+
+		monster_info.draw(position);
+
+		Point<int16_t> left_page = position + Point<int16_t>(50, 35);
+		Point<int16_t> right_page = position + Point<int16_t>(250, 35);
+		int16_t left_center_x = 87;
+
+		// Left panel: monster sprite centered
+		Point<int16_t> mob_draw = left_page + Point<int16_t>(left_center_x, 120);
+		switch (detail_anim_state)
+		{
+		case 0: detail_stand.draw(DrawArgument(mob_draw), inter); break;
+		case 1: detail_move.draw(DrawArgument(mob_draw), inter); break;
+		case 2: detail_die.draw(DrawArgument(mob_draw), inter); break;
+		}
+
+		// Monster name in black below sprite, above HP/MP
+		card_name_text.change_text(entry.mob_name);
+		card_name_text.draw(left_page + Point<int16_t>(left_center_x, 175));
+
+		// HP number in red
+		hp_text.change_text(std::to_string(entry.mob_hp));
+		hp_text.draw(left_page + Point<int16_t>(left_center_x, 198));
+
+		// MP number in blue
+		mp_text.change_text(std::to_string(entry.mob_mp));
+		mp_text.draw(left_page + Point<int16_t>(left_center_x, 216));
+
+		// Right panel drops - cubes are baked into monster_info (52x52 cells)
+		// monster_info screen topleft = position + (45, 32)
+		// Cube grid on the right side of the sprite
+		Point<int16_t> sprite_topleft = position + Point<int16_t>(45, 32);
+		Point<int16_t> drop_area = sprite_topleft + Point<int16_t>(210, 133);
+		int16_t drop_cell = 40;
+		int16_t drop_cols = 4;
+		int16_t visible_rows = 3;
+
+		if (!entry.drops.empty())
+		{
+			int16_t total_rows = static_cast<int16_t>((entry.drops.size() + drop_cols - 1) / drop_cols);
+			int16_t max_offset = std::max(static_cast<int16_t>(0), static_cast<int16_t>(total_rows - visible_rows));
+			int16_t scroll = std::min(detail_drop_offset, max_offset);
+
+			for (int16_t r = scroll; r < total_rows && r < scroll + visible_rows; r++)
+			{
+				for (int16_t c = 0; c < drop_cols; c++)
+				{
+					size_t idx = r * drop_cols + c;
+					if (idx >= entry.drops.size())
+						break;
+
+					// Center item in cube cell (icon origin is typically 0,32)
+					int16_t dx = c * drop_cell + 22;
+					int16_t dy = (r - scroll) * drop_cell + 22;
+					Point<int16_t> item_pos = drop_area + Point<int16_t>(dx, dy);
+
+					if (hovered_drop == static_cast<int16_t>(idx))
+						entry.drops[idx].second.draw(DrawArgument(item_pos, Color(1.3f, 1.3f, 1.3f, 1.0f)));
+					else
+						entry.drops[idx].second.draw(DrawArgument(item_pos, 0.8f, 0.8f));
+				}
+			}
+		}
+
+		UIElement::draw_buttons(inter);
+	}
+
+	void UIMonsterBook::load_sets()
+	{
+		// v83-compatible card sets (map area based)
+		struct SetDef { const char* name; const char* bonus; std::vector<int32_t> mobs; };
+		static const SetDef defs[] = {
+			{"Victoria Island", "+50 HP", {100100, 100101, 120100, 130100}},
+			{"Kerning City", "+20 Avoid", {2230100, 2230101, 2230102, 2230103, 2230104, 2230105, 2230106, 2230107, 2230108, 2230109, 2230110}},
+			{"Ellinia", "+50 MP", {210100, 100130, 100131, 100132, 100133, 100134, 1210100, 1210101, 1210102, 1210103}},
+			{"Sleepywood", "+5 ATK, +50 DEF", {4130100, 4130101, 4130102, 4130103, 4130104, 4130105, 6130100, 6130101, 6130102}},
+			{"Perion", "+50 HP", {130101, 1110100, 1110101, 1110130, 1120100, 1130100, 1140100, 1140130, 2100100, 2100101, 2100102, 2100103, 2100104, 2100105, 2100106, 2100107, 2100108}},
+			{"Henesys", "+20 ACC", {1210100, 2110200, 2110300, 2110301, 2130100, 2130103, 3000000, 3000001, 3000005, 3000006, 3100101, 3100102}},
+			{"Orbis", "+3 Speed, +10 Jump", {3210100, 3210200, 3210201, 3210202, 3210203, 3210204, 3210205, 3210206, 3210207, 3210208}},
+			{"El Nath", "+5 ATK, +10 DEX", {5100100, 5100101, 5100102, 5100103, 5100104, 5105100, 5105101, 5105102, 5120100, 5120101}},
+			{"Dead Mine", "+6 ATK%, +10 MATK", {5130100, 5130101, 5130102, 5130103, 5130104, 5130105, 5130106, 5130107, 5130108}},
+			{"Ludibrium", "+100 HP, +100 DEF", {3210450, 3210800, 3220000, 3230100, 3230101, 3230102, 3230200, 3230300, 3230301, 3230302}},
+			{"Aqua Road", "+6 Magic%, +100 MDEF", {2230131, 2230200, 2300100, 3110100, 3110101, 3110102, 3110300, 3110301, 3110302, 3110303}},
+			{"Mu Lung", "+15% Ignore DEF", {5090100, 6090000, 6090001, 6090002, 6090003, 6090004, 6130200, 6230100, 6230200, 6300100}},
+			{"Leafre", "+1 All Skills", {8140100, 8140101, 8140102, 8140103, 8140104, 8140105, 8140110, 8140111, 8140112, 8143000}},
+			{"Temple of Time", "+47 HP/MP Recovery", {8200000, 8200001, 8200002, 8200003, 8200004, 8200005, 8200006, 8200007, 8200008, 8200009}},
+			{"Nihal Desert", "+50 DEF, +50 MDEF", {7130000, 7130001, 7130002, 7130003, 7130004, 7130005, 7130100, 7130101, 7130200, 7130300}},
+			{"Magatia", "+10 INT, +5 MATK", {7130400, 7130401, 7130402, 7130500, 7130501, 7130600, 7130601, 7140000, 7140100}},
+			{"Mushroom Shrine", "+85 MP Recovery", {9400000, 9400001, 9400002, 9400003, 9400004, 9400005, 9400006, 9400007, 9400008}},
+			{"Ninja Castle", "+6 Speed, +6 Jump", {9400100, 9400101, 9400102, 9400103, 9400104, 9400105, 9400106}},
+			{"Showa Village", "+5 All Stats", {9400110, 9400111, 9400112, 9400113, 9400114, 9400115, 9400120, 9400121}},
+		};
+
+		card_sets.clear();
+
+		// Build a lookup: mobid -> whether player has collected it
+		std::unordered_map<int32_t, bool> collected_mobs;
+		for (auto& entry : sorted_cards)
+		{
+			if (entry.mobid > 0)
+				collected_mobs[entry.mobid] = true;
+		}
+
+		for (auto& def : defs)
+		{
+			CardSet cs;
+			cs.name = def.name;
+			cs.bonus = def.bonus;
+			cs.mob_ids = def.mobs;
+			cs.total = static_cast<int32_t>(def.mobs.size());
+			cs.collected = 0;
+
+			for (int32_t mobid : def.mobs)
+			{
+				if (collected_mobs.count(mobid))
+					cs.collected++;
+			}
+
+			// Load representative icon from first mob's card
+			if (!def.mobs.empty())
+			{
+				// Find the card for the first mob
+				for (auto& entry : sorted_cards)
+				{
+					if (entry.mobid == def.mobs[0] && entry.card_icon.is_valid())
+					{
+						cs.icon = entry.card_icon;
+						break;
+					}
+				}
+
+				// If no collected card found, try to load from NX
+				if (!cs.icon.is_valid())
+				{
+					std::string mob_strid = string_format::extend_id(def.mobs[0], 7);
+					nl::node mob_src = nl::nx::mob[mob_strid + ".img"];
+					nl::node stand = mob_src["stand"];
+					if (stand && stand["0"])
+						cs.icon = Texture(stand["0"]);
+				}
+			}
+
+			card_sets.push_back(cs);
+		}
+	}
+
+	void UIMonsterBook::draw_set_effect(float inter) const
+	{
+		UIElement::draw_sprites(inter);
+
+		// Draw set info background (contains "Set List", "Set score", "Points", "Selected set" labels)
+		set_info0.draw(position);
+
+		Point<int16_t> left_page = position + Point<int16_t>(50, 35);
+		Point<int16_t> right_page = position + Point<int16_t>(250, 35);
+
+		// Calculate total score (10 points per collected set card)
+		int32_t score = 0;
+		int32_t complete_count = 0;
+		for (auto& cs : card_sets)
+		{
+			score += cs.collected * 10;
+			if (cs.total > 0 && cs.collected >= cs.total)
+				complete_count++;
+		}
+
+		// Draw score as large number
+		draw_number(left_page + Point<int16_t>(40, 105), score, true);
+
+		if (active_set >= 0 && active_set < static_cast<int16_t>(card_sets.size()))
+		{
+			auto& active = card_sets[active_set];
+
+			// Draw set icon in a cell
+			set_icon_back.draw(left_page + Point<int16_t>(62, 150));
+			if (active.icon.is_valid())
+				active.icon.draw(DrawArgument(left_page + Point<int16_t>(88, 172), 0.8f, 0.8f));
+
+			// Set name below
+			card_name_text.change_text(active.name);
+			card_name_text.draw(left_page + Point<int16_t>(87, 210));
+		}
+
+		// Right page: "Complete Set X / Y" header
+		std::string complete_str = "Complete Set   " + std::to_string(complete_count) + " / " + std::to_string(static_cast<int32_t>(card_sets.size()));
+		mob_name_text.change_text(complete_str);
+		mob_name_text.draw(right_page + Point<int16_t>(87, 15));
+
+		// Draw set grid: 3 columns, scrollable
+		int16_t grid_cols = 3;
+		int16_t cell_w = 55;
+		int16_t cell_h = 70;
+		int16_t visible_rows = 3;
+		int16_t grid_start_y = 40;
+
+		int16_t total_sets = static_cast<int16_t>(card_sets.size());
+		int16_t total_rows = (total_sets + grid_cols - 1) / grid_cols;
+
+		for (int16_t r = set_scroll; r < total_rows && r < set_scroll + visible_rows; r++)
+		{
+			for (int16_t c = 0; c < grid_cols; c++)
+			{
+				int16_t idx = r * grid_cols + c;
+				if (idx >= total_sets)
+					break;
+
+				auto& cs = card_sets[idx];
+				Point<int16_t> cell_pos = right_page + Point<int16_t>(c * cell_w + 10, grid_start_y + (r - set_scroll) * cell_h);
+
+				// Draw cell background
+				set_icon_back.draw(cell_pos);
+
+				// Draw icon inside cell
+				if (cs.icon.is_valid())
+				{
+					Point<int16_t> icon_center = cell_pos + Point<int16_t>(26, 22);
+					if (hovered_set == idx)
+						cs.icon.draw(DrawArgument(icon_center, Color(1.3f, 1.3f, 1.3f, 1.0f)));
+					else
+						cs.icon.draw(DrawArgument(icon_center, 0.8f, 0.8f));
+				}
+
+				// Draw collected/total below cell
+				std::string count = std::to_string(cs.collected) + " / " + std::to_string(cs.total);
+				card_name_text.change_text(count);
+				card_name_text.draw(cell_pos + Point<int16_t>(26, 56));
+			}
+		}
 
 		UIElement::draw_buttons(inter);
 	}
@@ -526,18 +726,15 @@ namespace ms
 
 		selected_card = idx;
 		detail_anim_state = 0;
+		detail_drop_offset = 0;
 
 		auto& entry = filtered_cards[idx];
-		std::cout << "[MonsterBook] select_card idx=" << idx << " cardid=" << entry.cardid
-			<< " mobid=" << entry.mobid << " name=" << entry.mob_name
-			<< " drops=" << entry.drops.size() << std::endl;
 
 		if (entry.mobid > 0)
 		{
 			std::string mob_strid = string_format::extend_id(entry.mobid, 7);
 			nl::node mob_src = nl::nx::mob[mob_strid + ".img"];
 
-			// Load animations
 			nl::node stand_node = mob_src["stand"];
 			nl::node move_node = mob_src["move"];
 			nl::node die_node = mob_src["die1"];
@@ -553,16 +750,10 @@ namespace ms
 			detail_move = move_node ? Animation(move_node) : detail_stand;
 			detail_die = die_node ? Animation(die_node) : Animation();
 
-			std::cout << "[MonsterBook] loaded animations: stand=" << (stand_node ? "yes" : "no")
-				<< " move=" << (move_node ? "yes" : "no")
-				<< " die=" << (die_node ? "yes" : "no")
-				<< " fly=" << (fly_node ? "yes" : "no") << std::endl;
-
 			// Load drops if not already loaded
 			if (entry.drops.empty())
 			{
 				nl::node reward = nl::nx::string["MonsterBook.img"][std::to_string(entry.mobid)]["reward"];
-				std::cout << "[MonsterBook] reward node exists=" << (reward ? "yes" : "no") << std::endl;
 				if (reward)
 				{
 					for (auto drop : reward)
@@ -572,13 +763,9 @@ namespace ms
 						{
 							const ItemData& idata = ItemData::get(itemid);
 							if (idata.is_valid())
-							{
 								entry.drops.push_back({ itemid, idata.get_icon(false) });
-								std::cout << "[MonsterBook] drop item: " << itemid << std::endl;
-							}
 						}
 					}
-					std::cout << "[MonsterBook] total drops loaded: " << entry.drops.size() << std::endl;
 				}
 			}
 		}
@@ -607,38 +794,52 @@ namespace ms
 
 	int16_t UIMonsterBook::card_at_cursor(Point<int16_t> cursorpos) const
 	{
-		if (cur_page == 0)
-			return -1;
-
-		int16_t card_start = (cur_page - 1) * CARDS_PER_PAGE;
 		int16_t card_w = 35;
 		int16_t card_h = 43;
+		Point<int16_t> card_grid_offset = Point<int16_t>(0, 50);
 
-		Point<int16_t> pages[2] = {
-			position + Point<int16_t>(50, 27),   // left page
-			position + Point<int16_t>(247, 27)   // right page
-		};
+		Point<int16_t> left_page = position + Point<int16_t>(50, 27);
+		Point<int16_t> right_page = position + Point<int16_t>(247, 27);
 
-		for (int side = 0; side < 2; side++)
+		auto check_side = [&](Point<int16_t> page_origin, int16_t base_idx) -> int16_t
 		{
 			for (int16_t i = 0; i < CARDS_PER_SIDE; i++)
 			{
 				int16_t col = i % COLS_PER_SIDE;
 				int16_t row = i / COLS_PER_SIDE;
-				Point<int16_t> card_topleft = pages[side] + Point<int16_t>(col * card_w, row * card_h);
+				Point<int16_t> card_topleft = page_origin + card_grid_offset + Point<int16_t>(col * card_w, row * card_h);
 
 				Rectangle<int16_t> bounds(card_topleft.x(), card_topleft.x() + 31, card_topleft.y(), card_topleft.y() + 42);
 
 				if (bounds.contains(cursorpos))
 				{
-					int16_t idx = card_start + side * CARDS_PER_SIDE + i;
+					int16_t idx = base_idx + i;
 					if (idx < static_cast<int16_t>(filtered_cards.size()))
 						return idx;
 				}
 			}
-		}
+			return -1;
+		};
 
-		return -1;
+		if (cur_page == 0)
+		{
+			// Only right page has cards on cover page
+			return check_side(right_page, 0);
+		}
+		else
+		{
+			int16_t card_start;
+			if (cur_page == 1)
+				card_start = CARDS_PER_SIDE;
+			else
+				card_start = CARDS_PER_SIDE + (cur_page - 1) * CARDS_PER_PAGE;
+
+			int16_t result = check_side(left_page, card_start);
+			if (result >= 0)
+				return result;
+
+			return check_side(right_page, card_start + CARDS_PER_SIDE);
+		}
 	}
 
 	Cursor::State UIMonsterBook::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -648,40 +849,223 @@ namespace ms
 		if (dragged)
 			return dstate;
 
-		int16_t card_idx = card_at_cursor(cursorpos);
-		hovered_card = card_idx;
-
-		if (clicked && card_idx >= 0)
+		// Handle tab clicks manually
+		if (clicked)
 		{
-			if (selected_card == card_idx)
-				select_card(-1);
-			else
-				select_card(card_idx);
+			auto drawpos = get_draw_position();
 
-			return Cursor::State::CLICKING;
-		}
-		else if (clicked && selected_card >= 0)
-		{
-			// Check if clicking in the sprite/animation area to cycle animation
-			Point<int16_t> info_pos = position + Point<int16_t>(45, 32);
-			Rectangle<int16_t> anim_area(info_pos.x() + 220, info_pos.x() + 397, info_pos.y() + 25, info_pos.y() + 125);
-
-			if (anim_area.contains(cursorpos))
+			// Big tabs (0, 1, 2) - view switching
+			for (uint16_t t = 0; t <= 2; t++)
 			{
-				detail_anim_state = (detail_anim_state + 1) % 3;
-				if (detail_anim_state == 0) detail_stand.reset();
-				else if (detail_anim_state == 1) detail_move.reset();
-				else detail_die.reset();
+				auto& btn = buttons[Buttons::BT_TAB0 + t];
+				if (btn && btn->is_active() && btn->bounds(drawpos).contains(cursorpos))
+				{
+					if (t == 1)
+					{
+						show_set_page = !show_set_page;
+						selected_card = -1;
+					}
+					else
+					{
+						show_set_page = false;
+						selected_card = -1;
+					}
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			// Small left tabs (3-8) - category filtering
+			for (uint16_t t = 3; t <= 8; t++)
+			{
+				auto& btn = buttons[Buttons::BT_TAB0 + t];
+				if (btn && btn->is_active() && btn->bounds(drawpos).contains(cursorpos))
+				{
+					show_set_page = false;
+					selected_card = -1;
+					int16_t new_tab = static_cast<int16_t>(t);
+					if (new_tab == cur_tab)
+						set_tab(-1);
+					else
+						set_tab(new_tab);
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			// Right tabs (0-8) - category filtering
+			for (uint16_t t = 0; t <= 8; t++)
+			{
+				auto& btn = buttons[Buttons::BT_RTAB0 + t];
+				if (btn && btn->is_active() && btn->bounds(drawpos).contains(cursorpos))
+				{
+					show_set_page = false;
+					selected_card = -1;
+					int16_t new_tab = static_cast<int16_t>(t);
+					if (new_tab == cur_tab)
+						set_tab(-1);
+					else
+						set_tab(new_tab);
+					return Cursor::State::CLICKING;
+				}
+			}
+		}
+
+		// Set effect page hover/click
+		if (show_set_page)
+		{
+			hovered_set = -1;
+
+			// Check grid cells on right page
+			Point<int16_t> right_page = position + Point<int16_t>(250, 35);
+			int16_t grid_cols = 3;
+			int16_t cell_w = 55;
+			int16_t cell_h = 70;
+			int16_t visible_rows = 3;
+			int16_t grid_start_y = 40;
+			int16_t total_sets = static_cast<int16_t>(card_sets.size());
+			int16_t total_rows = (total_sets + grid_cols - 1) / grid_cols;
+
+			for (int16_t r = set_scroll; r < total_rows && r < set_scroll + visible_rows; r++)
+			{
+				for (int16_t c = 0; c < grid_cols; c++)
+				{
+					int16_t idx = r * grid_cols + c;
+					if (idx >= total_sets)
+						break;
+
+					Point<int16_t> cell_pos = right_page + Point<int16_t>(c * cell_w + 10, grid_start_y + (r - set_scroll) * cell_h);
+					Rectangle<int16_t> cell_rect(cell_pos.x(), cell_pos.x() + 52, cell_pos.y(), cell_pos.y() + 52);
+
+					if (cell_rect.contains(cursorpos))
+						hovered_set = idx;
+				}
+			}
+
+			Cursor::State btn_state = UIElement::send_cursor(clicked, cursorpos);
+
+			if (clicked && hovered_set >= 0 && hovered_set < total_sets)
+			{
+				auto& cs = card_sets[hovered_set];
+				bool complete = (cs.total > 0 && cs.collected >= cs.total);
+				if (complete)
+				{
+					if (active_set == hovered_set)
+						active_set = -1;
+					else
+						active_set = hovered_set;
+				}
 				return Cursor::State::CLICKING;
 			}
 
-			// Check if clicking outside the monster_info overlay to close it
-			Rectangle<int16_t> info_bounds(info_pos.x(), info_pos.x() + 397, info_pos.y(), info_pos.y() + 239);
-			if (!info_bounds.contains(cursorpos))
-				select_card(-1);
+			return btn_state;
+		}
+
+		int16_t card_idx = card_at_cursor(cursorpos);
+		hovered_card = card_idx;
+
+		if (selected_card >= 0)
+		{
+			// In detail view: detect hovered drop item
+			int16_t prev_hovered = hovered_drop;
+			hovered_drop = -1;
+			auto& entry = filtered_cards[selected_card];
+			if (!entry.drops.empty())
+			{
+				Point<int16_t> sprite_topleft = position + Point<int16_t>(45, 32);
+				Point<int16_t> drop_area = sprite_topleft + Point<int16_t>(210, 133);
+				int16_t drop_cell = 40;
+				int16_t drop_cols = 4;
+				int16_t visible_rows = 3;
+				int16_t total_rows = static_cast<int16_t>((entry.drops.size() + drop_cols - 1) / drop_cols);
+				int16_t max_offset = std::max(static_cast<int16_t>(0), static_cast<int16_t>(total_rows - visible_rows));
+				int16_t scroll = std::min(detail_drop_offset, max_offset);
+
+				for (int16_t r = scroll; r < total_rows && r < scroll + visible_rows; r++)
+				{
+					for (int16_t c = 0; c < drop_cols; c++)
+					{
+						size_t idx = r * drop_cols + c;
+						if (idx >= entry.drops.size())
+							break;
+
+						int16_t cx = drop_area.x() + c * drop_cell;
+						int16_t cy = drop_area.y() + (r - scroll) * drop_cell;
+						Rectangle<int16_t> cell_rect(cx, cx + drop_cell, cy, cy + drop_cell);
+
+						if (cell_rect.contains(cursorpos))
+							hovered_drop = static_cast<int16_t>(idx);
+					}
+				}
+			}
+
+			// Show/hide item tooltip
+			if (hovered_drop >= 0 && hovered_drop < static_cast<int16_t>(entry.drops.size()))
+				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, entry.drops[hovered_drop].first);
+			else if (prev_hovered >= 0)
+				UI::get().clear_tooltip(Tooltip::Parent::ITEMINVENTORY);
+
+			// Let buttons handle first, then handle clicks
+			Cursor::State btn_state = UIElement::send_cursor(clicked, cursorpos);
+
+			if (clicked)
+			{
+				Point<int16_t> left_page = position + Point<int16_t>(50, 27);
+				Rectangle<int16_t> mob_area(left_page.x() + 30, left_page.x() + 144, left_page.y() + 40, left_page.y() + 170);
+
+				if (mob_area.contains(cursorpos))
+				{
+					detail_anim_state = (detail_anim_state + 1) % 3;
+					if (detail_anim_state == 0) detail_stand.reset();
+					else if (detail_anim_state == 1) detail_move.reset();
+					else detail_die.reset();
+					return Cursor::State::CLICKING;
+				}
+				else
+				{
+					select_card(-1);
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			return btn_state;
+		}
+
+		if (clicked && card_idx >= 0)
+		{
+			select_card(card_idx);
+			return Cursor::State::CLICKING;
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIMonsterBook::send_scroll(double yoffset)
+	{
+		if (show_set_page)
+		{
+			int16_t grid_cols = 3;
+			int16_t visible_rows = 3;
+			int16_t total_sets = static_cast<int16_t>(card_sets.size());
+			int16_t total_rows = (total_sets + grid_cols - 1) / grid_cols;
+			int16_t max_offset = std::max(0, total_rows - visible_rows);
+
+			if (yoffset < 0)
+				set_scroll = std::min(static_cast<int16_t>(set_scroll + 1), max_offset);
+			else if (yoffset > 0)
+				set_scroll = std::max(static_cast<int16_t>(set_scroll - 1), static_cast<int16_t>(0));
+		}
+		else if (selected_card >= 0 && selected_card < static_cast<int16_t>(filtered_cards.size()))
+		{
+			auto& entry = filtered_cards[selected_card];
+			int16_t drop_cols = 4;
+			int16_t visible_rows = 3;
+			int16_t total_rows = static_cast<int16_t>((entry.drops.size() + drop_cols - 1) / drop_cols);
+			int16_t max_offset = std::max(0, (total_rows - visible_rows));
+
+			if (yoffset < 0)
+				detail_drop_offset = std::min(static_cast<int16_t>(detail_drop_offset + 1), max_offset);
+			else if (yoffset > 0)
+				detail_drop_offset = std::max(static_cast<int16_t>(detail_drop_offset - 1), static_cast<int16_t>(0));
+		}
 	}
 
 	void UIMonsterBook::send_key(int32_t keycode, bool pressed, bool escape)
@@ -755,7 +1139,8 @@ namespace ms
 			);
 			break;
 		case Buttons::BT_SETEFFECT:
-			break;
+			show_set_page = !show_set_page;
+			return Button::State::NORMAL;
 		case Buttons::BT_TAB0:
 		case Buttons::BT_TAB1:
 		case Buttons::BT_TAB2:
@@ -769,11 +1154,30 @@ namespace ms
 			int16_t new_tab = buttonid - Buttons::BT_TAB0;
 
 			if (new_tab == cur_tab)
-				set_tab(-1); // Toggle off = show all
+				set_tab(-1);
 			else
 				set_tab(new_tab);
 
-			return Button::State::PRESSED;
+			return Button::State::NORMAL;
+		}
+		case Buttons::BT_RTAB0:
+		case Buttons::BT_RTAB1:
+		case Buttons::BT_RTAB2:
+		case Buttons::BT_RTAB3:
+		case Buttons::BT_RTAB4:
+		case Buttons::BT_RTAB5:
+		case Buttons::BT_RTAB6:
+		case Buttons::BT_RTAB7:
+		case Buttons::BT_RTAB8:
+		{
+			int16_t new_tab = buttonid - Buttons::BT_RTAB0;
+
+			if (new_tab == cur_tab)
+				set_tab(-1);
+			else
+				set_tab(new_tab);
+
+			return Button::State::NORMAL;
 		}
 		default:
 			break;
@@ -793,15 +1197,17 @@ namespace ms
 
 	void UIMonsterBook::update_buttons()
 	{
-		if (cur_page <= 0)
-			buttons[Buttons::BT_ARROW_LEFT]->set_state(Button::State::DISABLED);
-		else
+		// Hide left arrow on first page
+		buttons[Buttons::BT_ARROW_LEFT]->set_active(cur_page > 0);
+		if (cur_page > 0)
 			buttons[Buttons::BT_ARROW_LEFT]->set_state(Button::State::NORMAL);
 
 		if (cur_page >= num_pages - 1)
 			buttons[Buttons::BT_ARROW_RIGHT]->set_state(Button::State::DISABLED);
 		else
 			buttons[Buttons::BT_ARROW_RIGHT]->set_state(Button::State::NORMAL);
+
+		buttons[Buttons::BT_SETEFFECT]->set_active(true);
 	}
 
 	void UIMonsterBook::draw_number(Point<int16_t> pos, int32_t number, bool large) const
@@ -813,11 +1219,15 @@ namespace ms
 			int digit = c - '0';
 
 			if (large)
+			{
 				num_large[digit].draw(pos);
+				pos.shift_x(num_large[digit].get_dimensions().x());
+			}
 			else
+			{
 				num_small[digit].draw(pos);
-
-			pos.shift_x(large ? 12 : 8);
+				pos.shift_x(num_small[digit].get_dimensions().x());
+			}
 		}
 	}
 }

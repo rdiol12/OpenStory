@@ -592,7 +592,6 @@ namespace ms
 
 	void QuickSlotInitHandler::handle(InPacket& recv) const
 	{
-		// Quick slot key init — read 8 int32 key bindings for the quick slot bar
 		if (recv.available())
 		{
 			bool init = recv.read_bool();
@@ -602,7 +601,7 @@ namespace ms
 				for (int i = 0; i < 8; i++)
 				{
 					if (recv.available())
-						recv.read_int(); // key binding for quick slot i
+						recv.read_int();
 				}
 			}
 		}
