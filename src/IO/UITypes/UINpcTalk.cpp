@@ -26,6 +26,7 @@
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Data/StringData.h"
 #include "../../Constants.h"
 
 #ifdef USE_NX
@@ -453,7 +454,7 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
-						std::string name = (std::string)nl::nx::string["Npc.img"][id_str]["name"];
+						std::string name = StringData::get_npc_name(std::stoi(id_str));
 						result += name.empty() ? ("NPC " + id_str) : name;
 					}
 					i = end;
@@ -492,7 +493,7 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
-						std::string name = (std::string)nl::nx::string["Mob.img"][id_str]["name"];
+						std::string name = StringData::get_mob_name(std::stoi(id_str));
 						result += name.empty() ? ("Mob " + id_str) : name;
 					}
 					i = end;
@@ -670,7 +671,7 @@ namespace ms
 
 			speaker = nl::nx::npc[strid]["stand"]["0"];
 
-			std::string namestr = (std::string)nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
+			std::string namestr = StringData::get_npc_name(npcid);
 			name.change_text(namestr);
 		}
 		else

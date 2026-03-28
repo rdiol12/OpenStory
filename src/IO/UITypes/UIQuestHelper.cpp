@@ -22,6 +22,8 @@
 #include "../UI.h"
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/QuestData.h"
+#include "../../Data/StringData.h"
 #include "../../Gameplay/Stage.h"
 
 #ifdef USE_NX
@@ -667,44 +669,32 @@ namespace ms
 		if (tq.questid <= 0)
 			return;
 
-		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
-		nl::node quest_check = nl::nx::quest["Check.img"];
-
-		std::string qid_str = std::to_string(tq.questid);
+		const QuestData& qdata_info = QuestData::get(tq.questid);
 
 		// Quest name — bold dark
-		nl::node qnode = quest_info[qid_str];
-		std::string name;
-		if (qnode)
-			name = qnode["name"].get_string();
+		std::string name = qdata_info.get_name();
 		if (name.empty())
-			name = "Quest " + qid_str;
+			name = "Quest " + std::to_string(tq.questid);
 
 		tq.name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::MINESHAFT, name, 0, false);
 
-		// Requirements
-		nl::node check = quest_check[qid_str];
-		if (!check) return;
-
-		nl::node end_check = check["1"];
-		if (!end_check) return;
+		if (!qdata_info.is_valid())
+			return;
 
 		const Inventory& inventory = Stage::get().get_player().get_inventory();
 
 		// Item requirements
-		for (auto item_node : end_check["item"])
+		for (auto& item_req : qdata_info.get_item_reqs(false))
 		{
-			int32_t itemid = item_node["id"].get_integer();
-			int32_t count = item_node["count"].get_integer();
-			if (itemid <= 0) continue;
+			if (item_req.itemid <= 0) continue;
 
-			int16_t have = inventory.get_total_item_count(itemid);
-			const ItemData& idata = ItemData::get(itemid);
+			int16_t have = inventory.get_total_item_count(item_req.itemid);
+			const ItemData& idata = ItemData::get(item_req.itemid);
 			std::string item_name = idata.get_name();
 			if (item_name.empty())
-				item_name = "Item " + std::to_string(itemid);
+				item_name = "Item " + std::to_string(item_req.itemid);
 
-			std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(count);
+			std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(item_req.count);
 			Color::Name color = Color::Name::BLACK;
 
 			tq.requirements.push_back(
@@ -722,11 +712,9 @@ namespace ms
 		}
 
 		int mob_idx = 0;
-		for (auto mob_node : end_check["mob"])
+		for (auto& mob_req : qdata_info.get_mob_reqs(false))
 		{
-			int32_t mobid = mob_node["id"].get_integer();
-			int32_t count = mob_node["count"].get_integer();
-			if (mobid <= 0) continue;
+			if (mob_req.mobid <= 0) continue;
 
 			// Parse kill count from quest data string (3 chars per mob)
 			int32_t killed = 0;
@@ -737,11 +725,13 @@ namespace ms
 				catch (...) { killed = 0; }
 			}
 
-			std::string mob_name = nl::nx::string["Mob.img"][std::to_string(mobid)]["name"].get_string();
+			std::string mob_name = mob_req.name;
 			if (mob_name.empty())
-				mob_name = "Monster " + std::to_string(mobid);
+				mob_name = StringData::get_mob_name(mob_req.mobid);
+			if (mob_name.empty())
+				mob_name = "Monster " + std::to_string(mob_req.mobid);
 
-			std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(count);
+			std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(mob_req.count);
 			Color::Name color = Color::Name::BLACK;
 
 			tq.requirements.push_back(
@@ -751,10 +741,10 @@ namespace ms
 		}
 
 		// NPC requirement
-		int32_t end_npc = end_check["npc"].get_integer();
+		int32_t end_npc = qdata_info.get_npc(false);
 		if (end_npc > 0)
 		{
-			std::string npc_name = nl::nx::string["Npc.img"][std::to_string(end_npc)]["name"].get_string();
+			std::string npc_name = StringData::get_npc_name(end_npc);
 			if (!npc_name.empty())
 			{
 				tq.requirements.push_back(

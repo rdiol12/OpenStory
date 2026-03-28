@@ -24,6 +24,7 @@
 
 #include "../../Configuration.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/StringData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/Misc.h"
@@ -204,9 +205,9 @@ namespace ms
 				else if (mob_src["fly"] && mob_src["fly"]["0"])
 					entry.mob_icon = Texture(mob_src["fly"]["0"]);
 
-				nl::node name_node = nl::nx::string["Mob.img"][std::to_string(entry.mobid)];
-				if (name_node["name"])
-					entry.mob_name = (std::string)name_node["name"];
+				std::string mob_name_str = StringData::get_mob_name(entry.mobid);
+				if (!mob_name_str.empty())
+					entry.mob_name = mob_name_str;
 
 				nl::node mob_info = mob_src["info"];
 				if (mob_info)
