@@ -38,8 +38,10 @@ namespace ms
 		has_map = false;
 		listNpc_enabled = false;
 		drag_resize = false;
+		drag_resize_side = false;
 		zoom_scale = 1.0f;
 		drag_start_y = 0;
+		drag_start_x = 0;
 		drag_start_zoom = 1.0f;
 		listNpc_dimensions = Point<int16_t>(150, 170);
 		listNpc_offset = 0;
@@ -217,24 +219,38 @@ namespace ms
 
 	Cursor::State UIMiniMap::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		// Handle drag-to-resize on the bottom edge (only in NORMAL/MAX mode)
+		// Handle drag-to-resize on edges (only in NORMAL/MAX mode)
 		if (type != Type::MIN && has_map)
 		{
 			Point<int16_t> cursor_relative = cursorpos - position;
 			int16_t bottom_y = dimension.y();
 			int16_t right_x = dimension.x();
 
-			// 8px resize zone on bottom and bottom-right corner
+			// 8px resize zones on bottom, left, and right edges
 			bool on_bottom = cursor_relative.y() >= bottom_y - 8 && cursor_relative.y() <= bottom_y + 4
 				&& cursor_relative.x() >= 0 && cursor_relative.x() <= right_x;
+			bool on_right = cursor_relative.x() >= right_x - 8 && cursor_relative.x() <= right_x + 4
+				&& cursor_relative.y() >= 20 && cursor_relative.y() <= bottom_y;
+			bool on_left = cursor_relative.x() >= -4 && cursor_relative.x() <= 8
+				&& cursor_relative.y() >= 20 && cursor_relative.y() <= bottom_y;
 
 			if (drag_resize)
 			{
 				if (clicked)
 				{
-					// Use cursor Y movement from drag start to compute zoom change
-					int16_t delta_y = cursorpos.y() - drag_start_y;
-					float new_zoom = drag_start_zoom + static_cast<float>(delta_y) / 100.0f;
+					float new_zoom;
+
+					if (drag_resize_side)
+					{
+						int16_t delta_x = cursorpos.x() - drag_start_x;
+						new_zoom = drag_start_zoom + static_cast<float>(delta_x) / 100.0f;
+					}
+					else
+					{
+						int16_t delta_y = cursorpos.y() - drag_start_y;
+						new_zoom = drag_start_zoom + static_cast<float>(delta_y) / 100.0f;
+					}
+
 					new_zoom = std::max(0.5f, std::min(4.0f, new_zoom));
 
 					if (new_zoom != zoom_scale)
@@ -250,18 +266,32 @@ namespace ms
 				else
 				{
 					drag_resize = false;
+					drag_resize_side = false;
 				}
 			}
 			else if (on_bottom && clicked)
 			{
 				drag_resize = true;
+				drag_resize_side = false;
 				drag_start_y = cursorpos.y();
+				drag_start_zoom = zoom_scale;
+				return Cursor::State::CLICKING;
+			}
+			else if ((on_right || on_left) && clicked)
+			{
+				drag_resize = true;
+				drag_resize_side = true;
+				drag_start_x = cursorpos.x();
 				drag_start_zoom = zoom_scale;
 				return Cursor::State::CLICKING;
 			}
 			else if (on_bottom)
 			{
 				return Cursor::State::VSCROLL;
+			}
+			else if (on_right || on_left)
+			{
+				return Cursor::State::HSCROLL;
 			}
 		}
 

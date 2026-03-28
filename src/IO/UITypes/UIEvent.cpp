@@ -20,8 +20,11 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "UIClock.h"
 
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
+#include "../../Net/Packets/GameplayPackets.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -32,102 +35,121 @@ namespace ms
 	UIEvent::UIEvent() : UIDragElement<PosEVENT>(Point<int16_t>(250, 20))
 	{
 		offset = 0;
-		event_count = 16;
+		selected_slot = 0;
+		refresh_counter = 0;
 
 		nl::node main = nl::nx::ui["UIWindow2.img"]["EventList"]["main"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
+		nl::node event_node = main["event"];
 
 		nl::node backgrnd = main["backgrnd"];
 		Point<int16_t> bg_dimensions = Texture(backgrnd).get_dimensions();
 
+		// Layered backgrounds
 		sprites.emplace_back(backgrnd);
 		sprites.emplace_back(main["backgrnd2"], Point<int16_t>(1, 0));
+		sprites.emplace_back(main["backgrnd3"], Point<int16_t>(6, 29));
 
+		// Close button
 		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
 
-		bool in_progress = false;
-		bool item_rewards = false;
+		// Event slot backgrounds (316x78)
+		slot_normal = event_node["normal"];
+		slot_selected = event_node["select"];
 
-		for (size_t i = 0; i < 5; i++)
-			events.emplace_back(BoolPair<bool>(true, true));
+		// Item reward slot frame (35x35)
+		slot_frame = event_node["slot"];
 
-		for (size_t i = 0; i < 10; i++)
-			events.emplace_back(BoolPair<bool>(false, true));
+		// Event type icons (19x19)
+		for (int i = 0; i < 4; i++)
+			event_icons[i] = event_node["icon"][std::to_string(i)];
 
-		events.emplace_back(BoolPair<bool>(false, false));
+		// Status button textures
+		btn_ing = event_node["BtIng"]["normal"]["0"];
+		btn_will = event_node["BtWill"]["normal"]["0"];
+		btn_clear = event_node["BtClear"]["normal"]["0"];
 
-		for (size_t i = 0; i < 3; i++)
-			event_title[i] = ShadowText(Text::Font::A18M, Text::Alignment::LEFT, Color::Name::HALFANDHALF, Color::Name::ENDEAVOUR);
+		// Text labels
+		for (size_t i = 0; i < MAX_VISIBLE; i++)
+		{
+			event_title[i] = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK);
+			event_desc[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
+			event_time[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::JAPANESELAUREL);
+		}
 
-		for (size_t i = 0; i < 3; i++)
-			event_date[i] = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
-
-		item_reward = main["event"]["normal"];
-		text_reward = main["liveEvent"]["normal"];
-		next = main["liveEvent"]["next"];
-		label_on = main["label_on"]["0"];
-		label_next = main["label_next"]["0"];
+		empty_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::GRAY, "Requesting events...");
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
+
+		request_events();
 	}
 
 	void UIEvent::draw(float inter) const
 	{
 		UIElement::draw(inter);
 
-		for (size_t i = 0; i < 3; i++)
+		if (events.empty())
+		{
+			empty_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() / 2));
+			return;
+		}
+
+		// Panel is 351 wide, slot is 316 wide, centered: (351-316)/2 = 17
+		// Slot area starts below header at y ~64
+		// 3 slots with 125px spacing fits in the 458px tall panel
+
+		for (int16_t i = 0; i < MAX_VISIBLE; i++)
 		{
 			int16_t slot = i + offset;
 
-			if (slot >= event_count)
+			if (slot >= static_cast<int16_t>(events.size()))
 				break;
 
-			auto event_pos = Point<int16_t>(12, 87 + 125 * i);
+			const EventData& ev = events[slot];
+			int16_t sy = SLOT_START_Y + SLOT_SPACING * i;
 
-			auto evnt = events[slot];
-			auto in_progress = evnt[1];
-			auto itm_reward = evnt[0];
+			// Slot background at centered x position
+			auto slot_pos = position + Point<int16_t>(SLOT_X, sy);
 
-			if (itm_reward)
+			if (slot == selected_slot)
+				slot_selected.draw(slot_pos);
+			else
+				slot_normal.draw(slot_pos);
+
+			// Title text inside the slot
+			event_title[i].draw(slot_pos + Point<int16_t>(8, 8));
+
+			// Description below title
+			event_desc[i].draw(slot_pos + Point<int16_t>(8, 28));
+
+			// Event time status text
+			event_time[i].draw(slot_pos + Point<int16_t>(8, 48));
+
+			// Status indicator inside the slot, top-right area
+			// Slot is 316 wide, button is 57 wide -> 316-57-5 = 254
+			if (ev.seconds_remaining > 0)
+				btn_ing.draw(slot_pos + Point<int16_t>(254, 6));
+			else if (ev.seconds_remaining == 0)
+				btn_clear.draw(slot_pos + Point<int16_t>(254, 6));
+			else
+				btn_will.draw(slot_pos + Point<int16_t>(254, 6));
+
+			// Item reward slots at bottom of slot area
+			if (ev.has_item_rewards && !ev.rewards.empty())
 			{
-				item_reward.draw(position + event_pos);
-
-				int16_t x_adj = 0;
-
-				for (size_t f = 0; f < 5; f++)
+				for (size_t f = 0; f < ev.rewards.size() && f < 5; f++)
 				{
-					const ItemData& item_data = ItemData::get(2000000 + f);
+					int16_t rx = 8 + 38 * static_cast<int16_t>(f);
+					int16_t ry = 60;
+
+					slot_frame.draw(slot_pos + Point<int16_t>(rx, ry));
+
+					const ItemData& item_data = ItemData::get(ev.rewards[f].first);
 					const Texture& icon = item_data.get_icon(true);
-
-					if (f == 2)
-						x_adj = 2;
-					else if (f == 3)
-						x_adj = 6;
-					else if (f == 4)
-						x_adj = 9;
-
-					icon.draw(position + Point<int16_t>(33 + x_adj + 46 * f, 191 + 125 * i));
+					icon.draw(slot_pos + Point<int16_t>(rx + 2, ry + 2));
 				}
 			}
-			else
-			{
-				text_reward.draw(position + event_pos);
-
-				if (!in_progress)
-					next.draw(position + event_pos);
-			}
-
-			if (in_progress)
-				label_on.draw(position + event_pos);
-			else
-				label_next.draw(position + event_pos);
-
-			auto title_pos = Point<int16_t>(28, 95 + 125 * i);
-			auto date_pos = Point<int16_t>(28, 123 + 125 * i);
-
-			event_title[i].draw(position + title_pos);
-			event_date[i].draw(position + date_pos);
 		}
 	}
 
@@ -135,51 +157,127 @@ namespace ms
 	{
 		UIElement::update();
 
-		for (size_t i = 0; i < 3; i++)
+		refresh_counter++;
+		if (refresh_counter >= REFRESH_INTERVAL)
+		{
+			refresh_counter = 0;
+			request_events();
+		}
+
+		// Update displayed text
+		for (int16_t i = 0; i < MAX_VISIBLE; i++)
 		{
 			int16_t slot = i + offset;
 
-			if (slot >= event_count)
+			if (slot >= static_cast<int16_t>(events.size()))
 				break;
 
-			std::string title = get_event_title(slot);
+			const EventData& ev = events[slot];
 
-			if (title.length() > 35)
-				title = title.substr(0, 35) + "..";
+			std::string title = ev.name;
+			if (ev.multiplier > 100)
+				title += " (" + std::to_string(ev.multiplier / 100) + "." + std::to_string((ev.multiplier % 100) / 10) + "x)";
+
+			if (title.length() > 30)
+				title = title.substr(0, 30) + "..";
 
 			event_title[i].change_text(title);
-			event_date[i].change_text(get_event_date(slot));
+
+			std::string desc = ev.description;
+			if (desc.length() > 42)
+				desc = desc.substr(0, 42) + "..";
+			event_desc[i].change_text(desc);
+
+			if (ev.seconds_remaining > 0)
+				event_time[i].change_text("In Progress");
+			else
+				event_time[i].change_text("Ended");
+		}
+
+		if (events.empty())
+			empty_text.change_text("No events running right now");
+	}
+
+	void UIEvent::set_events(std::vector<EventData> event_list)
+	{
+		events = std::move(event_list);
+		offset = 0;
+		selected_slot = 0;
+
+		// Set UIClock countdown to the first active event's time
+		for (const auto& ev : events)
+		{
+			if (ev.seconds_remaining > 0)
+			{
+				Stage::get().set_countdown(ev.seconds_remaining);
+				UI::get().emplace<UIClock>();
+				break;
+			}
 		}
 	}
+
+	void UIEvent::request_events()
+	{
+		RequestEventInfoPacket().dispatch();
+	}
+
+
 
 	void UIEvent::remove_cursor()
 	{
 		UIDragElement::remove_cursor();
-
 		UI::get().clear_tooltip(Tooltip::Parent::EVENT);
 	}
 
 	Cursor::State UIEvent::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;
+		int16_t slot_idx = slot_by_position(cursoroffset.y());
 
-		int16_t yoff = cursoroffset.y();
-		int16_t xoff = cursoroffset.x();
-		int16_t row = row_by_position(yoff);
-		int16_t col = col_by_position(xoff);
+		if (clicked && slot_idx >= 0)
+			selected_slot = slot_idx + offset;
 
-		if (row > 0 && row < 4 && col > 0 && col < 6)
-			show_item(row, col);
+		// Item tooltip on hover
+		if (slot_idx >= 0)
+		{
+			int16_t actual_slot = slot_idx + offset;
+			if (actual_slot < static_cast<int16_t>(events.size()))
+			{
+				const EventData& ev = events[actual_slot];
+				if (ev.has_item_rewards && !ev.rewards.empty())
+				{
+					int16_t ry = SLOT_START_Y + SLOT_SPACING * slot_idx + 60;
 
+					if (cursoroffset.y() >= ry && cursoroffset.y() <= ry + 35)
+					{
+						for (size_t f = 0; f < ev.rewards.size() && f < 5; f++)
+						{
+							int16_t rx = SLOT_X + 8 + 38 * static_cast<int16_t>(f);
+							if (cursoroffset.x() >= rx && cursoroffset.x() <= rx + 35)
+							{
+								UI::get().show_item(Tooltip::Parent::EVENT, ev.rewards[f].first);
+								return UIDragElement::send_cursor(clicked, cursorpos);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		UI::get().clear_tooltip(Tooltip::Parent::EVENT);
 		return UIDragElement::send_cursor(clicked, cursorpos);
 	}
 
 	void UIEvent::send_scroll(double yoffset)
 	{
+		if (events.empty())
+			return;
+
 		int16_t shift = (yoffset > 0) ? -1 : 1;
 		int16_t new_offset = offset + shift;
+		int16_t max_offset = std::max(0, static_cast<int16_t>(events.size()) - MAX_VISIBLE);
 
-		if (new_offset >= 0 && new_offset <= event_count - 3)
+		if (new_offset >= 0 && new_offset <= max_offset)
 			offset = new_offset;
 	}
 
@@ -213,115 +311,15 @@ namespace ms
 		deactivate();
 	}
 
-	std::string UIEvent::get_event_title(uint8_t id)
+	int16_t UIEvent::slot_by_position(int16_t y)
 	{
-		switch (id)
+		for (int16_t i = 0; i < MAX_VISIBLE; i++)
 		{
-		case 0:
-			return "LINE FRIENDS";
-		case 1:
-			return "LINE FRIENDS Coin Shop";
-		case 2:
-			return "[14th Street] Big Bang Store";
-		case 3:
-			return "[14th Street] Override Fashion Marketing";
-		case 4:
-			return "[14th Street] Dance Battle V";
-		case 5:
-			return "MapleStory 14th Anniversary Appre..";
-		case 6:
-			return "[14th Street] Big Bang Store Season..";
-		case 7:
-			return "[14th Street] Maplelin Star Grub!";
-		case 8:
-			return "[14th Street] Sub-Zero Hunt";
-		case 9:
-			return "[14th Street] The Legends Return!";
-		case 10:
-			return "[14th Street] Renegade Personal Training";
-		case 11:
-			return "[14th Street] Round-We-Go Cafe Rising Heroes!";
-		case 12:
-			return "[14th Street] Big Bang Attack!";
-		case 13:
-			return "[14th Street] Spiegelmann's Art Retrieval";
-		case 14:
-			return "[14th Street] 14th Street Sky";
-		case 15:
-			return "[Sunny Sunday] Perks Abound!";
-		default:
-			return "";
+			int16_t top = SLOT_START_Y + SLOT_SPACING * i;
+			if (y >= top && y < top + SLOT_SPACING)
+				return i;
 		}
-	}
 
-	std::string UIEvent::get_event_date(uint8_t id)
-	{
-		switch (id)
-		{
-		case 0:
-		case 1:
-		case 2:
-			return "04/24/2019 - 05/21/2019, 23:59";
-		case 3:
-			return "04/24/2019 - 05/07/2019, 23:59";
-		case 4:
-			return "04/24/2019 - 06/11/2019, 23:59";
-		case 5:
-			return "05/11/2019 - 05/11/2019, 23:59";
-		case 6:
-		case 10:
-		case 11:
-		case 12:
-			return "05/22/2019 - 06/11/2019, 23:59";
-		case 7:
-		case 8:
-			return "05/08/2019 - 05/21/2019, 23:59";
-		case 9:
-			return "05/08/2019 - 06/11/2019, 23:59";
-		case 13:
-		case 14:
-			return "05/29/2019 - 06/11/2019, 23:59";
-		case 15:
-			return "05/05/2019 - 05/05/2019, 23:59";
-		default:
-			return "";
-		}
-	}
-
-	int16_t UIEvent::row_by_position(int16_t y)
-	{
-		int16_t item_height = 43;
-
-		if (y >= 148 && y <= 148 + item_height)
-			return 1;
-		else if (y >= 273 && y <= 273 + item_height)
-			return 2;
-		else if (y >= 398 && y <= 398 + item_height)
-			return 3;
-		else
-			return -1;
-	}
-
-	int16_t UIEvent::col_by_position(int16_t x)
-	{
-		int16_t item_width = 43;
-
-		if (x >= 25 && x <= 25 + item_width)
-			return 1;
-		else if (x >= 71 && x <= 71 + item_width)
-			return 2;
-		else if (x >= 117 && x <= 117 + item_width)
-			return 3;
-		else if (x >= 163 && x <= 163 + item_width)
-			return 4;
-		else if (x >= 209 && x <= 209 + item_width)
-			return 5;
-		else
-			return -1;
-	}
-
-	void UIEvent::show_item(int16_t row, int16_t col)
-	{
-		UI::get().show_item(Tooltip::Parent::EVENT, 2000000 + col - 1);
+		return -1;
 	}
 }

@@ -80,6 +80,24 @@ namespace ms
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();
+		settings.emplace<ScreenShake>();
+		settings.emplace<GraphicsQuality>();
+		settings.emplace<EffectsQuality>();
+		settings.emplace<MouseSpeed>();
+		settings.emplace<HPWarning>();
+		settings.emplace<MPWarning>();
+		settings.emplace<AllowWhisper>();
+		settings.emplace<AllowChatInvite>();
+		settings.emplace<AllowPartyInvite>();
+		settings.emplace<AllowGuildChat>();
+		settings.emplace<AllowAllianceChat>();
+		settings.emplace<AllowFamilyInvite>();
+		settings.emplace<AllowFriendChat>();
+		settings.emplace<AllowTradeRequest>();
+		settings.emplace<AllowExpeditionInvite>();
+		settings.emplace<AllowGuildInvite>();
+		settings.emplace<AllowAllianceInvite>();
+		settings.emplace<AllowFollow>();
 
 		load();
 	}

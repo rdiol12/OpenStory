@@ -31,6 +31,7 @@
 #include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UIWhisper.h"
+#include "../../Configuration.h"
 
 namespace ms
 {
@@ -452,6 +453,9 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 
+		if ((mode == 9 || mode == 18) && !Setting<AllowWhisper>::get().load())
+			return;
+
 		if (mode == 9 || mode == 18) // Whisper received
 		{
 			std::string from = recv.read_string();
@@ -491,6 +495,14 @@ namespace ms
 		int8_t type = recv.read_byte(); // 0 = buddy, 1 = party, 2 = guild, 3 = alliance
 		std::string from = recv.read_string();
 		std::string message = recv.read_string();
+
+		// Filter by social settings
+		if (type == 0 && !Setting<AllowFriendChat>::get().load())
+			return;
+		if (type == 2 && !Setting<AllowGuildChat>::get().load())
+			return;
+		if (type == 3 && !Setting<AllowAllianceChat>::get().load())
+			return;
 
 		std::string prefix;
 

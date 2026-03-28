@@ -38,6 +38,7 @@
 #include "../../IO/UITypes/UIWedding.h"
 #include "../../IO/UITypes/UIRPSGame.h"
 #include "Helpers/LoginParser.h"
+#include "../../Configuration.h"
 
 namespace ms
 {
@@ -171,6 +172,9 @@ namespace ms
 		}
 		case 0x07: // Invite
 		{
+			if (!Setting<AllowFamilyInvite>::get().load())
+				break;
+
 			std::string senior_name = recv.read_string();
 			int32_t senior_cid = recv.read_int();
 
@@ -263,6 +267,9 @@ namespace ms
 		case 4:
 		{
 			// Invite received — show Yes/No popup
+			if (!Setting<AllowPartyInvite>::get().load())
+				break;
+
 			if (recv.length() < 4)
 				break;
 
@@ -590,6 +597,9 @@ namespace ms
 		{
 		case 0x05: // Invite received — show Yes/No popup
 		{
+			if (!Setting<AllowGuildInvite>::get().load())
+				break;
+
 			int32_t guild_id = recv.read_int();
 			std::string inviter = recv.read_string();
 
@@ -849,48 +859,347 @@ namespace ms
 
 	void AllianceOperationHandler::handle(InPacket& recv) const
 	{
+		if (!recv.available())
+			return;
+
 		int8_t op = recv.read_byte();
 
 		switch (op)
 		{
-		case 0x0C: // Alliance info
+		case 0x03: // Alliance invite
 		{
-			if (recv.length() >= 4)
+			if (!Setting<AllowAllianceInvite>::get().load())
+				break;
+
+			if (recv.available())
 			{
-				int8_t rank = recv.read_byte();
-				int8_t guild_count = recv.read_byte();
+				int32_t alliance_id = recv.read_int();
+				std::string inviter = recv.read_string();
+				recv.skip(2); // padding short
 
-				UI::get().emplace<UIAlliance>();
-
-				if (auto alliance = UI::get().get_element<UIAlliance>())
-				{
-					alliance->clear_guilds();
-					for (int8_t i = 0; i < guild_count; i++)
+				UI::get().emplace<UIYesNo>(
+					inviter + " has invited your guild to join their alliance.",
+					[alliance_id](bool yes)
 					{
-						if (recv.available())
-						{
-							int32_t guild_id = recv.read_int();
-							alliance->add_guild("Guild " + std::to_string(guild_id), guild_id);
-						}
+						if (yes)
+							AllianceAcceptInvitePacket(alliance_id).dispatch();
 					}
+				);
+			}
+			break;
+		}
+		case 0x0C: // getAllianceInfo — full alliance data
+		{
+			if (!recv.available())
+				break;
+
+			int8_t exists = recv.read_byte();
+
+			if (exists != 1)
+				break;
+
+			int32_t alliance_id = recv.read_int();
+			std::string alliance_name = recv.read_string();
+
+			// 5 rank titles
+			std::string rank_titles[5];
+			for (int i = 0; i < 5; i++)
+				rank_titles[i] = recv.read_string();
+
+			int8_t guild_count = recv.read_byte();
+			int32_t capacity = recv.read_int();
+
+			std::vector<int32_t> guild_ids;
+			for (int8_t i = 0; i < guild_count; i++)
+				guild_ids.push_back(recv.read_int());
+
+			std::string notice = recv.read_string();
+
+			UI::get().emplace<UIAlliance>();
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->set_alliance_info(alliance_name, 0, capacity);
+				alliance->set_notice(notice);
+				alliance->clear_guilds();
+
+				for (auto gid : guild_ids)
+					alliance->add_guild("Guild " + std::to_string(gid), gid);
+			}
+			break;
+		}
+		case 0x0D: // getGuildAlliances — full guild info blocks
+		{
+			if (!recv.available())
+				break;
+
+			int32_t guild_count = recv.read_int();
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->clear_guilds();
+
+				for (int32_t i = 0; i < guild_count; i++)
+				{
+					if (!recv.available())
+						break;
+
+					int32_t guild_id = recv.read_int();
+					std::string guild_name = recv.read_string();
+
+					// Skip guild rank titles (5)
+					for (int r = 0; r < 5; r++)
+						recv.read_string();
+
+					// Skip member data
+					int8_t member_count = recv.read_byte();
+
+					// Member character IDs
+					for (int8_t m = 0; m < member_count; m++)
+						recv.read_int();
+
+					// Member details: name(13 padded) + job(4) + level(4) + guildRank(4) + online(4) + sig(4) + allianceRank(4)
+					for (int8_t m = 0; m < member_count; m++)
+					{
+						recv.skip(13); // padded name
+						recv.skip(4 * 6); // job, level, guildRank, online, sig, allianceRank
+					}
+
+					recv.read_int();    // capacity
+					recv.read_short();  // logoBG
+					recv.read_byte();   // logoBGColor
+					recv.read_short();  // logo
+					recv.read_byte();   // logoColor
+					recv.read_string(); // guild notice
+					recv.read_int();    // GP
+					recv.read_int();    // allianceId
+
+					alliance->add_guild(guild_name, guild_id);
 				}
 			}
 			break;
 		}
-		case 0x0D: // Alliance notice
+		case 0x0E: // allianceMemberOnline
 		{
+			int32_t alliance_id = recv.read_int();
+			int32_t guild_id = recv.read_int();
+			int32_t character_id = recv.read_int();
+			bool online = recv.read_bool();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+			{
+				std::string status = online ? "logged in" : "logged out";
+				chatbar->send_chatline("[Alliance] A member has " + status + ".", UIChatBar::LineType::YELLOW);
+			}
+			break;
+		}
+		case 0x0F: // updateAllianceInfo — refresh all info
+		{
+			if (!recv.available())
+				break;
+
+			int32_t alliance_id = recv.read_int();
+			std::string alliance_name = recv.read_string();
+
+			// 5 rank titles
+			for (int i = 0; i < 5; i++)
+				recv.read_string();
+
+			int8_t guild_count = recv.read_byte();
+
+			std::vector<int32_t> guild_ids;
+			for (int8_t i = 0; i < guild_count; i++)
+				guild_ids.push_back(recv.read_int());
+
+			int32_t capacity = recv.read_int();
+			recv.skip(2); // padding short
+
+			// Skip guild info blocks
+			for (int8_t i = 0; i < guild_count; i++)
+			{
+				if (!recv.available())
+					break;
+
+				recv.read_int();    // guildId
+				recv.read_string(); // guildName
+
+				for (int r = 0; r < 5; r++)
+					recv.read_string(); // rank titles
+
+				int8_t member_count = recv.read_byte();
+				for (int8_t m = 0; m < member_count; m++)
+					recv.read_int(); // charIds
+
+				for (int8_t m = 0; m < member_count; m++)
+				{
+					recv.skip(13);
+					recv.skip(4 * 6);
+				}
+
+				recv.read_int();
+				recv.read_short();
+				recv.read_byte();
+				recv.read_short();
+				recv.read_byte();
+				recv.read_string();
+				recv.read_int();
+				recv.read_int();
+			}
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->set_alliance_info(alliance_name, 0, static_cast<int8_t>(capacity));
+				alliance->clear_guilds();
+
+				for (auto gid : guild_ids)
+					alliance->add_guild("Guild " + std::to_string(gid), gid);
+			}
+			break;
+		}
+		case 0x10: // removeGuildFromAlliance
+		{
+			// Re-sends full alliance header + expelled guild info
+			int32_t alliance_id = recv.read_int();
+			std::string alliance_name = recv.read_string();
+
+			for (int i = 0; i < 5; i++)
+				recv.read_string(); // rank titles
+
+			int8_t guild_count = recv.read_byte();
+			std::vector<int32_t> guild_ids;
+			for (int8_t i = 0; i < guild_count; i++)
+				guild_ids.push_back(recv.read_int());
+
+			int32_t capacity = recv.read_int();
+			std::string notice = recv.read_string();
+
+			// Expelled guild id + guild info block + trailing byte
+			int32_t expelled_guild_id = recv.read_int();
+			// Consume remaining data
+			while (recv.available())
+				recv.read_byte();
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->set_alliance_info(alliance_name, 0, static_cast<int8_t>(capacity));
+				alliance->set_notice(notice);
+				alliance->clear_guilds();
+
+				for (auto gid : guild_ids)
+				{
+					if (gid != expelled_guild_id)
+						alliance->add_guild("Guild " + std::to_string(gid), gid);
+				}
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] A guild has been removed from the alliance.", UIChatBar::LineType::YELLOW);
+
+			break;
+		}
+		case 0x12: // addGuildToAlliance
+		{
+			int32_t alliance_id = recv.read_int();
+			std::string alliance_name = recv.read_string();
+
+			for (int i = 0; i < 5; i++)
+				recv.read_string();
+
+			int8_t guild_count = recv.read_byte();
+			std::vector<int32_t> guild_ids;
+			for (int8_t i = 0; i < guild_count; i++)
+				guild_ids.push_back(recv.read_int());
+
+			int32_t capacity = recv.read_int();
+			std::string notice = recv.read_string();
+
+			// New guild id + guild info block
+			int32_t new_guild_id = recv.read_int();
+			std::string new_guild_name = "Guild " + std::to_string(new_guild_id);
+
+			// Try to read guild name from the info block
 			if (recv.available())
 			{
-				std::string notice = recv.read_string();
-				if (auto alliance = UI::get().get_element<UIAlliance>())
-					alliance->set_notice(notice);
+				recv.read_int(); // guildId (same as new_guild_id)
+				new_guild_name = recv.read_string();
+				// Consume remaining
+				while (recv.available())
+					recv.read_byte();
 			}
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->set_alliance_info(alliance_name, 0, static_cast<int8_t>(capacity));
+				alliance->set_notice(notice);
+				alliance->clear_guilds();
+
+				for (auto gid : guild_ids)
+				{
+					if (gid == new_guild_id)
+						alliance->add_guild(new_guild_name, gid);
+					else
+						alliance->add_guild("Guild " + std::to_string(gid), gid);
+				}
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] A new guild has joined the alliance.", UIChatBar::LineType::YELLOW);
+
+			break;
+		}
+		case 0x18: // updateAllianceJobLevel — member job/level changed
+		{
+			recv.read_int(); // allianceId
+			recv.read_int(); // guildId
+			recv.read_int(); // characterId
+			recv.read_int(); // level
+			recv.read_int(); // jobId
+			break;
+		}
+		case 0x1A: // changeAllianceRankTitle
+		{
+			recv.read_int(); // allianceId
+			for (int i = 0; i < 5; i++)
+				recv.read_string(); // rank titles
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] Rank titles have been updated.", UIChatBar::LineType::YELLOW);
+
+			break;
+		}
+		case 0x1C: // allianceNotice
+		{
+			recv.read_int(); // allianceId
+			std::string notice = recv.read_string();
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+				alliance->set_notice(notice);
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] Notice updated.", UIChatBar::LineType::YELLOW);
+
+			break;
+		}
+		case 0x1D: // disbandAlliance
+		{
+			recv.read_int(); // allianceId
+
+			if (auto alliance = UI::get().get_element<UIAlliance>())
+			{
+				alliance->set_alliance_info("", 0, 0);
+				alliance->clear_guilds();
+				alliance->set_notice("");
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Alliance] The alliance has been disbanded.", UIChatBar::LineType::RED);
+
 			break;
 		}
 		default:
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Operation update (code: " + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+				chatbar->send_chatline("[Alliance] Operation (code: " + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
 			break;
 		}
 		}
@@ -932,6 +1241,9 @@ namespace ms
 		}
 		case 0x03: // messengerInvite — invite received
 		{
+			if (!Setting<AllowChatInvite>::get().load())
+				break;
+
 			std::string from = recv.read_string();
 			recv.read_byte(); // 0
 			int32_t messenger_id = recv.read_int();

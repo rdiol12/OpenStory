@@ -129,6 +129,10 @@ namespace ms
 			/// Guild
 			GUILD_OPERATION = 138,
 
+			/// Alliance
+			ALLIANCE_OPERATION = 143,
+			DENY_ALLIANCE_REQUEST = 144,
+
 			/// Messenger
 			MESSENGER = 126,
 
@@ -144,6 +148,9 @@ namespace ms
 			/// Party Search
 			PARTY_SEARCH_REGISTER = 221,
 			PARTY_SEARCH_START = 222,
+
+			/// Event
+			REQUEST_EVENT_INFO = 241, // 0xF1
 
 			/// Wedding
 			WEDDING_ACTION = 232

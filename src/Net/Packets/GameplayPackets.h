@@ -258,4 +258,11 @@ namespace ms
 		// Finished updating player stats
 		PlayerUpdatePacket() : OutPacket(OutPacket::Opcode::PLAYER_UPDATE) {}
 	};
+
+	// Opcode: REQUEST_EVENT_INFO(0xF1)
+	class RequestEventInfoPacket : public OutPacket
+	{
+	public:
+		RequestEventInfoPacket() : OutPacket(OutPacket::Opcode::REQUEST_EVENT_INFO) {}
+	};
 }

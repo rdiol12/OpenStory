@@ -59,6 +59,8 @@ namespace ms
 		void select_card(int16_t idx);
 		int16_t card_at_cursor(Point<int16_t> cursorpos) const;
 		void draw_number(Point<int16_t> pos, int32_t number, bool large) const;
+		void draw_count(Point<int16_t> pos, int32_t num, int32_t den, bool large) const;
+		int16_t number_width(int32_t number, bool large) const;
 		void draw_detail(float inter) const;
 		void draw_set_effect(float inter) const;
 
@@ -87,6 +89,7 @@ namespace ms
 			BT_RTAB6,
 			BT_RTAB7,
 			BT_RTAB8,
+			BT_BACK,
 			NUM_BUTTONS
 		};
 
@@ -132,6 +135,7 @@ namespace ms
 		Texture set_icon_back;
 		Texture set_info0;
 		Texture set_info1;
+		Texture set_region_icon[8];
 
 		Text page_text;
 		Text card_count_text;
@@ -179,7 +183,8 @@ namespace ms
 			std::vector<int32_t> mob_ids; // mobs in this set
 			int32_t collected = 0;
 			int32_t total = 0;
-			Texture icon; // representative icon (first mob's card)
+			int8_t region = 0; // region icon index (0-7)
+			Texture icon; // representative card icon (iconRaw)
 		};
 
 		std::vector<CardSet> card_sets;

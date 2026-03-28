@@ -102,6 +102,7 @@ namespace ms
 		invincible.update();
 		ironbody.update();
 
+
 		for (auto& pet : pets)
 		{
 			if (pet.get_itemid())
@@ -219,6 +220,7 @@ namespace ms
 
 		damagenumbers.emplace_back(DamageNumber::Type::HEAL, amount, start_y, x);
 	}
+
 
 	void Char::speak(const std::string& line)
 	{

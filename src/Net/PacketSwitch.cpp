@@ -196,6 +196,7 @@ namespace ms
 		DAMAGE_PLAYER = 192,    // 0xC0
 		FACIAL_EXPRESSION = 193,// 0xC1
 		SHOW_ITEM_EFFECT = 194, // 0xC2
+		EVENT_INFO = 195,       // 0xC3
 		SHOW_CHAIR = 196,       // 0xC4
 		UPDATE_CHARLOOK = 197,  // 0xC5
 		SHOW_FOREIGN_EFFECT = 198, // 0xC6
@@ -586,6 +587,9 @@ namespace ms
 		// MTS (Maple Trading System)
 		emplace<MTS_OPERATION, MTSOperationHandler>();
 		emplace<MTS_OPERATION2, MTSCashHandler>();
+
+		// Event info
+		emplace<EVENT_INFO, EventInfoHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const

@@ -657,6 +657,103 @@ namespace ms
 		MiniMapDefaultHelpers() : BoolEntry("MiniMapDefaultHelpers", "false") {}
 	};
 
+	// Whether screen shake effects are enabled
+	struct ScreenShake : public Configuration::BoolEntry
+	{
+		ScreenShake() : BoolEntry("ScreenShake", "true") {}
+	};
+
+	// Graphics quality slider (0-100)
+	struct GraphicsQuality : public Configuration::ByteEntry
+	{
+		GraphicsQuality() : ByteEntry("GraphicsQuality", "50") {}
+	};
+
+	// Effects quality slider (0-100)
+	struct EffectsQuality : public Configuration::ByteEntry
+	{
+		EffectsQuality() : ByteEntry("EffectsQuality", "50") {}
+	};
+
+	// Mouse speed slider (0-100)
+	struct MouseSpeed : public Configuration::ByteEntry
+	{
+		MouseSpeed() : ByteEntry("MouseSpeed", "50") {}
+	};
+
+	// HP warning threshold slider (0-100)
+	struct HPWarning : public Configuration::ByteEntry
+	{
+		HPWarning() : ByteEntry("HPWarning", "50") {}
+	};
+
+	// MP warning threshold slider (0-100)
+	struct MPWarning : public Configuration::ByteEntry
+	{
+		MPWarning() : ByteEntry("MPWarning", "50") {}
+	};
+
+	// Social filter settings — true means ALLOW
+	struct AllowWhisper : public Configuration::BoolEntry
+	{
+		AllowWhisper() : BoolEntry("AllowWhisper", "true") {}
+	};
+
+	struct AllowChatInvite : public Configuration::BoolEntry
+	{
+		AllowChatInvite() : BoolEntry("AllowChatInvite", "true") {}
+	};
+
+	struct AllowPartyInvite : public Configuration::BoolEntry
+	{
+		AllowPartyInvite() : BoolEntry("AllowPartyInvite", "true") {}
+	};
+
+	struct AllowGuildChat : public Configuration::BoolEntry
+	{
+		AllowGuildChat() : BoolEntry("AllowGuildChat", "true") {}
+	};
+
+	struct AllowAllianceChat : public Configuration::BoolEntry
+	{
+		AllowAllianceChat() : BoolEntry("AllowAllianceChat", "true") {}
+	};
+
+	struct AllowFamilyInvite : public Configuration::BoolEntry
+	{
+		AllowFamilyInvite() : BoolEntry("AllowFamilyInvite", "true") {}
+	};
+
+	struct AllowFriendChat : public Configuration::BoolEntry
+	{
+		AllowFriendChat() : BoolEntry("AllowFriendChat", "true") {}
+	};
+
+	struct AllowTradeRequest : public Configuration::BoolEntry
+	{
+		AllowTradeRequest() : BoolEntry("AllowTradeRequest", "true") {}
+	};
+
+	struct AllowExpeditionInvite : public Configuration::BoolEntry
+	{
+		AllowExpeditionInvite() : BoolEntry("AllowExpeditionInvite", "true") {}
+	};
+
+	struct AllowGuildInvite : public Configuration::BoolEntry
+	{
+		AllowGuildInvite() : BoolEntry("AllowGuildInvite", "true") {}
+	};
+
+	struct AllowAllianceInvite : public Configuration::BoolEntry
+	{
+		AllowAllianceInvite() : BoolEntry("AllowAllianceInvite", "true") {}
+	};
+
+	struct AllowFollow : public Configuration::BoolEntry
+	{
+		AllowFollow() : BoolEntry("AllowFollow", "true") {}
+	};
+
 	template <typename T>
 	// Can be used to access settings
 	struct Setting
