@@ -21,6 +21,10 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/QuestData.h"
+#include "../../Data/NpcData.h"
+#include "../../Data/MapData.h"
+#include "../../Data/StringData.h"
 #include "../UI.h"
 #include "UIMiniMap.h"
 #include "UINotice.h"
@@ -365,7 +369,7 @@ namespace ms
 		// weekly_entries is not cleared here — it's managed separately
 
 		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
-		nl::node quest_check = nl::nx::quest["Check.img"];
+		// NOTE: quest_info iteration kept inline — QuestData cache is not iterable
 
 		const auto& started = questlog.get_started();
 		const auto& completed_map = questlog.get_completed();
@@ -378,12 +382,8 @@ namespace ms
 		for (auto& iter : started)
 		{
 			int16_t qid = iter.first;
-			std::string name;
-
-			nl::node qnode = quest_info[std::to_string(qid)];
-
-			if (qnode)
-				name = qnode["name"].get_string();
+			const auto& qdata = QuestData::get(static_cast<int32_t>(qid));
+			std::string name = qdata.get_name();
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
@@ -404,12 +404,8 @@ namespace ms
 		for (auto& iter : completed_map)
 		{
 			int16_t qid = iter.first;
-			std::string name;
-
-			nl::node qnode = quest_info[std::to_string(qid)];
-
-			if (qnode)
-				name = qnode["name"].get_string();
+			const auto& qdata = QuestData::get(static_cast<int32_t>(qid));
+			std::string name = qdata.get_name();
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
@@ -453,36 +449,29 @@ namespace ms
 			if (started.count(qid) || completed_map.count(qid))
 				continue;
 
+			const auto& qdata = QuestData::get(qid_full);
+
 			// Skip auto-start quests (server triggers these, not the player)
-			if (qnode["autoStart"].get_integer() != 0)
-				continue;
-
-			// Check requirements from Check.img
-			nl::node check = quest_check[qid_str];
-			if (!check)
-				continue;
-
-			nl::node start_check = check["0"];
-			if (!start_check)
+			if (qdata.is_auto_start())
 				continue;
 
 			// Skip quests with normalAutoStart
-			if (start_check["normalAutoStart"].get_integer() != 0)
+			if (qdata.is_normal_auto_start(true))
 				continue;
 
 			// Skip expired event quests with start/end dates
-			std::string end_date = start_check["end"].get_string();
+			std::string end_date = qdata.get_end_date(true);
 			if (!end_date.empty())
 				continue;
 
 			// Must have an NPC to start (skip orphan quests)
-			int32_t start_npc = start_check["npc"].get_integer();
+			int32_t start_npc = qdata.get_npc(true);
 			if (start_npc <= 0)
 				continue;
 
 			// Level check
-			int32_t lvmin = start_check["lvmin"].get_integer();
-			int32_t lvmax = start_check["lvmax"].get_integer();
+			int32_t lvmin = qdata.get_min_level(true);
+			int32_t lvmax = qdata.get_max_level(true);
 
 			if (lvmin > 0 && player_level < lvmin)
 				continue;
@@ -495,14 +484,12 @@ namespace ms
 				continue;
 
 			// Job check
-			nl::node job_node = start_check["job"];
-			if (job_node && job_node.size() > 0)
+			const auto& job_reqs = qdata.get_job_reqs(true);
+			if (!job_reqs.empty())
 			{
 				bool job_ok = false;
-				for (auto j : job_node)
+				for (int32_t required_job : job_reqs)
 				{
-					int32_t required_job = j.get_integer();
-
 					if (required_job == 0 || required_job == player_job)
 					{
 						job_ok = true;
@@ -525,14 +512,14 @@ namespace ms
 			}
 
 			// Prerequisite quest check
-			nl::node quest_prereq = start_check["quest"];
-			if (quest_prereq)
+			const auto& quest_prereqs = qdata.get_quest_reqs(true);
+			if (!quest_prereqs.empty())
 			{
 				bool prereqs_met = true;
-				for (auto qp : quest_prereq)
+				for (const auto& qp : quest_prereqs)
 				{
-					int32_t prereq_id = qp["id"].get_integer();
-					int32_t prereq_state = qp["state"].get_integer();
+					int32_t prereq_id = qp.questid;
+					int32_t prereq_state = qp.state;
 
 					if (prereq_id > 0)
 					{
@@ -556,7 +543,7 @@ namespace ms
 			}
 
 			// Quest is available — get name
-			std::string name = qnode["name"].get_string();
+			std::string name = qdata.get_name();
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
@@ -572,7 +559,7 @@ namespace ms
 			// Location filter — check if quest area matches current map area
 			if (filter_my_location)
 			{
-				int32_t quest_area = qnode["area"].get_integer();
+				int32_t quest_area = qdata.get_area();
 				int32_t current_map = Stage::get().get_mapid();
 				// Area is the map region (first 1-3 digits of map ID)
 				int32_t current_area = current_map / 10000000;
@@ -586,11 +573,10 @@ namespace ms
 			bool is_recommended = false;
 
 			// Job-specific check: quest requires a specific (non-zero) job
-			if (job_node && job_node.size() > 0)
+			if (!job_reqs.empty())
 			{
-				for (auto j : job_node)
+				for (int32_t rj : job_reqs)
 				{
-					int32_t rj = j.get_integer();
 					if (rj > 0)
 					{
 						is_recommended = true;
@@ -602,7 +588,7 @@ namespace ms
 			// Nearby check: quest area matches current map area
 			if (!is_recommended)
 			{
-				int32_t quest_area = qnode["area"].get_integer();
+				int32_t quest_area = qdata.get_area();
 				int32_t current_map = Stage::get().get_mapid();
 				int32_t current_area = current_map / 10000000;
 
@@ -615,35 +601,17 @@ namespace ms
 			{
 				int32_t current_map = Stage::get().get_mapid();
 
-				// Look up NPC's map from String.img
-				std::string npc_strid = std::to_string(start_npc);
-				if (npc_strid.size() < 7)
-					npc_strid.insert(0, 7 - npc_strid.size(), '0');
-
-				nl::node npc_node = nl::nx::npc[npc_strid + ".img"]["info"];
-				if (npc_node)
+				const auto& npc_data = NpcData::get(start_npc);
+				if (npc_data.is_valid())
 				{
-					// Some NPC nodes store a map id
-					// But more reliably, check if the NPC exists on the current map's life data
-					std::string map_strid = std::to_string(current_map);
-					if (map_strid.size() < 9)
-						map_strid.insert(0, 9 - map_strid.size(), '0');
-
-					nl::node map_node = nl::nx::map["Map"]["Map" + std::to_string(current_map / 100000000)][map_strid + ".img"];
-					nl::node life = map_node["life"];
-					if (life)
+					// Check if the NPC exists on the current map's life data
+					const auto& life_entries = MapData::get(current_map).get_life();
+					for (const auto& life_entry : life_entries)
 					{
-						for (auto life_entry : life)
+						if (life_entry.type == "n" && life_entry.id == start_npc)
 						{
-							if (life_entry["type"].get_string() == "n")
-							{
-								std::string life_id = life_entry["id"].get_string();
-								if (!life_id.empty() && std::to_string(start_npc) == life_id)
-								{
-									is_recommended = true;
-									break;
-								}
-							}
+							is_recommended = true;
+							break;
 						}
 					}
 				}
@@ -661,10 +629,8 @@ namespace ms
 			std::sort(entries.begin(), entries.end(),
 				[&](const QuestEntry& a, const QuestEntry& b)
 				{
-					nl::node ca = quest_check[std::to_string(a.id)]["0"];
-					nl::node cb = quest_check[std::to_string(b.id)]["0"];
-					int32_t la = ca ? ca["lvmin"].get_integer() : 0;
-					int32_t lb = cb ? cb["lvmin"].get_integer() : 0;
+					int32_t la = QuestData::get(static_cast<int32_t>(a.id)).get_min_level(true);
+					int32_t lb = QuestData::get(static_cast<int32_t>(b.id)).get_min_level(true);
 					return la < lb;
 				});
 		};
@@ -924,9 +890,8 @@ namespace ms
 		int16_t qid = entries[index].id;
 		std::string name = entries[index].name.get_text();
 
-		// === QuestInfo.img: name, descriptions, area, parent, order, autoStart, autoPreComplete ===
-		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
-		nl::node qnode = quest_info[std::to_string(qid)];
+		// === QuestData: name, descriptions, area, parent, order, autoStart, autoPreComplete ===
+		const auto& qdata = QuestData::get(static_cast<int32_t>(qid));
 
 		std::string desc;
 		detail_area = 0;
@@ -936,22 +901,18 @@ namespace ms
 		detail_auto_complete = false;
 		detail_time_limit = 0;
 
-		if (qnode)
 		{
-			if (is_in_progress && qnode["1"])
-				desc = qnode["1"].get_string();
-			else if (qnode["0"])
-				desc = qnode["0"].get_string();
+			desc = qdata.get_desc(!is_in_progress);
+			std::string qname = qdata.get_name();
+			if (!qname.empty())
+				name = qname;
 
-			if (qnode["name"])
-				name = qnode["name"].get_string();
-
-			detail_area = qnode["area"].get_integer();
-			detail_parent = qnode["parent"].get_string();
-			detail_order = qnode["order"].get_integer();
-			detail_auto_start = (qnode["autoStart"].get_integer() != 0);
-			detail_auto_complete = (qnode["autoPreComplete"].get_integer() != 0);
-			detail_time_limit = qnode["timeLimit"].get_integer();
+			detail_area = qdata.get_area();
+			detail_parent = qdata.get_parent();
+			detail_order = qdata.get_order();
+			detail_auto_start = qdata.is_auto_start();
+			detail_auto_complete = qdata.is_auto_pre_complete();
+			detail_time_limit = qdata.get_time_limit();
 		}
 
 		if (desc.empty())
@@ -991,35 +952,32 @@ namespace ms
 		detail_progress = 0.0f;
 		detail_npcid = 0;
 
-		// === Check.img: NPC, level, job, prereq quests, items, mobs ===
-		nl::node quest_check = nl::nx::quest["Check.img"];
-		nl::node check_node = quest_check[std::to_string(qid)];
-
-		if (check_node)
+		// === QuestData: NPC, level, job, prereq quests, items, mobs ===
 		{
-			nl::node start_check = check_node["0"];
-			nl::node end_check = check_node["1"];
-
 			// NPC
-			if (is_in_progress && end_check["npc"])
-				detail_npcid = end_check["npc"].get_integer();
-			else if (start_check["npc"])
-				detail_npcid = start_check["npc"].get_integer();
+			if (is_in_progress)
+			{
+				int32_t end_npc = qdata.get_npc(false);
+				detail_npcid = (end_npc > 0) ? end_npc : qdata.get_npc(true);
+			}
+			else
+			{
+				detail_npcid = qdata.get_npc(true);
+			}
 
 			// Level requirement
-			int32_t lvmin = start_check["lvmin"].get_integer();
+			int32_t lvmin = qdata.get_min_level(true);
 			if (lvmin > 0)
 				detail_level_req = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Level " + std::to_string(lvmin) + "+", 120, false);
 
 			// Job requirement
-			nl::node job_node = start_check["job"];
-			if (job_node)
+			const auto& job_reqs = qdata.get_job_reqs(true);
+			if (!job_reqs.empty())
 			{
 				std::string job_str = "Job: ";
 				bool first = true;
-				for (auto j : job_node)
+				for (int32_t jobid : job_reqs)
 				{
-					int32_t jobid = j.get_integer();
 					if (!first) job_str += ", ";
 					job_str += std::to_string(jobid);
 					first = false;
@@ -1029,25 +987,19 @@ namespace ms
 			}
 
 			// Prerequisite quests
-			nl::node quest_prereq = start_check["quest"];
-			if (quest_prereq)
+			const auto& quest_prereqs = qdata.get_quest_reqs(true);
+			for (const auto& qp : quest_prereqs)
 			{
-				for (auto qp : quest_prereq)
-				{
-					int32_t prereq_id = qp["id"].get_integer();
-					if (prereq_id <= 0) continue;
+				int32_t prereq_id = qp.questid;
+				if (prereq_id <= 0) continue;
 
-					std::string pname;
-					nl::node pnode = quest_info[std::to_string(prereq_id)];
-					if (pnode)
-						pname = pnode["name"].get_string();
-					if (pname.empty())
-						pname = "Quest " + std::to_string(prereq_id);
+				std::string pname = QuestData::get(prereq_id).get_name();
+				if (pname.empty())
+					pname = "Quest " + std::to_string(prereq_id);
 
-					detail_prereq_quests.push_back(
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, pname, 220, false)
-					);
-				}
+				detail_prereq_quests.push_back(
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, pname, 220, false)
+				);
 			}
 
 			// Required items - check player inventory for progress
@@ -1055,12 +1007,13 @@ namespace ms
 			int32_t total_collected = 0;
 			const Inventory& inventory = Stage::get().get_player().get_inventory();
 
-			if (is_in_progress && end_check["item"])
+			if (is_in_progress)
 			{
-				for (auto item_node : end_check["item"])
+				const auto& item_reqs = qdata.get_item_reqs(false);
+				for (const auto& ireq : item_reqs)
 				{
-					int32_t itemid = item_node["id"].get_integer();
-					int32_t count = item_node["count"].get_integer();
+					int32_t itemid = ireq.itemid;
+					int32_t count = ireq.count;
 
 					if (itemid <= 0)
 						continue;
@@ -1089,19 +1042,20 @@ namespace ms
 			}
 
 			// Required mob kills
-			if (is_in_progress && end_check["mob"])
+			if (is_in_progress)
 			{
-				for (auto mob_node : end_check["mob"])
+				const auto& mob_reqs = qdata.get_mob_reqs(false);
+				for (const auto& mreq : mob_reqs)
 				{
-					int32_t mobid = mob_node["id"].get_integer();
-					int32_t count = mob_node["count"].get_integer();
+					int32_t mobid = mreq.mobid;
+					int32_t count = mreq.count;
 
 					if (mobid <= 0)
 						continue;
 
 					total_required += count;
 
-					std::string mob_name = nl::nx::string["Mob.img"][std::to_string(mobid)]["name"].get_string();
+					std::string mob_name = StringData::get_mob_name(mobid);
 					if (mob_name.empty())
 						mob_name = "Monster " + std::to_string(mobid);
 
@@ -1117,7 +1071,7 @@ namespace ms
 				detail_progress = static_cast<float>(total_collected) / static_cast<float>(total_required);
 		}
 
-		// === Load NPC sprite ===
+		// === Load NPC sprite (graphical data kept inline) ===
 		if (detail_npcid > 0)
 		{
 			std::string strid = std::to_string(detail_npcid);
@@ -1127,150 +1081,148 @@ namespace ms
 
 			nl::node npc_src = nl::nx::npc[strid];
 
-			std::string link = npc_src["info"]["link"].get_string();
+			// Use NpcData for link resolution
+			const auto& npc_info = NpcData::get(detail_npcid);
+			std::string link = npc_info.get_link();
 			if (!link.empty())
 			{
-				link.append(".img");
-				npc_src = nl::nx::npc[link];
+				std::string link_strid = link;
+				if (link_strid.size() < 7)
+					link_strid.insert(0, 7 - link_strid.size(), '0');
+				link_strid.append(".img");
+				npc_src = nl::nx::npc[link_strid];
 			}
 
+			// NPC sprite kept as inline NX access (graphical data)
 			if (npc_src["stand"] && npc_src["stand"]["0"])
 				detail_npc_sprite = Texture(npc_src["stand"]["0"]);
 
-			std::string npc_name = nl::nx::string["Npc.img"][std::to_string(detail_npcid)]["name"].get_string();
+			std::string npc_name = StringData::get_npc_name(detail_npcid);
 			if (!npc_name.empty())
 				detail_npc_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::YELLOW, npc_name, 120, false);
 		}
 
-		// === Act.img: rewards (exp, money, fame, buff, items, skills, nextQuest) ===
-		nl::node quest_act = nl::nx::quest["Act.img"];
-		nl::node act_node = quest_act[std::to_string(qid)];
-		if (act_node)
+		// === QuestData: rewards (exp, money, fame, buff, items, skills) ===
 		{
-			nl::node reward_node = act_node["1"];
-			if (!reward_node)
-				reward_node = act_node["0"];
+			// Prefer completion rewards (false = end), fall back to start rewards
+			bool reward_phase = false;
 
-			if (reward_node)
+			// EXP
+			int32_t exp_reward = qdata.get_exp_reward(reward_phase);
+			if (exp_reward > 0)
 			{
-				// EXP
-				int32_t exp_reward = reward_node["exp"].get_integer();
-				if (exp_reward > 0)
-				{
-					detail_rewards.push_back({
-						Texture(),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "EXP", 180, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(exp_reward), 80, false)
-					});
-				}
+				detail_rewards.push_back({
+					Texture(),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "EXP", 180, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(exp_reward), 80, false)
+				});
+			}
 
-				// Mesos
-				int32_t money = reward_node["money"].get_integer();
-				if (money > 0)
-				{
-					detail_rewards.push_back({
-						Texture(),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Mesos", 180, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(money), 80, false)
-					});
-				}
+			// Mesos
+			int32_t money = qdata.get_meso_reward(reward_phase);
+			if (money > 0)
+			{
+				detail_rewards.push_back({
+					Texture(),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Mesos", 180, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(money), 80, false)
+				});
+			}
 
-				// Fame
-				int32_t fame = reward_node["pop"].get_integer();
-				if (fame > 0)
-				{
-					detail_rewards.push_back({
-						Texture(),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Fame", 180, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(fame), 80, false)
-					});
-				}
+			// Fame
+			int32_t fame = qdata.get_fame_reward(reward_phase);
+			if (fame > 0)
+			{
+				detail_rewards.push_back({
+					Texture(),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Fame", 180, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "+" + std::to_string(fame), 80, false)
+				});
+			}
 
-				// Buff item
-				int32_t buffid = reward_node["buffItemID"].get_integer();
-				if (buffid > 0)
-				{
-					const ItemData& bdata = ItemData::get(buffid);
-					std::string bname = bdata.get_name();
-					if (bname.empty())
-						bname = "Buff Item " + std::to_string(buffid);
+			// Buff item
+			int32_t buffid = qdata.get_buff_item_reward(reward_phase);
+			if (buffid > 0)
+			{
+				const ItemData& bdata = ItemData::get(buffid);
+				std::string bname = bdata.get_name();
+				if (bname.empty())
+					bname = "Buff Item " + std::to_string(buffid);
 
-					detail_rewards.push_back({
-						bdata.get_icon(false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, bname, 150, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "x1", 80, false)
-					});
-				}
+				detail_rewards.push_back({
+					bdata.get_icon(false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, bname, 150, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "x1", 80, false)
+				});
+			}
 
-				// Item rewards
-				for (auto item_node : reward_node["item"])
-				{
-					int32_t itemid = item_node["id"].get_integer();
-					int32_t count = item_node["count"].get_integer();
+			// Item rewards
+			const auto& item_rewards = qdata.get_item_rewards(reward_phase);
+			for (const auto& irew : item_rewards)
+			{
+				int32_t itemid = irew.itemid;
+				int32_t count = irew.count;
 
-					if (itemid <= 0)
-						continue;
+				if (itemid <= 0)
+					continue;
 
-					const ItemData& idata = ItemData::get(itemid);
-					std::string item_name = idata.get_name();
-					if (item_name.empty())
-						item_name = "Item " + std::to_string(itemid);
+				const ItemData& idata = ItemData::get(itemid);
+				std::string item_name = idata.get_name();
+				if (item_name.empty())
+					item_name = "Item " + std::to_string(itemid);
 
-					detail_rewards.push_back({
-						idata.get_icon(false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, item_name, 150, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "x" + std::to_string(count > 0 ? count : 1), 80, false)
-					});
-				}
+				detail_rewards.push_back({
+					idata.get_icon(false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, item_name, 150, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "x" + std::to_string(count > 0 ? count : 1), 80, false)
+				});
+			}
 
-				// Skill rewards
-				for (auto skill_node : reward_node["skill"])
-				{
-					int32_t skillid = skill_node["id"].get_integer();
-					if (skillid <= 0) continue;
+			// Skill rewards
+			const auto& skill_rewards = qdata.get_skill_rewards(reward_phase);
+			for (const auto& srew : skill_rewards)
+			{
+				int32_t skillid = srew.skillid;
+				if (skillid <= 0) continue;
 
-					std::string sname = "Skill " + std::to_string(skillid);
-					int32_t mslevel = skill_node["masterLevel"].get_integer();
-					int32_t slevel = skill_node["skillLevel"].get_integer();
+				std::string sname = "Skill " + std::to_string(skillid);
+				int32_t mslevel = srew.master_level;
+				int32_t slevel = srew.level;
 
-					std::string slvl_str;
-					if (mslevel > 0)
-						slvl_str = "Lv." + std::to_string(mslevel);
-					else if (slevel > 0)
-						slvl_str = "Lv." + std::to_string(slevel);
+				std::string slvl_str;
+				if (mslevel > 0)
+					slvl_str = "Lv." + std::to_string(mslevel);
+				else if (slevel > 0)
+					slvl_str = "Lv." + std::to_string(slevel);
 
-					detail_rewards.push_back({
-						Texture(),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, sname, 150, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, slvl_str, 80, false)
-					});
-				}
+				detail_rewards.push_back({
+					Texture(),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, sname, 150, false),
+					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, slvl_str, 80, false)
+				});
 			}
 		}
 
-		// === Say.img: NPC dialog lines ===
-		nl::node say_node = nl::nx::quest["Say.img"][std::to_string(qid)];
-		if (say_node)
+		// === QuestData: NPC dialog lines ===
 		{
-			// Load start (0) or completion (1) dialog
-			nl::node say_phase = is_in_progress ? say_node["0"] : say_node["1"];
-			if (!say_phase)
-				say_phase = say_node["0"];
-
-			if (say_phase)
+			// get_say_lines(true) = start dialog, get_say_lines(false) = completion dialog
+			const auto& say_lines = qdata.get_say_lines(is_in_progress ? true : false);
+			if (say_lines.empty() && !is_in_progress)
 			{
-				bool has_yes = (say_phase["yes"].data_type() != nl::node::type::none);
-				bool has_no = (say_phase["no"].data_type() != nl::node::type::none);
-
-				for (auto line : say_phase)
+				// Fall back to start dialog if completion dialog is empty
+				const auto& fallback = qdata.get_say_lines(true);
+				for (const auto& sl : fallback)
 				{
-					std::string lname = line.name();
-					// Only numbered entries are dialog lines
-					if (!lname.empty() && lname[0] >= '0' && lname[0] <= '9')
-					{
-						std::string text = strip_quest_codes(line.get_string());
-						detail_say_lines.push_back({ text, has_yes && has_no });
-					}
+					std::string text = strip_quest_codes(sl.text);
+					detail_say_lines.push_back({ text, false });
+				}
+			}
+			else
+			{
+				for (const auto& sl : say_lines)
+				{
+					std::string text = strip_quest_codes(sl.text);
+					detail_say_lines.push_back({ text, false });
 				}
 			}
 		}
@@ -1289,21 +1241,16 @@ namespace ms
 			}
 		}
 
-		// === Exclusive.img: medal ===
-		nl::node exclusive = nl::nx::quest["Exclusive.img"];
-		if (exclusive["medal"])
-		{
-			std::string medal_val = exclusive["medal"][std::to_string(qid)].get_string();
-			if (!medal_val.empty())
-				detail_medal = medal_val;
-		}
+		// === QuestData: medal ===
+		if (qdata.is_medal_quest())
+			detail_medal = "Medal Quest";
 
 		// Show delivery buttons if quest has delivery items
 		bool has_delivery = false;
-		if (is_in_progress && check_node)
+		if (is_in_progress)
 		{
-			nl::node end_check = check_node["1"];
-			if (end_check && end_check["item"])
+			const auto& end_item_reqs = qdata.get_item_reqs(false);
+			if (!end_item_reqs.empty())
 				has_delivery = true;
 		}
 		set_btn_active(Buttons::BT_DELIVERY_ACCEPT, has_delivery && is_available);

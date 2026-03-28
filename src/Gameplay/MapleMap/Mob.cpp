@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
 
+#include "../../Data/MobData.h"
 #include "../../Util/Misc.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -29,28 +30,29 @@ namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, bool newspawn, int8_t tm, Point<int16_t> position) : MapObject(oi)
 	{
+		const MobData& data = MobData::get(mid);
+
+		level = data.get_level();
+		watk = data.get_watk();
+		matk = data.get_matk();
+		wdef = data.get_wdef();
+		mdef = data.get_mdef();
+		accuracy = data.get_accuracy();
+		avoid = data.get_avoid();
+		knockback = data.get_knockback();
+		speed = data.get_speed();
+		flyspeed = data.get_fly_speed();
+		touchdamage = data.is_body_attack();
+		undead = data.is_undead();
+		noflip = data.is_no_flip();
+		notattack = data.is_not_attack();
+		canjump = data.can_jump();
+		canfly = data.can_fly();
+		canmove = data.can_move();
+
+		// Animations and sounds still need direct NX access
 		std::string strid = string_format::extend_id(mid, 7);
 		nl::node src = nl::nx::mob[strid + ".img"];
-
-		nl::node info = src["info"];
-
-		level = info["level"];
-		watk = info["PADamage"];
-		matk = info["MADamage"];
-		wdef = info["PDDamage"];
-		mdef = info["MDDamage"];
-		accuracy = info["acc"];
-		avoid = info["eva"];
-		knockback = info["pushed"];
-		speed = info["speed"];
-		flyspeed = info["flySpeed"];
-		touchdamage = info["bodyAttack"].get_bool();
-		undead = info["undead"].get_bool();
-		noflip = info["noFlip"].get_bool();
-		notattack = info["notAttack"].get_bool();
-		canjump = src["jump"].size() > 0;
-		canfly = src["fly"].size() > 0;
-		canmove = src["move"].size() > 0 || canfly;
 
 		if (canfly)
 		{
@@ -67,7 +69,7 @@ namespace ms
 		animations[Stance::HIT] = src["hit1"];
 		animations[Stance::DIE] = src["die1"];
 
-		name = (std::string)nl::nx::string["Mob.img"][std::to_string(mid)]["name"];
+		name = data.get_name();
 
 		nl::node sndsrc = nl::nx::sound["Mob.img"][strid];
 

@@ -19,6 +19,9 @@
 
 #include "../Stage.h"
 #include "../../Character/QuestLog.h"
+#include "../../Data/NpcData.h"
+#include "../../Data/QuestData.h"
+#include "../../Util/Misc.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -96,27 +99,23 @@ namespace ms
 	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) :
 		MapObject(o), quest_mark_type(QuestMarkType::NONE)
 	{
-		std::string strid = std::to_string(id);
-		if (strid.size() < 7)
-			strid.insert(0, 7 - strid.size(), '0');
-		strid.append(".img");
+		const NpcData& data = NpcData::get(id);
 
-		nl::node src = nl::nx::npc[strid];
-		nl::node strsrc = nl::nx::string["Npc.img"][std::to_string(id)];
+		hidename = data.get_hide_name();
+		mouseonly = data.get_talk_mouse_only();
+		scripted = !data.get_script().empty() || data.is_shop();
 
-		std::string link = (std::string)src["info"]["link"];
+		// Resolve linked NPC for animations (still needs direct NX)
+		std::string strid = string_format::extend_id(id, 7);
+		nl::node src = nl::nx::npc[strid + ".img"];
 
-		if (link.size() > 0)
+		int32_t link_id = data.get_link();
+
+		if (link_id > 0)
 		{
-			link.append(".img");
-			src = nl::nx::npc[link];
+			std::string linkstrid = string_format::extend_id(link_id, 7);
+			src = nl::nx::npc[linkstrid + ".img"];
 		}
-
-		nl::node info = src["info"];
-
-		hidename = info["hideName"].get_bool();
-		mouseonly = info["talkMouseOnly"].get_bool();
-		scripted = info["script"].size() > 0 || info["shop"].get_bool();
 
 		for (auto npcnode : src)
 		{
@@ -127,13 +126,14 @@ namespace ms
 				animations[state] = npcnode;
 				states.push_back(state);
 			}
-
-			for (auto speaknode : npcnode["speak"])
-				lines[state].push_back((std::string)strsrc[speaknode.get_string()]);
 		}
 
-		name = (std::string)strsrc["name"];
-		func = (std::string)strsrc["func"];
+		// Use cached data for speak lines
+		if (!states.empty())
+			lines[states[0]] = data.get_speak_lines();
+
+		name = data.get_name();
+		func = data.get_func();
 
 		namelabel = Text(Text::Font::A13B, Text::Alignment::CENTER, Color::Name::YELLOW, Text::Background::NAMETAG, name);
 		funclabel = Text(Text::Font::A13B, Text::Alignment::CENTER, Color::Name::YELLOW, Text::Background::NAMETAG, func);
@@ -282,48 +282,43 @@ namespace ms
 		const auto& started = quests.get_started();
 		const auto& completed_map = quests.get_completed();
 
-		nl::node quest_check = nl::nx::quest["Check.img"];
-		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
-
-		// First check: does this NPC have an in-progress quest ready to complete?
+		// First check: does this NPC complete an in-progress quest?
 		for (auto& iter : started)
 		{
 			int16_t qid = iter.first;
-			nl::node check = quest_check[std::to_string(qid)];
-			if (!check) continue;
+			const QuestData& qdata = QuestData::get(qid);
 
-			nl::node end_check = check["1"];
-			if (!end_check) continue;
+			if (!qdata.is_valid())
+				continue;
 
-			int32_t end_npc = end_check["npc"].get_integer();
-			if (end_npc != npcid) continue;
+			if (qdata.get_npc(false) != npcid)
+				continue;
 
-			// This NPC completes an in-progress quest — show complete mark
 			quest_mark_type = QuestMarkType::COMPLETE;
 			quest_mark_anim = mark_complete;
 			return;
 		}
 
-		// Second check: does this NPC have an in-progress quest (not yet completable)?
+		// Second check: does this NPC start an in-progress quest?
 		for (auto& iter : started)
 		{
 			int16_t qid = iter.first;
-			nl::node check = quest_check[std::to_string(qid)];
-			if (!check) continue;
+			const QuestData& qdata = QuestData::get(qid);
 
-			nl::node start_check = check["0"];
-			if (!start_check) continue;
+			if (!qdata.is_valid())
+				continue;
 
-			int32_t start_npc = start_check["npc"].get_integer();
-			if (start_npc != npcid) continue;
+			if (qdata.get_npc(true) != npcid)
+				continue;
 
 			quest_mark_type = QuestMarkType::IN_PROGRESS;
 			quest_mark_anim = mark_in_progress;
 			return;
 		}
 
-		// Third check: does this NPC have an available quest the player qualifies for?
-		// Only show for quests within 5 levels of the player to avoid marking every NPC
+		// Third check: available quests (still iterate NX since Cache is per-ID)
+		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
+
 		for (auto qnode : quest_info)
 		{
 			std::string qid_str = qnode.name();
@@ -336,28 +331,22 @@ namespace ms
 			if (qid_full > 32767 || qid_full < 0) continue;
 			int16_t qid = static_cast<int16_t>(qid_full);
 
-			// Skip already started or completed
 			if (started.count(qid) || completed_map.count(qid))
 				continue;
 
-			nl::node check = quest_check[qid_str];
-			if (!check) continue;
+			const QuestData& qdata = QuestData::get(qid);
 
-			nl::node start_check = check["0"];
-			if (!start_check) continue;
-
-			// Check if this NPC starts the quest
-			int32_t start_npc = start_check["npc"].get_integer();
-			if (start_npc <= 0 || start_npc != npcid)
+			if (!qdata.is_valid())
 				continue;
 
-			// Skip auto-start quests (they don't need a bulb indicator)
-			if (start_check["normalAutoStart"].get_integer() != 0)
+			if (qdata.get_npc(true) != npcid)
 				continue;
 
-			// Level checks
-			int32_t lvmin = start_check["lvmin"].get_integer();
-			int32_t lvmax = start_check["lvmax"].get_integer();
+			if (qdata.is_auto_start())
+				continue;
+
+			int16_t lvmin = qdata.get_min_level(true);
+			int16_t lvmax = qdata.get_max_level(true);
 
 			if (lvmin > 0 && player_level < lvmin)
 				continue;
@@ -365,67 +354,60 @@ namespace ms
 			if (lvmax > 0 && player_level > lvmax)
 				continue;
 
-			// Skip quests that are way below player level
 			if (lvmin > 0 && (player_level - lvmin) > 10)
 				continue;
 
-			// Skip expired event quests
-			std::string end_date = start_check["end"].get_string();
-			if (!end_date.empty())
-				continue;
+			// Job check via QuestData
+			const auto& jobs = qdata.get_job_reqs(true);
 
-			// Job check
-			nl::node job_node = start_check["job"];
-			if (job_node && job_node.size() > 0)
+			if (!jobs.empty())
 			{
 				bool job_ok = false;
-				for (auto j : job_node)
+
+				for (int32_t required_job : jobs)
 				{
-					int32_t required_job = j.get_integer();
 					if (required_job == 0 || required_job == player_job)
 					{
 						job_ok = true;
 						break;
 					}
+
 					if (required_job > 0 && (player_job / 100) == (required_job / 100) && player_job >= required_job)
 					{
 						job_ok = true;
 						break;
 					}
 				}
+
 				if (!job_ok)
 					continue;
 			}
 
-			// Prerequisite quest check
-			nl::node quest_prereq = start_check["quest"];
-			if (quest_prereq)
-			{
-				bool prereqs_met = true;
-				for (auto qp : quest_prereq)
-				{
-					int32_t prereq_id = qp["id"].get_integer();
-					int32_t prereq_state = qp["state"].get_integer();
+			// Prerequisite quest check via QuestData
+			const auto& prereqs = qdata.get_quest_reqs(true);
+			bool prereqs_met = true;
 
-					if (prereq_id > 0)
+			for (const auto& pq : prereqs)
+			{
+				if (pq.questid > 0)
+				{
+					if (pq.state == 2 && !completed_map.count(static_cast<int16_t>(pq.questid)))
 					{
-						if (prereq_state == 2 && !completed_map.count(static_cast<int16_t>(prereq_id)))
-						{
-							prereqs_met = false;
-							break;
-						}
-						if (prereq_state == 1 && !started.count(static_cast<int16_t>(prereq_id)))
-						{
-							prereqs_met = false;
-							break;
-						}
+						prereqs_met = false;
+						break;
+					}
+
+					if (pq.state == 1 && !started.count(static_cast<int16_t>(pq.questid)))
+					{
+						prereqs_met = false;
+						break;
 					}
 				}
-				if (!prereqs_met)
-					continue;
 			}
 
-			// Player qualifies — show available mark
+			if (!prereqs_met)
+				continue;
+
 			quest_mark_type = QuestMarkType::AVAILABLE;
 			quest_mark_anim = mark_available;
 			return;

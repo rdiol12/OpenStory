@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Misc.h"
 
+#include "../Data/StringData.h"
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -152,18 +154,19 @@ namespace ms
 					if (life_type == "m")
 					{
 						// Mob
-						nl::node life_name = nl::nx::string["Mob.img"][life_id]["name"];
+						std::string life_name = StringData::get_mob_name(static_cast<int32_t>(life_id));
 
 						std::string life_id_str = string_format::extend_id(life_id, 7);
 						nl::node life_level = nl::nx::mob[life_id_str + ".img"]["info"]["level"];
 
-						if (life_name && life_level)
-							map_life[life_id] = { life_type, life_name + "(Lv. " + life_level + ")" };
+						if (!life_name.empty() && life_level)
+							map_life[life_id] = { life_type, life_name + "(Lv. " + (std::string)life_level + ")" };
 					}
 					else if (life_type == "n")
 					{
 						// NPC
-						if (nl::node life_name = nl::nx::string["Npc.img"][life_id]["name"])
+						std::string life_name = StringData::get_npc_name(static_cast<int32_t>(life_id));
+						if (!life_name.empty())
 							map_life[life_id] = { life_type, life_name };
 					}
 				}
