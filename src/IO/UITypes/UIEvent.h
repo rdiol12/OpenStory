@@ -19,12 +19,24 @@
 
 #include "../UIDragElement.h"
 
-#include "../Components/Slider.h"
-
 #include "../../Graphics/SpecialText.h"
+#include "../../Graphics/Text.h"
+
+#include <vector>
 
 namespace ms
 {
+	struct EventData
+	{
+		int8_t type;
+		std::string name;
+		std::string description;
+		int32_t seconds_remaining;
+		int16_t multiplier;
+		bool has_item_rewards;
+		std::vector<std::pair<int32_t, int16_t>> rewards; // itemId, quantity
+	};
+
 	class UIEvent : public UIDragElement<PosEVENT>
 	{
 	public:
@@ -44,16 +56,20 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		void set_events(std::vector<EventData> event_list);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		static constexpr int16_t MAX_VISIBLE = 3;
+		static constexpr int16_t SLOT_X = 11;
+		static constexpr int16_t SLOT_START_Y = 64;
+		static constexpr int16_t SLOT_SPACING = 125;
+
 		void close();
-		std::string get_event_title(uint8_t id);
-		std::string get_event_date(uint8_t id);
-		int16_t row_by_position(int16_t y);
-		int16_t col_by_position(int16_t x);
-		void show_item(int16_t row, int16_t col);
+		void request_events();
+		int16_t slot_by_position(int16_t y);
 
 		enum Buttons : uint16_t
 		{
@@ -61,15 +77,28 @@ namespace ms
 		};
 
 		int16_t offset;
-		int16_t event_count;
-		ShadowText event_title[3];
-		Text event_date[3];
-		Slider slider;
-		Texture item_reward;
-		Texture text_reward;
-		Texture next;
-		Texture label_on;
-		Texture label_next;
-		std::vector<BoolPair<bool>> events;
+		int16_t selected_slot;
+
+		// Event slot backgrounds
+		Texture slot_normal;
+		Texture slot_selected;
+		Texture slot_frame;
+		Texture event_icons[4];
+
+		// Status buttons
+		Texture btn_ing;
+		Texture btn_will;
+		Texture btn_clear;
+
+		// Text per visible slot
+		Text event_title[MAX_VISIBLE];
+		Text event_desc[MAX_VISIBLE];
+		Text event_time[MAX_VISIBLE];
+
+		std::vector<EventData> events;
+		Text empty_text;
+
+		int32_t refresh_counter;
+		static constexpr int32_t REFRESH_INTERVAL = 1250;
 	};
 }

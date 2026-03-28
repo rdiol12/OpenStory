@@ -19,6 +19,7 @@
 
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIEvent.h"
 #include "../../IO/UITypes/UIMonsterCarnival.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 
@@ -346,5 +347,38 @@ namespace ms
 		// Empty body
 		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 			messenger->show_status(Color::Name::RED, "Cannot place a kite here.");
+	}
+
+	void EventInfoHandler::handle(InPacket& recv) const
+	{
+		int16_t event_count = recv.read_short();
+
+		std::vector<EventData> events;
+		events.reserve(event_count);
+
+		for (int16_t i = 0; i < event_count; i++)
+		{
+			EventData ev;
+			ev.type = recv.read_byte();
+			ev.name = recv.read_string();
+			ev.description = recv.read_string();
+			ev.seconds_remaining = recv.read_int();
+			ev.multiplier = recv.read_short();
+			ev.has_item_rewards = recv.read_byte() != 0;
+
+			int16_t reward_count = recv.read_short();
+
+			for (int16_t r = 0; r < reward_count; r++)
+			{
+				int32_t item_id = recv.read_int();
+				int16_t quantity = recv.read_short();
+				ev.rewards.emplace_back(item_id, quantity);
+			}
+
+			events.push_back(std::move(ev));
+		}
+
+		if (auto event_ui = UI::get().get_element<UIEvent>())
+			event_ui->set_events(std::move(events));
 	}
 }

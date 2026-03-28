@@ -24,6 +24,8 @@
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Graphics/GraphicsGL.h"
+#include "../Character/MapleStat.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -122,6 +124,8 @@ namespace ms
 		double viewx = viewrpos.x();
 		double viewy = viewrpos.y();
 
+		uint8_t gfx_quality = Setting<GraphicsQuality>::get().load();
+
 		backgrounds.drawbackgrounds(viewx, viewy, alpha);
 
 		for (auto id : Layer::IDs)
@@ -136,15 +140,61 @@ namespace ms
 			player.draw(id, viewx, viewy, alpha);
 			drops.draw(id, viewx, viewy, alpha);
 			doors.draw(id, viewx, viewy, alpha);
-			mists.draw(id, viewx, viewy, alpha);
+
+			if (gfx_quality > 25)
+				mists.draw(id, viewx, viewy, alpha);
 		}
 
 		combat.draw(viewx, viewy, alpha);
 		portals.draw(viewpos, alpha);
-		backgrounds.drawforegrounds(viewx, viewy, alpha);
-		environments.draw(viewx, viewy, alpha);
+
+		if (gfx_quality > 10)
+			backgrounds.drawforegrounds(viewx, viewy, alpha);
+
+		if (gfx_quality > 25)
+			environments.draw(viewx, viewy, alpha);
+
 		effect.draw();
-		weather.draw(alpha);
+
+		if (gfx_quality > 50)
+			weather.draw(alpha);
+
+		// HP/MP warning screen overlay
+		uint8_t hp_threshold = Setting<HPWarning>::get().load();
+		uint8_t mp_threshold = Setting<MPWarning>::get().load();
+
+		if (hp_threshold > 0 || mp_threshold > 0)
+		{
+			const CharStats& stats = player.get_stats();
+			int32_t cur_hp = stats.get_stat(MapleStat::Id::HP);
+			int32_t max_hp = stats.get_total(EquipStat::Id::HP);
+			int32_t cur_mp = stats.get_stat(MapleStat::Id::MP);
+			int32_t max_mp = stats.get_total(EquipStat::Id::MP);
+
+			if (max_hp > 0 && hp_threshold > 0)
+			{
+				int32_t hp_pct = cur_hp * 100 / max_hp;
+
+				if (hp_pct <= hp_threshold)
+				{
+					float intensity = 1.0f - static_cast<float>(hp_pct) / hp_threshold;
+					float pulse_alpha = 0.15f + 0.10f * intensity;
+					GraphicsGL::get().drawscreenfill(1.0f, 0.0f, 0.0f, pulse_alpha);
+				}
+			}
+
+			if (max_mp > 0 && mp_threshold > 0)
+			{
+				int32_t mp_pct = cur_mp * 100 / max_mp;
+
+				if (mp_pct <= mp_threshold)
+				{
+					float intensity = 1.0f - static_cast<float>(mp_pct) / mp_threshold;
+					float pulse_alpha = 0.12f + 0.08f * intensity;
+					GraphicsGL::get().drawscreenfill(0.0f, 0.0f, 1.0f, pulse_alpha);
+				}
+			}
+		}
 	}
 
 	void Stage::update()

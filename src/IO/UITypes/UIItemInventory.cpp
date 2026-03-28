@@ -231,7 +231,9 @@ namespace ms
 
 			const bool untradable = ItemData::get(item_id).is_untradable();
 			const bool cashitem = ItemData::get(item_id).is_cashitem();
-			const Texture& texture = ItemData::get(item_id).get_icon(false);
+			int32_t item_prefix = item_id / 10000;
+			bool is_card = (item_prefix == 238 || item_prefix == 239);
+			const Texture& texture = ItemData::get(item_id).get_icon(is_card);
 			EquipSlot::Id eqslot = inventory.find_equipslot(item_id);
 
 			icons[slot] = std::make_unique<Icon>(

@@ -43,11 +43,24 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
+- **Event System (Custom - WIP)**: Live event list UI using NX EventList sprites. Server sends events via EVENT_INFO (0xC3) packet, client requests via REQUEST_EVENT_INFO (0xF1). Shows event name, description, status (In Progress/Ended), item rewards with tooltips, and activates UIClock countdown for the first active event. *Custom protocol -- not supported by Cosmic server out of the box.*
+- **UIOptionMenu overhaul**: Full settings panel with working sliders for BGM/SFX volume, HP/MP warning thresholds, graphics/effects quality. Slider percentage labels displayed. Menu always centered on screen.
+- **HP/MP Warning overlays**: Screen flashes red when HP drops below threshold, blue for MP. Configurable via UIOptionMenu sliders.
+- **Graphics/Effects Quality**: Slider controls limit concurrent effects and conditionally skip mists, foregrounds, environments, and weather based on quality setting.
+- **System menu cleanup**: Reduced to 6 buttons, removed duplicates (MonsterLife, SystemOption, RoomChange). Game Option opens UIGameSettings, Option opens UIOptionMenu.
+- **Minimap fixes**: Fixed simple mode breaking minimap open (uninitialized mapid), added side-edge resizing.
 - **Monster Book UI -i i based this system on some pictures and videos i saw if you have a better reference open a ticket and i will adjust**: Card grid, detail overlay with animated mob sprite, drop items with tooltip on hover, and stats display. Click cards to view details, click sprite area to cycle stand/move/die animations. Tabs for category filtering and search. Home/card view works. *Note: Set Effect menu UI is still broken — layout and positioning need polish.*
 - **Login Remember Me**: The "Save ID" checkbox on the login screen now actually remembers your login credentials between sessions.
-- **Idle HP/MP regen (HEAL_OVER_TIME)**: Client now sends regen packets every ~10 seconds while idle. Formula: HP = level/5 + 2, MP = level/5 + INT/20 + 3. Mage Improving MP Recovery skill adds Level × SkillLevel / 10 extra MP. Chair sitting gives 3x bonus. Regen pauses during attacks, hit stun, invincibility, and death.
+- **Idle HP/MP regen (HEAL_OVER_TIME)**: Client now sends regen packets every ~10 seconds while idle. Formula: HP = level/5 + 2, MP = level/5 + INT/20 + 3. Mage Improving MP Recovery skill adds Level x SkillLevel / 10 extra MP. Chair sitting gives 3x bonus. Regen pauses during attacks, hit stun, invincibility, and death.
 - **Heal floating numbers**: HP regen shows blue floating numbers above the character using the BasicEff heal number sprites.
 - **Chair rendering and animation**: Fixed chair sprite rendering and sit animation when using inventory chair items.
+
+### Custom Features (Not Cosmic-supported -- WIP)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Event System | WIP | Custom EVENT_INFO/REQUEST_EVENT_INFO packets. Needs server-side handler in Cosmic. |
+| HP/MP Warning | Working | Client-only, no server changes needed |
+| Graphics/Effects Quality | Working | Client-only, no server changes needed |
 
 ### Recent Fixes
 - **Quest complete effect**: Fixed QuestClear animation path (`Quest/clear` -> `QuestClear`) to match NX data; quest complete light pillar now shows from both SHOW_STATUS_INFO and QUEST_CLEAR handlers

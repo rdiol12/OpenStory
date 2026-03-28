@@ -94,7 +94,7 @@ namespace ms
 		};
 
 		/// Constants
-		int32_t mapid;
+		int32_t mapid = -1;
 		int8_t type;
 		int8_t user_type;
 		bool simpleMode;
@@ -149,8 +149,10 @@ namespace ms
 
 		// Drag-to-resize state
 		bool drag_resize;
+		bool drag_resize_side;
 		float zoom_scale;
 		int16_t drag_start_y;
+		int16_t drag_start_x;
 		float drag_start_zoom;
 
 		const CharStats& stats;

@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "EffectLayer.h"
+#include "../Configuration.h"
 
 namespace ms
 {
@@ -48,6 +49,19 @@ namespace ms
 
 	void EffectLayer::add(const Animation& animation, const DrawArgument& args, int8_t z, float speed)
 	{
+		uint8_t efx_quality = Setting<EffectsQuality>::get().load();
+
+		// Limit max concurrent effects based on quality
+		// quality 100 = unlimited, quality 0 = max 2
+		size_t max_effects = 2 + static_cast<size_t>(efx_quality) * 48 / 100;
+		size_t total = 0;
+
+		for (auto& el : effects)
+			total += el.second.size();
+
+		if (total >= max_effects)
+			return;
+
 		effects[z].emplace_back(animation, args, speed);
 	}
 

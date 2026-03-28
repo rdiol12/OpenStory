@@ -366,47 +366,93 @@ namespace ms
 	};
 
 	// --- Alliance Packets ---
-	// Alliance operations use GUILD_OPERATION with alliance-specific sub-ops
 
-	// Request alliance info
+	// Request alliance info (sub-op 0x01)
 	class AllianceInfoRequestPacket : public OutPacket
 	{
 	public:
-		AllianceInfoRequestPacket() : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		AllianceInfoRequestPacket() : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
 		{
-			write_byte(20);  // ALLIANCE_INFO_REQUEST
+			write_byte(0x01);
 		}
 	};
 
-	// Invite guild to alliance
+	// Leave alliance (sub-op 0x02)
+	class AllianceLeavePacket : public OutPacket
+	{
+	public:
+		AllianceLeavePacket() : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
+		{
+			write_byte(0x02);
+		}
+	};
+
+	// Invite guild to alliance (sub-op 0x03)
 	class AllianceInvitePacket : public OutPacket
 	{
 	public:
-		AllianceInvitePacket(const std::string& guild_name) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		AllianceInvitePacket(const std::string& guild_name) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
 		{
-			write_byte(21);  // ALLIANCE_INVITE
+			write_byte(0x03);
 			write_string(guild_name);
 		}
 	};
 
-	// Leave alliance
-	class AllianceLeavePacket : public OutPacket
+	// Accept alliance invite (sub-op 0x04)
+	class AllianceAcceptInvitePacket : public OutPacket
 	{
 	public:
-		AllianceLeavePacket() : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		AllianceAcceptInvitePacket(int32_t alliance_id) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
 		{
-			write_byte(22);  // ALLIANCE_LEAVE
+			write_byte(0x04);
+			write_int(alliance_id);
 		}
 	};
 
-	// Change alliance notice
+	// Expel guild from alliance (sub-op 0x06)
+	class AllianceExpelGuildPacket : public OutPacket
+	{
+	public:
+		AllianceExpelGuildPacket(int32_t guild_id, int32_t alliance_id) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
+		{
+			write_byte(0x06);
+			write_int(guild_id);
+			write_int(alliance_id);
+		}
+	};
+
+	// Change alliance rank titles (sub-op 0x08)
+	class AllianceChangeRankTitlesPacket : public OutPacket
+	{
+	public:
+		AllianceChangeRankTitlesPacket(const std::string ranks[5]) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
+		{
+			write_byte(0x08);
+			for (int i = 0; i < 5; i++)
+				write_string(ranks[i]);
+		}
+	};
+
+	// Change alliance notice (sub-op 0x0A)
 	class AllianceChangeNoticePacket : public OutPacket
 	{
 	public:
-		AllianceChangeNoticePacket(const std::string& notice) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		AllianceChangeNoticePacket(const std::string& notice) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
 		{
-			write_byte(27);  // ALLIANCE_CHANGE_NOTICE
+			write_byte(0x0A);
 			write_string(notice);
+		}
+	};
+
+	// Deny alliance invite
+	class DenyAllianceInvitePacket : public OutPacket
+	{
+	public:
+		DenyAllianceInvitePacket(const std::string& inviter, const std::string& guild_name) : OutPacket(OutPacket::Opcode::DENY_ALLIANCE_REQUEST)
+		{
+			write_byte(0);
+			write_string(inviter);
+			write_string(guild_name);
 		}
 	};
 }

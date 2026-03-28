@@ -315,13 +315,13 @@ namespace ms
 		// === System sub-panel ===
 		nl::node sys_node = mainbar["System"];
 
-		// 8 visible buttons (MonsterLife skipped in layout)
+		// 6 visible buttons
 		constexpr int16_t SYS_STEP = 24;
-		constexpr int16_t SYS_VISIBLE = 8;
+		constexpr int16_t SYS_VISIBLE = 6;
 		constexpr int16_t SYS_PANEL_H = SYS_VISIBLE * SYS_STEP + 8;
 
 		int16_t sys_x = 264;
-		int16_t sys_panel_top = -(84 + SYS_PANEL_H);
+		int16_t sys_panel_top = -(30 + SYS_PANEL_H);
 		int16_t sys_y = sys_panel_top + 4;
 
 		int16_t si = 0;
@@ -331,18 +331,9 @@ namespace ms
 		buttons[BT_SYS_JOYPAD]       = std::make_unique<MapleButton>(sys_node["BtJoyPad"],       Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
 		buttons[BT_SYS_KEYSETTING]   = std::make_unique<MapleButton>(sys_node["BtKeySetting"],   Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
 		buttons[BT_SYS_OPTION]       = std::make_unique<MapleButton>(sys_node["BtOption"],       Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
-		buttons[BT_SYS_ROOMCHANGE]   = std::make_unique<MapleButton>(sys_node["BtRoomChange"],   Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
-		if (sys_node["BtSystemOption"].size() > 0)
-			buttons[BT_SYS_SYSTEMOPTION] = std::make_unique<MapleButton>(sys_node["BtSystemOption"], Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
-		else
-			buttons[BT_SYS_SYSTEMOPTION] = std::make_unique<MapleButton>(sys_node["BtGameOption"], Point<int16_t>(sys_x, sys_y + SYS_STEP * si++));
-
-		// MonsterLife — created but never shown (no position slot)
-		buttons[BT_SYS_MONSTERLIFE]  = std::make_unique<MapleButton>(sys_node["BtMonsterLife"],  Point<int16_t>(sys_x, sys_y + SYS_STEP * si));
-		buttons[BT_SYS_MONSTERLIFE]->set_state(Button::State::DISABLED);
 
 		// All system buttons hidden until toggled
-		for (uint16_t i = BT_SYS_CHANNEL; i <= BT_SYS_SYSTEMOPTION; i++)
+		for (uint16_t i = BT_SYS_CHANNEL; i <= BT_SYS_OPTION; i++)
 			buttons[i]->set_active(false);
 
 		// System background sized to cover visible buttons
@@ -651,10 +642,10 @@ namespace ms
 				buttons[BT_SYS_GAMEQUIT]->set_active(false);
 				buttons[BT_SYS_JOYPAD]->set_active(false);
 				buttons[BT_SYS_KEYSETTING]->set_active(false);
-				buttons[BT_SYS_MONSTERLIFE]->set_active(false);
+
 				buttons[BT_SYS_OPTION]->set_active(false);
-				buttons[BT_SYS_ROOMCHANGE]->set_active(false);
-				buttons[BT_SYS_SYSTEMOPTION]->set_active(false);
+	
+
 			}
 			else
 			{
@@ -668,10 +659,10 @@ namespace ms
 				buttons[BT_SYS_GAMEQUIT]->set_active(true);
 				buttons[BT_SYS_JOYPAD]->set_active(true);
 				buttons[BT_SYS_KEYSETTING]->set_active(true);
-				// BT_SYS_MONSTERLIFE stays disabled (post-BB)
+	
 				buttons[BT_SYS_OPTION]->set_active(true);
-				buttons[BT_SYS_ROOMCHANGE]->set_active(true);
-				buttons[BT_SYS_SYSTEMOPTION]->set_active(true);
+	
+	
 			}
 			return Button::State::NORMAL;
 		}
@@ -719,22 +710,9 @@ namespace ms
 			remove_menus();
 			return Button::State::NORMAL;
 
-		case BT_SYS_SYSTEMOPTION:
-			UI::get().emplace<UIOptionMenu>();
-			remove_menus();
-			return Button::State::NORMAL;
-
-		case BT_SYS_ROOMCHANGE:
-			UI::get().emplace<UIChannel>();
-			remove_menus();
-			return Button::State::NORMAL;
 
 		case BT_SYS_JOYPAD:
 			UI::get().emplace<UIJoypad>();
-			remove_menus();
-			return Button::State::NORMAL;
-
-		case BT_SYS_MONSTERLIFE:
 			remove_menus();
 			return Button::State::NORMAL;
 
@@ -903,10 +881,10 @@ namespace ms
 				buttons[BT_SYS_GAMEQUIT]->set_active(false);
 				buttons[BT_SYS_JOYPAD]->set_active(false);
 				buttons[BT_SYS_KEYSETTING]->set_active(false);
-				buttons[BT_SYS_MONSTERLIFE]->set_active(false);
+
 				buttons[BT_SYS_OPTION]->set_active(false);
-				buttons[BT_SYS_ROOMCHANGE]->set_active(false);
-				buttons[BT_SYS_SYSTEMOPTION]->set_active(false);
+	
+
 			}
 
 			show_menu = true;
@@ -938,10 +916,8 @@ namespace ms
 			buttons[BT_SYS_GAMEQUIT]->set_active(false);
 			buttons[BT_SYS_JOYPAD]->set_active(false);
 			buttons[BT_SYS_KEYSETTING]->set_active(false);
-			buttons[BT_SYS_MONSTERLIFE]->set_active(false);
 			buttons[BT_SYS_OPTION]->set_active(false);
-			buttons[BT_SYS_ROOMCHANGE]->set_active(false);
-			buttons[BT_SYS_SYSTEMOPTION]->set_active(false);
+
 		}
 	}
 

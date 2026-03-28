@@ -206,4 +206,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Event info response from server
+	// Opcode: EVENT_INFO(195)
+	class EventInfoHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

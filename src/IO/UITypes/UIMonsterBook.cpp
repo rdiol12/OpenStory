@@ -68,6 +68,10 @@ namespace ms
 		set_info0 = page_info["setInfo0"];
 		set_info1 = page_info["setInfo1"];
 
+		// Region icons for set effect page (8 regions)
+		for (int i = 0; i < 8; i++)
+			set_region_icon[i] = src["icon"][std::to_string(i)];
+
 
 		// Level marks (0-4 = 1-5 cards collected)
 		for (int i = 0; i < 5; i++)
@@ -86,6 +90,8 @@ namespace ms
 		buttons[Buttons::BT_ARROW_RIGHT] = std::make_unique<MapleButton>(src["arrowRight"], Point<int16_t>(400, 290));
 		buttons[Buttons::BT_SEARCH] = std::make_unique<MapleButton>(src["BtSearch"]);
 		buttons[Buttons::BT_SETEFFECT] = std::make_unique<MapleButton>(src["BtSetEffect"]);
+		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(src["UpTab"]);
+		buttons[Buttons::BT_BACK]->set_active(false);
 
 		// Left tabs
 		nl::node left_tab = src["LeftTab"];
@@ -554,27 +560,28 @@ namespace ms
 	void UIMonsterBook::load_sets()
 	{
 		// v83-compatible card sets (map area based)
-		struct SetDef { const char* name; const char* bonus; std::vector<int32_t> mobs; };
+		// region: 0=Victoria, 1=Orbis, 2=ElNath, 3=Ludibrium, 4=MuLung, 5=Leafre, 6=Nihal, 7=Japan
+		struct SetDef { const char* name; const char* bonus; int8_t region; std::vector<int32_t> mobs; };
 		static const SetDef defs[] = {
-			{"Victoria Island", "+50 HP", {100100, 100101, 120100, 130100}},
-			{"Kerning City", "+20 Avoid", {2230100, 2230101, 2230102, 2230103, 2230104, 2230105, 2230106, 2230107, 2230108, 2230109, 2230110}},
-			{"Ellinia", "+50 MP", {210100, 100130, 100131, 100132, 100133, 100134, 1210100, 1210101, 1210102, 1210103}},
-			{"Sleepywood", "+5 ATK, +50 DEF", {4130100, 4130101, 4130102, 4130103, 4130104, 4130105, 6130100, 6130101, 6130102}},
-			{"Perion", "+50 HP", {130101, 1110100, 1110101, 1110130, 1120100, 1130100, 1140100, 1140130, 2100100, 2100101, 2100102, 2100103, 2100104, 2100105, 2100106, 2100107, 2100108}},
-			{"Henesys", "+20 ACC", {1210100, 2110200, 2110300, 2110301, 2130100, 2130103, 3000000, 3000001, 3000005, 3000006, 3100101, 3100102}},
-			{"Orbis", "+3 Speed, +10 Jump", {3210100, 3210200, 3210201, 3210202, 3210203, 3210204, 3210205, 3210206, 3210207, 3210208}},
-			{"El Nath", "+5 ATK, +10 DEX", {5100100, 5100101, 5100102, 5100103, 5100104, 5105100, 5105101, 5105102, 5120100, 5120101}},
-			{"Dead Mine", "+6 ATK%, +10 MATK", {5130100, 5130101, 5130102, 5130103, 5130104, 5130105, 5130106, 5130107, 5130108}},
-			{"Ludibrium", "+100 HP, +100 DEF", {3210450, 3210800, 3220000, 3230100, 3230101, 3230102, 3230200, 3230300, 3230301, 3230302}},
-			{"Aqua Road", "+6 Magic%, +100 MDEF", {2230131, 2230200, 2300100, 3110100, 3110101, 3110102, 3110300, 3110301, 3110302, 3110303}},
-			{"Mu Lung", "+15% Ignore DEF", {5090100, 6090000, 6090001, 6090002, 6090003, 6090004, 6130200, 6230100, 6230200, 6300100}},
-			{"Leafre", "+1 All Skills", {8140100, 8140101, 8140102, 8140103, 8140104, 8140105, 8140110, 8140111, 8140112, 8143000}},
-			{"Temple of Time", "+47 HP/MP Recovery", {8200000, 8200001, 8200002, 8200003, 8200004, 8200005, 8200006, 8200007, 8200008, 8200009}},
-			{"Nihal Desert", "+50 DEF, +50 MDEF", {7130000, 7130001, 7130002, 7130003, 7130004, 7130005, 7130100, 7130101, 7130200, 7130300}},
-			{"Magatia", "+10 INT, +5 MATK", {7130400, 7130401, 7130402, 7130500, 7130501, 7130600, 7130601, 7140000, 7140100}},
-			{"Mushroom Shrine", "+85 MP Recovery", {9400000, 9400001, 9400002, 9400003, 9400004, 9400005, 9400006, 9400007, 9400008}},
-			{"Ninja Castle", "+6 Speed, +6 Jump", {9400100, 9400101, 9400102, 9400103, 9400104, 9400105, 9400106}},
-			{"Showa Village", "+5 All Stats", {9400110, 9400111, 9400112, 9400113, 9400114, 9400115, 9400120, 9400121}},
+			{"Victoria Island", "+50 HP", 0, {100100, 100101, 120100, 130100}},
+			{"Kerning City", "+20 Avoid", 0, {2230100, 2230101, 2230102, 2230103, 2230104, 2230105, 2230106, 2230107, 2230108, 2230109, 2230110}},
+			{"Ellinia", "+50 MP", 0, {210100, 100130, 100131, 100132, 100133, 100134, 1210100, 1210101, 1210102, 1210103}},
+			{"Sleepywood", "+5 ATK, +50 DEF", 0, {4130100, 4130101, 4130102, 4130103, 4130104, 4130105, 6130100, 6130101, 6130102}},
+			{"Perion", "+50 HP", 0, {130101, 1110100, 1110101, 1110130, 1120100, 1130100, 1140100, 1140130, 2100100, 2100101, 2100102, 2100103, 2100104, 2100105, 2100106, 2100107, 2100108}},
+			{"Henesys", "+20 ACC", 0, {1210100, 2110200, 2110300, 2110301, 2130100, 2130103, 3000000, 3000001, 3000005, 3000006, 3100101, 3100102}},
+			{"Orbis", "+3 Speed, +10 Jump", 1, {3210100, 3210200, 3210201, 3210202, 3210203, 3210204, 3210205, 3210206, 3210207, 3210208}},
+			{"El Nath", "+5 ATK, +10 DEX", 2, {5100100, 5100101, 5100102, 5100103, 5100104, 5105100, 5105101, 5105102, 5120100, 5120101}},
+			{"Dead Mine", "+6 ATK%, +10 MATK", 2, {5130100, 5130101, 5130102, 5130103, 5130104, 5130105, 5130106, 5130107, 5130108}},
+			{"Ludibrium", "+100 HP, +100 DEF", 3, {3210450, 3210800, 3220000, 3230100, 3230101, 3230102, 3230200, 3230300, 3230301, 3230302}},
+			{"Aqua Road", "+6 Magic%, +100 MDEF", 3, {2230131, 2230200, 2300100, 3110100, 3110101, 3110102, 3110300, 3110301, 3110302, 3110303}},
+			{"Mu Lung", "+15% Ignore DEF", 4, {5090100, 6090000, 6090001, 6090002, 6090003, 6090004, 6130200, 6230100, 6230200, 6300100}},
+			{"Leafre", "+1 All Skills", 5, {8140100, 8140101, 8140102, 8140103, 8140104, 8140105, 8140110, 8140111, 8140112, 8143000}},
+			{"Temple of Time", "+47 HP/MP Recovery", 5, {8200000, 8200001, 8200002, 8200003, 8200004, 8200005, 8200006, 8200007, 8200008, 8200009}},
+			{"Nihal Desert", "+50 DEF, +50 MDEF", 6, {7130000, 7130001, 7130002, 7130003, 7130004, 7130005, 7130100, 7130101, 7130200, 7130300}},
+			{"Magatia", "+10 INT, +5 MATK", 6, {7130400, 7130401, 7130402, 7130500, 7130501, 7130600, 7130601, 7140000, 7140100}},
+			{"Mushroom Shrine", "+85 MP Recovery", 7, {9400000, 9400001, 9400002, 9400003, 9400004, 9400005, 9400006, 9400007, 9400008}},
+			{"Ninja Castle", "+6 Speed, +6 Jump", 7, {9400100, 9400101, 9400102, 9400103, 9400104, 9400105, 9400106}},
+			{"Showa Village", "+5 All Stats", 7, {9400110, 9400111, 9400112, 9400113, 9400114, 9400115, 9400120, 9400121}},
 		};
 
 		card_sets.clear();
@@ -595,6 +602,7 @@ namespace ms
 			cs.mob_ids = def.mobs;
 			cs.total = static_cast<int32_t>(def.mobs.size());
 			cs.collected = 0;
+			cs.region = def.region;
 
 			for (int32_t mobid : def.mobs)
 			{
@@ -602,28 +610,58 @@ namespace ms
 					cs.collected++;
 			}
 
-			// Load representative icon from first mob's card
-			if (!def.mobs.empty())
+			// Load icon: try collected card_icon first
+			for (int32_t mobid : def.mobs)
 			{
-				// Find the card for the first mob
 				for (auto& entry : sorted_cards)
 				{
-					if (entry.mobid == def.mobs[0] && entry.card_icon.is_valid())
+					if (entry.mobid == mobid && entry.card_icon.is_valid())
 					{
 						cs.icon = entry.card_icon;
 						break;
 					}
 				}
+				if (cs.icon.is_valid()) break;
+			}
 
-				// If no collected card found, try to load from NX
-				if (!cs.icon.is_valid())
+			// Fallback: search ALL consume .img files for card iconRaw
+			if (!cs.icon.is_valid())
+			{
+				nl::node consume_root = nl::nx::item["Consume"];
+				for (int32_t mobid : def.mobs)
 				{
-					std::string mob_strid = string_format::extend_id(def.mobs[0], 7);
-					nl::node mob_src = nl::nx::mob[mob_strid + ".img"];
-					nl::node stand = mob_src["stand"];
-					if (stand && stand["0"])
-						cs.icon = Texture(stand["0"]);
+					for (auto img : consume_root)
+					{
+						for (auto item : img)
+						{
+							nl::node info = item["info"];
+							if (!info) continue;
+							nl::node mob_node = info["mob"];
+							if (!mob_node) continue;
+							if (static_cast<int32_t>(mob_node) == mobid)
+							{
+								nl::node icon_node = info["iconRaw"];
+								if (icon_node)
+									cs.icon = Texture(icon_node);
+								break;
+							}
+						}
+						if (cs.icon.is_valid()) break;
+					}
+					if (cs.icon.is_valid()) break;
 				}
+			}
+
+			// Final fallback: mob stand sprite
+			if (!cs.icon.is_valid() && !def.mobs.empty())
+			{
+				std::string mob_strid = string_format::extend_id(def.mobs[0], 7);
+				nl::node mob_src = nl::nx::mob[mob_strid + ".img"];
+				nl::node stand = mob_src["stand"];
+				if (stand && stand["0"])
+					cs.icon = Texture(stand["0"]);
+				else if (mob_src["fly"] && mob_src["fly"]["0"])
+					cs.icon = Texture(mob_src["fly"]["0"]);
 			}
 
 			card_sets.push_back(cs);
@@ -634,13 +672,17 @@ namespace ms
 	{
 		UIElement::draw_sprites(inter);
 
-		// Draw set info background (contains "Set List", "Set score", "Points", "Selected set" labels)
+		// Left page background with baked-in labels: "Set List", "Set score", "Points", "Selected set"
 		set_info0.draw(position);
+
+		// Right page header with "Complete Set" label
+		set_info1.draw(position);
 
 		Point<int16_t> left_page = position + Point<int16_t>(50, 35);
 		Point<int16_t> right_page = position + Point<int16_t>(250, 35);
+		int16_t left_center_x = 87;
 
-		// Calculate total score (10 points per collected set card)
+		// Calculate totals
 		int32_t score = 0;
 		int32_t complete_count = 0;
 		for (auto& cs : card_sets)
@@ -650,39 +692,50 @@ namespace ms
 				complete_count++;
 		}
 
-		// Draw score as large number
-		draw_number(left_page + Point<int16_t>(40, 105), score, true);
+		// Score number below "Set score" label, centered on left page
+		int16_t score_w = number_width(score, true);
+		draw_number(left_page + Point<int16_t>(left_center_x - score_w / 2, 100), score, true);
 
+		// "Points" is baked into setInfo0 — no text needed
+
+		// Selected set display below "Selected set" label
 		if (active_set >= 0 && active_set < static_cast<int16_t>(card_sets.size()))
 		{
 			auto& active = card_sets[active_set];
 
-			// Draw set icon in a cell
-			set_icon_back.draw(left_page + Point<int16_t>(62, 150));
-			if (active.icon.is_valid())
-				active.icon.draw(DrawArgument(left_page + Point<int16_t>(88, 172), 0.8f, 0.8f));
+			// setIconBack cell centered on left page
+			Point<int16_t> icon_cell = left_page + Point<int16_t>(left_center_x - 26, 160);
+			set_icon_back.draw(icon_cell);
 
-			// Set name below
+			// Card icon centered in cell
+			if (active.icon.is_valid())
+				active.icon.draw(DrawArgument(icon_cell + Point<int16_t>(26, 26)));
+
+			// Set name below cell
 			card_name_text.change_text(active.name);
-			card_name_text.draw(left_page + Point<int16_t>(87, 210));
+			card_name_text.draw(left_page + Point<int16_t>(left_center_x, 220));
 		}
 
-		// Right page: "Complete Set X / Y" header
-		std::string complete_str = "Complete Set   " + std::to_string(complete_count) + " / " + std::to_string(static_cast<int32_t>(card_sets.size()));
-		mob_name_text.change_text(complete_str);
-		mob_name_text.draw(right_page + Point<int16_t>(87, 15));
+		// Right page: "Complete Set X / Y" count using small number sprites
+		// setInfo1 draws the "Complete Set" label; numbers go to its right
+		draw_count(right_page + Point<int16_t>(108, 3), complete_count, static_cast<int32_t>(card_sets.size()), false);
 
-		// Draw set grid: 3 columns, scrollable
+		// Right page grid: 3 columns of setIconBack cells
 		int16_t grid_cols = 3;
-		int16_t cell_w = 55;
-		int16_t cell_h = 70;
-		int16_t visible_rows = 3;
-		int16_t grid_start_y = 40;
+		int16_t cell_size = 52;   // setIconBack is 52x52
+		int16_t cell_gap_x = 7;
+		int16_t cell_gap_y = 16;  // space for count text below cell
+		int16_t cell_stride_x = cell_size + cell_gap_x;
+		int16_t cell_stride_y = cell_size + cell_gap_y;
+		int16_t grid_width = grid_cols * cell_size + (grid_cols - 1) * cell_gap_x;
+		int16_t grid_x_offset = (175 - grid_width) / 2;
+		int16_t grid_start_y = 22;
+		int16_t max_visible_rows = 3;
 
 		int16_t total_sets = static_cast<int16_t>(card_sets.size());
 		int16_t total_rows = (total_sets + grid_cols - 1) / grid_cols;
 
-		for (int16_t r = set_scroll; r < total_rows && r < set_scroll + visible_rows; r++)
+		for (int16_t r = set_scroll; r < total_rows && r < set_scroll + max_visible_rows; r++)
 		{
 			for (int16_t c = 0; c < grid_cols; c++)
 			{
@@ -691,25 +744,28 @@ namespace ms
 					break;
 
 				auto& cs = card_sets[idx];
-				Point<int16_t> cell_pos = right_page + Point<int16_t>(c * cell_w + 10, grid_start_y + (r - set_scroll) * cell_h);
+				Point<int16_t> cell_pos = right_page + Point<int16_t>(
+					grid_x_offset + c * cell_stride_x,
+					grid_start_y + (r - set_scroll) * cell_stride_y
+				);
 
-				// Draw cell background
+				// Gold cell background
 				set_icon_back.draw(cell_pos);
 
-				// Draw icon inside cell
+				// Card icon centered in 52x52 cell
 				if (cs.icon.is_valid())
 				{
-					Point<int16_t> icon_center = cell_pos + Point<int16_t>(26, 22);
+					Point<int16_t> icon_center = cell_pos + Point<int16_t>(26, 26);
 					if (hovered_set == idx)
 						cs.icon.draw(DrawArgument(icon_center, Color(1.3f, 1.3f, 1.3f, 1.0f)));
 					else
-						cs.icon.draw(DrawArgument(icon_center, 0.8f, 0.8f));
+						cs.icon.draw(DrawArgument(icon_center));
 				}
 
-				// Draw collected/total below cell
-				std::string count = std::to_string(cs.collected) + " / " + std::to_string(cs.total);
-				card_name_text.change_text(count);
-				card_name_text.draw(cell_pos + Point<int16_t>(26, 56));
+				// Collected/total count below cell using small number sprites, centered
+				int16_t count_w = number_width(cs.collected, false) + 2 + num_small[10].get_dimensions().x() + 2 + number_width(cs.total, false);
+				Point<int16_t> count_pos = cell_pos + Point<int16_t>((cell_size - count_w) / 2, cell_size + 2);
+				draw_count(count_pos, cs.collected, cs.total, false);
 			}
 		}
 
@@ -870,6 +926,7 @@ namespace ms
 						show_set_page = false;
 						selected_card = -1;
 					}
+					buttons[Buttons::BT_BACK]->set_active(show_set_page);
 					return Cursor::State::CLICKING;
 				}
 			}
@@ -882,6 +939,7 @@ namespace ms
 				{
 					show_set_page = false;
 					selected_card = -1;
+					buttons[Buttons::BT_BACK]->set_active(false);
 					int16_t new_tab = static_cast<int16_t>(t);
 					if (new_tab == cur_tab)
 						set_tab(-1);
@@ -899,6 +957,7 @@ namespace ms
 				{
 					show_set_page = false;
 					selected_card = -1;
+					buttons[Buttons::BT_BACK]->set_active(false);
 					int16_t new_tab = static_cast<int16_t>(t);
 					if (new_tab == cur_tab)
 						set_tab(-1);
@@ -914,17 +973,22 @@ namespace ms
 		{
 			hovered_set = -1;
 
-			// Check grid cells on right page
+			// Match grid layout from draw_set_effect
 			Point<int16_t> right_page = position + Point<int16_t>(250, 35);
 			int16_t grid_cols = 3;
-			int16_t cell_w = 55;
-			int16_t cell_h = 70;
-			int16_t visible_rows = 3;
-			int16_t grid_start_y = 40;
+			int16_t cell_size = 52;
+			int16_t cell_gap_x = 7;
+			int16_t cell_gap_y = 16;
+			int16_t cell_stride_x = cell_size + cell_gap_x;
+			int16_t cell_stride_y = cell_size + cell_gap_y;
+			int16_t grid_width = grid_cols * cell_size + (grid_cols - 1) * cell_gap_x;
+			int16_t grid_x_offset = (175 - grid_width) / 2;
+			int16_t grid_start_y = 22;
+			int16_t max_visible_rows = 3;
 			int16_t total_sets = static_cast<int16_t>(card_sets.size());
 			int16_t total_rows = (total_sets + grid_cols - 1) / grid_cols;
 
-			for (int16_t r = set_scroll; r < total_rows && r < set_scroll + visible_rows; r++)
+			for (int16_t r = set_scroll; r < total_rows && r < set_scroll + max_visible_rows; r++)
 			{
 				for (int16_t c = 0; c < grid_cols; c++)
 				{
@@ -932,8 +996,11 @@ namespace ms
 					if (idx >= total_sets)
 						break;
 
-					Point<int16_t> cell_pos = right_page + Point<int16_t>(c * cell_w + 10, grid_start_y + (r - set_scroll) * cell_h);
-					Rectangle<int16_t> cell_rect(cell_pos.x(), cell_pos.x() + 52, cell_pos.y(), cell_pos.y() + 52);
+					Point<int16_t> cell_pos = right_page + Point<int16_t>(
+						grid_x_offset + c * cell_stride_x,
+						grid_start_y + (r - set_scroll) * cell_stride_y
+					);
+					Rectangle<int16_t> cell_rect(cell_pos.x(), cell_pos.x() + cell_size, cell_pos.y(), cell_pos.y() + cell_size);
 
 					if (cell_rect.contains(cursorpos))
 						hovered_set = idx;
@@ -944,15 +1011,10 @@ namespace ms
 
 			if (clicked && hovered_set >= 0 && hovered_set < total_sets)
 			{
-				auto& cs = card_sets[hovered_set];
-				bool complete = (cs.total > 0 && cs.collected >= cs.total);
-				if (complete)
-				{
-					if (active_set == hovered_set)
-						active_set = -1;
-					else
-						active_set = hovered_set;
-				}
+				if (active_set == hovered_set)
+					active_set = -1;
+				else
+					active_set = hovered_set;
 				return Cursor::State::CLICKING;
 			}
 
@@ -1140,6 +1202,11 @@ namespace ms
 			break;
 		case Buttons::BT_SETEFFECT:
 			show_set_page = !show_set_page;
+			buttons[Buttons::BT_BACK]->set_active(show_set_page);
+			return Button::State::NORMAL;
+		case Buttons::BT_BACK:
+			show_set_page = false;
+			buttons[Buttons::BT_BACK]->set_active(false);
 			return Button::State::NORMAL;
 		case Buttons::BT_TAB0:
 		case Buttons::BT_TAB1:
@@ -1229,5 +1296,46 @@ namespace ms
 				pos.shift_x(num_small[digit].get_dimensions().x());
 			}
 		}
+	}
+
+	int16_t UIMonsterBook::number_width(int32_t number, bool large) const
+	{
+		std::string numstr = std::to_string(number);
+		int16_t w = 0;
+
+		for (char c : numstr)
+		{
+			int digit = c - '0';
+			if (large)
+				w += num_large[digit].get_dimensions().x();
+			else
+				w += num_small[digit].get_dimensions().x();
+		}
+
+		return w;
+	}
+
+	void UIMonsterBook::draw_count(Point<int16_t> pos, int32_t num, int32_t den, bool large) const
+	{
+		// Draw numerator
+		draw_number(pos, num, large);
+
+		std::string numstr = std::to_string(num);
+		for (char c : numstr)
+		{
+			int digit = c - '0';
+			if (large)
+				pos.shift_x(num_large[digit].get_dimensions().x());
+			else
+				pos.shift_x(num_small[digit].get_dimensions().x());
+		}
+
+		// "/" separator (num_small[10])
+		pos.shift_x(2);
+		num_small[10].draw(pos);
+		pos.shift_x(num_small[10].get_dimensions().x() + 2);
+
+		// Draw denominator
+		draw_number(pos, den, large);
 	}
 }
