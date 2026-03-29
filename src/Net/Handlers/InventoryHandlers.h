@@ -38,4 +38,16 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Vicious hammer result
+	class ViciousHammerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Vega scroll result
+	class VegaScrollHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

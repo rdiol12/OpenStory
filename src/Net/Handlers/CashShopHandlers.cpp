@@ -22,6 +22,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UIMTS.h"
 #include "../../IO/Window.h"
 
@@ -65,8 +66,6 @@ namespace ms
 		recv.skip_int();
 
 		transition();
-
-		UI::get().change_state(UI::State::CASHSHOP);
 	}
 
 	void CashShopOperationHandler::handle(InPacket& recv) const
@@ -159,14 +158,124 @@ namespace ms
 
 				Stage::get().load(-1, 0);
 
+				GraphicsGL::get().unlock();
+
+				UI::get().change_state(UI::State::CASHSHOP);
 				UI::get().enable();
 				Timer::get().start();
-				GraphicsGL::get().unlock();
 			}
 		);
 
 		GraphicsGL::get().lock();
 		Stage::get().clear();
 		Timer::get().start();
+	}
+
+	void QueryCashResultHandler::handle(InPacket& recv) const
+	{
+		// Cash query result — returns the player's NX cash balance
+		if (recv.available())
+		{
+			int32_t cash_nx = recv.read_int();
+			int32_t maple_points = recv.read_int();
+			int32_t cash_prepaid = recv.read_int();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Cash] NX: " + std::to_string(cash_nx) + " | MaplePoints: " + std::to_string(maple_points) + " | Prepaid: " + std::to_string(cash_prepaid), UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void CashShopNameChangeHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		bool in_use = recv.read_bool();
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+		{
+			if (in_use)
+				messenger->show_status(Color::Name::RED, "Name '" + name + "' is already in use.");
+			else
+				messenger->show_status(Color::Name::WHITE, "Name '" + name + "' is available!");
+		}
+	}
+
+	void CashShopNameChangePossibleHandler::handle(InPacket& recv) const
+	{
+		recv.read_int(); // 0
+		int8_t error = recv.read_byte();
+		recv.read_int(); // 0
+
+		if (error == 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::WHITE, "Name change is available.");
+		}
+		else
+		{
+			std::string msg;
+
+			switch (error)
+			{
+			case 1: msg = "A name change has already been submitted."; break;
+			case 2: msg = "Must wait at least one month between name changes."; break;
+			case 3: msg = "Cannot change name due to a recent ban."; break;
+			default: msg = "Name change is not available."; break;
+			}
+
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, msg);
+		}
+	}
+
+	void CashShopTransferWorldHandler::handle(InPacket& recv) const
+	{
+		recv.read_int(); // 0
+		int8_t error = recv.read_byte();
+		recv.read_int(); // 0
+		bool ok = recv.read_bool();
+
+		if (ok)
+		{
+			int32_t world_count = recv.read_int();
+			std::string world_list = "[CashShop] Available worlds: ";
+
+			for (int32_t i = 0; i < world_count; i++)
+			{
+				std::string world_name = recv.read_string();
+
+				if (i > 0)
+					world_list += ", ";
+
+				world_list += world_name;
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(world_list, UIChatBar::LineType::YELLOW);
+		}
+		else if (error != 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "World transfer failed (error=" + std::to_string(error) + ").");
+		}
+	}
+
+	void CashGachaponResultHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (op == (int8_t)0xE4) // Open failed
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED, "Gachapon failed to open.");
+		}
+		else if (op == (int8_t)0xE5) // Open success
+		{
+			recv.read_long(); // box cash id
+			int32_t remaining = recv.read_int();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[Gachapon] Opened! Remaining: " + std::to_string(remaining), UIChatBar::LineType::YELLOW);
+			// CashItemInfo + reward data follows
+		}
 	}
 }

@@ -18,6 +18,7 @@
 #include "UIStateCashShop.h"
 
 #include "UITypes/UICashShop.h"
+#include "KeyAction.h"
 
 namespace ms
 {
@@ -82,6 +83,21 @@ namespace ms
 				return Cursor::State::IDLE;
 			}
 		}
+	}
+
+	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
+	{
+		if (pressed && escape)
+		{
+			if (auto cashshop = dynamic_cast<UICashShop*>(get(UIElement::Type::CASHSHOP)))
+				cashshop->exit_cashshop();
+		}
+	}
+
+	void UIStateCashShop::send_scroll(double yoffset)
+	{
+		if (auto front = get_front())
+			front->send_scroll(yoffset);
 	}
 
 	UIState::Iterator UIStateCashShop::pre_add(UIElement::Type type, bool toggled, bool is_focused)

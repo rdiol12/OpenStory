@@ -28,10 +28,18 @@
 #include "Handlers/PlayerHandlers.h"
 #include "Handlers/PlayerInteractionHandlers.h"
 #include "Handlers/SetFieldHandlers.h"
-#include "Handlers/TestingHandlers.h"
+#include "Handlers/WeatherHandlers.h"
+#include "Handlers/ClockHandlers.h"
+#include "Handlers/FieldHandlers.h"
+#include "Handlers/UIControlHandlers.h"
+#include "Handlers/QuestHandlers.h"
+#include "Handlers/MiscHandlers.h"
+#include "Handlers/EventHandlers.h"
+#include "Handlers/SocialHandlers.h"
 #include "Handlers/ForeignCharHandlers.h"
 #include "Handlers/ShopStorageHandlers.h"
 #include "Handlers/MTSHandlers.h"
+#include "Handlers/BotInventoryHandlers.h"
 
 #include "../Configuration.h"
 
@@ -323,7 +331,10 @@ namespace ms
 
 		/// Item Enhancement
 		VICIOUS_HAMMER = 354,   // 0x162
-		VEGA_SCROLL = 358       // 0x166
+		VEGA_SCROLL = 358,      // 0x166
+
+		/// Bot Inventory (custom)
+		BOT_INVENTORY = 359     // 0x167
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -590,6 +601,9 @@ namespace ms
 
 		// Event info
 		emplace<EVENT_INFO, EventInfoHandler>();
+
+		// Bot Inventory (custom)
+		emplace<BOT_INVENTORY, BotInventoryHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const

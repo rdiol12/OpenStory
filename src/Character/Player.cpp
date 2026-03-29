@@ -209,6 +209,11 @@ namespace ms
 				pst->update_state(*this);
 			}
 		}
+		else if (state == Char::State::DIED)
+		{
+			// Still update the character look so the death animation plays
+			Char::update(physics, get_stancespeed());
+		}
 
 		uint8_t stancebyte = facing_right ? state : state + 1;
 		Movement newmove(phobj, stancebyte);

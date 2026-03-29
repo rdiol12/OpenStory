@@ -21,56 +21,97 @@
 
 namespace ms
 {
-	// Handler for entering the Cash Shop
-	class SetCashShopHandler : public PacketHandler
-	{
-	public:
-		void handle(InPacket& recv) const override;
-
-	private:
-		void transition() const;
-	};
-
-	// Handler for Cash Shop operation responses (buy, coupon, etc.)
-	class CashShopOperationHandler : public PacketHandler
-	{
-	public:
-		void handle(InPacket& recv) const override;
-	};
-
-	// Handler for entering MTS (SET_ITC, opcode 126)
-	class SetITCHandler : public PacketHandler
-	{
-	public:
-		void handle(InPacket& recv) const override;
-	};
-
-	// Cash shop cash query result
-	class QueryCashResultHandler : public PacketHandler
+	class NpcActionHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
 
-	// Cash shop name change check
-	class CashShopNameChangeHandler : public PacketHandler
+	class YellowTipHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
 
-	// Cash shop name change possible result
-	class CashShopNameChangePossibleHandler : public PacketHandler
+	class BroadcastMsgHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
 
-	// Cash shop world transfer possible result
-	class CashShopTransferWorldHandler : public PacketHandler
+	class AdminResultHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
 
-	// Cash shop gachapon item result
-	class CashGachaponResultHandler : public PacketHandler
+	class SetNpcScriptableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class AutoHpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class AutoMpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class QuickSlotInitHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ClaimStatusChangedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SueCharacterResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SpouseChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class BlockedMapHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class BlockedServerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SetExtraPendantSlotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SkillLearnItemResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class MakerResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class CatchMonsterHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class CatchMonsterWithItemHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class NewYearCardHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};

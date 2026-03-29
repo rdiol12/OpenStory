@@ -15,33 +15,60 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include "../OutPacket.h"
+#include "ClockHandlers.h"
+#include "../../Gameplay/Stage.h"
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIClock.h"
 
 namespace ms
 {
-	// Packet to request character info
-	// Opcode: CHAR_INFO_REQUEST(97)
-	class CharInfoRequestPacket : public OutPacket
+	void ClockHandler::handle(InPacket& recv) const
 	{
-	public:
-		CharInfoRequestPacket(int32_t character_id) : OutPacket(OutPacket::Opcode::CHAR_INFO_REQUEST)
-		{
-			write_random();
-			write_int(character_id);
-		}
-	};
+		if (!recv.available())
+			return;
 
-	// Packet to give fame (+1) or defame (-1) a player
-	// Opcode: GIVE_FAME(95)
-	class GiveFamePacket : public OutPacket
-	{
-	public:
-		GiveFamePacket(int32_t character_id, bool raise) : OutPacket(OutPacket::Opcode::GIVE_FAME)
+		int8_t type = recv.read_byte();
+
+		switch (type)
 		{
-			write_int(character_id);
-			write_byte(raise ? 1 : 0);
+		case 1: // Game clock — byte hour, byte min, byte sec
+		{
+			if (recv.length() < 3)
+				break;
+
+			int8_t hour = recv.read_byte();
+			int8_t min = recv.read_byte();
+			int8_t sec = recv.read_byte();
+
+			Stage::get().set_clock(hour, min, sec);
+			UI::get().emplace<UIClock>();
+			break;
 		}
-	};
+		case 2: // Countdown timer — int secondsRemaining
+		{
+			if (recv.length() < 4)
+				break;
+
+			int32_t seconds = recv.read_int();
+
+			Stage::get().set_countdown(seconds);
+			UI::get().emplace<UIClock>();
+			break;
+		}
+		case 3: // Remove timer
+		{
+			Stage::get().clear_clock();
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	void StopClockHandler::handle(InPacket& recv) const
+	{
+		recv.read_byte(); // 0
+
+		Stage::get().clear_clock();
+	}
 }

@@ -20,6 +20,7 @@
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UICharInfo.h"
+#include "../../IO/UITypes/UIStatusMessenger.h"
 
 namespace ms
 {
@@ -78,9 +79,84 @@ namespace ms
 				recv.read_short();
 		}
 
-		UI::get().emplace<UICharInfo>(character_id);
+		// Reuse existing active window for same character, otherwise recreate
+		auto existing = UI::get().get_element<UICharInfo>();
+
+		if (existing && (existing->get_char_id() != character_id || !existing->is_active()))
+		{
+			UI::get().remove(UIElement::Type::CHARINFO);
+			existing = nullptr;
+		}
+
+		if (!existing)
+			UI::get().emplace<UICharInfo>(character_id);
 
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
+	}
+
+	void FameResponseHandler::handle(InPacket& recv) const
+	{
+		// v83: byte mode
+		if (!recv.available())
+			return;
+
+		int8_t mode = recv.read_byte();
+
+		auto messenger = UI::get().get_element<UIStatusMessenger>();
+
+		switch (mode)
+		{
+		case 0:
+		{
+			// Successfully gave fame
+			if (recv.available())
+			{
+				std::string charname = recv.read_string();
+				int8_t type = recv.read_byte();
+				int16_t new_fame = recv.available() ? recv.read_short() : 0;
+				if (recv.available())
+					recv.read_short(); // padding
+
+				std::string msg = (type == 1)
+					? "You have raised " + charname + "'s fame to " + std::to_string(new_fame) + "."
+					: "You have lowered " + charname + "'s fame to " + std::to_string(new_fame) + ".";
+
+				if (messenger)
+					messenger->show_status(Color::Name::WHITE, msg);
+			}
+			break;
+		}
+		case 1:
+		{
+			// Error: can't raise/lower own fame
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "You can't raise or lower your own fame.");
+			break;
+		}
+		case 2:
+		{
+			// Error: already famed this person today
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "You have already given fame to this character today.");
+			break;
+		}
+		case 3:
+		{
+			// Error: target level too low
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "That character's level is too low.");
+			break;
+		}
+		case 5:
+		{
+			// Error: too low level to fame
+			if (messenger)
+				messenger->show_status(Color::Name::RED, "You must be at least level 15 to give fame.");
+			break;
+		}
+		default:
+			break;
+		}
 	}
 }

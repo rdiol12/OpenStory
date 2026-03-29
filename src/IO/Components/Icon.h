@@ -49,6 +49,8 @@ namespace ms
 			virtual void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const = 0;
 			virtual void set_count(int16_t) = 0;
 			virtual IconType get_type() = 0;
+			virtual int16_t get_source_slot() const { return -1; }
+			virtual InventoryType::Id get_source_tab() const { return InventoryType::Id::NONE; }
 		};
 
 		class NullType : public Type
@@ -78,6 +80,8 @@ namespace ms
 		virtual Texture get_texture() const;
 		int16_t get_count() const;
 		bool get_drag();
+		int16_t get_source_slot() const;
+		InventoryType::Id get_source_tab() const;
 
 	private:
 		std::unique_ptr<Type> type;

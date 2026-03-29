@@ -15,33 +15,48 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include "../OutPacket.h"
+#include "WeatherHandlers.h"
+#include "../../Gameplay/Stage.h"
+#include "../../IO/UI.h"
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
-	// Packet to request character info
-	// Opcode: CHAR_INFO_REQUEST(97)
-	class CharInfoRequestPacket : public OutPacket
+	void BlowWeatherHandler::handle(InPacket& recv) const
 	{
-	public:
-		CharInfoRequestPacket(int32_t character_id) : OutPacket(OutPacket::Opcode::CHAR_INFO_REQUEST)
-		{
-			write_random();
-			write_int(character_id);
-		}
-	};
+		if (!recv.available())
+			return;
 
-	// Packet to give fame (+1) or defame (-1) a player
-	// Opcode: GIVE_FAME(95)
-	class GiveFamePacket : public OutPacket
-	{
-	public:
-		GiveFamePacket(int32_t character_id, bool raise) : OutPacket(OutPacket::Opcode::GIVE_FAME)
+		int8_t type = recv.read_byte(); // 0=no weather, 1=snow, 2=rain
+		int32_t itemid = recv.read_int(); // 0 if none, or cash weather item
+		std::string message;
+
+		if (recv.available())
+			message = recv.read_string();
+
+		if (type == 0 || itemid == 0)
 		{
-			write_int(character_id);
-			write_byte(raise ? 1 : 0);
+			Stage::get().clear_weather();
+			return;
 		}
-	};
+
+		std::string id_str = "0" + std::to_string(itemid);
+		nl::node item_node = nl::nx::item["Cash"]["0512.img"][id_str];
+		std::string path = item_node["info"]["path"];
+
+		if (!path.empty())
+		{
+			std::string resolve_path = path;
+
+			if (resolve_path.substr(0, 4) == "Map/")
+				resolve_path = resolve_path.substr(4);
+
+			Stage::get().set_weather(resolve_path, message);
+		}
+
+		if (!message.empty())
+			UI::get().set_scrollnotice(message);
+	}
 }

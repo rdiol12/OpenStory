@@ -363,6 +363,7 @@ namespace ms
 			ev.name = recv.read_string();
 			ev.description = recv.read_string();
 			ev.seconds_remaining = recv.read_int();
+			ev.total_seconds = ev.seconds_remaining;
 			ev.multiplier = recv.read_short();
 			ev.has_item_rewards = recv.read_byte() != 0;
 

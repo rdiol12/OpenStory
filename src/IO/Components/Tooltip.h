@@ -39,7 +39,8 @@ namespace ms
 			KEYCONFIG,
 			WORLDMAP,
 			MINIMAP,
-			BUFFLIST
+			BUFFLIST,
+			CHARINFO
 		};
 
 		virtual ~Tooltip() {}

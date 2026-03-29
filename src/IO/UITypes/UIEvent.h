@@ -19,6 +19,7 @@
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Animation.h"
 #include "../../Graphics/SpecialText.h"
 #include "../../Graphics/Text.h"
 
@@ -32,6 +33,7 @@ namespace ms
 		std::string name;
 		std::string description;
 		int32_t seconds_remaining;
+		int32_t total_seconds; // initial duration for gauge calculation
 		int16_t multiplier;
 		bool has_item_rewards;
 		std::vector<std::pair<int32_t, int16_t>> rewards; // itemId, quantity
@@ -62,14 +64,17 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		static constexpr int16_t MAX_VISIBLE = 3;
-		static constexpr int16_t SLOT_X = 11;
-		static constexpr int16_t SLOT_START_Y = 64;
-		static constexpr int16_t SLOT_SPACING = 125;
+		static constexpr int16_t MAX_VISIBLE = 4;
+		static constexpr int16_t SLOT_X = 17;
+		static constexpr int16_t SLOT_START_Y = 38;
+		static constexpr int16_t SLOT_HEIGHT = 78;
+		static constexpr int16_t SLOT_SPACING = 82;
 
 		void close();
 		void request_events();
 		int16_t slot_by_position(int16_t y);
+		void draw_timer(Point<int16_t> pos, int32_t seconds_remaining, int32_t total_seconds) const;
+		void draw_timer_number(int value, int digits, Point<int16_t> pos) const;
 
 		enum Buttons : uint16_t
 		{
@@ -97,6 +102,25 @@ namespace ms
 
 		std::vector<EventData> events;
 		Text empty_text;
+
+		// TimeEvent timer widget (UIWindow4.img/TimeEvent)
+		Texture timer_bg;
+		Texture timer_bg2;
+		Texture timer_bg3;
+		Texture timer_gauge_bg;
+		Texture timer_gauge_cover;
+		Texture timer_gauge_fill;
+		Texture timer_digit[10];
+		Texture timer_state_timer;
+		Texture timer_state_end;
+		Texture timer_state_complete;
+		Texture timer_icon_frame;
+		Animation timer_effect;
+		int16_t timer_digit_width;
+		int16_t gauge_width;
+
+		// Local countdown
+		int64_t countdown_accumulator;
 
 		int32_t refresh_counter;
 		static constexpr int32_t REFRESH_INTERVAL = 1250;
