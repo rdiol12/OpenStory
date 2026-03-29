@@ -20,27 +20,37 @@
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 
-#include <iomanip>
-#include <sstream>
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
 	UIClock::UIClock()
 	{
-		int16_t width = Constants::Constants::get().get_viewwidth();
-		int16_t height = Constants::Constants::get().get_viewheight();
+		nl::node src = nl::nx::ui["UIWindow.img"]["muruengRaid"];
 
-		// Position in the top-center area of the screen
-		position = Point<int16_t>(width / 2 - BG_WIDTH / 2, 10);
+		// Clock background sprite
+		clock_bg = src["clock"]["0"];
+		bg_width = clock_bg.get_dimensions().x();
+		bg_height = clock_bg.get_dimensions().y();
 
-		background = ColorBox(BG_WIDTH, BG_HEIGHT, Color::Name::BLACK, 0.6f);
+		// Digit sprites 0-9
+		nl::node numbers = src["number"];
+		for (int i = 0; i < 10; i++)
+			digit[i] = numbers[std::to_string(i)];
 
-		clock_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE);
-		clock_shadow = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::BLACK);
+		digit_width = digit[0].get_dimensions().x();
+
+		// Colon separator
+		colon = numbers["bar"];
+		colon_width = colon.get_dimensions().x();
+
+		// Center on screen
+		int16_t screen_w = Constants::Constants::get().get_viewwidth();
+		position = Point<int16_t>(screen_w / 2, 10);
 
 		last_update_time = 0;
-
-		update_text();
 	}
 
 	void UIClock::draw(float alpha) const
@@ -50,14 +60,71 @@ namespace ms
 		if (!stage.is_clock_active() && !stage.is_countdown_active())
 			return;
 
-		// Draw semi-transparent background
-		background.draw(DrawArgument(position));
+		// Draw clock background centered at position
+		clock_bg.draw(DrawArgument(position));
 
-		// Draw text centered in the background
-		Point<int16_t> text_pos = position + Point<int16_t>(BG_WIDTH / 2, BG_PADDING);
+		// Calculate digit positions centered in the background
+		// The background origin is (102, 26) so it draws centered at position
+		if (stage.is_clock_active())
+		{
+			// HH:MM:SS — 6 digits + 2 colons
+			int16_t total_w = 6 * digit_width + 2 * colon_width;
+			int16_t start_x = position.x() - total_w / 2;
+			int16_t y = position.y() - digit[0].get_dimensions().y() / 2;
 
-		clock_shadow.draw(DrawArgument(text_pos + Point<int16_t>(1, 1)));
-		clock_text.draw(DrawArgument(text_pos));
+			int16_t x = start_x;
+			draw_number(stage.get_clock_hour(), 2, Point<int16_t>(x, y));
+			x += 2 * digit_width;
+
+			colon.draw(DrawArgument(Point<int16_t>(x, y)));
+			x += colon_width;
+
+			draw_number(stage.get_clock_min(), 2, Point<int16_t>(x, y));
+			x += 2 * digit_width;
+
+			colon.draw(DrawArgument(Point<int16_t>(x, y)));
+			x += colon_width;
+
+			draw_number(stage.get_clock_sec(), 2, Point<int16_t>(x, y));
+		}
+		else if (stage.is_countdown_active())
+		{
+			int32_t seconds = stage.get_countdown_seconds();
+			int32_t mins = seconds / 60;
+			int32_t secs = seconds % 60;
+
+			// MM:SS — 4 digits + 1 colon
+			int16_t total_w = 4 * digit_width + colon_width;
+			int16_t start_x = position.x() - total_w / 2;
+			int16_t y = position.y() - digit[0].get_dimensions().y() / 2;
+
+			int16_t x = start_x;
+			draw_number(mins, 2, Point<int16_t>(x, y));
+			x += 2 * digit_width;
+
+			colon.draw(DrawArgument(Point<int16_t>(x, y)));
+			x += colon_width;
+
+			draw_number(secs, 2, Point<int16_t>(x, y));
+		}
+	}
+
+	void UIClock::draw_number(int value, int digits, Point<int16_t> pos) const
+	{
+		// Draw a number with leading zeros, left-to-right
+		int divisor = 1;
+		for (int i = 1; i < digits; i++)
+			divisor *= 10;
+
+		int16_t x = pos.x();
+
+		for (int i = 0; i < digits; i++)
+		{
+			int d = (value / divisor) % 10;
+			digit[d].draw(DrawArgument(Point<int16_t>(x, pos.y())));
+			x += digit_width;
+			divisor /= 10;
+		}
 	}
 
 	void UIClock::update()
@@ -85,45 +152,11 @@ namespace ms
 					Stage::get().clear_clock();
 			}
 		}
-
-		update_text();
-	}
-
-	void UIClock::update_text()
-	{
-		const Stage& stage = Stage::get();
-
-		std::ostringstream oss;
-
-		if (stage.is_clock_active())
-		{
-			oss << std::setfill('0') << std::setw(2) << (int)stage.get_clock_hour() << ":"
-				<< std::setfill('0') << std::setw(2) << (int)stage.get_clock_min() << ":"
-				<< std::setfill('0') << std::setw(2) << (int)stage.get_clock_sec();
-		}
-		else if (stage.is_countdown_active())
-		{
-			int32_t seconds = stage.get_countdown_seconds();
-			int32_t mins = seconds / 60;
-			int32_t secs = seconds % 60;
-
-			oss << "Time: "
-				<< std::setfill('0') << std::setw(2) << mins << ":"
-				<< std::setfill('0') << std::setw(2) << secs;
-		}
-		else
-		{
-			return;
-		}
-
-		std::string text = oss.str();
-		clock_text.change_text(text);
-		clock_shadow.change_text(text);
 	}
 
 	void UIClock::update_screen(int16_t new_width, int16_t new_height)
 	{
-		position = Point<int16_t>(new_width / 2 - BG_WIDTH / 2, 10);
+		position = Point<int16_t>(new_width / 2, 10);
 	}
 
 	UIElement::Type UIClock::get_type() const

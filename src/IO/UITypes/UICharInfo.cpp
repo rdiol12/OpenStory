@@ -17,12 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICharInfo.h"
 
+#include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "../Components/TwoSpriteButton.h"
 
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Net/Packets/TradePackets.h"
+#include "../../Net/Packets/BotInventoryPackets.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -30,41 +33,38 @@
 
 namespace ms
 {
-	UICharInfo::UICharInfo(int32_t cid) : UIDragElement<PosCHARINFO>(Point<int16_t>(250, 20)), is_loading(true), timestep(Constants::TIMESTEP), personality_enabled(false), collect_enabled(false), damage_enabled(false), item_enabled(false)
+	UICharInfo::UICharInfo(int32_t cid) : UIDragElement<PosCHARINFO>(Point<int16_t>(250, 20)), bot_tab_active(false), target_char_id(cid), bot_scroll_offset(0)
 	{
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-		nl::node UserInfo = nl::nx::ui["UIWindow2.img"]["UserInfo"];
-		nl::node character = UserInfo["character"];
-		nl::node backgrnd = character["backgrnd"];
+		nl::node UserInfo = nl::nx::ui["UIWindow.img"]["UserInfo"];
 
-		// v83: button bitmaps are in UIWindow.img/UserInfo, not UIWindow2.img
-		nl::node UserInfoBtns = nl::nx::ui["UIWindow.img"]["UserInfo"];
+		// Use UIWindow2.img backgrounds (correct layer structure) with UIWindow.img buttons
+		nl::node UserInfo2 = nl::nx::ui["UIWindow2.img"]["UserInfo"];
+		nl::node character = UserInfo2["character"];
 
-		/// Main Window
-		sprites.emplace_back(backgrnd);
+		sprites.emplace_back(character["backgrnd"]);
 		sprites.emplace_back(character["backgrnd2"]);
 		sprites.emplace_back(character["name"]);
 
-		Point<int16_t> backgrnd_dim = Texture(backgrnd).get_dimensions();
-		Point<int16_t> close_dimensions = Point<int16_t>(backgrnd_dim.x() - 21, 6);
+		Point<int16_t> backgrnd_dim = Texture(character["backgrnd"]).get_dimensions();
 
+		Point<int16_t> close_dimensions = Point<int16_t>(backgrnd_dim.x() - 21, 6);
 		buttons[Buttons::BtClose] = std::make_unique<MapleButton>(close, close_dimensions);
 
-		// Only create buttons if their NX nodes exist
 		auto add_button = [&](uint16_t id, nl::node src) {
 			if (src.size() > 0)
 				buttons[id] = std::make_unique<MapleButton>(src);
 		};
 
-		// v83 button names differ from post-BB names
-		add_button(Buttons::BtCollect, UserInfoBtns["BtCollectionShow"]);
-		add_button(Buttons::BtFamily, UserInfoBtns["BtFamily"]);
-		add_button(Buttons::BtItem, UserInfoBtns["BtItem"]);
-		add_button(Buttons::BtParty, UserInfoBtns["BtParty"]);
-		add_button(Buttons::BtPet, UserInfoBtns["BtPetShow"]);
-		add_button(Buttons::BtRide, UserInfoBtns["BtTamingShow"]);
-		add_button(Buttons::BtTrad, UserInfoBtns["BtTrade"]);
-		add_button(Buttons::BtWish, UserInfoBtns["BtWish"]);
+		// Buttons from UIWindow2.img/UserInfo/character (have built-in positions)
+		add_button(Buttons::BtFamily, character["BtFamily"]);
+		add_button(Buttons::BtParty, character["BtParty"]);
+		add_button(Buttons::BtPet, character["BtPet"]);
+		add_button(Buttons::BtRide, character["BtRide"]);
+		add_button(Buttons::BtTrad, character["BtTrad"]);
+		add_button(Buttons::BtItem, character["BtItem"]);
+		add_button(Buttons::BtPopUp, character["BtPopUp"]);
+		add_button(Buttons::BtPopDown, character["BtPopDown"]);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		job = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
@@ -73,136 +73,50 @@ namespace ms
 		guild = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 		alliance = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 
-		// Pet and mount buttons are disabled until mount/pet state is known
 		if (buttons.count(Buttons::BtPet))
 			buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
 		if (buttons.count(Buttons::BtRide))
 			buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
-		if (buttons.count(Buttons::BtWish))
-			buttons[Buttons::BtWish]->set_state(Button::State::DISABLED);
-
-		/// Farm (post-BB, may not exist in v83)
-		nl::node farm = UserInfo["farm"];
-		nl::node farm_backgrnd = farm["backgrnd"];
-
-		if (farm_backgrnd.size() > 0)
-		{
-			loading = farm["loading"];
-
-			farm_dim = Texture(farm_backgrnd).get_dimensions();
-			farm_adj = Point<int16_t>(-farm_dim.x(), 0);
-
-			sprites.emplace_back(farm_backgrnd, farm_adj);
-			sprites.emplace_back(farm["backgrnd2"], farm_adj);
-			sprites.emplace_back(farm["default"], farm_adj);
-			sprites.emplace_back(farm["cover"], farm_adj);
-
-			add_button(Buttons::BtFriend, farm["btFriend"]);
-			add_button(Buttons::BtVisit, farm["btVisit"]);
-
-			// Apply farm offset to buttons if created
-			// Note: farm buttons position from NX relative to farm panel
-		}
-		else
-		{
-			farm_dim = Point<int16_t>(0, 0);
-			farm_adj = Point<int16_t>(0, 0);
-		}
-
-		farm_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::SUPERNOVA);
-		farm_level = Charset(farm["number"], Charset::Alignment::LEFT);
-
-#pragma region BottomWindow
-		bottom_window_adj = Point<int16_t>(0, backgrnd_dim.y() + 1);
-
-		/// Personality (post-BB, may not exist in v83)
-		nl::node personality = UserInfo["personality"];
-		nl::node personality_backgrnd = personality["backgrnd"];
-
-		if (personality_backgrnd.size() > 0)
-		{
-			personality_sprites.emplace_back(personality_backgrnd, bottom_window_adj);
-			personality_sprites.emplace_back(personality["backgrnd2"], bottom_window_adj);
-
-			personality_sprites_enabled[true].emplace_back(personality["backgrnd3"], bottom_window_adj);
-			personality_sprites_enabled[true].emplace_back(personality["backgrnd4"], bottom_window_adj);
-			personality_sprites_enabled[true].emplace_back(personality["center"], bottom_window_adj);
-			personality_sprites_enabled[false].emplace_back(personality["before30level"], bottom_window_adj);
-		}
-
-		personality_dimensions = Texture(personality_backgrnd).get_dimensions();
-
-		/// Collect (post-BB, may not exist in v83)
-		nl::node collect = UserInfo["collect"];
-		nl::node collect_backgrnd = collect["backgrnd"];
-
-		if (collect_backgrnd.size() > 0)
-		{
-			collect_sprites.emplace_back(collect_backgrnd, bottom_window_adj);
-			collect_sprites.emplace_back(collect["backgrnd2"], bottom_window_adj);
-
-			default_medal = collect["icon1"];
-
-			add_button(Buttons::BtArrayGet, collect["BtArrayGet"]);
-			add_button(Buttons::BtArrayName, collect["BtArrayName"]);
-		}
-
-		medal_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "Junior Adventurer");
-		medal_total = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "2");
-
-		collect_dimensions = Texture(collect_backgrnd).get_dimensions();
-
-		/// Damage (post-BB, may not exist in v83)
-		nl::node damage = UserInfo["damage"];
-		nl::node damage_backgrnd = damage["backgrnd"];
-
-		if (damage_backgrnd.size() > 0)
-		{
-			damage_sprites.emplace_back(damage_backgrnd, bottom_window_adj);
-			damage_sprites.emplace_back(damage["backgrnd2"], bottom_window_adj);
-			damage_sprites.emplace_back(damage["backgrnd3"], bottom_window_adj);
-
-			add_button(Buttons::BtFAQ, damage["BtFAQ"]);
-			add_button(Buttons::BtRegist, damage["BtRegist"]);
-		}
-
-		damage_dimensions = Texture(damage_backgrnd).get_dimensions();
-#pragma endregion
-
-#pragma region RightWindow
-		right_window_adj = Point<int16_t>(backgrnd_dim.x(), 0);
-
-		/// Item (post-BB, may not exist in v83)
-		nl::node item = UserInfo["item"];
-		nl::node item_backgrnd = item["backgrnd"];
-
-		if (item_backgrnd.size() > 0)
-		{
-			item_sprites.emplace_back(item_backgrnd, right_window_adj);
-			item_sprites.emplace_back(item["backgrnd2"], right_window_adj);
-		}
-
-		item_dimensions = Texture(item_backgrnd).get_dimensions();
-#pragma endregion
-
 
 		dimension = backgrnd_dim;
+		charinfo_dim = backgrnd_dim;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
 		target_character = Stage::get().get_character(cid).get();
+
+		// Bot inventory labels
+		bot_name_label = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
+		bot_level_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		bot_meso_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+
+		// Load NX sprites for bot inventory (reuse Item inventory assets)
+		nl::node Item = nl::nx::ui["UIWindow2.img"]["Item"];
+		bot_backgrnd = Item["productionBackgrnd"];
+		bot_backgrnd2 = Item["productionBackgrnd2"];
+		bot_backgrnd3 = Item["productionBackgrnd3"];
+		bot_slot_disabled = Item["disabled"];
 
 		CharInfoRequestPacket(cid).dispatch();
 	}
 
 	void UICharInfo::draw(float inter) const
 	{
-		UIElement::draw_sprites(inter);
-
-		for (size_t i = 0; i < Buttons::BtArrayGet; i++)
+		if (bot_tab_active && bot_inventory.is_valid())
 		{
-			auto it = buttons.find(static_cast<uint16_t>(i));
+			draw_bot_inventory(inter);
+
+			auto it = buttons.find(static_cast<uint16_t>(Buttons::BtClose));
 			if (it != buttons.end() && it->second)
 				it->second->draw(position);
+			return;
+		}
+
+		UIElement::draw_sprites(inter);
+
+		for (auto& btn : buttons)
+		{
+			if (btn.first < Buttons::BtBotEquip && btn.second)
+				btn.second->draw(position);
 		}
 
 		/// Main Window
@@ -218,106 +132,30 @@ namespace ms
 		fame.draw(text_pos + Point<int16_t>(0, row_height * 2));
 		guild.draw(text_pos + Point<int16_t>(0, row_height * 3) + Point<int16_t>(0, 1));
 		alliance.draw(text_pos + Point<int16_t>(0, row_height * 4));
-
-		/// Farm
-		Point<int16_t> farm_pos = position + farm_adj;
-
-		if (is_loading)
-			loading.draw(farm_pos, inter);
-
-		farm_name.draw(farm_pos + Point<int16_t>(136, 51));
-		farm_level.draw(farm_level_text, farm_pos + Point<int16_t>(126, 34));
-
-		/// Personality
-		if (personality_enabled)
-		{
-			for (Sprite sprite : personality_sprites)
-				sprite.draw(position, inter);
-
-			bool show_personality = (target_character && target_character->get_level() >= 30);
-
-			for (Sprite sprite : personality_sprites_enabled[show_personality])
-				sprite.draw(position, inter);
-		}
-
-		/// Collect
-		if (collect_enabled)
-		{
-			for (Sprite sprite : collect_sprites)
-				sprite.draw(position, inter);
-
-			for (size_t i = 0; i < 15; i++)
-			{
-				div_t div = std::div(i, 5);
-				default_medal.draw(position + bottom_window_adj + Point<int16_t>(61, 66) + Point<int16_t>(38 * div.rem, 38 * div.quot), inter);
-			}
-
-			for (size_t i = Buttons::BtArrayGet; i < Buttons::BtFAQ; i++)
-			{
-				auto it = buttons.find(static_cast<uint16_t>(i));
-				if (it != buttons.end() && it->second)
-					it->second->draw(position);
-			}
-
-			Point<int16_t> text_pos = Point<int16_t>(121, 8);
-
-			medal_text.draw(position + bottom_window_adj + text_pos);
-			medal_total.draw(position + bottom_window_adj + text_pos + Point<int16_t>(0, 19));
-		}
-
-		/// Damage
-		if (damage_enabled)
-		{
-			for (Sprite sprite : damage_sprites)
-				sprite.draw(position, inter);
-
-			for (size_t i = Buttons::BtFAQ; i <= Buttons::BtRegist; i++)
-			{
-				auto it = buttons.find(static_cast<uint16_t>(i));
-				if (it != buttons.end() && it->second)
-					it->second->draw(position);
-			}
-		}
-
-		/// Item
-		if (item_enabled)
-			for (Sprite sprite : item_sprites)
-				sprite.draw(position, inter);
 	}
 
-	void UICharInfo::update()
-	{
-		if (timestep >= Constants::TIMESTEP * UCHAR_MAX)
-		{
-			is_loading = false;
-		}
-		else
-		{
-			loading.update();
-			timestep += Constants::TIMESTEP;
-		}
-	}
+	void UICharInfo::update() {}
 
 	Button::State UICharInfo::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
 		{
 		case Buttons::BtClose:
-			deactivate();
+			if (bot_tab_active)
+			{
+				bot_tab_active = false;
+				dimension = charinfo_dim;
+				dragarea = Point<int16_t>(dimension.x(), 20);
+			}
+			else
+			{
+				deactivate();
+			}
 			return Button::State::NORMAL;
 		case Buttons::BtFamily:
 		case Buttons::BtParty:
 			break;
-		case Buttons::BtItem:
-			show_right_window(buttonid);
-			return Button::State::NORMAL;
-		case Buttons::BtCollect:
-		case Buttons::BtRide:
-		case Buttons::BtPet:
-			show_bottom_window(buttonid);
-			return Button::State::NORMAL;
 		case Buttons::BtTrad:
-			// Request trade with this player
 			if (target_character)
 			{
 				TradeCreatePacket().dispatch();
@@ -325,9 +163,56 @@ namespace ms
 			}
 			deactivate();
 			return Button::State::NORMAL;
-		case Buttons::BtWish:
-		case Buttons::BtFriend:
-		case Buttons::BtVisit:
+		case Buttons::BtItem:
+		{
+			static FILE* itemdbg = fopen("charinfo_item_btn.txt", "a");
+			if (itemdbg) { fprintf(itemdbg, "BtItem pressed: bot_valid=%d char_id=%d\n", bot_inventory.is_valid(), bot_inventory.char_id); fflush(itemdbg); }
+
+			if (bot_inventory.is_valid())
+			{
+				bot_tab_active = true;
+				dimension = bot_backgrnd.get_dimensions();
+				dragarea = Point<int16_t>(dimension.x(), 20);
+				load_bot_icons();
+			}
+			return Button::State::NORMAL;
+		}
+		case Buttons::BtRide:
+		case Buttons::BtPet:
+			return Button::State::NORMAL;
+		case Buttons::BtPopUp:
+			if (target_character)
+				GiveFamePacket(target_character->get_oid(), true).dispatch();
+			return Button::State::NORMAL;
+		case Buttons::BtPopDown:
+			if (target_character)
+				GiveFamePacket(target_character->get_oid(), false).dispatch();
+			return Button::State::NORMAL;
+		case Buttons::BtBotEquip:
+			bot_sub_tab = 0;
+			bot_scroll_offset = 0;
+			load_bot_icons();
+			return Button::State::NORMAL;
+		case Buttons::BtBotUse:
+			bot_sub_tab = 1;
+			bot_scroll_offset = 0;
+			load_bot_icons();
+			return Button::State::NORMAL;
+		case Buttons::BtBotSetup:
+			bot_sub_tab = 2;
+			bot_scroll_offset = 0;
+			load_bot_icons();
+			return Button::State::NORMAL;
+		case Buttons::BtBotEtc:
+			bot_sub_tab = 3;
+			bot_scroll_offset = 0;
+			load_bot_icons();
+			return Button::State::NORMAL;
+		case Buttons::BtBotEquipped:
+			bot_sub_tab = 4;
+			bot_scroll_offset = 0;
+			load_bot_icons();
+			return Button::State::NORMAL;
 		default:
 			break;
 		}
@@ -338,47 +223,24 @@ namespace ms
 	bool UICharInfo::is_in_range(Point<int16_t> cursorpos) const
 	{
 		Rectangle<int16_t> bounds = Rectangle<int16_t>(position, position + dimension);
-
-		Rectangle<int16_t> farm_bounds = Rectangle<int16_t>(position, position + farm_dim);
-		farm_bounds.shift(farm_adj);
-
-		Rectangle<int16_t> bottom_bounds = Rectangle<int16_t>(Point<int16_t>(0, 0), Point<int16_t>(0, 0));
-		Rectangle<int16_t> right_bounds = Rectangle<int16_t>(Point<int16_t>(0, 0), Point<int16_t>(0, 0));
-
-		int16_t cur_x = cursorpos.x();
-		int16_t cur_y = cursorpos.y();
-
-		if (personality_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + personality_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (collect_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + collect_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (damage_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + damage_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (item_enabled)
-		{
-			right_bounds = Rectangle<int16_t>(position, position + item_dimensions);
-			right_bounds.shift(right_window_adj);
-		}
-
-		return bounds.contains(cursorpos) || farm_bounds.contains(cursorpos) || bottom_bounds.contains(cursorpos) || right_bounds.contains(cursorpos);
+		return bounds.contains(cursorpos);
 	}
 
 	void UICharInfo::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-			deactivate();
+		{
+			if (bot_tab_active)
+			{
+				bot_tab_active = false;
+				dimension = charinfo_dim;
+				dragarea = Point<int16_t>(dimension.x(), 20);
+			}
+			else
+			{
+				deactivate();
+			}
+		}
 	}
 
 	UIElement::Type UICharInfo::get_type() const
@@ -398,7 +260,9 @@ namespace ms
 		if (character_id == player_id)
 		{
 			disable_button(Buttons::BtParty);
-			disable_button(Buttons::BtFriend);
+			disable_button(Buttons::BtTrad);
+			disable_button(Buttons::BtPopUp);
+			disable_button(Buttons::BtPopDown);
 		}
 
 		Job character_job = Job(job_id);
@@ -412,45 +276,272 @@ namespace ms
 		guild.change_text((g == "" ? "-" : g));
 		alliance.change_text(a);
 
-		// Enable pet button if the character has an active pet
-		if (target_character && target_character->has_pet())
-			buttons[Buttons::BtPet]->set_state(Button::State::NORMAL);
-		else
-			buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
-
-		// Enable mount button if the character has a taming mob equipped
-		if (target_character && target_character->has_mount())
-			buttons[Buttons::BtRide]->set_state(Button::State::NORMAL);
-		else
-			buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
-
-		farm_name.change_text("");
-		farm_level_text = "1";
-	}
-
-	void UICharInfo::show_bottom_window(uint16_t buttonid)
-	{
-		personality_enabled = false;
-		collect_enabled = false;
-		damage_enabled = false;
-
-		switch (buttonid)
+		if (buttons.count(Buttons::BtPet))
 		{
-		case Buttons::BtCollect:
-			collect_enabled = true;
-			break;
+			if (target_character && target_character->has_pet())
+				buttons[Buttons::BtPet]->set_state(Button::State::NORMAL);
+			else
+				buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
+		}
+
+		if (buttons.count(Buttons::BtRide))
+		{
+			if (target_character && target_character->has_mount())
+				buttons[Buttons::BtRide]->set_state(Button::State::NORMAL);
+			else
+				buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
 		}
 	}
 
-	void UICharInfo::show_right_window(uint16_t buttonid)
+	int32_t UICharInfo::get_char_id() const
 	{
-		item_enabled = false;
+		return target_char_id;
+	}
 
-		switch (buttonid)
+	void UICharInfo::set_bot_inventory(BotInventoryData data)
+	{
+		bot_inventory = std::move(data);
+		bot_scroll_offset = 0;
+
+		// Create tab buttons if they don't exist
+		if (!buttons.count(Buttons::BtBotEquip))
 		{
-		case Buttons::BtItem:
-			item_enabled = true;
-			break;
+			nl::node Item = nl::nx::ui["UIWindow2.img"]["Item"];
+			nl::node Tab = Item["Tab"];
+			nl::node taben = Tab["enabled"];
+			nl::node tabdis = Tab["disabled"];
+
+			buttons[Buttons::BtBotEquip] = std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"]);
+			buttons[Buttons::BtBotUse] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"]);
+			buttons[Buttons::BtBotSetup] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"]);
+			buttons[Buttons::BtBotEtc] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"]);
+			buttons[Buttons::BtBotEquipped] = std::make_unique<TwoSpriteButton>(tabdis["4"], taben["4"]);
+		}
+
+		bot_sub_tab = 4;
+		bot_tab_active = true;
+		dimension = bot_backgrnd.get_dimensions();
+		dragarea = Point<int16_t>(dimension.x(), 20);
+
+		bot_name_label.change_text(bot_inventory.name);
+		bot_level_label.change_text("Lv. " + std::to_string(bot_inventory.level));
+
+		std::string meso_str = std::to_string(bot_inventory.meso);
+		string_format::split_number(meso_str);
+		bot_meso_label.change_text("Meso: " + meso_str);
+
+		load_bot_icons();
+	}
+
+	void UICharInfo::draw_bot_inventory(float inter) const
+	{
+		bot_backgrnd.draw(position);
+		bot_backgrnd2.draw(position);
+		bot_backgrnd3.draw(position);
+
+		for (uint16_t i = Buttons::BtBotEquip; i <= Buttons::BtBotEquipped; i++)
+		{
+			auto it = buttons.find(i);
+			if (it != buttons.end() && it->second)
+				it->second->draw(position);
+		}
+
+		const auto& items = bot_inventory.get_tab(bot_sub_tab);
+		draw_bot_item_grid(items, BOT_GRID_Y - bot_scroll_offset);
+
+		bot_name_label.draw(position + Point<int16_t>(10, 262));
+		bot_level_label.draw(position + Point<int16_t>(80, 262));
+		bot_meso_label.draw(position + Point<int16_t>(10, 278));
+	}
+
+	void UICharInfo::draw_bot_item_grid(const std::vector<BotItem>& items, int16_t start_y) const
+	{
+		for (size_t i = 0; i < BOT_MAX_SLOTS; i++)
+		{
+			Point<int16_t> slotpos = position + get_bot_slotpos(static_cast<int16_t>(i));
+
+			if (i >= items.size())
+			{
+				bot_slot_disabled.draw(slotpos);
+			}
+			else
+			{
+				auto it = bot_icons.find(static_cast<int16_t>(i));
+				if (it != bot_icons.end() && it->second)
+					it->second->draw(slotpos);
+				else
+					bot_slot_disabled.draw(slotpos);
+			}
 		}
 	}
+
+	Cursor::State UICharInfo::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
+
+		if (dragged)
+			return dstate;
+
+		if (bot_tab_active && bot_inventory.is_valid())
+		{
+			Point<int16_t> cursor_rel = cursorpos - position;
+			int16_t slot_index = bot_slot_by_position(cursor_rel);
+			Icon* icon = get_bot_icon(slot_index);
+
+			if (icon)
+			{
+				if (clicked)
+				{
+					Point<int16_t> slotpos = get_bot_slotpos(slot_index);
+					icon->start_drag(cursor_rel - slotpos);
+					UI::get().drag_icon(icon);
+
+					return Cursor::State::GRABBING;
+				}
+				else
+				{
+					const auto& items = bot_inventory.get_tab(bot_sub_tab);
+					if (slot_index < static_cast<int16_t>(items.size()))
+						UI::get().show_item(Tooltip::Parent::CHARINFO, items[slot_index].item_id);
+
+					return Cursor::State::CANGRAB;
+				}
+			}
+		}
+
+		return dstate;
+	}
+
+	void UICharInfo::send_scroll(double yoffset)
+	{
+		if (bot_tab_active && bot_inventory.is_valid())
+		{
+			const auto& items = bot_inventory.get_tab(bot_sub_tab);
+			int rows = (static_cast<int>(items.size()) + BOT_COLS - 1) / BOT_COLS;
+			int16_t max_scroll = std::max(0, rows * BOT_ICON_H - (dimension.y() - BOT_GRID_Y - 10));
+
+			bot_scroll_offset -= static_cast<int16_t>(yoffset * BOT_ICON_H);
+
+			if (bot_scroll_offset < 0)
+				bot_scroll_offset = 0;
+			else if (bot_scroll_offset > max_scroll)
+				bot_scroll_offset = max_scroll;
+		}
+	}
+
+	bool UICharInfo::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		if (!bot_tab_active || !bot_inventory.is_valid())
+			return false;
+
+		InventoryType::Id src_tab = icon.get_source_tab();
+		int16_t src_slot = icon.get_source_slot();
+
+		if (src_tab == InventoryType::Id::NONE || src_slot < 0)
+			return false;
+
+		int8_t inv_type = static_cast<int8_t>(src_tab);
+		BotInvGivePacket(bot_inventory.char_id, inv_type, src_slot).dispatch();
+
+		return true;
+	}
+
+	void UICharInfo::load_bot_icons()
+	{
+		bot_icons.clear();
+		const auto& items = bot_inventory.get_tab(bot_sub_tab);
+		int8_t inv_type = bot_inventory.get_inv_type(bot_sub_tab);
+
+		for (size_t i = 0; i < items.size(); i++)
+		{
+			const auto& bi = items[i];
+			int32_t item_prefix = bi.item_id / 10000;
+			bool is_card = (item_prefix == 238 || item_prefix == 239);
+			const Texture& texture = ItemData::get(bi.item_id).get_icon(is_card);
+			int16_t count = (bot_sub_tab == 0 || bot_sub_tab == 4) ? -1 : bi.count;
+
+			bot_icons[static_cast<int16_t>(i)] = std::make_unique<Icon>(
+				std::make_unique<BotItemIcon>(bot_inventory.char_id, inv_type, bi.slot, bi.item_id, bi.count, bot_sub_tab),
+				texture, count
+			);
+		}
+	}
+
+	Point<int16_t> UICharInfo::get_bot_slotpos(int16_t slot_index) const
+	{
+		div_t d = std::div(slot_index, BOT_COLS);
+		int16_t start_y = BOT_GRID_Y - bot_scroll_offset;
+		return Point<int16_t>(BOT_GRID_X + BOT_ICON_W * d.rem, start_y + BOT_ICON_H * d.quot);
+	}
+
+	int16_t UICharInfo::bot_slot_by_position(Point<int16_t> cursor_rel) const
+	{
+		int16_t start_y = BOT_GRID_Y - bot_scroll_offset;
+		int16_t rx = cursor_rel.x() - BOT_GRID_X;
+		int16_t ry = cursor_rel.y() - start_y;
+
+		if (rx < 0 || ry < 0)
+			return -1;
+
+		int16_t col = rx / BOT_ICON_W;
+		int16_t row = ry / BOT_ICON_H;
+
+		if (col >= BOT_COLS || col < 0)
+			return -1;
+
+		return row * BOT_COLS + col;
+	}
+
+	Icon* UICharInfo::get_bot_icon(int16_t slot_index)
+	{
+		if (slot_index < 0)
+			return nullptr;
+
+		auto it = bot_icons.find(slot_index);
+		if (it != bot_icons.end())
+			return it->second.get();
+
+		return nullptr;
+	}
+
+	void UICharInfo::remove_cursor()
+	{
+		UIDragElement::remove_cursor();
+		UI::get().clear_tooltip(Tooltip::Parent::CHARINFO);
+	}
+
+	// BotItemIcon implementation
+	UICharInfo::BotItemIcon::BotItemIcon(int32_t bid, int8_t it, int16_t s, int32_t iid, int16_t c, int8_t st)
+		: bot_id(bid), inv_type(it), slot(s), item_id(iid), count(c), sub_tab(st) {}
+
+	void UICharInfo::BotItemIcon::drop_on_stage() const
+	{
+		if (sub_tab == 4)
+		{
+			BotInvEquipPacket(bot_id, slot, static_cast<int16_t>(-slot)).dispatch();
+		}
+		else
+		{
+			BotInvTakePacket(bot_id, inv_type, slot).dispatch();
+		}
+	}
+
+	void UICharInfo::BotItemIcon::drop_on_equips(EquipSlot::Id) const {}
+
+	bool UICharInfo::BotItemIcon::drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const
+	{
+		if (sub_tab == 4)
+		{
+			BotInvEquipPacket(bot_id, slot, static_cast<int16_t>(-slot)).dispatch();
+		}
+		else
+		{
+			BotInvTakePacket(bot_id, inv_type, slot).dispatch();
+		}
+		return true;
+	}
+
+	void UICharInfo::BotItemIcon::drop_on_bindings(Point<int16_t>, bool) const {}
+	void UICharInfo::BotItemIcon::set_count(int16_t c) { count = c; }
+	Icon::IconType UICharInfo::BotItemIcon::get_type() { return Icon::IconType::ITEM; }
 }

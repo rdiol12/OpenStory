@@ -20,10 +20,9 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
-#include "UIClock.h"
 
+#include "../../Constants.h"
 #include "../../Data/ItemData.h"
-#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/GameplayPackets.h"
 
 #ifdef USE_NX
@@ -37,6 +36,7 @@ namespace ms
 		offset = 0;
 		selected_slot = 0;
 		refresh_counter = 0;
+		countdown_accumulator = 0;
 
 		nl::node main = nl::nx::ui["UIWindow2.img"]["EventList"]["main"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
@@ -79,6 +79,38 @@ namespace ms
 
 		empty_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::GRAY, "Requesting events...");
 
+		// Load TimeEvent timer widget from UIWindow4.img/TimeEvent
+		nl::node te = nl::nx::ui["UIWindow4.img"]["TimeEvent"];
+
+		timer_bg = te["backgrnd"];
+		timer_bg2 = te["backgrnd2"];
+		timer_bg3 = te["backgrnd3"];
+
+		// Gauge
+		nl::node gauge = te["Guage"];
+		timer_gauge_bg = gauge["backgrnd"];
+		timer_gauge_cover = gauge["cover"];
+		timer_gauge_fill = gauge["1"]["0"];
+		gauge_width = Texture(gauge["backgrnd"]).get_dimensions().x();
+
+		// Digit sprites 0-9 (~9x12)
+		nl::node numbers = te["Number"];
+		for (int i = 0; i < 10; i++)
+			timer_digit[i] = numbers[std::to_string(i)];
+
+		timer_digit_width = timer_digit[0].get_dimensions().x();
+
+		// State overlays
+		timer_state_timer = te["State"]["Timer"]["0"];
+		timer_state_end = te["State"]["End"]["0"];
+		timer_state_complete = te["State"]["Complete"]["0"];
+
+		// Icon frame
+		timer_icon_frame = te["icon"]["frame"];
+
+		// Effect animation
+		timer_effect = te["Effect"];
+
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
@@ -95,10 +127,6 @@ namespace ms
 			return;
 		}
 
-		// Panel is 351 wide, slot is 316 wide, centered: (351-316)/2 = 17
-		// Slot area starts below header at y ~64
-		// 3 slots with 125px spacing fits in the 458px tall panel
-
 		for (int16_t i = 0; i < MAX_VISIBLE; i++)
 		{
 			int16_t slot = i + offset;
@@ -109,7 +137,6 @@ namespace ms
 			const EventData& ev = events[slot];
 			int16_t sy = SLOT_START_Y + SLOT_SPACING * i;
 
-			// Slot background at centered x position
 			auto slot_pos = position + Point<int16_t>(SLOT_X, sy);
 
 			if (slot == selected_slot)
@@ -117,31 +144,57 @@ namespace ms
 			else
 				slot_normal.draw(slot_pos);
 
-			// Title text inside the slot
-			event_title[i].draw(slot_pos + Point<int16_t>(8, 8));
+			// Event type icon (19x19)
+			if (ev.type >= 0 && ev.type < 4)
+				event_icons[ev.type].draw(slot_pos + Point<int16_t>(6, 6));
 
-			// Description below title
-			event_desc[i].draw(slot_pos + Point<int16_t>(8, 28));
+			// Title text (next to icon)
+			event_title[i].draw(slot_pos + Point<int16_t>(28, 6));
 
-			// Event time status text
-			event_time[i].draw(slot_pos + Point<int16_t>(8, 48));
-
-			// Status indicator inside the slot, top-right area
-			// Slot is 316 wide, button is 57 wide -> 316-57-5 = 254
+			// Status indicator top-right (inside slot, 57x32)
+			int16_t btn_x = 316 - 57 - 4;
 			if (ev.seconds_remaining > 0)
-				btn_ing.draw(slot_pos + Point<int16_t>(254, 6));
+				btn_ing.draw(slot_pos + Point<int16_t>(btn_x, 4));
 			else if (ev.seconds_remaining == 0)
-				btn_clear.draw(slot_pos + Point<int16_t>(254, 6));
+				btn_clear.draw(slot_pos + Point<int16_t>(btn_x, 4));
 			else
-				btn_will.draw(slot_pos + Point<int16_t>(254, 6));
+				btn_will.draw(slot_pos + Point<int16_t>(btn_x, 4));
 
-			// Item reward slots at bottom of slot area
+			// Description
+			event_desc[i].draw(slot_pos + Point<int16_t>(8, 26));
+
+			// Compact inline gauge + time text
+			if (ev.seconds_remaining > 0)
+			{
+				auto gauge_pos = slot_pos + Point<int16_t>(8, 44);
+				timer_gauge_bg.draw(gauge_pos);
+
+				if (ev.total_seconds > 0)
+				{
+					float ratio = static_cast<float>(ev.seconds_remaining) / static_cast<float>(ev.total_seconds);
+					int16_t fill_width = static_cast<int16_t>(gauge_width * ratio);
+
+					for (int16_t x = 0; x < fill_width; x++)
+						timer_gauge_fill.draw(gauge_pos + Point<int16_t>(x, 0));
+				}
+
+				timer_gauge_cover.draw(gauge_pos);
+
+				// Time digits right of gauge
+				event_time[i].draw(slot_pos + Point<int16_t>(gauge_width + 14, 44));
+			}
+			else
+			{
+				event_time[i].draw(slot_pos + Point<int16_t>(8, 44));
+			}
+
+			// Item reward slots (compact, within slot bottom area)
 			if (ev.has_item_rewards && !ev.rewards.empty())
 			{
 				for (size_t f = 0; f < ev.rewards.size() && f < 5; f++)
 				{
 					int16_t rx = 8 + 38 * static_cast<int16_t>(f);
-					int16_t ry = 60;
+					int16_t ry = 58;
 
 					slot_frame.draw(slot_pos + Point<int16_t>(rx, ry));
 
@@ -150,6 +203,63 @@ namespace ms
 					icon.draw(slot_pos + Point<int16_t>(rx + 2, ry + 2));
 				}
 			}
+		}
+	}
+
+	void UIEvent::draw_timer(Point<int16_t> pos, int32_t seconds_remaining, int32_t total_seconds) const
+	{
+		if (seconds_remaining <= 0)
+		{
+			// Draw "End" state
+			timer_state_end.draw(pos);
+			return;
+		}
+
+		// Draw "Timer" state label
+		timer_state_timer.draw(pos);
+
+		// Draw gauge bar below the state label
+		auto gauge_pos = pos + Point<int16_t>(0, 20);
+		timer_gauge_bg.draw(gauge_pos);
+
+		// Fill the gauge based on remaining time
+		if (total_seconds > 0)
+		{
+			float ratio = static_cast<float>(seconds_remaining) / static_cast<float>(total_seconds);
+			int16_t fill_width = static_cast<int16_t>(gauge_width * ratio);
+
+			// Draw fill segments
+			for (int16_t x = 0; x < fill_width; x++)
+				timer_gauge_fill.draw(gauge_pos + Point<int16_t>(x, 0));
+		}
+
+		timer_gauge_cover.draw(gauge_pos);
+
+		// Draw countdown digits to the right of the gauge: MM:SS
+		int32_t mins = seconds_remaining / 60;
+		int32_t secs = seconds_remaining % 60;
+
+		auto digit_pos = pos + Point<int16_t>(gauge_width + 5, 22);
+		draw_timer_number(mins, 2, digit_pos);
+		// Simple colon using two dots would need a sprite; just use spacing
+		digit_pos = digit_pos + Point<int16_t>(2 * timer_digit_width + 2, 0);
+		draw_timer_number(secs, 2, digit_pos);
+	}
+
+	void UIEvent::draw_timer_number(int value, int digits, Point<int16_t> pos) const
+	{
+		int divisor = 1;
+		for (int i = 1; i < digits; i++)
+			divisor *= 10;
+
+		int16_t x = pos.x();
+
+		for (int i = 0; i < digits; i++)
+		{
+			int d = (value / divisor) % 10;
+			timer_digit[d].draw(DrawArgument(Point<int16_t>(x, pos.y())));
+			x += timer_digit_width;
+			divisor /= 10;
 		}
 	}
 
@@ -163,6 +273,22 @@ namespace ms
 			refresh_counter = 0;
 			request_events();
 		}
+
+		// Local countdown decrement
+		countdown_accumulator += Constants::TIMESTEP;
+		if (countdown_accumulator >= 1000)
+		{
+			countdown_accumulator -= 1000;
+
+			for (auto& ev : events)
+			{
+				if (ev.seconds_remaining > 0)
+					ev.seconds_remaining--;
+			}
+		}
+
+		// Update effect animation
+		timer_effect.update();
 
 		// Update displayed text
 		for (int16_t i = 0; i < MAX_VISIBLE; i++)
@@ -189,9 +315,16 @@ namespace ms
 			event_desc[i].change_text(desc);
 
 			if (ev.seconds_remaining > 0)
-				event_time[i].change_text("In Progress");
+			{
+				int32_t mins = ev.seconds_remaining / 60;
+				int32_t secs = ev.seconds_remaining % 60;
+				std::string time_str = (mins < 10 ? "0" : "") + std::to_string(mins) + ":" + (secs < 10 ? "0" : "") + std::to_string(secs);
+				event_time[i].change_text(time_str);
+			}
 			else
+			{
 				event_time[i].change_text("Ended");
+			}
 		}
 
 		if (events.empty())
@@ -200,28 +333,23 @@ namespace ms
 
 	void UIEvent::set_events(std::vector<EventData> event_list)
 	{
+		// Set total_seconds for gauge on first receive
+		for (auto& ev : event_list)
+		{
+			if (ev.total_seconds <= 0)
+				ev.total_seconds = ev.seconds_remaining;
+		}
+
 		events = std::move(event_list);
 		offset = 0;
 		selected_slot = 0;
-
-		// Set UIClock countdown to the first active event's time
-		for (const auto& ev : events)
-		{
-			if (ev.seconds_remaining > 0)
-			{
-				Stage::get().set_countdown(ev.seconds_remaining);
-				UI::get().emplace<UIClock>();
-				break;
-			}
-		}
+		countdown_accumulator = 0;
 	}
 
 	void UIEvent::request_events()
 	{
 		RequestEventInfoPacket().dispatch();
 	}
-
-
 
 	void UIEvent::remove_cursor()
 	{
@@ -246,7 +374,7 @@ namespace ms
 				const EventData& ev = events[actual_slot];
 				if (ev.has_item_rewards && !ev.rewards.empty())
 				{
-					int16_t ry = SLOT_START_Y + SLOT_SPACING * slot_idx + 60;
+					int16_t ry = SLOT_START_Y + SLOT_SPACING * slot_idx + 58;
 
 					if (cursoroffset.y() >= ry && cursoroffset.y() <= ry + 35)
 					{

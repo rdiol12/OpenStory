@@ -30,6 +30,8 @@
 #include "../../IO/UITypes/UIRaceSelect.h"
 #include "../../IO/UITypes/UITermsOfService.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
+#include "../../Configuration.h"
+#include "../../Net/Session.h"
 
 namespace ms
 {
@@ -257,5 +259,57 @@ namespace ms
 					worldselect->add_recommended_world(world);
 			}
 		}
+	}
+
+	void CheckSpwResultHandler::handle(InPacket& recv) const
+	{
+		int reason = recv.read_byte();
+
+		if (reason == 0)
+			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::INCORRECT_PIC);
+		else
+			// Unknown SPW reason
+
+		UI::get().enable();
+	}
+
+	void RelogResponseHandler::handle(InPacket& recv) const
+	{
+		// v83: byte success (1 = ok to relog back to login screen)
+		if (!recv.available())
+			return;
+
+		int8_t success = recv.read_byte();
+
+		if (success == 1)
+		{
+			// Reconnect to the login server
+			Session::get().reconnect();
+		}
+	}
+
+	void LastConnectedWorldHandler::handle(InPacket& recv) const
+	{
+		// Last connected world — auto-select this world in world select UI
+		if (!recv.available())
+			return;
+
+		int32_t worldid = recv.read_int();
+
+		auto worldselect = UI::get().get_element<UIWorldSelect>();
+
+		if (worldselect)
+		{
+			// Store the last connected world so auto-select works
+			Configuration::get().set_worldid(static_cast<uint8_t>(worldid));
+		}
+	}
+
+	void SetGenderHandler::handle(InPacket& recv) const
+	{
+		// Gender confirmation from server after gender selection
+		// Just consume — gender is already set in CharStats from login
+		if (recv.available())
+			recv.read_byte(); // gender (0=male, 1=female)
 	}
 }

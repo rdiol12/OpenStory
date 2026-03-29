@@ -17,31 +17,47 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../OutPacket.h"
+#include "../PacketHandler.h"
 
 namespace ms
 {
-	// Packet to request character info
-	// Opcode: CHAR_INFO_REQUEST(97)
-	class CharInfoRequestPacket : public OutPacket
+	class FieldEffectHandler : public PacketHandler
 	{
-	public:
-		CharInfoRequestPacket(int32_t character_id) : OutPacket(OutPacket::Opcode::CHAR_INFO_REQUEST)
-		{
-			write_random();
-			write_int(character_id);
-		}
+		void handle(InPacket& recv) const override;
 	};
 
-	// Packet to give fame (+1) or defame (-1) a player
-	// Opcode: GIVE_FAME(95)
-	class GiveFamePacket : public OutPacket
+	class ForcedStatSetHandler : public PacketHandler
 	{
-	public:
-		GiveFamePacket(int32_t character_id, bool raise) : OutPacket(OutPacket::Opcode::GIVE_FAME)
-		{
-			write_int(character_id);
-			write_byte(raise ? 1 : 0);
-		}
+		void handle(InPacket& recv) const override;
+	};
+
+	class SetTractionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class FieldObstacleOnOffHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ForcedMapEquipHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class SetBackEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ContiMoveHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class ContiStateHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
 	};
 }

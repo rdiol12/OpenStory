@@ -81,10 +81,12 @@ namespace ms
 		buttons[Buttons::BtHelp] = std::make_unique<MapleButton>(CSStatus["BtHelp"], Point<int16_t>(997, 4));
 		buttons[Buttons::BtCoupon] = std::make_unique<MapleButton>(CSStatus["BtCoupon"], Point<int16_t>(950, 4));
 
-		Charset tab;
+		Player& player = Stage::get().get_player();
+		std::string pname = player.get_stats().get_name();
+		std::string pjob = player.get_stats().get_jobname();
 
-		job_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA, "Illium");
-		name_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, "ShomeiZekkou");
+		job_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA, pjob);
+		name_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, pname);
 
 		promotion_pos = Point<int16_t>(138, 40);
 		sprites.emplace_back(CSPromotionBanner["shadow"], promotion_pos);

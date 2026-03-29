@@ -153,7 +153,10 @@ namespace ms
 			REQUEST_EVENT_INFO = 241, // 0xF1
 
 			/// Wedding
-			WEDDING_ACTION = 232
+			WEDDING_ACTION = 232,
+
+			/// Bot Inventory (custom)
+			BOT_INV_ACTION = 0x168
 		};
 
 	protected:

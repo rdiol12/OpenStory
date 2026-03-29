@@ -119,4 +119,14 @@ namespace ms
 	{
 		return dragged;
 	}
+
+	int16_t Icon::get_source_slot() const
+	{
+		return type->get_source_slot();
+	}
+
+	InventoryType::Id Icon::get_source_tab() const
+	{
+		return type->get_source_tab();
+	}
 }

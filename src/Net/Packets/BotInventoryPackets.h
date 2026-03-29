@@ -21,27 +21,48 @@
 
 namespace ms
 {
-	// Packet to request character info
-	// Opcode: CHAR_INFO_REQUEST(97)
-	class CharInfoRequestPacket : public OutPacket
+	// TAKE: GM takes item from bot inventory to their own
+	// Opcode: BOT_INV_ACTION(0x168)
+	class BotInvTakePacket : public OutPacket
 	{
 	public:
-		CharInfoRequestPacket(int32_t character_id) : OutPacket(OutPacket::Opcode::CHAR_INFO_REQUEST)
+		BotInvTakePacket(int32_t bot_id, int8_t inv_type, int16_t slot)
+			: OutPacket(OutPacket::Opcode::BOT_INV_ACTION)
 		{
-			write_random();
-			write_int(character_id);
+			write_byte(0); // action = TAKE
+			write_int(bot_id);
+			write_byte(inv_type);
+			write_short(slot);
 		}
 	};
 
-	// Packet to give fame (+1) or defame (-1) a player
-	// Opcode: GIVE_FAME(95)
-	class GiveFamePacket : public OutPacket
+	// GIVE: GM gives item from their inventory to bot
+	// Opcode: BOT_INV_ACTION(0x168)
+	class BotInvGivePacket : public OutPacket
 	{
 	public:
-		GiveFamePacket(int32_t character_id, bool raise) : OutPacket(OutPacket::Opcode::GIVE_FAME)
+		BotInvGivePacket(int32_t bot_id, int8_t src_inv_type, int16_t src_slot)
+			: OutPacket(OutPacket::Opcode::BOT_INV_ACTION)
 		{
-			write_int(character_id);
-			write_byte(raise ? 1 : 0);
+			write_byte(1); // action = GIVE
+			write_int(bot_id);
+			write_byte(src_inv_type);
+			write_short(src_slot);
+		}
+	};
+
+	// EQUIP: Move equip between bot's equip inv and equipped slots
+	// Opcode: BOT_INV_ACTION(0x168)
+	class BotInvEquipPacket : public OutPacket
+	{
+	public:
+		BotInvEquipPacket(int32_t bot_id, int16_t src_slot, int16_t dst_slot)
+			: OutPacket(OutPacket::Opcode::BOT_INV_ACTION)
+		{
+			write_byte(2); // action = EQUIP
+			write_int(bot_id);
+			write_short(src_slot);
+			write_short(dst_slot);
 		}
 	};
 }

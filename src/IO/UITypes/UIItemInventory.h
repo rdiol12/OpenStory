@@ -80,6 +80,8 @@ namespace ms
 			void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
 			void set_count(int16_t count) override;
 			Icon::IconType get_type() override;
+			int16_t get_source_slot() const override { return source; }
+			InventoryType::Id get_source_tab() const override { return sourcetab; }
 
 		private:
 			InventoryType::Id sourcetab;

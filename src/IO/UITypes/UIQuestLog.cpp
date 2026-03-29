@@ -1523,7 +1523,20 @@ namespace ms
 			iconQM1_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
 		}
 
-		// TimeQuest elements are only drawn when a timed quest is active (not implemented yet)
+		// TimeQuest alarm clock shown when a countdown is active
+		if (Stage::get().is_countdown_active())
+		{
+			int32_t remaining = Stage::get().get_countdown_seconds();
+			int32_t mins = remaining / 60;
+			int32_t secs = remaining % 60;
+
+			std::string time_str = (mins < 10 ? "0" : "") + std::to_string(mins) + ":" + (secs < 10 ? "0" : "") + std::to_string(secs);
+
+			Point<int16_t> clock_pos = position + Point<int16_t>(dimension.x() - 80, 38);
+			time_alarm_clock.draw(DrawArgument(clock_pos), alpha);
+			time_text.change_text(time_str);
+			time_text.draw(clock_pos + Point<int16_t>(22, 4));
+		}
 
 		// === Detail panel (right of list) ===
 		if (show_detail && selected_entry >= 0)
@@ -1744,32 +1757,39 @@ namespace ms
 				detail_quest_desc.draw(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset)));
 
 			// === Timed quest indicator ===
-			if (detail_time_limit > 0)
+			// Show live countdown if active, otherwise static time limit from quest data
 			{
-				int16_t desc_h = detail_quest_desc.height();
-				if (desc_h <= 0) desc_h = 16;
-				y_offset += desc_h + 8;
+				bool has_live = Stage::get().is_countdown_active();
+				int32_t show_time = has_live ? Stage::get().get_countdown_seconds() : detail_time_limit;
 
-				if (IN_VIEW(y_offset))
-					sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
-				y_offset += 6;
-
-				if (IN_VIEW(y_offset))
+				if (show_time > 0)
 				{
-					time_alarm_clock.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))), alpha);
+					int16_t desc_h = detail_quest_desc.height();
+					if (desc_h <= 0) desc_h = 16;
+					y_offset += desc_h + 8;
 
-					int32_t minutes = detail_time_limit / 60;
-					int32_t seconds = detail_time_limit % 60;
-					std::string time_str = "Time Limit: " + std::to_string(minutes) + ":" +
-						(seconds < 10 ? "0" : "") + std::to_string(seconds);
-					time_text.change_text(time_str);
-					time_text.draw(detail_pos + Point<int16_t>(35, DETAIL_Y(y_offset) + 2));
+					if (IN_VIEW(y_offset))
+						sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
+					y_offset += 6;
+
+					if (IN_VIEW(y_offset))
+					{
+						time_alarm_clock.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))), alpha);
+
+						int32_t minutes = show_time / 60;
+						int32_t seconds = show_time % 60;
+						std::string label = has_live ? "" : "Time Limit: ";
+						std::string time_str = label + (minutes < 10 ? "0" : "") + std::to_string(minutes) + ":" +
+							(seconds < 10 ? "0" : "") + std::to_string(seconds);
+						time_text.change_text(time_str);
+						time_text.draw(detail_pos + Point<int16_t>(35, DETAIL_Y(y_offset) + 2));
+					}
+
+					y_offset += 20;
+					if (IN_VIEW(y_offset))
+						time_bar.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))), alpha);
+					y_offset += 16;
 				}
-
-				y_offset += 20;
-				if (IN_VIEW(y_offset))
-					time_bar.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))), alpha);
-				y_offset += 16;
 			}
 
 			if (detail_time_limit <= 0)

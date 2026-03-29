@@ -26,4 +26,10 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Handler for fame/defame response
+	class FameResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

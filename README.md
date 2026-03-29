@@ -43,6 +43,10 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
+- **TestingHandlers refactor**: Split the 1200+ line catch-all TestingHandlers into proper domain files: WeatherHandlers, ClockHandlers, FieldHandlers, UIControlHandlers, QuestHandlers, MiscHandlers. Moved login handlers to LoginHandlers, fame to PlayerInteractionHandlers, cash shop handlers to CashShopHandlers, hammer/vega to InventoryHandlers.
+- **Fame/Defame fix**: Fixed fame buttons sending character ID instead of map object OID (server silently dropped the packet). Also fixed FameResponseHandler reading fame value as int instead of short.
+- **Bot Inventory**: View another player's inventory from the character info window (custom feature).
+- **UIClock NX sprites**: Clock UI now uses NX-based sprites instead of programmatic drawing.
 - **Event System (Custom - WIP)**: Live event list UI using NX EventList sprites. Server sends events via EVENT_INFO (0xC3) packet, client requests via REQUEST_EVENT_INFO (0xF1). Shows event name, description, status (In Progress/Ended), item rewards with tooltips, and activates UIClock countdown for the first active event. *Custom protocol -- not supported by Cosmic server out of the box.*
 - **UIOptionMenu overhaul**: Full settings panel with working sliders for BGM/SFX volume, HP/MP warning thresholds, graphics/effects quality. Slider percentage labels displayed. Menu always centered on screen.
 - **HP/MP Warning overlays**: Screen flashes red when HP drops below threshold, blue for MP. Configurable via UIOptionMenu sliders.

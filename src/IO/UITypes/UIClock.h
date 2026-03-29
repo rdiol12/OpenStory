@@ -19,8 +19,7 @@
 
 #include "../UIElement.h"
 
-#include "../../Graphics/Geometry.h"
-#include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
 
 namespace ms
 {
@@ -40,16 +39,19 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 	private:
-		void update_text();
+		void draw_number(int value, int digits, Point<int16_t> pos) const;
 
-		Text clock_text;
-		Text clock_shadow;
-		ColorBox background;
+		Texture clock_bg;
+		Texture digit[10];
+		Texture colon;
 
-		// Background dimensions
-		static constexpr int16_t BG_WIDTH = 120;
-		static constexpr int16_t BG_HEIGHT = 28;
-		static constexpr int16_t BG_PADDING = 8;
+		// Background dimensions for centering
+		int16_t bg_width;
+		int16_t bg_height;
+
+		// Digit dimensions for spacing
+		int16_t digit_width;
+		int16_t colon_width;
 
 		// Countdown timer tracking
 		int64_t last_update_time;

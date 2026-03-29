@@ -74,4 +74,28 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Handles the server response for secondary password (PIC) verification
+	class CheckSpwResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handles relog response (return to login screen)
+	class RelogResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Last connected world notification
+	class LastConnectedWorldHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Set gender packet
+	class SetGenderHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

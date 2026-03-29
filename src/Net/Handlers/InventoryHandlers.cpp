@@ -27,6 +27,7 @@
 #include "../../IO/UITypes/UIKeyConfig.h"
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStorage.h"
+#include "../../IO/UITypes/UIChatBar.h"
 
 namespace ms
 {
@@ -190,5 +191,32 @@ namespace ms
 
 		Stage::get().get_player().recalc_stats(true);
 		UI::get().enable();
+	}
+
+	void ViciousHammerHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (op == 0x39)
+		{
+			recv.read_int(); // 0
+			int32_t hammer_used = recv.read_int();
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[ViciousHammer] Used " + std::to_string(hammer_used) + " times.", UIChatBar::LineType::YELLOW);
+		}
+		else if (op == 0x3D)
+		{
+			recv.read_int(); // 0
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("[ViciousHammer] Hammering complete!", UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void VegaScrollHandler::handle(InPacket& recv) const
+	{
+		int8_t op = recv.read_byte();
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline("[VegaScroll] Result (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
 	}
 }
