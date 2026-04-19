@@ -111,7 +111,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 
 Track up to 5 quests at once with live progress updates.
 
-- **Add a quest**: Open the Quest Log (Q), go to In-Progress, click and drag a quest into the Quest Helper
+- **Add a quest**: Open the Quest Log (Q), go to In-Progress, click and drag a quest into the Quest Helper or doable click on opened quest 
 - **Remove a quest**: Click the X button next to the quest name
 - **Reorder**: Drag a quest name up or down within the Quest Helper
 - **Collapse/Expand**: Click a quest name to toggle its requirements
