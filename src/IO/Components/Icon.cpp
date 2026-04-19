@@ -129,4 +129,9 @@ namespace ms
 	{
 		return type->get_source_tab();
 	}
+
+	int32_t Icon::get_action_id() const
+	{
+		return type->get_action_id();
+	}
 }

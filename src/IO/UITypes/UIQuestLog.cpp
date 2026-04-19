@@ -210,12 +210,16 @@ namespace ms
 		icon_info_backgrnd = Texture(icon_info["backgrnd"]);
 		icon_info_backgrnd2 = Texture(icon_info["backgrnd2"]);
 		icon_info_sheet = Texture(icon_info["Sheet"]);
+		icon_info_sheet0 = Texture(icon_info["Sheet"]["0"]);
+		icon_info_sheet1 = Texture(icon_info["Sheet"]["1"]);
+		icon_info_sheet2 = Texture(icon_info["Sheet"]["2"]);
 
 		// === v83 root textures from UIWindow.img/Quest ===
 		basic_texture = Texture(questBtns["basic"]);
 		prob_texture = Texture(questBtns["prob"]);
 		reward_texture = Texture(questBtns["reward"]);
 		summary_texture = Texture(questBtns["summary"]);
+		obtain_select_texture = Texture(questBtns["select"]);
 
 		// Selection highlight — use UIWindow2.img only (v83 select contains "OBTAIN SELECTIVELY" text)
 		select_texture = Texture(list["recommend"]["select"]);
@@ -356,6 +360,8 @@ namespace ms
 			buttons[id]->set_position(pos);
 	}
 
+	static std::string strip_quest_codes(const std::string& desc);
+
 	void UIQuestLog::load_quests()
 	{
 		available_entries.clear();
@@ -383,7 +389,7 @@ namespace ms
 			nl::node qnode = quest_info[std::to_string(qid)];
 
 			if (qnode)
-				name = qnode["name"].get_string();
+				name = strip_quest_codes(qnode["name"].get_string());
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
@@ -397,7 +403,10 @@ namespace ms
 					continue;
 			}
 
-			active_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
+			int32_t area = qnode ? static_cast<int32_t>(qnode["area"].get_integer()) : 0;
+			QuestEntry e{ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false), area };
+			e.icon_type = pick_quest_icon(qid, Buttons::TAB1, false);
+			active_entries.push_back(std::move(e));
 		}
 
 		// TAB2: Completed quests (from server)
@@ -409,7 +418,7 @@ namespace ms
 			nl::node qnode = quest_info[std::to_string(qid)];
 
 			if (qnode)
-				name = qnode["name"].get_string();
+				name = strip_quest_codes(qnode["name"].get_string());
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
@@ -423,7 +432,10 @@ namespace ms
 					continue;
 			}
 
-			completed_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, name, 220, false) });
+			int32_t area_c = qnode ? static_cast<int32_t>(qnode["area"].get_integer()) : 0;
+			QuestEntry e{ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, name, 220, false), area_c };
+			e.icon_type = pick_quest_icon(qid, Buttons::TAB2, false);
+			completed_entries.push_back(std::move(e));
 		}
 
 		// TAB0: Available quests (from NX data, filtered by level/job)
@@ -480,19 +492,18 @@ namespace ms
 			if (start_npc <= 0)
 				continue;
 
-			// Level check
+			// Level check — only enforced when "My Level" filter is on.
+			// "All Level" shows every quest regardless of player level.
 			int32_t lvmin = start_check["lvmin"].get_integer();
 			int32_t lvmax = start_check["lvmax"].get_integer();
 
-			if (lvmin > 0 && player_level < lvmin)
-				continue;
-
-			if (lvmax > 0 && player_level > lvmax)
-				continue;
-
-			// Filter by "my level" — only show quests within 10 levels
-			if (filter_my_level && lvmin > 0 && (player_level - lvmin) > 10)
-				continue;
+			if (filter_my_level)
+			{
+				if (lvmin > 0 && player_level < lvmin)
+					continue;
+				if (lvmax > 0 && player_level > lvmax)
+					continue;
+			}
 
 			// Job check
 			nl::node job_node = start_check["job"];
@@ -556,7 +567,7 @@ namespace ms
 			}
 
 			// Quest is available — get name
-			std::string name = qnode["name"].get_string();
+			std::string name = strip_quest_codes(qnode["name"].get_string());
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
@@ -569,14 +580,37 @@ namespace ms
 					continue;
 			}
 
-			// Location filter — check if quest area matches current map area
+			// Location filter — show quests whose start NPC is in the current map.
 			if (filter_my_location)
 			{
-				int32_t quest_area = qnode["area"].get_integer();
 				int32_t current_map = Stage::get().get_mapid();
-				// Area is the map region (first 1-3 digits of map ID)
-				int32_t current_area = current_map / 10000000;
-				if (quest_area > 0 && quest_area != current_area)
+				bool npc_in_current_map = false;
+
+				// Build map id string with 9-digit zero padding ("000000000.img")
+				char map_img[20];
+				std::snprintf(map_img, sizeof(map_img), "%09d.img", current_map);
+
+				// Map node path: Map/Map<prefix>/<mapid>.img/life
+				int32_t prefix = current_map / 100000000;
+				std::string map_folder = "Map" + std::to_string(prefix);
+				nl::node map_node = nl::nx::map["Map"][map_folder][map_img]["life"];
+				if (map_node)
+				{
+					for (auto life : map_node)
+					{
+						if (life["type"].get_string() == "n")
+						{
+							std::string life_id = life["id"].get_string();
+							if (!life_id.empty() && std::stoi(life_id) == start_npc)
+							{
+								npc_in_current_map = true;
+								break;
+							}
+						}
+					}
+				}
+
+				if (!npc_in_current_map)
 					continue;
 			}
 
@@ -649,13 +683,16 @@ namespace ms
 				}
 			}
 
+			int32_t area_v = qnode ? static_cast<int32_t>(qnode["area"].get_integer()) : 0;
+			QuestEntry e{ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false), area_v };
+			e.icon_type = pick_quest_icon(qid, Buttons::TAB0, is_recommended);
 			if (is_recommended)
-				recommended_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
+				recommended_entries.push_back(std::move(e));
 			else
-				available_entries.push_back({ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false) });
+				available_entries.push_back(std::move(e));
 		}
 
-		// Sort both lists by level requirement
+		// Sort recommended/available by level only (TAB0 has its own Recommend header)
 		auto sort_by_level = [&](std::vector<QuestEntry>& entries)
 		{
 			std::sort(entries.begin(), entries.end(),
@@ -671,19 +708,141 @@ namespace ms
 		sort_by_level(recommended_entries);
 		sort_by_level(available_entries);
 
+		// Sort TAB1/TAB2/TAB3 by (area, name) to group by region
+		auto sort_by_area = [](std::vector<QuestEntry>& entries)
+		{
+			std::sort(entries.begin(), entries.end(),
+				[](const QuestEntry& a, const QuestEntry& b)
+				{
+					if (a.area != b.area)
+						return a.area < b.area;
+					return a.name.get_text() < b.name.get_text();
+				});
+		};
+		sort_by_area(active_entries);
+		sort_by_area(completed_entries);
+		sort_by_area(weekly_entries);
+
+		// Build virtual row layouts with dividers between area groups
+		auto build_layout = [](const std::vector<QuestEntry>& entries, std::vector<int16_t>& layout)
+		{
+			layout.clear();
+			int32_t prev_area = 0;
+			bool has_prev = false;
+			for (int16_t i = 0; i < static_cast<int16_t>(entries.size()); i++)
+			{
+				if (has_prev && entries[i].area != prev_area)
+					layout.push_back(-1);
+				layout.push_back(i);
+				prev_area = entries[i].area;
+				has_prev = true;
+			}
+		};
+		build_layout(active_entries, active_row_layout);
+		build_layout(completed_entries, completed_row_layout);
+		build_layout(weekly_entries, weekly_row_layout);
+
 		uint16_t count;
 		if (tab == Buttons::TAB0)
 			count = get_available_row_count();
 		else if (tab == Buttons::TAB1)
-			count = static_cast<uint16_t>(active_entries.size());
+			count = static_cast<uint16_t>(active_row_layout.size());
+		else if (tab == Buttons::TAB3)
+			count = static_cast<uint16_t>(weekly_row_layout.size());
 		else
-			count = static_cast<uint16_t>(completed_entries.size());
+			count = static_cast<uint16_t>(completed_row_layout.size());
 
 		slider.setrows(ROWS, count);
 		offset = 0;
 		selected_entry = -1;
 		hover_entry = -1;
 		show_detail = false;
+	}
+
+	uint8_t UIQuestLog::pick_quest_icon(int16_t qid, uint16_t tab_id, bool is_recommended) const
+	{
+		// Sprite semantics (from UIWindow.img/Quest):
+		//   icon0 (static !)       — available to accept  (start)
+		//   icon1 (static ?)       — ready to turn in     (end)
+		//   icon2 (animated !)     — available (animated, new/highlighted)
+		//   icon3 (animated ?)     — in-progress          (talk to NPC)
+		//   icon4 (static ?)       — completable
+		//   icon5 (animated star)  — event/special quest
+		//   icon6 (animated !)     — party quest start
+		//   icon7 (animated ?)     — party quest end
+		//   icon8 (animated clock !) — time-limited start
+		//   icon9 (animated clock ?) — time-limited end
+		//   icon10 (static ?)      — blitz / special end
+		//   iconQM0/QM1            — unknown / generic marker
+
+		nl::node qinfo = nl::nx::quest["QuestInfo.img"][std::to_string(qid)];
+		nl::node chk_start = nl::nx::quest["Check.img"][std::to_string(qid)]["0"];
+		nl::node chk_end   = nl::nx::quest["Check.img"][std::to_string(qid)]["1"];
+
+		// Time-limited: has timeLimit field or an event end date
+		bool time_limited = false;
+		if (qinfo && (qinfo["timeLimit"].get_integer() > 0 || qinfo["timeLimit2"].get_integer() > 0))
+			time_limited = true;
+		if (chk_start && !chk_start["end"].get_string().empty())
+			time_limited = true;
+
+		// Party quest
+		bool party = false;
+		if (chk_start && chk_start["partyQuest"].get_integer() != 0)
+			party = true;
+
+		switch (tab_id)
+		{
+		case Buttons::TAB0: // Available (start-side → "!" icons)
+			if (time_limited) return 8;  // clock !
+			if (party)        return 6;  // party !
+			if (is_recommended) return 2;  // animated ! (highlighted available)
+			return 0;                      // static ! (generic available)
+
+		case Buttons::TAB1: // In-progress (end-side → "?" icons)
+			if (time_limited) return 9;  // clock ?
+			if (party)        return 7;  // party ?
+			return 3;                    // animated ? (in progress)
+
+		case Buttons::TAB2: // Completed (end-side → static ?)
+			return 4;                    // static ? (completable/done)
+
+		case Buttons::TAB3: // Weekly / repeatable / event
+			return 5;                    // animated star (event/special)
+
+		default:
+			return 0;
+		}
+	}
+
+	int16_t UIQuestLog::row_height_for(const QuestEntry& e) const
+	{
+		int16_t text_h = e.name.height();
+		// A small 2px bottom padding so consecutive wrapped rows don't visually touch.
+		int16_t needed = static_cast<int16_t>(text_h + 2);
+		return (needed > ROW_HEIGHT) ? needed : ROW_HEIGHT;
+	}
+
+	void UIQuestLog::draw_entry_icon(uint8_t icon_type, Point<int16_t> pos, float alpha) const
+	{
+		DrawArgument arg(pos);
+		switch (icon_type)
+		{
+		case 0:  if (icon0.is_valid())       icon0.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
+		case 1:  if (icon1.is_valid())       icon1.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
+		case 2:  icon2_anim.draw(arg, alpha); break;
+		case 3:  quest_icon_anim.draw(arg, alpha); break;
+		case 4:  if (icon4.is_valid())       icon4.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
+		case 5:  icon5_anim.draw(arg, alpha); break;
+		case 6:  icon6_anim.draw(arg, alpha); break;
+		case 7:  icon7_anim.draw(arg, alpha); break;
+		case 8:  icon8_anim.draw(arg, alpha); break;
+		case 9:  icon9_anim.draw(arg, alpha); break;
+		case 10: if (icon10.is_valid())      icon10.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
+		case 11: iconQM0_anim.draw(arg, alpha); break;
+		case 12: iconQM1_anim.draw(arg, alpha); break;
+		default: quest_icon_anim.draw(arg, alpha); break;
+		}
 	}
 
 	uint16_t UIQuestLog::get_available_row_count() const
@@ -813,11 +972,17 @@ namespace ms
 	static std::string strip_quest_codes(const std::string& desc)
 	{
 		std::string clean;
+		clean.reserve(desc.size());
+
 		for (size_t i = 0; i < desc.size(); i++)
 		{
-			if (desc[i] == '#' && i + 1 < desc.size())
+			unsigned char c = static_cast<unsigned char>(desc[i]);
+
+			// MapleStory format codes: #X or #X<payload># — strip them entirely
+			if (c == '#' && i + 1 < desc.size())
 			{
 				char next = desc[i + 1];
+				// Single-letter toggle codes: color/font/style switches
 				if (next == 'b' || next == 'k' || next == 'e' || next == 'n'
 					|| next == 'r' || next == 'd' || next == 'g' || next == 'c'
 					|| next == 'B' || next == 'L' || next == 'l')
@@ -825,32 +990,84 @@ namespace ms
 					i++;
 					continue;
 				}
-				else if (next == 'R' || next == 'f' || next == 'i' || next == 't'
+				// Paired codes: #X<id># — skip to matching '#'
+				if (next == 'R' || next == 'f' || next == 'i' || next == 't'
 					|| next == 'p' || next == 'h' || next == 'm' || next == 'o'
-					|| next == 's' || next == 'v' || next == 'z')
+					|| next == 's' || next == 'v' || next == 'z' || next == 'q'
+					|| next == 'F' || next == 'a' || next == 'j' || next == 'x'
+					|| next == 'y')
 				{
 					size_t end = desc.find('#', i + 2);
 					if (end != std::string::npos)
 						i = end;
+					else
+						i = desc.size();
 					continue;
 				}
-				clean += desc[i];
+				// Unknown #X — drop both chars to avoid leaving stray '#'
+				i++;
+				continue;
 			}
-			else if (desc[i] == '\r')
+
+			if (c == '\r')
 			{
 				if (i + 1 < desc.size() && desc[i + 1] == '\n')
 					i++;
 				clean += '\n';
+				continue;
 			}
-			else if (desc[i] == '\n')
+			if (c == '\n' || c == '\t')
 			{
-				clean += '\n';
+				clean += static_cast<char>(c);
+				continue;
 			}
-			else
+
+			// ASCII printable
+			if (c >= 0x20 && c < 0x7F)
+			{
+				clean += static_cast<char>(c);
+				continue;
+			}
+
+			// Valid UTF-8 multi-byte sequence — keep as-is
+			if ((c & 0xE0) == 0xC0 && i + 1 < desc.size()
+				&& ((unsigned char)desc[i + 1] & 0xC0) == 0x80)
 			{
 				clean += desc[i];
+				clean += desc[i + 1];
+				i += 1;
+				continue;
 			}
+			if ((c & 0xF0) == 0xE0 && i + 2 < desc.size()
+				&& ((unsigned char)desc[i + 1] & 0xC0) == 0x80
+				&& ((unsigned char)desc[i + 2] & 0xC0) == 0x80)
+			{
+				clean += desc[i];
+				clean += desc[i + 1];
+				clean += desc[i + 2];
+				i += 2;
+				continue;
+			}
+			if ((c & 0xF8) == 0xF0 && i + 3 < desc.size()
+				&& ((unsigned char)desc[i + 1] & 0xC0) == 0x80
+				&& ((unsigned char)desc[i + 2] & 0xC0) == 0x80
+				&& ((unsigned char)desc[i + 3] & 0xC0) == 0x80)
+			{
+				clean += desc[i];
+				clean += desc[i + 1];
+				clean += desc[i + 2];
+				clean += desc[i + 3];
+				i += 3;
+				continue;
+			}
+
+			// Control chars, lone UTF-8 continuation bytes, or other garbage — drop
 		}
+
+		// Trim trailing whitespace
+		while (!clean.empty() && (clean.back() == ' ' || clean.back() == '\n' || clean.back() == '\t'))
+			clean.pop_back();
+
 		return clean;
 	}
 
@@ -944,7 +1161,7 @@ namespace ms
 				desc = qnode["0"].get_string();
 
 			if (qnode["name"])
-				name = qnode["name"].get_string();
+				name = strip_quest_codes(qnode["name"].get_string());
 
 			detail_area = qnode["area"].get_integer();
 			detail_parent = qnode["parent"].get_string();
@@ -982,6 +1199,8 @@ namespace ms
 		detail_level_req = Text();
 		detail_job_req = Text();
 		detail_rewards.clear();
+		detail_rewards_select.clear();
+		detail_rewards_prob.clear();
 		detail_requirements.clear();
 		detail_prereq_quests.clear();
 		detail_say_lines.clear();
@@ -1055,7 +1274,7 @@ namespace ms
 			int32_t total_collected = 0;
 			const Inventory& inventory = Stage::get().get_player().get_inventory();
 
-			if (is_in_progress && end_check["item"])
+			if (end_check["item"])
 			{
 				for (auto item_node : end_check["item"])
 				{
@@ -1074,23 +1293,32 @@ namespace ms
 					if (item_name.empty())
 						item_name = "Item " + std::to_string(itemid);
 
-					Texture icon = idata.get_icon(false);
-
-					// Show "have/need" count with color based on completion
-					std::string count_str = std::to_string(have) + "/" + std::to_string(count);
-					Color::Name count_color = (have >= count) ? Color::Name::CHARTREUSE : Color::Name::DUSTYGRAY;
+					// Icon + "ItemName have/need" inline (quest helper style)
+					std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(count);
+					Color::Name color = (have >= count) ? Color::Name::CHARTREUSE : Color::Name::BLACK;
 
 					detail_requirements.push_back({
-						icon,
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, item_name, 150, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, count_color, count_str, 60, false)
+						idata.get_icon(false),
+						Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 220, false),
+						Text()
 					});
 				}
 			}
 
-			// Required mob kills
-			if (is_in_progress && end_check["mob"])
+			// Required mob kills — show "killed/need" progress when in progress
+			// (parse kill counts from quest data string, same logic as UIQuestHelper)
+			if (end_check["mob"])
 			{
+				std::string qdata;
+				if (is_in_progress)
+				{
+					const auto& started_map = questlog.get_started();
+					auto it = started_map.find(static_cast<int16_t>(qid));
+					if (it != started_map.end())
+						qdata = it->second;
+				}
+
+				int mob_idx = 0;
 				for (auto mob_node : end_check["mob"])
 				{
 					int32_t mobid = mob_node["id"].get_integer();
@@ -1101,15 +1329,55 @@ namespace ms
 
 					total_required += count;
 
+					int32_t killed = 0;
+					if (is_in_progress)
+					{
+						size_t offset = static_cast<size_t>(mob_idx) * 3;
+						if (offset + 3 <= qdata.size())
+						{
+							try { killed = std::stoi(qdata.substr(offset, 3)); }
+							catch (...) { killed = 0; }
+						}
+						total_collected += std::min(killed, count);
+					}
+
 					std::string mob_name = nl::nx::string["Mob.img"][std::to_string(mobid)]["name"].get_string();
 					if (mob_name.empty())
 						mob_name = "Monster " + std::to_string(mobid);
 
+					// Load mob icon — first frame of stand (or fly as fallback)
+					Texture mob_icon;
+					{
+						std::string mob_strid = std::to_string(mobid);
+						if (mob_strid.size() < 7)
+							mob_strid.insert(0, 7 - mob_strid.size(), '0');
+						nl::node mob_src = nl::nx::mob[mob_strid + ".img"];
+
+						std::string link = mob_src["info"]["link"].get_string();
+						if (!link.empty())
+						{
+							if (link.size() < 7)
+								link.insert(0, 7 - link.size(), '0');
+							mob_src = nl::nx::mob[link + ".img"];
+						}
+
+						nl::node stand = mob_src["stand"];
+						if (stand && stand["0"])
+							mob_icon = Texture(stand["0"]);
+						else if (mob_src["fly"] && mob_src["fly"]["0"])
+							mob_icon = Texture(mob_src["fly"]["0"]);
+					}
+
+					// Icon + "MobName killed/need" inline
+					std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(count);
+					Color::Name color = (killed >= count) ? Color::Name::CHARTREUSE : Color::Name::BLACK;
+
 					detail_requirements.push_back({
-						Texture(),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, mob_name, 150, false),
-						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, std::to_string(count), 40, false)
+						mob_icon,
+						Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 220, false),
+						Text()
 					});
+					mob_idx++;
 				}
 			}
 
@@ -1137,7 +1405,7 @@ namespace ms
 			if (npc_src["stand"] && npc_src["stand"]["0"])
 				detail_npc_sprite = Texture(npc_src["stand"]["0"]);
 
-			std::string npc_name = nl::nx::string["Npc.img"][std::to_string(detail_npcid)]["name"].get_string();
+			std::string npc_name = strip_quest_codes(nl::nx::string["Npc.img"][std::to_string(detail_npcid)]["name"].get_string());
 			if (!npc_name.empty())
 				detail_npc_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::YELLOW, npc_name, 120, false);
 		}
@@ -1202,13 +1470,18 @@ namespace ms
 					});
 				}
 
-				// Item rewards
+				// Item rewards — split by `prop` field:
+				//   prop missing/0  -> unconditional (detail_rewards)
+				//   prop == -1      -> "Obtain selectively" (player picks one)
+				//   prop >= 1       -> "Obtain randomly" (server rolls from pool)
+				// Items with negative count are CONSUMED by the quest (delivery items),
+				// not rewards — skip them.
 				for (auto item_node : reward_node["item"])
 				{
 					int32_t itemid = item_node["id"].get_integer();
 					int32_t count = item_node["count"].get_integer();
 
-					if (itemid <= 0)
+					if (itemid <= 0 || count < 0)
 						continue;
 
 					const ItemData& idata = ItemData::get(itemid);
@@ -1216,11 +1489,21 @@ namespace ms
 					if (item_name.empty())
 						item_name = "Item " + std::to_string(itemid);
 
-					detail_rewards.push_back({
+					QuestItem entry {
 						idata.get_icon(false),
 						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, item_name, 150, false),
 						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "x" + std::to_string(count > 0 ? count : 1), 80, false)
-					});
+					};
+
+					nl::node prop_node = item_node["prop"];
+					int32_t prop = prop_node ? static_cast<int32_t>(prop_node.get_integer()) : 0;
+
+					if (prop == -1)
+						detail_rewards_select.push_back(std::move(entry));
+					else if (prop >= 1)
+						detail_rewards_prob.push_back(std::move(entry));
+					else
+						detail_rewards.push_back(std::move(entry));
 				}
 
 				// Skill rewards
@@ -1404,123 +1687,188 @@ namespace ms
 		if (tab == Buttons::TAB0)
 		{
 			// TAB0: recommended + available entries
+			int16_t entry_y = LIST_Y;
 			for (int16_t i = 0; i < ROWS; i++)
 			{
 				int16_t virtual_row = offset + i;
 				if (virtual_row >= static_cast<int16_t>(get_available_row_count()))
 					break;
 
-				int16_t entry_y = LIST_Y + i * ROW_HEIGHT;
 				int16_t entry_index;
 				RowType row_type = get_row_type(virtual_row, entry_index);
+				int16_t row_h = ROW_HEIGHT;
 
 				if (row_type == RowType::RECOMMEND_ENTRY)
 				{
 					if (entry_index < 0 || (size_t)entry_index >= recommended_entries.size())
 						continue;
 
+					row_h = row_height_for(recommended_entries[entry_index]);
+
 					if (hover_entry == virtual_row)
-						hover_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+						hover_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
 					if (selected_entry == virtual_row)
-						sel_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+						sel_bg_recommend.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
-					quest_icon_anim.draw(DrawArgument(position + Point<int16_t>(14, entry_y + 4)), alpha);
-					recommended_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y + 5));
+					draw_entry_icon(recommended_entries[entry_index].icon_type, position + Point<int16_t>(14, entry_y + 4), alpha);
+					recommended_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y - 2));
 				}
 				else if (row_type == RowType::AVAILABLE_ENTRY)
 				{
 					if (entry_index < 0 || (size_t)entry_index >= available_entries.size())
 						continue;
 
+					row_h = row_height_for(available_entries[entry_index]);
+
 					if (hover_entry == virtual_row)
-						hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+						hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
 					if (selected_entry == virtual_row)
-						sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+						sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
-					quest_icon_anim.draw(DrawArgument(position + Point<int16_t>(14, entry_y + 4)), alpha);
-					available_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y + 5));
+					draw_entry_icon(available_entries[entry_index].icon_type, position + Point<int16_t>(14, entry_y + 4), alpha);
+					available_entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y - 2));
 				}
+
+				entry_y += row_h;
 			}
 		}
 		else
 		{
-			// TAB1 / TAB2 / TAB3: flat list (in-progress / completed / weekly)
+			// TAB1 / TAB2 / TAB3: flat list (in-progress / completed / weekly), grouped by area
 			const auto& entries = (tab == Buttons::TAB1) ? active_entries :
 				(tab == Buttons::TAB3) ? weekly_entries : completed_entries;
+			const auto& layout = (tab == Buttons::TAB1) ? active_row_layout :
+				(tab == Buttons::TAB3) ? weekly_row_layout : completed_row_layout;
 
+			int16_t entry_y = LIST_Y;
 			for (int16_t i = 0; i < ROWS; i++)
 			{
 				size_t idx = offset + i;
 
-				if (idx >= entries.size())
+				if (idx >= layout.size())
 					break;
 
-				int16_t entry_y = LIST_Y + i * ROW_HEIGHT;
+				int16_t entry_index = layout[idx];
+				int16_t row_h = ROW_HEIGHT;
+
+				if (entry_index < 0)
+				{
+					// Divider between area groups
+					if (drop_texture.is_valid())
+						drop_texture.draw(DrawArgument(position + Point<int16_t>(8, entry_y + (ROW_HEIGHT - drop_texture.get_dimensions().y()) / 2)));
+					entry_y += row_h;
+					continue;
+				}
+
+				if ((size_t)entry_index >= entries.size())
+				{
+					entry_y += row_h;
+					continue;
+				}
+
+				row_h = row_height_for(entries[entry_index]);
 
 				if (hover_entry >= 0 && (size_t)hover_entry == idx)
-					hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+					hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
-				if (selected_entry >= 0 && (size_t)selected_entry == idx)
-					sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y)));
+				if (selected_entry >= 0 && selected_entry == entry_index)
+					sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
-				// Draw animated lightbulb icon on each quest row
+				// Draw the per-quest icon (from ? legend panel) instead of a generic bulb
 				Point<int16_t> icon_pos = position + Point<int16_t>(14, entry_y + 4);
-				quest_icon_anim.draw(DrawArgument(icon_pos), alpha);
+				draw_entry_icon(entries[entry_index].icon_type, icon_pos, alpha);
 
-				entries[idx].name.draw(position + Point<int16_t>(32, entry_y + 5));
+				entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y - 2));
+
+				entry_y += row_h;
 			}
 		}
 
 		// Draw icon info panel if toggled (icon legend)
+		// Uses the official icon_info/backgrnd (235x91) stretched vertically so all
+		// 13 icon rows + their text labels fit inside.
 		if (show_icon_info)
 		{
 			Point<int16_t> info_pos = position + Point<int16_t>(dimension.x() + 5, 30);
-			if (icon_info_backgrnd.is_valid())
-				icon_info_backgrnd.draw(info_pos);
-			if (icon_info_backgrnd2.is_valid())
-				icon_info_backgrnd2.draw(info_pos);
-			if (icon_info_sheet.is_valid())
-				icon_info_sheet.draw(info_pos);
 
-			// Draw icon legend entries
-			int16_t iy = 20;
-			if (icon0.is_valid())
+			constexpr int16_t ROW_H = 26;
+			constexpr int16_t ICON_X = 20;
+			constexpr int16_t LABEL_X = 52;
+			constexpr int16_t TOP_PAD = 12;
+			constexpr int16_t BOT_PAD = 20;
+			constexpr int16_t ICON_COUNT = 13;
+
+			int16_t needed_h = TOP_PAD + ICON_COUNT * ROW_H + BOT_PAD;
+
+			// Stretch icon_info_backgrnd vertically to engulf all rows
+			if (icon_info_backgrnd.is_valid())
 			{
-				icon0.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)));
-				iy += 25;
+				int16_t bg_w = icon_info_backgrnd.get_dimensions().x();
+				icon_info_backgrnd.draw(DrawArgument(info_pos, Point<int16_t>(bg_w, needed_h)));
 			}
-			if (icon1.is_valid())
+			if (icon_info_backgrnd2.is_valid())
 			{
-				icon1.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)));
-				iy += 25;
+				int16_t bg_w = icon_info_backgrnd2.get_dimensions().x();
+				icon_info_backgrnd2.draw(DrawArgument(info_pos, Point<int16_t>(bg_w, needed_h - 10)));
 			}
-			icon2_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			if (icon4.is_valid())
+
+			// Pre-allocated label texts
+			static const char* labels[ICON_COUNT] = {
+				"Quest available",
+				"Accept quest",
+				"Quest in progress",
+				"Quest tracked",
+				"Ready to complete",
+				"Story quest",
+				"Party quest",
+				"Guild quest",
+				"Time-limited quest",
+				"Repeatable quest",
+				"Event quest",
+				"Unknown quest start",
+				"Unknown quest end"
+			};
+			static Text icon_labels[ICON_COUNT] = {
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[0]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[1]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[2]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[3]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[4]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[5]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[6]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[7]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[8]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[9]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[10]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[11]),
+				Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, labels[12])
+			};
+
+			int16_t iy = TOP_PAD;
+			Point<int16_t> base = info_pos;
+
+			auto draw_row = [&](int idx, std::function<void(Point<int16_t>)> draw_icon)
 			{
-				icon4.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)));
-				iy += 25;
-			}
-			icon5_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			icon6_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			icon7_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			icon8_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			icon9_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			if (icon10.is_valid())
-			{
-				icon10.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)));
-				iy += 25;
-			}
-			iconQM0_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
-			iy += 25;
-			iconQM1_anim.draw(DrawArgument(info_pos + Point<int16_t>(15, iy)), alpha);
+				draw_icon(base + Point<int16_t>(ICON_X, iy));
+				icon_labels[idx].draw(base + Point<int16_t>(LABEL_X, iy + 4));
+				iy += ROW_H;
+			};
+
+			draw_row(0, [&](Point<int16_t> p) { if (icon0.is_valid()) icon0.draw(DrawArgument(p)); });
+			draw_row(1, [&](Point<int16_t> p) { if (icon1.is_valid()) icon1.draw(DrawArgument(p)); });
+			draw_row(2, [&](Point<int16_t> p) { icon2_anim.draw(DrawArgument(p), alpha); });
+			draw_row(3, [&](Point<int16_t> p) { quest_icon_anim.draw(DrawArgument(p), alpha); });
+			draw_row(4, [&](Point<int16_t> p) { if (icon4.is_valid()) icon4.draw(DrawArgument(p)); });
+			draw_row(5, [&](Point<int16_t> p) { icon5_anim.draw(DrawArgument(p), alpha); });
+			draw_row(6, [&](Point<int16_t> p) { icon6_anim.draw(DrawArgument(p), alpha); });
+			draw_row(7, [&](Point<int16_t> p) { icon7_anim.draw(DrawArgument(p), alpha); });
+			draw_row(8, [&](Point<int16_t> p) { icon8_anim.draw(DrawArgument(p), alpha); });
+			draw_row(9, [&](Point<int16_t> p) { icon9_anim.draw(DrawArgument(p), alpha); });
+			draw_row(10, [&](Point<int16_t> p) { if (icon10.is_valid()) icon10.draw(DrawArgument(p)); });
+			draw_row(11, [&](Point<int16_t> p) { iconQM0_anim.draw(DrawArgument(p), alpha); });
+			draw_row(12, [&](Point<int16_t> p) { iconQM1_anim.draw(DrawArgument(p), alpha); });
 		}
 
 		// TimeQuest alarm clock shown when a countdown is active
@@ -1581,13 +1929,32 @@ namespace ms
 			#define DETAIL_Y(yo) ((yo) - ds)
 			#define IN_VIEW(yo) (DETAIL_Y(yo) >= header_h && DETAIL_Y(yo) < (detail_h - 70))
 
-			// === NPC Dialog preview (first line only, compact) ===
+			// Absolute screen Y bounds for the scrollable content area.
+			// Used to per-glyph clip multi-line text that crosses the header boundary
+			// (without this, long wrapped text would either overflow the header or
+			// disappear entirely when its top goes above header_h).
+			int16_t clip_top = detail_pos.y() + header_h;
+			int16_t clip_bot = detail_pos.y() + detail_h - 70;
+
+			// === NPC Dialog preview (first line only) ===
+			// Per-glyph vertical clipping keeps the description inside the scroll area
+			// so it slides under the header rather than popping out of view all at once.
 			if (!detail_say_lines.empty())
 			{
 				say_preview_text.change_text(detail_say_lines[0].text);
-				if (IN_VIEW(y_offset))
-					say_preview_text.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
-				int16_t say_h = std::min(say_preview_text.height(), (int16_t)48);
+				int16_t say_h = say_preview_text.height();
+				if (say_h <= 0) say_h = 14;
+
+				// Block overlaps visible band? (render even if partially off so clipping runs)
+				bool block_in_view = (DETAIL_Y(y_offset) + say_h > header_h)
+					&& (DETAIL_Y(y_offset) < (detail_h - 70));
+				if (block_in_view)
+				{
+					say_preview_text.draw(
+						DrawArgument(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset))),
+						Range<int16_t>(clip_top, clip_bot)
+					);
+				}
 				y_offset += say_h + 8;
 
 				if (IN_VIEW(y_offset))
@@ -1596,8 +1963,56 @@ namespace ms
 			}
 
 			// === Rewards section ===
-			if (!detail_rewards.empty())
+			// Local helper to draw a single reward/requirement line.
+			auto draw_entry = [&](const QuestItem& e, int16_t count_x)
 			{
+				if (e.icon.is_valid())
+				{
+					if (IN_VIEW(y_offset))
+					{
+						auto io = e.icon.get_origin();
+						auto id = e.icon.get_dimensions();
+						// Right edge of the icon in detail-panel local X.
+						// io.x() is typically negative (sprite anchor offset).
+						int16_t icon_right = 20 + io.x() + id.x();
+						// Push name/count past wide sprites (e.g. Pig's Head, 64x64+
+						// special-quest icons) so the text doesn't render on top of
+						// the item art. 32px default icon → name at 56, count at 200/220.
+						int16_t name_x  = std::max<int16_t>(56, icon_right + 4);
+						int16_t count_min = name_x + 60;
+						int16_t count_draw_x = std::max<int16_t>(count_x, count_min);
+
+						e.icon.draw(DrawArgument(detail_pos + Point<int16_t>(20 + io.x(), DETAIL_Y(y_offset) + io.y())));
+						e.name.draw(detail_pos + Point<int16_t>(name_x, DETAIL_Y(y_offset) + 10));
+						e.count.draw(detail_pos + Point<int16_t>(count_draw_x, DETAIL_Y(y_offset) + 10));
+					}
+					// Row height needs to fit the sprite when it's taller than 32px.
+					int16_t row_h = 36;
+					if (e.icon.is_valid())
+					{
+						int16_t sprite_h = e.icon.get_dimensions().y();
+						if (sprite_h + 4 > row_h) row_h = sprite_h + 4;
+					}
+					y_offset += row_h;
+				}
+				else
+				{
+					if (IN_VIEW(y_offset))
+					{
+						e.name.draw(detail_pos + Point<int16_t>(25, DETAIL_Y(y_offset)));
+						e.count.draw(detail_pos + Point<int16_t>(count_x, DETAIL_Y(y_offset)));
+					}
+					y_offset += 18;
+				}
+			};
+
+			bool has_any_reward = !detail_rewards.empty()
+				|| !detail_rewards_select.empty()
+				|| !detail_rewards_prob.empty();
+
+			if (has_any_reward)
+			{
+				// Main "Reward" header sprite
 				if (IN_VIEW(y_offset))
 				{
 					if (reward_texture.is_valid())
@@ -1610,40 +2025,52 @@ namespace ms
 				}
 				y_offset += 22;
 
-				if (IN_VIEW(y_offset))
-				{
-					static Text receive_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "YOU WILL RECEIVE", 200, false);
-					receive_label.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
-				}
-				y_offset += 20;
-
+				// Unconditional (exp/mesos/fame/skill + items with prop=0)
 				for (auto& rew : detail_rewards)
+					draw_entry(rew, 200);
+
+				// "Obtain selectively" sub-header + items (player picks one)
+				if (!detail_rewards_select.empty())
 				{
-					if (rew.icon.is_valid())
+					if (IN_VIEW(y_offset))
 					{
-						if (IN_VIEW(y_offset))
+						if (obtain_select_texture.is_valid())
+							obtain_select_texture.draw(DrawArgument(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset))));
+						else
 						{
-							auto io = rew.icon.get_origin();
-							rew.icon.draw(DrawArgument(detail_pos + Point<int16_t>(20 + io.x(), DETAIL_Y(y_offset) + io.y())));
-							rew.name.draw(detail_pos + Point<int16_t>(56, DETAIL_Y(y_offset) + 10));
-							rew.count.draw(detail_pos + Point<int16_t>(200, DETAIL_Y(y_offset) + 10));
+							static Text sel_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "Obtain selectively", 200, false);
+							sel_label.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
 						}
-						y_offset += 36;
 					}
-					else
-					{
-						if (IN_VIEW(y_offset))
-						{
-							rew.name.draw(detail_pos + Point<int16_t>(25, DETAIL_Y(y_offset)));
-							rew.count.draw(detail_pos + Point<int16_t>(200, DETAIL_Y(y_offset)));
-						}
-						y_offset += 18;
-					}
+					y_offset += 16;
+
+					for (auto& rew : detail_rewards_select)
+						draw_entry(rew, 200);
 				}
+
+				// "Obtain randomly" sub-header + items (server rolls from pool)
+				if (!detail_rewards_prob.empty())
+				{
+					if (IN_VIEW(y_offset))
+					{
+						if (prob_texture.is_valid())
+							prob_texture.draw(DrawArgument(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset))));
+						else
+						{
+							static Text prob_label(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "Obtain randomly", 200, false);
+							prob_label.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
+						}
+					}
+					y_offset += 16;
+
+					for (auto& rew : detail_rewards_prob)
+						draw_entry(rew, 200);
+				}
+
 				y_offset += 8;
 			}
 
-			// === Requirements section ===
+			// === Requirements section (no sprite exists in v83 — plain text header) ===
 			if (!detail_requirements.empty())
 			{
 				if (IN_VIEW(y_offset))
@@ -1652,42 +2079,14 @@ namespace ms
 
 				if (IN_VIEW(y_offset))
 				{
-					if (prob_texture.is_valid())
-					{
-						auto pb_origin = prob_texture.get_origin();
-						prob_texture.draw(DrawArgument(detail_pos + Point<int16_t>(15 + pb_origin.x(), DETAIL_Y(y_offset) + pb_origin.y())));
-					}
-					else
-					{
-						static Text req_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Requirements", 200, false);
-						req_header.draw(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset)));
-					}
+					static Text req_header(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::ORANGE, "Requirements", 200, false);
+					req_header.draw(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset)));
 				}
 				y_offset += 22;
 
 				for (auto& req : detail_requirements)
-				{
-					if (req.icon.is_valid())
-					{
-						if (IN_VIEW(y_offset))
-						{
-							auto io = req.icon.get_origin();
-							req.icon.draw(DrawArgument(detail_pos + Point<int16_t>(20 + io.x(), DETAIL_Y(y_offset) + io.y())));
-							req.name.draw(detail_pos + Point<int16_t>(56, DETAIL_Y(y_offset) + 10));
-							req.count.draw(detail_pos + Point<int16_t>(220, DETAIL_Y(y_offset) + 10));
-						}
-						y_offset += 36;
-					}
-					else
-					{
-						if (IN_VIEW(y_offset))
-						{
-							req.name.draw(detail_pos + Point<int16_t>(25, DETAIL_Y(y_offset)));
-							req.count.draw(detail_pos + Point<int16_t>(220, DETAIL_Y(y_offset)));
-						}
-						y_offset += 18;
-					}
-				}
+					draw_entry(req, 220);
+
 				y_offset += 8;
 			}
 
@@ -1753,8 +2152,29 @@ namespace ms
 			if (basic_texture.is_valid())
 				y_offset += 20;
 
-			if (IN_VIEW(y_offset))
-				detail_quest_desc.draw(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset)));
+			// Measure the description height upfront so we can:
+			//   1. Clip per-glyph via Range when drawing (so long desc doesn't
+			//      leak above the header or below the scroll band)
+			//   2. Reserve scroll space for the full block, so the user can
+			//      actually scroll to the bottom of multi-line descriptions
+			int16_t desc_h = detail_quest_desc.height();
+			if (desc_h <= 0) desc_h = 16;
+
+			{
+				// Block overlaps visible band? (render even when partially off
+				// so the glyph-level vertical clip runs and the text slides
+				// smoothly under the header / above the bottom edge)
+				bool desc_in_view = (DETAIL_Y(y_offset) + desc_h > header_h)
+					&& (DETAIL_Y(y_offset) < (detail_h - 70));
+				if (desc_in_view)
+				{
+					detail_quest_desc.draw(
+						DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))),
+						Range<int16_t>(clip_top, clip_bot)
+					);
+				}
+			}
+			y_offset += desc_h + 8;
 
 			// === Timed quest indicator ===
 			// Show live countdown if active, otherwise static time limit from quest data
@@ -1764,10 +2184,6 @@ namespace ms
 
 				if (show_time > 0)
 				{
-					int16_t desc_h = detail_quest_desc.height();
-					if (desc_h <= 0) desc_h = 16;
-					y_offset += desc_h + 8;
-
 					if (IN_VIEW(y_offset))
 						sep_line_box.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))));
 					y_offset += 6;
@@ -1790,13 +2206,6 @@ namespace ms
 						time_bar.draw(DrawArgument(detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset))), alpha);
 					y_offset += 16;
 				}
-			}
-
-			if (detail_time_limit <= 0)
-			{
-				int16_t desc_h = detail_quest_desc.height();
-				if (desc_h > 0)
-					y_offset += desc_h + 8;
 			}
 
 			// Track total content height for scroll clamping
@@ -1954,16 +2363,26 @@ namespace ms
 				int16_t tab0_list_start = LIST_Y;
 				uint16_t total_rows = get_available_row_count();
 
+				int16_t entry_y = tab0_list_start;
 				for (int16_t i = 0; i < ROWS; i++)
 				{
 					int16_t virtual_row = offset + i;
 					if (virtual_row >= static_cast<int16_t>(total_rows))
 						break;
 
-					int16_t entry_y = tab0_list_start + i * ROW_HEIGHT;
+					int16_t entry_index;
+					RowType row_type = get_row_type(virtual_row, entry_index);
+					int16_t row_h = ROW_HEIGHT;
+					if (row_type == RowType::RECOMMEND_ENTRY
+						&& entry_index >= 0 && (size_t)entry_index < recommended_entries.size())
+						row_h = row_height_for(recommended_entries[entry_index]);
+					else if (row_type == RowType::AVAILABLE_ENTRY
+						&& entry_index >= 0 && (size_t)entry_index < available_entries.size())
+						row_h = row_height_for(available_entries[entry_index]);
+
 					Rectangle<int16_t> entry_bounds(
 						position + Point<int16_t>(10, entry_y),
-						position + Point<int16_t>(260, entry_y + ROW_HEIGHT)
+						position + Point<int16_t>(260, entry_y + row_h)
 					);
 
 					if (entry_bounds.contains(cursorpos))
@@ -1978,24 +2397,41 @@ namespace ms
 
 						break;
 					}
+
+					entry_y += row_h;
 				}
 			}
 			else
 			{
-				// TAB1/TAB2/TAB3: flat list
+				// TAB1/TAB2/TAB3: flat list with area-group dividers
 				const auto& entries = (tab == Buttons::TAB1) ? active_entries :
 					(tab == Buttons::TAB3) ? weekly_entries : completed_entries;
+				const auto& layout = (tab == Buttons::TAB1) ? active_row_layout :
+					(tab == Buttons::TAB3) ? weekly_row_layout : completed_row_layout;
 
+				int16_t entry_y = LIST_Y;
 				for (int16_t i = 0; i < ROWS; i++)
 				{
 					size_t idx = offset + i;
-					if (idx >= entries.size())
+					if (idx >= layout.size())
 						break;
 
-					int16_t entry_y = LIST_Y + i * ROW_HEIGHT;
+					int16_t entry_index = layout[idx];
+					int16_t row_h = ROW_HEIGHT;
+
+					if (entry_index < 0)
+					{
+						// divider row is not clickable — still advances y
+						entry_y += row_h;
+						continue;
+					}
+
+					if ((size_t)entry_index < entries.size())
+						row_h = row_height_for(entries[entry_index]);
+
 					Rectangle<int16_t> entry_bounds(
 						position + Point<int16_t>(10, entry_y),
-						position + Point<int16_t>(260, entry_y + ROW_HEIGHT)
+						position + Point<int16_t>(260, entry_y + row_h)
 					);
 
 					if (entry_bounds.contains(cursorpos))
@@ -2004,13 +2440,13 @@ namespace ms
 
 						if (clicking)
 						{
-							select_quest(static_cast<int16_t>(idx));
+							select_quest(entry_index);
 
 							// Record drag candidate for in-progress quests
-							if (tab == Buttons::TAB1 && idx < entries.size())
+							if (tab == Buttons::TAB1 && (size_t)entry_index < entries.size())
 							{
-								drag_quest_id = entries[idx].id;
-								drag_quest_name = entries[idx].name.get_text();
+								drag_quest_id = entries[entry_index].id;
+								drag_quest_name = entries[entry_index].name.get_text();
 								drag_start_pos = cursorpos;
 							}
 
@@ -2019,6 +2455,8 @@ namespace ms
 
 						break;
 					}
+
+					entry_y += row_h;
 				}
 			}
 
@@ -2069,7 +2507,33 @@ namespace ms
 			}
 		}
 
-		return UIDragElement::send_cursor(clicking, cursorpos);
+		// Temporarily deactivate detail panel buttons so UIElement::send_cursor
+		// doesn't hit-test them with `position` as parentpos — they're drawn with
+		// `detail_pos` as parentpos and have already been handled above. Without
+		// this, hovering a left-panel button (like ?) falsely highlights GIVEUP.
+		static const uint16_t detail_btn_ids[] = {
+			Buttons::BT_DETAIL_CLOSE, Buttons::BT_ACCEPT, Buttons::BT_FINISH,
+			Buttons::GIVEUP, Buttons::MARK_NPC, Buttons::BT_DELIVERY_ACCEPT,
+			Buttons::BT_DELIVERY_COMPLETE
+		};
+		std::vector<uint16_t> reactivate;
+		for (uint16_t id : detail_btn_ids)
+		{
+			auto it = buttons.find(id);
+			if (it != buttons.end() && it->second && it->second->is_active())
+			{
+				reactivate.push_back(id);
+				it->second->set_active(false);
+			}
+		}
+		Cursor::State result = UIDragElement::send_cursor(clicking, cursorpos);
+		for (uint16_t id : reactivate)
+		{
+			auto it = buttons.find(id);
+			if (it != buttons.end() && it->second)
+				it->second->set_active(true);
+		}
+		return result;
 	}
 
 	bool UIQuestLog::is_in_range(Point<int16_t> cursorpos) const
@@ -2126,8 +2590,11 @@ namespace ms
 				int16_t scroll_step = 20;
 				detail_scroll -= static_cast<int16_t>(yoffset * scroll_step);
 
-				// Clamp scroll
-				int16_t max_scroll = std::max((int16_t)0, (int16_t)(detail_content_height - detail_h + 20));
+				// Clamp scroll.
+				// Visible band is header_h .. (detail_h - 70). For the last content y
+				// to reach the band bottom we need ds >= content_height - (detail_h - 70).
+				// Extra 10px padding so the last line isn't glued to the band edge.
+				int16_t max_scroll = std::max((int16_t)0, (int16_t)(detail_content_height - detail_h + 80));
 				if (detail_scroll < 0) detail_scroll = 0;
 				if (detail_scroll > max_scroll) detail_scroll = max_scroll;
 				return;
@@ -2143,14 +2610,55 @@ namespace ms
 			if (tab == Buttons::TAB0)
 				total = get_available_row_count();
 			else if (tab == Buttons::TAB1)
-				total = static_cast<uint16_t>(active_entries.size());
+				total = static_cast<uint16_t>(active_row_layout.size());
 			else if (tab == Buttons::TAB2)
-				total = static_cast<uint16_t>(completed_entries.size());
+				total = static_cast<uint16_t>(completed_row_layout.size());
 			else if (tab == Buttons::TAB3)
-				total = static_cast<uint16_t>(weekly_entries.size());
+				total = static_cast<uint16_t>(weekly_row_layout.size());
 
 			if (total > ROWS && offset < total - ROWS)
 				offset++;
+		}
+	}
+
+	void UIQuestLog::doubleclick(Point<int16_t> cursorpos)
+	{
+		// Double-click on an in-progress quest entry tracks it in the quest helper.
+		if (tab != Buttons::TAB1)
+			return;
+
+		int16_t entry_y = LIST_Y;
+		for (int16_t i = 0; i < ROWS; i++)
+		{
+			size_t idx = offset + i;
+			if (idx >= active_row_layout.size())
+				break;
+
+			int16_t entry_index = active_row_layout[idx];
+			int16_t row_h = ROW_HEIGHT;
+
+			if (entry_index < 0 || (size_t)entry_index >= active_entries.size())
+			{
+				entry_y += row_h;
+				continue;
+			}
+
+			row_h = row_height_for(active_entries[entry_index]);
+
+			Rectangle<int16_t> entry_bounds(
+				position + Point<int16_t>(10, entry_y),
+				position + Point<int16_t>(260, entry_y + row_h)
+			);
+
+			if (entry_bounds.contains(cursorpos))
+			{
+				int16_t questid = active_entries[entry_index].id;
+				if (auto helper = UI::get().get_element<UIQuestHelper>())
+					helper->track_quest(questid);
+				return;
+			}
+
+			entry_y += row_h;
 		}
 	}
 
@@ -2298,11 +2806,11 @@ namespace ms
 		case Buttons::ALL_LEVEL:
 			filter_my_level = false;
 			load_quests();
-			return Button::State::IDENTITY;
+			return Button::State::NORMAL;
 		case Buttons::MY_LEVEL:
 			filter_my_level = true;
 			load_quests();
-			return Button::State::IDENTITY;
+			return Button::State::NORMAL;
 		case Buttons::BT_SEARCH:
 			search_text = search.get_text();
 			load_quests();
@@ -2310,11 +2818,11 @@ namespace ms
 		case Buttons::BT_ALLLOCN:
 			filter_my_location = false;
 			load_quests();
-			return Button::State::IDENTITY;
+			return Button::State::NORMAL;
 		case Buttons::BT_MYLOCATION:
 			filter_my_location = true;
 			load_quests();
-			return Button::State::IDENTITY;
+			return Button::State::NORMAL;
 		case Buttons::BT_NEXT:
 		{
 			const auto& entries = (tab == Buttons::TAB0) ? available_entries :
@@ -2366,6 +2874,7 @@ namespace ms
 			set_btn_active(Buttons::BT_ALLLOCN, tab == Buttons::TAB0);
 			set_btn_active(Buttons::BT_MYLOCATION, tab == Buttons::TAB0);
 
+
 			// Search on available and in-progress tabs
 			bool search_active = (tab == Buttons::TAB0 || tab == Buttons::TAB1);
 			set_btn_active(Buttons::BT_SEARCH, search_active);
@@ -2386,7 +2895,6 @@ namespace ms
 		selected_entry = -1;
 		hover_entry = -1;
 		show_detail = false;
-		show_icon_info = false;
 
 		// Hide all detail buttons
 		set_btn_active(Buttons::GIVEUP, false);
@@ -2404,11 +2912,11 @@ namespace ms
 		if (tab == Buttons::TAB0)
 			count = get_available_row_count();
 		else if (tab == Buttons::TAB1)
-			count = static_cast<uint16_t>(active_entries.size());
+			count = static_cast<uint16_t>(active_row_layout.size());
 		else if (tab == Buttons::TAB2)
-			count = static_cast<uint16_t>(completed_entries.size());
+			count = static_cast<uint16_t>(completed_row_layout.size());
 		else if (tab == Buttons::TAB3)
-			count = static_cast<uint16_t>(weekly_entries.size());
+			count = static_cast<uint16_t>(weekly_row_layout.size());
 
 		slider = Slider(
 			Slider::Type::DEFAULT_SILVER, Range<int16_t>(LIST_Y, LIST_Y + ROWS * ROW_HEIGHT), 262, ROWS, count,
@@ -2420,11 +2928,11 @@ namespace ms
 				if (tab == Buttons::TAB0)
 					count = get_available_row_count();
 				else if (tab == Buttons::TAB1)
-					count = static_cast<uint16_t>(active_entries.size());
+					count = static_cast<uint16_t>(active_row_layout.size());
 				else if (tab == Buttons::TAB3)
-					count = static_cast<uint16_t>(weekly_entries.size());
+					count = static_cast<uint16_t>(weekly_row_layout.size());
 				else
-					count = static_cast<uint16_t>(completed_entries.size());
+					count = static_cast<uint16_t>(completed_row_layout.size());
 
 				if (new_offset >= 0 && new_offset + ROWS <= (int16_t)count)
 					offset = new_offset;

@@ -30,8 +30,11 @@ namespace ms
 	{
 		/// Locate sources
 		std::string strid = string_format::extend_id(id, 7);
-		// Job ID is skill_id / 10000 — use that to find the correct .img
-		std::string jobid = std::to_string(id / 10000);
+		// Job ID is skill_id / 10000 — use that to find the correct .img.
+		// NX skill files are named with 3-digit zero-padded job IDs
+		// (e.g. 000.img for beginner, 100.img for warrior), while post-BB
+		// jobs like Cygnus/Aran use 4-digit IDs (1000.img, 2000.img).
+		std::string jobid = string_format::extend_id(id / 10000, 3);
 		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
 		nl::node strsrc = nl::nx::string["Skill.img"][strid];
 

@@ -87,9 +87,11 @@ namespace ms
 			Text name;
 			Text progress;
 			std::vector<Text> requirements;
+			std::vector<bool> requirements_complete;
+			bool all_complete;
 			bool collapsed;
 
-			TrackedQuest() : questid(-1), collapsed(false) {}
+			TrackedQuest() : questid(-1), all_complete(false), collapsed(false) {}
 		};
 
 		void refresh_quest_info(TrackedQuest& tq);

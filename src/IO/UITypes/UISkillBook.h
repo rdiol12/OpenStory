@@ -22,12 +22,14 @@
 #include "../Components/Charset.h"
 #include "../Components/Slider.h"
 #include "../Components/StatefulIcon.h"
+#include "../Components/Textfield.h"
 
 #include "../../Character/CharStats.h"
 #include "../../Character/SkillBook.h"
 
 namespace ms
 {
+
 	class UISkillBook : public UIDragElement<PosSKILL>
 	{
 	public:
@@ -45,11 +47,17 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_scroll(double yoffset) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		void update() override;
+
+		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
 		void update_stat(MapleStat::Id stat, int16_t value);
 		void update_skills(int32_t skill_id);
+
+		// Called by SkillMacrosHandler at login
+		void load_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3);
 
 	protected:
 		Button::State button_pressed(uint16_t id) override;
@@ -67,6 +75,7 @@ namespace ms
 			void set_count(int16_t) override {}
 			void set_state(StatefulIcon::State) override {}
 			Icon::IconType get_type() override;
+			int32_t get_action_id() const override { return skill_id; }
 
 		private:
 			int32_t skill_id;
@@ -166,5 +175,23 @@ namespace ms
 		Texture macro_backgrnd2;
 		Texture macro_backgrnd3;
 
+		// Inline macro editor controls (drawn on top of macro_backgrnd* when macro_enabled)
+		static constexpr int16_t MACRO_COUNT = 3;
+		Texture macro_slot;
+		// Layout (relative to macro panel top-left = position + (bg_dimensions.x(), 0))
+		Point<int16_t> macro_slots_origin;   // top-left of the 3x3 slot grid
+		int16_t macro_slot_size;             // width/height of each slot
+		int16_t macro_slot_gap;              // spacing between slots
+		int16_t macro_row_gap;               // spacing between rows
+		Point<int16_t> macro_name_origin;    // top-left of the single name field
+		Point<int16_t> macro_name_size;      // width/height of name field
+		int16_t selected_macro;              // which row the bottom name field edits
+		Textfield macro_name_field;          // single shared bottom field
+		std::string macro_names[MACRO_COUNT];
+		bool macro_shouts[MACRO_COUNT];
+		int32_t macro_skills[MACRO_COUNT][3];
+
+		void macro_select_row(int16_t row);
+		void save_macros();
 	};
 }

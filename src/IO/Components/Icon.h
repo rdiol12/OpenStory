@@ -51,6 +51,9 @@ namespace ms
 			virtual IconType get_type() = 0;
 			virtual int16_t get_source_slot() const { return -1; }
 			virtual InventoryType::Id get_source_tab() const { return InventoryType::Id::NONE; }
+			// Returns the action id represented by this icon (skill_id for SKILL, item_id for ITEM, etc.)
+			// Used so drop handlers outside the originating UI can identify the binding target.
+			virtual int32_t get_action_id() const { return 0; }
 		};
 
 		class NullType : public Type
@@ -82,6 +85,7 @@ namespace ms
 		bool get_drag();
 		int16_t get_source_slot() const;
 		InventoryType::Id get_source_tab() const;
+		int32_t get_action_id() const;
 
 	private:
 		std::unique_ptr<Type> type;

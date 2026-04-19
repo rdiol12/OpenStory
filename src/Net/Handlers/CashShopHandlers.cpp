@@ -143,8 +143,26 @@ namespace ms
 		UI::get().emplace<UIMTS>();
 	}
 
+	// Holds the UI scale that was active immediately before the cash shop
+	// transition forced scale=1.0. UICashShop reads this back via
+	// get_pre_cashshop_ui_scale() when the player leaves the shop.
+	static float s_pre_cashshop_ui_scale = 1.0f;
+
+	float get_pre_cashshop_ui_scale()
+	{
+		return s_pre_cashshop_ui_scale;
+	}
+
 	void SetCashShopHandler::transition() const
 	{
+		// The cash shop UI is authored at 1:1 for a 1024x768 physical window.
+		// Setting UI_SCALE to 1.0 makes the logical view match the physical
+		// window so the hard-coded button positions line up with the cursor
+		// (cursor_callback divides physical coords by get_viewwidth() /
+		// get_viewheight(), which at scale=1.0 equal the physical size).
+		s_pre_cashshop_ui_scale = Constants::Constants::get().get_ui_scale();
+		Constants::Constants::get().set_ui_scale(1.0f);
+
 		Constants::Constants::get().set_viewwidth(1024);
 		Constants::Constants::get().set_viewheight(768);
 

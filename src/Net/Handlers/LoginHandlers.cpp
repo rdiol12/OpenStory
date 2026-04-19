@@ -31,6 +31,7 @@
 #include "../../IO/UITypes/UITermsOfService.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
 #include "../../Configuration.h"
+#include "../../Net/ChannelLoadData.h"
 #include "../../Net/Session.h"
 
 namespace ms
@@ -133,6 +134,13 @@ namespace ms
 
 			if (world.wid != -1)
 			{
+				// Cache the real channel count/loads reported by the server
+				// so in-game UIs (UIChannel) can query them after login.
+				ChannelLoadData::get().update(
+					static_cast<int8_t>(world.wid),
+					world.channelcount,
+					world.chloads);
+
 				worldselect->add_world(world);
 			}
 			else

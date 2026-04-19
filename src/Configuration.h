@@ -319,6 +319,19 @@ namespace ms
 		FontPathBold() : StringEntry("FontPathBold", "fonts/Arial/Arial-Bold.ttf") {}
 	};
 
+	// Optional color-emoji font for announcements/chat. Left empty to disable.
+	struct FontPathEmoji : public Configuration::StringEntry
+	{
+		FontPathEmoji() : StringEntry("FontPathEmoji", "C:/Windows/Fonts/seguiemj.ttf") {}
+	};
+
+	// CJK (Korean/Japanese/Chinese) fallback font for quest names, NPC names,
+	// and chat. Used when the primary font lacks a glyph. Left empty to disable.
+	struct FontPathCJK : public Configuration::StringEntry
+	{
+		FontPathCJK() : StringEntry("FontPathCJK", "C:/Windows/Fonts/malgun.ttf") {}
+	};
+
 	// Music Volume
 	// Number from 0 to 100
 	struct BGMVolume : public Configuration::ByteEntry
@@ -679,6 +692,12 @@ namespace ms
 	struct MouseSpeed : public Configuration::ByteEntry
 	{
 		MouseSpeed() : ByteEntry("MouseSpeed", "50") {}
+	};
+
+	// Directory where F12 screenshots are written (created if missing).
+	struct ScreenshotFolder : public Configuration::StringEntry
+	{
+		ScreenshotFolder() : StringEntry("ScreenshotFolder", "screenshots") {}
 	};
 
 	// HP warning threshold slider (0-100)

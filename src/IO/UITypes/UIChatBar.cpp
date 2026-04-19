@@ -124,7 +124,8 @@ namespace ms
 				msg = trim(msg);
 				if (msg.empty())
 				{
-					toggle_chatfield(false);
+					// Empty Enter minimizes the whole chat window.
+					set_chat_open(false);
 					return;
 				}
 
@@ -245,7 +246,7 @@ namespace ms
 					textheight--;
 				}
 
-				int16_t msgy = chattop - yshift - 1;
+				int16_t msgy = chattop - yshift - 7;
 
 				if (msgy < chattop)
 					continue;

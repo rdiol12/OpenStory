@@ -38,7 +38,7 @@ namespace ms
 		else
 			strid = std::to_string(skillid);
 
-		std::string jobid = std::to_string(skillid / 10000);
+		std::string jobid = string_format::extend_id(skillid / 10000, 3);
 		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
 
 		projectile = true;

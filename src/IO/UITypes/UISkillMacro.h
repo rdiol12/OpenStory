@@ -58,11 +58,19 @@ namespace ms
 
 		void set_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3);
 
+		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+
+		// Called by SkillMacrosHandler at login, before this UI is ever emplaced.
+		static void cache_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		void save_macros();
+
+		static SkillMacro cached_macros[NUM_MACROS];
+		static bool cache_loaded;
 
 		enum Buttons : uint16_t
 		{

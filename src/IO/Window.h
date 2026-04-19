@@ -55,6 +55,16 @@ namespace ms
 
 		void toggle_fullscreen();
 
+		// Applies the given slider value (0-100 range, as stored by
+		// UIOptionMenu) to the system pointer speed via Windows'
+		// SPI_SETMOUSESPEED. Windows accepts 1..20, where 10 is the default.
+		// Pass -1 to apply the currently saved MouseSpeed setting.
+		void apply_mouse_speed(int slider_value = -1);
+
+		// Captures the current framebuffer contents and saves a timestamped
+		// PNG under ./screenshots/. Called from the F12 key handler.
+		void take_screenshot();
+
 	private:
 		void updateopc();
 

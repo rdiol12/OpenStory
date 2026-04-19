@@ -38,6 +38,12 @@ namespace ms
 		if (msgtype == 0 && recv.length() > 0)
 			style = recv.read_short();
 
+		// Force-remove any stale NpcTalk element so emplace always creates a
+		// fresh one. UIStateGame::remove uses unique_ptr::release() which
+		// leaves a null entry behind; that can occasionally wedge subsequent
+		// dialog opens when the server sends a new dialogue before the old
+		// one's state has fully cleared.
+		UI::get().remove(UIElement::Type::NPCTALK);
 		UI::get().emplace<UINpcTalk>();
 		UI::get().enable();
 

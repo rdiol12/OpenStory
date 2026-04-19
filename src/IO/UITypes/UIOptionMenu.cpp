@@ -372,6 +372,7 @@ namespace ms
 		Setting<GraphicsQuality>::get().save(slider_val[SL_GRAPHICS]);
 		Setting<EffectsQuality>::get().save(slider_val[SL_EFFECTS]);
 		Setting<MouseSpeed>::get().save(slider_val[SL_MOUSE_SPEED]);
+		Window::get().apply_mouse_speed(slider_val[SL_MOUSE_SPEED]);
 		Setting<HPWarning>::get().save(slider_val[SL_HP_WARNING]);
 		Setting<MPWarning>::get().save(slider_val[SL_MP_WARNING]);
 

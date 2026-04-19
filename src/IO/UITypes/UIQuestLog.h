@@ -44,6 +44,7 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 		void send_scroll(double yoffset) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
@@ -135,7 +136,10 @@ namespace ms
 		// icon_info panel
 		Texture icon_info_backgrnd;
 		Texture icon_info_backgrnd2;
-		Texture icon_info_sheet;
+		Texture icon_info_sheet;      // legacy (container — invalid). Kept for back-compat.
+		Texture icon_info_sheet0;     // Sheet/0 (192x18)
+		Texture icon_info_sheet1;     // Sheet/1 (192x17)
+		Texture icon_info_sheet2;     // Sheet/2 (192x17, sourced from Sheet/1)
 		bool show_icon_info;
 
 		// List extras
@@ -147,13 +151,34 @@ namespace ms
 		{
 			int16_t id;
 			Text name;
+			int32_t area = 0;
+			// Which icon from the ? legend panel to draw next to this entry.
+			// Maps directly to icon0..icon10 + QM0/QM1 (0-12).
+			uint8_t icon_type = 0;
 		};
+
+		// Pick an appropriate legend icon (0..12) for a quest, given its tab/state.
+		uint8_t pick_quest_icon(int16_t qid, uint16_t tab_id, bool is_recommended) const;
+		// Draw the chosen legend icon at pos for a given quest entry.
+		void draw_entry_icon(uint8_t icon_type, Point<int16_t> pos, float alpha) const;
+
+		// Returns the visual height (in px) needed to render a quest entry's
+		// name. If the name's wrapped layout exceeds ROW_HEIGHT (i.e. it spans
+		// more than one visual line), the row grows to fit; otherwise returns
+		// ROW_HEIGHT. A small padding is added so successive rows don't touch.
+		int16_t row_height_for(const QuestEntry& e) const;
 
 		std::vector<QuestEntry> available_entries;
 		std::vector<QuestEntry> recommended_entries;
 		std::vector<QuestEntry> active_entries;
 		std::vector<QuestEntry> completed_entries;
 		std::vector<QuestEntry> weekly_entries;
+
+		// Virtual row layouts with area-group dividers.
+		// Each element: entry index (>=0) or -1 (divider row).
+		std::vector<int16_t> active_row_layout;
+		std::vector<int16_t> completed_row_layout;
+		std::vector<int16_t> weekly_row_layout;
 		bool filter_my_level;
 		bool filter_my_location;
 		bool show_recommended;
@@ -213,7 +238,9 @@ namespace ms
 			Text name;
 			Text count;
 		};
-		std::vector<QuestItem> detail_rewards;
+		std::vector<QuestItem> detail_rewards;          // unconditional items + exp/meso/fame/skill
+		std::vector<QuestItem> detail_rewards_select;   // "Obtain selectively" (player picks one)
+		std::vector<QuestItem> detail_rewards_prob;     // "Obtain randomly" (server rolls from pool)
 		std::vector<QuestItem> detail_requirements;
 
 		// Quest job requirement text
@@ -250,6 +277,7 @@ namespace ms
 		Texture prob_texture;
 		Texture reward_texture;
 		Texture summary_texture;
+		Texture obtain_select_texture;   // UIWindow.img/Quest/select: "Obtain selectively" banner
 
 		// Per-tab backgrounds (one per tab, never stacked)
 		Texture list_backgrnd;

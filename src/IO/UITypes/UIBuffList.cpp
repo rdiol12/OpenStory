@@ -44,7 +44,7 @@ namespace ms
 			else
 				strid = std::to_string(buffid);
 
-			std::string jobid = std::to_string(buffid / 10000);
+			std::string jobid = string_format::extend_id(buffid / 10000, 3);
 			nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
 			icon = src["icon"];
 		}

@@ -21,11 +21,19 @@
 
 #include "../Components/Charset.h"
 #include "../Components/Gauge.h"
+#include "../Components/Icon.h"
+#include "../KeyConfig.h"
+#include "../KeyType.h"
+
+#include <map>
+#include <memory>
 
 #include "../../Character/CharStats.h"
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Geometry.h"
+
+#include <array>
 
 namespace ms
 {
@@ -42,6 +50,8 @@ namespace ms
 		void update() override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
+		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -199,6 +209,61 @@ namespace ms
 		Texture quickslot_bg;
 		bool show_quickslot;
 
+		// Quickslot drop support.
+		// The v83 panel shows 8 key bindings laid out in 2 rows of 4.
+		// Top row keys (L→R): LEFT_SHIFT, INSERT, HOME, PAGE_UP
+		// Bottom row keys (L→R): LEFT_CONTROL, DELETE, END, PAGE_DOWN
+		static constexpr std::array<uint8_t, 8> QUICKSLOT_KEYS{
+			KeyConfig::Key::LEFT_SHIFT, KeyConfig::Key::INSERT,
+			KeyConfig::Key::HOME,       KeyConfig::Key::PAGE_UP,
+			KeyConfig::Key::LEFT_CONTROL, KeyConfig::Key::DELETE,
+			KeyConfig::Key::END,        KeyConfig::Key::PAGE_DOWN
+		};
+		// Returns the quickslot slot index (0..7) under the cursor, or -1 if outside.
+		int16_t quickslot_slot_at(Point<int16_t> cursorpos) const;
+		// Returns the top-left screen position of the given slot (0..7).
+		Point<int16_t> quickslot_slot_pos(int16_t slot) const;
+		// Returns the top-left screen position of the quickslot panel sprite.
+		Point<int16_t> quickslot_panel_pos() const;
+		// Applies a mapping to a quickslot key and dispatches the server packet.
+		void assign_quickslot(int16_t slot, KeyType::Id type, int32_t action);
+
+		// Text labels drawn above each cell showing the bound key name.
+		Text qs_key_labels[8];
+
+		// Drawn icons for bound quickslot entries (keyed by maple keycode).
+		mutable std::map<int32_t, Texture> qs_icon_cache;
+		Texture get_quickslot_icon(KeyType::Id type, int32_t action) const;
+
+		// Clears the binding on a quickslot key locally + on the server.
+		void clear_quickslot(uint8_t key);
+
+		// Owns draggable Icon objects created when the user picks a binding
+		// out of a quickslot cube. Keyed by maple keycode so repeat drags of
+		// the same slot reuse the same Icon.
+		std::map<uint8_t, std::unique_ptr<Icon>> qs_drag_icons;
+
+		// Type/action pickup helper class that writes a cleared binding on
+		// drop_on_stage so dropping outside the quickslot removes it.
+		class QuickslotDragType : public Icon::Type
+		{
+		public:
+			QuickslotDragType(uint8_t key, KeyType::Id type, int32_t action);
+
+			void drop_on_stage() const override;
+			void drop_on_equips(EquipSlot::Id) const override {}
+			bool drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const override { return true; }
+			void drop_on_bindings(Point<int16_t>, bool) const override {}
+			void set_count(int16_t) override {}
+			Icon::IconType get_type() override;
+			int32_t get_action_id() const override { return action; }
+
+		private:
+			uint8_t key;
+			KeyType::Id type;
+			int32_t action;
+		};
+
 		// readyZero
 		Texture ready_zero_backgrnd;
 		Texture ready_zero_gauge_backgrnd;
@@ -216,6 +281,7 @@ namespace ms
 		// Notice/notification state
 		bool has_notification;
 		Texture notice_sprite;
+		uint32_t notice_pulse_tick;
 
 		// Pre-allocated draw objects
 		ColorBox menu_bg;

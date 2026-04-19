@@ -201,11 +201,24 @@ namespace ms
 				GLshort bl;
 				GLshort bt;
 				Offset offset;
+				// true when the glyph is a color bitmap (emoji) stored outside
+				// the monochrome font region of the atlas.
+				bool color = false;
 			};
 
 			GLshort width;
 			GLshort height;
-			Char chars[128];
+			// Lazily populated glyph cache keyed by Unicode codepoint.
+			// ASCII 32-127 are pre-loaded in addfont(); other codepoints are
+			// materialized on demand via ensure_glyph().
+			std::unordered_map<uint32_t, Char> chars;
+			// Pixel size used when this font was created; needed when we have
+			// to load additional glyphs later (FT_Set_Pixel_Sizes on the face).
+			FT_UInt pixelw = 0;
+			FT_UInt pixelh = 0;
+			// Path to the monochrome font file (persisted so ensure_glyph can
+			// reopen the face to load a missing codepoint).
+			std::string path;
 
 			Font(GLshort w, GLshort h)
 			{
@@ -228,7 +241,7 @@ namespace ms
 		class LayoutBuilder
 		{
 		public:
-			LayoutBuilder(const Font& font, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj);
+			LayoutBuilder(const Font& font, Text::Font fontid, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj);
 
 			size_t add(const char* text, size_t prev, size_t first, size_t last);
 			Text::Layout finish(size_t first, size_t last);
@@ -238,6 +251,7 @@ namespace ms
 			void add_line();
 
 			const Font& font;
+			Text::Font base_fontid;
 
 			Text::Alignment alignment;
 			Text::Font fontid;
@@ -288,9 +302,24 @@ namespace ms
 		Point<GLshort> border;
 		Range<GLshort> yrange;
 
+		// Returns the glyph for the given (font, codepoint), by value.
+		// Loads the glyph into the atlas lazily if it hasn't been cached yet.
+		Font::Char ensure_glyph(Text::Font fontid, uint32_t codepoint);
+		// Loads a single monochrome glyph from the font's own face into the font atlas region.
+		bool load_mono_glyph(Font& font, uint32_t codepoint);
+		// Loads a single color emoji glyph into the general (RGBA) atlas area.
+		bool load_emoji_glyph(Font& font, uint32_t codepoint);
+
 		FT_Library ftlibrary;
 		Font fonts[Text::Font::NUM_FONTS];
 		Point<GLshort> fontborder;
 		GLshort fontymax;
+
+		// Optional color emoji face (loaded once). Shared across all font sizes.
+		FT_Face emojiface = nullptr;
+		FT_UInt emoji_strike_size = 0;
+
+		// CJK fallback font path — used when primary font lacks a glyph
+		std::string cjk_fallback_path;
 	};
 }
