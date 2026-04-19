@@ -19,6 +19,9 @@
 
 #include "../UIElement.h"
 
+#include "../../Graphics/Animation.h"
+#include "../../Graphics/Text.h"
+#include "../../Gameplay/MapleMap/MapBackgrounds.h"
 #include "../../Net/Login.h"
 
 namespace ms
@@ -33,6 +36,7 @@ namespace ms
 		UIWorldSelect();
 
 		void draw(float alpha) const override;
+		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
@@ -57,18 +61,13 @@ namespace ms
 
 		enum Buttons : uint16_t
 		{
-			BT_ENTERWORLD = 0,
-			BT_WORLD0 = 1,
-			BT_CHANNEL0 = 17,
-			BT_GOWORLD = 37,
-			BT_VIEWALL = 38,
-			BT_VIEWCHOICE = 39,
-			BT_SCROLLUP = 40,
-			BT_SCROLLDOWN = 41,
-			BT_ALERT_ARROWL = 42,
-			BT_ALERT_ARROWR = 43,
-			BT_ALERT_CHOICE = 44,
-			BT_ALERT_CLOSE = 45
+			BT_WORLD0 = 0,
+			BT_CHANNEL0 = 5,
+			BT_ENTERWORLD = 25,
+			BT_VIEWALL = 26,
+			BT_VIEWCHOICE = 27,
+			BT_QUITGAME = 28,
+			BT_CHANGEREGION = 29
 		};
 
 		uint8_t worldid;
@@ -79,39 +78,38 @@ namespace ms
 		std::vector<World> worlds;
 
 		bool world_selected;
-		bool show_alert;
+		bool draw_chatballoon;
 
+		// NX node references (kept for draw_world/set_region)
+		nl::node world_select;
+		nl::node world_src;
+		nl::node channel_src;
+
+		// Panel positions
+		Point<int16_t> channel_pos;
+		Point<int16_t> world_pos;
+
+		// Textures
 		Texture channels_background;
+		Texture worlds_background;
+		Texture channel_gauge;
+		Texture scroll_closed;
+		Texture scroll_open;
 		std::vector<Texture> world_textures;
 
-		// Channel gauge (load indicator)
-		Texture channel_gauge;
+		// Channel selection highlight
+		Animation channel_selected;
 
-		// Channel background (alternative)
-		Texture ch_backgrn;
+		// Scroll/springboard position
+		Point<int16_t> scroll_pos;
 
-		// Channel labels and decorations
-		std::vector<Texture> channel_labels;
-		Texture ch_event;
-		Texture ch_select;
-		Texture ch_gauge_bar;
+		// Channel panel top-left (cached for drawing)
+		Point<int16_t> ch_panel_tl;
 
-		// World name label bitmaps
-		std::vector<Texture> world_labels;
+		// Map backgrounds (from MapLogin.img)
+		MapBackgrounds map_backgrounds;
 
-		// World notice
-		Texture world_notice;
-
-		// Tooltip textures
-		std::vector<Texture> tooltip_textures;
-
-		// Alert panel
-		Texture alert_backgrd;
-
-		// Hover tracking for world button tooltips
-		int16_t hovered_world;
-
-		// Active channel count for the selected world
-		uint8_t active_channelcount;
+		// Version text
+		Text version;
 	};
 }

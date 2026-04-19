@@ -29,9 +29,21 @@
 
 namespace ms
 {
+	SkillMacro UISkillMacro::cached_macros[UISkillMacro::NUM_MACROS] = {};
+	bool UISkillMacro::cache_loaded = false;
+
+	void UISkillMacro::cache_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3)
+	{
+		if (index >= NUM_MACROS)
+			return;
+
+		cached_macros[index] = SkillMacro(name, shout, s1, s2, s3);
+		cache_loaded = true;
+	}
+
 	UISkillMacro::UISkillMacro() : UIDragElement<PosSKILLMACRO>(Point<int16_t>(250, 20))
 	{
-		nl::node src = nl::nx::ui["UIWindow2.img"]["SkillMacro"];
+		nl::node src = nl::nx::ui["UIWindow.img"]["SkillMacro"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
 
 		nl::node backgrnd = src["backgrnd"];
@@ -83,6 +95,17 @@ namespace ms
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
+
+		// Load any macros received from server before this UI was emplaced.
+		if (cache_loaded)
+		{
+			for (int16_t i = 0; i < NUM_MACROS; i++)
+			{
+				const SkillMacro& c = cached_macros[i];
+				macros[i] = c;
+				name_fields[i].change_text(c.name);
+			}
+		}
 	}
 
 	void UISkillMacro::draw(float inter) const
@@ -198,6 +221,37 @@ namespace ms
 
 		macros[index] = SkillMacro(name, shout, s1, s2, s3);
 		name_fields[index].change_text(name);
+		cached_macros[index] = macros[index];
+		cache_loaded = true;
+	}
+
+	bool UISkillMacro::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		if (const_cast<Icon&>(icon).get_type() != Icon::IconType::SKILL)
+			return true;
+
+		int32_t skill_id = icon.get_action_id();
+		if (skill_id == 0)
+			return true;
+
+		for (int16_t i = 0; i < NUM_MACROS; i++)
+		{
+			for (int16_t s = 0; s < 3; s++)
+			{
+				Point<int16_t> slot_pos = position + row_origin + Point<int16_t>(188 + s * 36, i * row_height);
+				Rectangle<int16_t> slot_rect(slot_pos, slot_pos + Point<int16_t>(32, 32));
+
+				if (slot_rect.contains(cursorpos))
+				{
+					if (s == 0) macros[i].skill1 = skill_id;
+					else if (s == 1) macros[i].skill2 = skill_id;
+					else macros[i].skill3 = skill_id;
+					return false;
+				}
+			}
+		}
+
+		return true;
 	}
 
 	Button::State UISkillMacro::button_pressed(uint16_t buttonid)
@@ -237,7 +291,11 @@ namespace ms
 			data[i].skill1 = macros[i].skill1;
 			data[i].skill2 = macros[i].skill2;
 			data[i].skill3 = macros[i].skill3;
+
+			cached_macros[i] = macros[i];
 		}
+
+		cache_loaded = true;
 
 		SkillMacroModifiedPacket(data, NUM_MACROS).dispatch();
 	}

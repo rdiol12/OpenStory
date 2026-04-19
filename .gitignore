@@ -24,3 +24,11 @@ Settings
 /.vscode
 /build
 /wz
+
+# local backup / scratch dirs
+/src_backup_*
+/src_v83_mess_*
+/vendor/freetype.bak-*
+/launcher/node_modules
+/launcher/dist
+crash_debug.txt

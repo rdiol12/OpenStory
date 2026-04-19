@@ -137,7 +137,49 @@ namespace ms
 
 		buttons[Buttons::BT_MACRO_OK] = std::make_unique<MapleButton>(macro["BtOK"], Point<int16_t>(bg_dimensions.x(), 0));
 
-		buttons[Buttons::BT_MACRO_OK]->set_state(Button::State::DISABLED);
+		// Load slot sprite from the standalone SkillMacro NX (UIWindow.img/SkillMacro)
+		nl::node sm = nl::nx::ui["UIWindow.img"]["SkillMacro"];
+		if (sm["slot"].size() > 0)
+		{
+			macro_slot = sm["slot"];
+			// Normalize: draw at pos places top-left at pos (origin -> 0,0)
+			macro_slot.shift(macro_slot.get_origin());
+		}
+
+		// Layout for the v83 inline macro panel:
+		//   - 3 rows x 3 slots grid at the top
+		//   - Single name field at the bottom (edits selected row)
+		macro_slots_origin = Point<int16_t>(14, 46);
+		macro_slot_size = 32;
+		macro_slot_gap = 4;          // 32 + 4 = 36 between slot columns
+		macro_row_gap = 12;          // 32 + 12 = 44 between slot rows
+
+		macro_name_origin = Point<int16_t>(14, macro_slots_origin.y() + MACRO_COUNT * (macro_slot_size + macro_row_gap) + 8);
+		macro_name_size = Point<int16_t>(
+			3 * macro_slot_size + 2 * macro_slot_gap, // width matches slot grid
+			18
+		);
+
+		selected_macro = 0;
+
+		for (int16_t i = 0; i < MACRO_COUNT; i++)
+		{
+			macro_names[i] = "";
+			macro_shouts[i] = false;
+			macro_skills[i][0] = 0;
+			macro_skills[i][1] = 0;
+			macro_skills[i][2] = 0;
+		}
+
+		{
+			Point<int16_t> field_lt = Point<int16_t>(bg_dimensions.x(), 0) + macro_name_origin;
+			Point<int16_t> field_rb = field_lt + macro_name_size;
+			macro_name_field = Textfield(
+				Text::A11M, Text::LEFT, Color::Name::BLACK,
+				Rectangle<int16_t>(field_lt, field_rb), 13
+			);
+		}
+
 
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
 
@@ -232,10 +274,47 @@ namespace ms
 			macro_backgrnd.draw(macro_pos + Point<int16_t>(1, 0));
 			macro_backgrnd2.draw(macro_pos);
 			macro_backgrnd3.draw(macro_pos);
+
+			// 3x3 macro skill slot grid
+			for (int16_t i = 0; i < MACRO_COUNT; i++)
+			{
+				for (int16_t s = 0; s < 3; s++)
+				{
+					Point<int16_t> slot_pos = macro_pos + macro_slots_origin + Point<int16_t>(
+						s * (macro_slot_size + macro_slot_gap),
+						i * (macro_slot_size + macro_row_gap)
+					);
+
+					int32_t skillid = macro_skills[i][s];
+
+					if (skillid > 0)
+					{
+						const SkillData& data = SkillData::get(skillid);
+						Texture icon = data.get_icon(SkillData::Icon::NORMAL);
+
+						if (icon.is_valid())
+						{
+							icon.shift(Point<int16_t>(0, 32));
+							icon.draw(DrawArgument(slot_pos + Point<int16_t>(2, 2)));
+						}
+					}
+				}
+			}
+
+			// Bottom name field (for currently selected row)
+			macro_name_field.draw(position);
 		}
 
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UISkillBook::update()
+	{
+		UIElement::update();
+
+		if (macro_enabled)
+			macro_name_field.update(position);
 	}
 
 	Button::State UISkillBook::button_pressed(uint16_t id)
@@ -265,10 +344,13 @@ namespace ms
 		case Buttons::BT_SPUP3:
 			send_spup(id - Buttons::BT_SPUP0 + offset);
 			break;
+		case Buttons::BT_MACRO_OK:
+			save_macros();
+			set_macro(false);
+			break;
 		case Buttons::BT_HYPER:
 		case Buttons::BT_GUILDSKILL:
 		case Buttons::BT_RIDE:
-		case Buttons::BT_MACRO_OK:
 		default:
 			break;
 		}
@@ -309,6 +391,33 @@ namespace ms
 
 		if (dragged)
 			return dstate;
+
+		if (macro_enabled)
+		{
+			// Bottom name field (single, edits selected row)
+			Cursor::State tstate = macro_name_field.send_cursor(cursorpos, clicked);
+			if (tstate != Cursor::State::IDLE)
+				return tstate;
+
+			// Row selection: click on a row's slot-grid area to select that row for name editing
+			if (clicked)
+			{
+				Point<int16_t> macro_pos = position + Point<int16_t>(bg_dimensions.x(), 0);
+
+				for (int16_t i = 0; i < MACRO_COUNT; i++)
+				{
+					Point<int16_t> row_tl = macro_pos + macro_slots_origin + Point<int16_t>(0, i * (macro_slot_size + macro_row_gap));
+					Point<int16_t> row_br = row_tl + Point<int16_t>(3 * macro_slot_size + 2 * macro_slot_gap, macro_slot_size);
+					Rectangle<int16_t> row_rect(row_tl, row_br);
+
+					if (row_rect.contains(cursorpos))
+					{
+						macro_select_row(i);
+						return Cursor::State::CLICKING;
+					}
+				}
+			}
+		}
 
 		Point<int16_t> cursor_relative = cursorpos - position;
 
@@ -791,11 +900,111 @@ namespace ms
 		macro_enabled = enabled;
 
 		if (macro_enabled)
-			dimension = bg_dimensions + Point<int16_t>(macro_backgrnd.get_dimensions().x(), 0);
+		{
+			// Extend dimension to cover the inline macro panel so drops over it hit this UI.
+			int16_t panel_w = macro_backgrnd.get_dimensions().x();
+			int16_t panel_h = std::max<int16_t>(bg_dimensions.y(),
+				macro_name_origin.y() + macro_name_size.y() + 16);
+			dimension = Point<int16_t>(bg_dimensions.x() + panel_w, panel_h);
+		}
 		else
+		{
 			dimension = bg_dimensions;
+		}
 
 		buttons[Buttons::BT_MACRO_OK]->set_active(macro_enabled);
+		buttons[Buttons::BT_MACRO_OK]->set_state(macro_enabled ? Button::State::NORMAL : Button::State::DISABLED);
+
+		if (macro_enabled)
+		{
+			macro_name_field.set_state(Textfield::State::NORMAL);
+			macro_name_field.change_text(macro_names[selected_macro]);
+		}
+		else
+		{
+			macro_name_field.set_state(Textfield::State::DISABLED);
+		}
+	}
+
+	void UISkillBook::macro_select_row(int16_t row)
+	{
+		if (row < 0 || row >= MACRO_COUNT)
+			return;
+
+		// Persist current field text into the previously selected macro
+		macro_names[selected_macro] = macro_name_field.get_text();
+
+		selected_macro = row;
+		macro_name_field.change_text(macro_names[selected_macro]);
+	}
+
+	void UISkillBook::load_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3)
+	{
+		if (index >= MACRO_COUNT)
+			return;
+
+		macro_names[index] = name;
+		macro_shouts[index] = shout;
+		macro_skills[index][0] = s1;
+		macro_skills[index][1] = s2;
+		macro_skills[index][2] = s3;
+
+		if (index == selected_macro)
+			macro_name_field.change_text(name);
+	}
+
+	void UISkillBook::save_macros()
+	{
+		// Persist the currently edited name into the selected row
+		macro_names[selected_macro] = macro_name_field.get_text();
+
+		SkillMacroModifiedPacket::MacroData data[MACRO_COUNT];
+
+		for (int16_t i = 0; i < MACRO_COUNT; i++)
+		{
+			data[i].name = macro_names[i];
+			data[i].shout = macro_shouts[i];
+			data[i].skill1 = macro_skills[i][0];
+			data[i].skill2 = macro_skills[i][1];
+			data[i].skill3 = macro_skills[i][2];
+		}
+
+		SkillMacroModifiedPacket(data, MACRO_COUNT).dispatch();
+	}
+
+	bool UISkillBook::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		if (!macro_enabled)
+			return true;
+
+		if (const_cast<Icon&>(icon).get_type() != Icon::IconType::SKILL)
+			return true;
+
+		int32_t skill_id = icon.get_action_id();
+		if (skill_id == 0)
+			return true;
+
+		Point<int16_t> macro_pos = position + Point<int16_t>(bg_dimensions.x(), 0);
+
+		for (int16_t i = 0; i < MACRO_COUNT; i++)
+		{
+			for (int16_t s = 0; s < 3; s++)
+			{
+				Point<int16_t> slot_pos = macro_pos + macro_slots_origin + Point<int16_t>(
+					s * (macro_slot_size + macro_slot_gap),
+					i * (macro_slot_size + macro_row_gap)
+				);
+				Rectangle<int16_t> slot_rect(slot_pos, slot_pos + Point<int16_t>(macro_slot_size, macro_slot_size));
+
+				if (slot_rect.contains(cursorpos))
+				{
+					macro_skills[i][s] = skill_id;
+					return true;
+				}
+			}
+		}
+
+		return true;
 	}
 
 }

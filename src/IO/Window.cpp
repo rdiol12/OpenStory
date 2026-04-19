@@ -26,9 +26,19 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 #include <Windows.h>
+#include <ShlObj.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <glfw3native.h>
+
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <iomanip>
+#include <sstream>
+#include <vector>
 
 namespace ms
 {
@@ -245,6 +255,9 @@ namespace ms
 		// Confine cursor to window so it can't escape to desktop/taskbar
 		clip_cursor_to_window(glwnd);
 
+		// Apply saved mouse speed (SystemParametersInfo SPI_SETMOUSESPEED).
+		apply_mouse_speed();
+
 		char buf[256];
 		GetCurrentDirectoryA(256, buf);
 		strcat_s(buf, sizeof(buf), "\\Icon.png");
@@ -347,6 +360,75 @@ namespace ms
 		const char* text = glfwGetClipboardString(glwnd);
 
 		return text ? text : "";
+	}
+
+	void Window::apply_mouse_speed(int slider_value)
+	{
+		// Slider stored 0..100. Windows SPI_SETMOUSESPEED takes 1..20 (10 = default).
+		if (slider_value < 0)
+			slider_value = Setting<MouseSpeed>::get().load();
+
+		if (slider_value < 0) slider_value = 0;
+		if (slider_value > 100) slider_value = 100;
+
+		// Map 0..100 -> 1..20 linearly, rounding to nearest.
+		int sys_speed = 1 + static_cast<int>(((slider_value * 19) + 50) / 100);
+		if (sys_speed < 1) sys_speed = 1;
+		if (sys_speed > 20) sys_speed = 20;
+
+		SystemParametersInfoA(SPI_SETMOUSESPEED, 0,
+			reinterpret_cast<PVOID>(static_cast<INT_PTR>(sys_speed)), 0);
+	}
+
+	void Window::take_screenshot()
+	{
+		if (!glwnd)
+			return;
+
+		int fb_w = 0, fb_h = 0;
+		glfwGetFramebufferSize(glwnd, &fb_w, &fb_h);
+		if (fb_w <= 0 || fb_h <= 0)
+			return;
+
+		// Read RGBA pixels from the default framebuffer.
+		std::vector<uint8_t> pixels(static_cast<size_t>(fb_w) * fb_h * 4);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadBuffer(GL_FRONT);
+		glReadPixels(0, 0, fb_w, fb_h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		// OpenGL origin is bottom-left; PNG expects top-left — flip vertically.
+		std::vector<uint8_t> flipped(pixels.size());
+		size_t row_bytes = static_cast<size_t>(fb_w) * 4;
+		for (int y = 0; y < fb_h; ++y)
+		{
+			std::memcpy(
+				flipped.data() + (fb_h - 1 - y) * row_bytes,
+				pixels.data() + y * row_bytes,
+				row_bytes);
+		}
+
+		// Resolve output folder (from Setting<ScreenshotFolder>; create if missing).
+		std::string folder = Setting<ScreenshotFolder>::get().load();
+		if (folder.empty())
+			folder = "screenshots";
+
+		std::error_code ec;
+		std::filesystem::create_directories(folder, ec);
+
+		// Timestamped filename: maple_YYYYMMDD_HHMMSS.png
+		auto now = std::chrono::system_clock::now();
+		std::time_t t = std::chrono::system_clock::to_time_t(now);
+		std::tm tm_local;
+		localtime_s(&tm_local, &t);
+
+		std::ostringstream name;
+		name << "maple_"
+			<< std::put_time(&tm_local, "%Y%m%d_%H%M%S")
+			<< ".png";
+
+		std::filesystem::path out = std::filesystem::path(folder) / name.str();
+		stbi_write_png(out.string().c_str(), fb_w, fb_h, 4, flipped.data(),
+			static_cast<int>(row_bytes));
 	}
 
 	void Window::toggle_fullscreen()

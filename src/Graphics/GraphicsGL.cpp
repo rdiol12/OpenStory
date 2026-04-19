@@ -19,6 +19,77 @@
 
 #include "../Configuration.h"
 
+#include FT_BITMAP_H
+
+#include <cstdio>
+#include <cstdarg>
+
+namespace
+{
+	// ---------------- Debug logging ----------------
+	// Writes to GraphicsGL_debug.log next to the executable. Opened on first
+	// use, flushed on every line so nothing is lost if the process crashes.
+	static FILE* g_gfx_log = nullptr;
+	static void gfx_log(const char* fmt, ...)
+	{
+		if (!g_gfx_log)
+		{
+			g_gfx_log = std::fopen("GraphicsGL_debug.log", "w");
+			if (!g_gfx_log) return;
+		}
+		std::va_list ap;
+		va_start(ap, fmt);
+		std::vfprintf(g_gfx_log, fmt, ap);
+		va_end(ap);
+		std::fputc('\n', g_gfx_log);
+		std::fflush(g_gfx_log);
+	}
+
+	// Decodes one UTF-8 codepoint starting at `text[i]`. Sets `consumed` to
+	// the byte count (1-4). Falls back to the raw byte on malformed input.
+	inline uint32_t utf8_decode(const char* text, size_t length, size_t i, size_t& consumed)
+	{
+		if (i >= length) { consumed = 0; return 0; }
+		uint8_t b0 = static_cast<uint8_t>(text[i]);
+		if (b0 < 0x80) { consumed = 1; return b0; }
+
+		auto cont = [&](size_t j) -> uint8_t { return j < length ? static_cast<uint8_t>(text[j]) : 0; };
+
+		if ((b0 & 0xE0) == 0xC0 && i + 1 < length)
+		{
+			uint8_t b1 = cont(i + 1);
+			if ((b1 & 0xC0) == 0x80) { consumed = 2; return ((b0 & 0x1F) << 6) | (b1 & 0x3F); }
+		}
+		else if ((b0 & 0xF0) == 0xE0 && i + 2 < length)
+		{
+			uint8_t b1 = cont(i + 1), b2 = cont(i + 2);
+			if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80)
+			{
+				consumed = 3;
+				return ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F);
+			}
+		}
+		else if ((b0 & 0xF8) == 0xF0 && i + 3 < length)
+		{
+			uint8_t b1 = cont(i + 1), b2 = cont(i + 2), b3 = cont(i + 3);
+			if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80)
+			{
+				consumed = 4;
+				return ((b0 & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+			}
+		}
+		consumed = 1;
+		return b0;
+	}
+
+	inline bool is_emoji_codepoint(uint32_t cp)
+	{
+		return (cp >= 0x1F300 && cp <= 0x1FAFF)
+			|| (cp >= 0x2600  && cp <= 0x27BF)
+			|| (cp == 0x2764) || (cp == 0x2728);
+	}
+}
+
 #ifdef PLATFORM_IOS
 // Defined in FontPathIOS.mm
 extern const char* ios_font_path_normal();
@@ -261,6 +332,68 @@ namespace ms
 		addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18);
 
 		fontymax += fontborder.y();
+		gfx_log("init: finished addfont calls, fontymax=%d fontborder=(%d,%d)",
+			(int)fontymax, (int)fontborder.x(), (int)fontborder.y());
+
+#ifndef PLATFORM_IOS
+		const std::string FONT_CJK = Setting<FontPathCJK>().get().load();
+		cjk_fallback_path = FONT_CJK;
+		gfx_log("init: FONT_CJK=%s", FONT_CJK.c_str());
+
+		const std::string FONT_EMOJI = Setting<FontPathEmoji>().get().load();
+		gfx_log("init: FONT_EMOJI=%s", FONT_EMOJI.c_str());
+		if (!FONT_EMOJI.empty())
+		{
+			if (FT_New_Face(ftlibrary, FONT_EMOJI.c_str(), 0, &emojiface) == 0)
+			{
+				gfx_log("init: emoji FT_New_Face ok, num_fixed_sizes=%ld", (long)emojiface->num_fixed_sizes);
+				if (emojiface->num_fixed_sizes > 0)
+				{
+					int best = 0;
+					for (int i = 1; i < emojiface->num_fixed_sizes; ++i)
+					{
+						if (std::abs(emojiface->available_sizes[i].height - 16)
+							< std::abs(emojiface->available_sizes[best].height - 16))
+							best = i;
+					}
+					if (FT_Select_Size(emojiface, best) != 0)
+					{
+						gfx_log("init: FT_Select_Size failed; disabling emoji face");
+						FT_Done_Face(emojiface);
+						emojiface = nullptr;
+					}
+					else
+					{
+						emoji_strike_size = emojiface->available_sizes[best].height;
+						gfx_log("init: emoji strike %d height=%u", best, (unsigned)emoji_strike_size);
+					}
+				}
+				else
+				{
+					// Modern emoji fonts (e.g. Windows Segoe UI Emoji on Win10+)
+					// are COLR/COLRv1 vector fonts with no bitmap strikes.
+					// Use FT_Set_Pixel_Sizes so FT_LOAD_COLOR can rasterize
+					// the colored layers into a BGRA bitmap.
+					emoji_strike_size = 16;
+					if (FT_Set_Pixel_Sizes(emojiface, 0, emoji_strike_size) != 0)
+					{
+						gfx_log("init: emoji FT_Set_Pixel_Sizes failed; disabling emoji face");
+						FT_Done_Face(emojiface);
+						emojiface = nullptr;
+					}
+					else
+					{
+						gfx_log("init: emoji vector face, pixel size=%u", (unsigned)emoji_strike_size);
+					}
+				}
+			}
+			else
+			{
+				gfx_log("init: emoji FT_New_Face FAILED for %s", FONT_EMOJI.c_str());
+				emojiface = nullptr;
+			}
+		}
+#endif
 
 		leftovers = QuadTree<size_t, Leftover>(
 			[](const Leftover& first, const Leftover& second)
@@ -329,6 +462,9 @@ namespace ms
 			fontymax = height;
 
 		fonts[id] = Font(width, height);
+		fonts[id].path = name;
+		fonts[id].pixelw = pixelw;
+		fonts[id].pixelh = pixelh;
 
 		GLshort ox = x;
 		GLshort oy = y;
@@ -348,12 +484,234 @@ namespace ms
 			glTexSubImage2D(GL_TEXTURE_2D, 0, ox, oy, w, h, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
 
 			Offset offset = Offset(ox, oy, w, h);
-			fonts[id].chars[c] = { ax, ay, w, h, l, t, offset };
+			Font::Char ch = { ax, ay, w, h, l, t, offset, false };
+			fonts[id].chars.emplace(static_cast<uint32_t>(c), ch);
 
 			ox += w;
 		}
 
+		FT_Done_Face(face);
+		gfx_log("addfont id=%d name=%s pixelw=%u pixelh=%u width=%d height=%d chars=%zu",
+			(int)id, name, (unsigned)pixelw, (unsigned)pixelh,
+			(int)width, (int)height, fonts[id].chars.size());
 		return true;
+	}
+
+	bool GraphicsGL::load_mono_glyph(Font& font, uint32_t codepoint)
+	{
+		if (font.path.empty()) return false;
+
+		FT_Face face;
+		const char* loaded_path = font.path.c_str();
+		if (FT_New_Face(ftlibrary, font.path.c_str(), 0, &face))
+		{
+			gfx_log("load_mono_glyph: FT_New_Face failed for cp=U+%04X path=%s", codepoint, font.path.c_str());
+			return false;
+		}
+
+		// If the primary font has no glyph for this codepoint, try the CJK
+		// fallback face (e.g. malgun.ttf for Korean). This covers MapleStory
+		// v83 quest/NPC names which are often in Korean.
+		if (FT_Get_Char_Index(face, codepoint) == 0 && !cjk_fallback_path.empty())
+		{
+			FT_Face cjkface;
+			if (FT_New_Face(ftlibrary, cjk_fallback_path.c_str(), 0, &cjkface) == 0)
+			{
+				if (FT_Get_Char_Index(cjkface, codepoint) != 0)
+				{
+					FT_Done_Face(face);
+					face = cjkface;
+					loaded_path = cjk_fallback_path.c_str();
+				}
+				else
+				{
+					FT_Done_Face(cjkface);
+				}
+			}
+		}
+
+		if (FT_Set_Pixel_Sizes(face, font.pixelw, font.pixelh))
+		{
+			FT_Done_Face(face);
+			gfx_log("load_mono_glyph: FT_Set_Pixel_Sizes failed for cp=U+%04X", codepoint);
+			return false;
+		}
+
+		if (FT_Load_Char(face, codepoint, FT_LOAD_RENDER))
+		{
+			FT_Done_Face(face);
+			return false;
+		}
+		(void)loaded_path;
+
+		FT_GlyphSlot g = face->glyph;
+		GLshort w = static_cast<GLshort>(g->bitmap.width);
+		GLshort h = static_cast<GLshort>(g->bitmap.rows);
+
+		if (fontborder.x() + w > ATLASW)
+		{
+			fontborder.set_x(0);
+			fontborder.set_y(fontymax);
+			fontymax = 0;
+		}
+
+		GLshort ox = fontborder.x();
+		GLshort oy = fontborder.y();
+
+		fontborder.shift_x(w > 0 ? w : 1);
+
+		if (h > fontymax) fontymax = h;
+
+		if (w > 0 && h > 0)
+			glTexSubImage2D(GL_TEXTURE_2D, 0, ox, oy, w, h, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
+
+		Font::Char ch;
+		ch.ax = static_cast<GLshort>(g->advance.x >> 6);
+		ch.ay = static_cast<GLshort>(g->advance.y >> 6);
+		ch.bw = w;
+		ch.bh = h;
+		ch.bl = static_cast<GLshort>(g->bitmap_left);
+		ch.bt = static_cast<GLshort>(g->bitmap_top);
+		ch.offset = Offset(ox, oy, w, h);
+		ch.color = false;
+		font.chars.emplace(codepoint, ch);
+
+		FT_Done_Face(face);
+		gfx_log("load_mono_glyph: loaded cp=U+%04X ax=%d bw=%d bh=%d", codepoint, (int)ch.ax, (int)w, (int)h);
+		return true;
+	}
+
+	bool GraphicsGL::load_emoji_glyph(Font& font, uint32_t codepoint)
+	{
+		if (emojiface == nullptr) return false;
+
+		FT_UInt gidx = FT_Get_Char_Index(emojiface, codepoint);
+		if (gidx == 0)
+		{
+			gfx_log("load_emoji_glyph: cp=U+%04X not present in emoji face", codepoint);
+			return false;
+		}
+
+		if (FT_Load_Char(emojiface, codepoint, FT_LOAD_COLOR | FT_LOAD_RENDER))
+		{
+			gfx_log("load_emoji_glyph: FT_Load_Char failed cp=U+%04X", codepoint);
+			return false;
+		}
+
+		FT_GlyphSlot g = emojiface->glyph;
+
+		GLshort strike_w = static_cast<GLshort>(g->bitmap.width);
+		GLshort strike_h = static_cast<GLshort>(g->bitmap.rows);
+		if (strike_w <= 0 || strike_h <= 0)
+		{
+			gfx_log("load_emoji_glyph: cp=U+%04X zero-sized bitmap %dx%d", codepoint, (int)strike_w, (int)strike_h);
+			return false;
+		}
+
+		// Convert bitmap to BGRA. COLRv1 color rendering isn't always available
+		// in FreeType builds, so FT_LOAD_COLOR may still return FT_PIXEL_MODE_GRAY
+		// (plain grayscale outline). In that case we up-convert to BGRA so the
+		// emoji renders as a black silhouette rather than a placeholder box.
+		std::vector<uint8_t> rgba_buf;
+		const uint8_t* src_pixels = g->bitmap.buffer;
+
+		if (g->bitmap.pixel_mode == FT_PIXEL_MODE_GRAY)
+		{
+			rgba_buf.resize(static_cast<size_t>(strike_w) * strike_h * 4);
+			for (int y = 0; y < strike_h; ++y)
+			{
+				const uint8_t* row = g->bitmap.buffer + y * g->bitmap.pitch;
+				uint8_t* dst = rgba_buf.data() + y * strike_w * 4;
+				for (int x = 0; x < strike_w; ++x)
+				{
+					uint8_t a = row[x];
+					dst[x * 4 + 0] = 0;   // B
+					dst[x * 4 + 1] = 0;   // G
+					dst[x * 4 + 2] = 0;   // R
+					dst[x * 4 + 3] = a;   // A
+				}
+			}
+			src_pixels = rgba_buf.data();
+		}
+		else if (g->bitmap.pixel_mode != FT_PIXEL_MODE_BGRA)
+		{
+			gfx_log("load_emoji_glyph: cp=U+%04X unsupported pixel_mode=%d", codepoint, (int)g->bitmap.pixel_mode);
+			return false;
+		}
+
+		GLshort target = static_cast<GLshort>(font.height > 0 ? font.height + 2 : 14);
+
+		Leftover value = Leftover(0, 0, strike_w, strike_h);
+		GLshort gx = 0, gy = 0;
+
+		size_t lid = leftovers.findnode(value,
+			[](const Leftover& val, const Leftover& leaf) {
+				return val.width() <= leaf.width() && val.height() <= leaf.height();
+			});
+
+		if (lid > 0)
+		{
+			const Leftover& lo = leftovers[lid];
+			gx = lo.left;
+			gy = lo.top;
+			leftovers.erase(lid);
+		}
+		else
+		{
+			if (border.x() + strike_w > ATLASW)
+			{
+				border.set_x(0);
+				border.shift_y(yrange.second());
+				if (border.y() + strike_h > ATLASH) return false;
+				yrange = Range<GLshort>();
+			}
+			gx = border.x();
+			gy = border.y();
+			border.shift_x(strike_w);
+			if (strike_h > yrange.second())
+				yrange = Range<int16_t>(gy + strike_h, strike_h);
+		}
+
+		glTexSubImage2D(GL_TEXTURE_2D, 0, gx, gy, strike_w, strike_h, GL_BGRA, GL_UNSIGNED_BYTE, src_pixels);
+
+		Font::Char ch;
+		ch.ax = target;
+		ch.ay = 0;
+		ch.bw = target;
+		ch.bh = target;
+		ch.bl = 0;
+		ch.bt = static_cast<GLshort>(font.height);
+		ch.offset = Offset(gx, gy, strike_w, strike_h);
+		ch.color = true;
+		font.chars.emplace(codepoint, ch);
+		gfx_log("load_emoji_glyph: loaded cp=U+%04X strike=%dx%d target=%d", codepoint, (int)strike_w, (int)strike_h, (int)target);
+		return true;
+	}
+
+	GraphicsGL::Font::Char GraphicsGL::ensure_glyph(Text::Font fontid, uint32_t codepoint)
+	{
+		Font& font = fonts[fontid];
+
+		auto it = font.chars.find(codepoint);
+		if (it != font.chars.end()) return it->second;
+
+		gfx_log("ensure_glyph: fontid=%d cp=U+%04X (miss, loading)", (int)fontid, codepoint);
+
+		if (is_emoji_codepoint(codepoint) && load_emoji_glyph(font, codepoint))
+		{
+			it = font.chars.find(codepoint);
+			if (it != font.chars.end()) return it->second;
+		}
+
+		if (load_mono_glyph(font, codepoint))
+		{
+			it = font.chars.find(codepoint);
+			if (it != font.chars.end()) return it->second;
+		}
+
+		Font::Char placeholder{};
+		font.chars.emplace(codepoint, placeholder);
+		return placeholder;
 	}
 
 	void GraphicsGL::reinit()
@@ -559,7 +917,8 @@ namespace ms
 		if (length == 0)
 			return Text::Layout();
 
-		LayoutBuilder builder(fonts[id], alignment, maxwidth, formatted, line_adj);
+		gfx_log("createlayout: id=%d len=%zu maxw=%d fmt=%d text='%.80s'", (int)id, length, (int)maxwidth, (int)formatted, text.c_str());
+		LayoutBuilder builder(fonts[id], id, alignment, maxwidth, formatted, line_adj);
 
 		const char* p_text = text.c_str();
 
@@ -580,7 +939,7 @@ namespace ms
 		return builder.finish(first, offset);
 	}
 
-	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font& f, Text::Alignment a, int16_t mw, bool fm, int16_t la) : font(f), alignment(a), maxwidth(mw), formatted(fm), line_adj(la)
+	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font& f, Text::Font fid, Text::Alignment a, int16_t mw, bool fm, int16_t la) : font(f), base_fontid(fid), alignment(a), maxwidth(mw), formatted(fm), line_adj(la)
 	{
 		fontid = Text::Font::NUM_FONTS;
 		color = Color::Name::NUM_COLORS;
@@ -664,23 +1023,31 @@ namespace ms
 
 		if (!linebreak)
 		{
-			for (size_t i = first; i < last; i++)
+			size_t i = first;
+			while (i < last)
 			{
-				char c = text[i];
-				wordwidth += font.chars[c].ax;
+				size_t consumed = 1;
+				uint32_t cp = utf8_decode(text, last, i, consumed);
+				if (consumed == 0) break;
+				Font::Char ch = GraphicsGL::get().ensure_glyph(base_fontid, cp);
+				wordwidth += ch.ax;
 
 				if (wordwidth > maxwidth)
 				{
-					if (last - first == 1)
-					{
+					if (last - first <= consumed)
 						return last;
-					}
-					else
+					// First codepoint alone is too wide; skip past it to avoid
+					// infinite recursion when nothing has been consumed yet.
+					if (i == first)
 					{
-						prev = add(text, prev, first, i);
-						return add(text, prev, i, last);
+						size_t next = first + consumed;
+						if (next >= last) return last;
+						return add(text, prev, next, last);
 					}
+					prev = add(text, prev, first, i);
+					return add(text, prev, i, last);
 				}
+				i += consumed;
 			}
 		}
 
@@ -702,20 +1069,27 @@ namespace ms
 				ay -= line_adj;
 		}
 
-		for (size_t pos = first; pos < last; pos++)
+		size_t pos = first;
+		while (pos < last)
 		{
-			char c = text[pos];
-			const Font::Char& ch = font.chars[c];
+			size_t consumed = 1;
+			uint32_t cp = utf8_decode(text, last, pos, consumed);
+			if (consumed == 0) break;
+			Font::Char ch = GraphicsGL::get().ensure_glyph(base_fontid, cp);
 
-			advances.push_back(ax);
+			// Push the same advance for each byte of the codepoint so byte-
+			// indexed lookups (word.first, etc.) keep lining up.
+			for (size_t b = 0; b < consumed; ++b)
+				advances.push_back(ax);
 
-			if (pos < first + skip || newline && c == ' ')
-				continue;
+			bool skip_char = (pos < first + skip) || (newline && cp == ' ');
+			if (!skip_char)
+			{
+				ax += ch.ax;
+				if (width < ax) width = ax;
+			}
 
-			ax += ch.ax;
-
-			if (width < ax)
-				width = ax;
+			pos += consumed;
 		}
 
 		if (newword || newline)
@@ -768,6 +1142,7 @@ namespace ms
 		if (text.empty() || color.invisible())
 			return;
 
+		gfx_log("drawtext: id=%d text='%.60s' pos=(%d,%d)", (int)id, text.c_str(), (int)args.getpos().x(), (int)args.getpos().y());
 		const Font& font = fonts[id];
 
 		GLshort x = args.getpos().x();
@@ -817,10 +1192,13 @@ namespace ms
 
 				Color abscolor = color * Color(wordcolor[0], wordcolor[1], wordcolor[2], 1.0f);
 
-				for (size_t pos = word.first; pos < word.last; ++pos)
+				size_t pos = word.first;
+				while (pos < word.last)
 				{
-					const char c = text[pos];
-					const Font::Char& ch = font.chars[c];
+					size_t consumed = 1;
+					uint32_t cp = utf8_decode(text.c_str(), word.last, pos, consumed);
+					if (consumed == 0) break;
+					Font::Char ch = ensure_glyph(id, cp);
 
 					GLshort char_x = x + ax + ch.bl;
 					GLshort char_y = y + ay - ch.bt;
@@ -829,6 +1207,15 @@ namespace ms
 					GLshort char_bottom = char_y + char_height;
 
 					Offset offset = ch.offset;
+
+					if (ch.color)
+					{
+						// Color emoji strikes: scale the full bitmap to ax x ax.
+						char_width = ch.ax;
+						char_height = ch.ax;
+						char_y = y + ay - ch.ax;
+						char_bottom = y + ay;
+					}
 
 					if (char_bottom > maxheight)
 					{
@@ -841,22 +1228,36 @@ namespace ms
 						}
 						else
 						{
+							pos += consumed;
 							continue;
 						}
 					}
 
 					if (char_y < minheight)
+					{
+						pos += consumed;
 						continue;
+					}
 
-					if (ax == 0 && c == ' ')
+					if (ax == 0 && cp == ' ')
+					{
+						pos += consumed;
 						continue;
+					}
 
 					ax += ch.ax;
 
 					if (char_width <= 0 || char_height <= 0)
+					{
+						pos += consumed;
 						continue;
+					}
 
-					quads.emplace_back(char_x, char_x + char_width, char_y, char_bottom, offset, abscolor, 0.0f);
+					// Color glyphs carry their own RGBA, so bypass the color
+					// modulation that would tint monochrome alpha glyphs.
+					Color draw_color = ch.color ? color : abscolor;
+					quads.emplace_back(char_x, char_x + char_width, char_y, char_bottom, offset, draw_color, 0.0f);
+					pos += consumed;
 				}
 			}
 		}

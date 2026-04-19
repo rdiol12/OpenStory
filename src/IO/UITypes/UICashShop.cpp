@@ -24,6 +24,7 @@
 
 #include "../../Gameplay/Stage.h"
 
+#include "../../Net/Handlers/CashShopHandlers.h"
 #include "../../Net/Packets/CashShopPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
@@ -36,29 +37,103 @@
 #include <nlnx/nx.hpp>
 #endif
 
+#include <fstream>
+
 namespace ms
 {
+	// Debug helper — recursively dumps a single NX node (with children up to
+	// max_depth) into ofs. Same shape as UIQuestHelper's dump_nx_node.
+	static void dump_cs_node(std::ofstream& ofs, nl::node n, int depth, int max_depth = 3)
+	{
+		if (!n) return;
+
+		for (int i = 0; i < depth; i++) ofs << "  ";
+		ofs << n.name() << " [" << (int)n.data_type() << "]";
+
+		switch (n.data_type())
+		{
+		case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
+		case nl::node::type::real:    ofs << " = " << (double)n; break;
+		case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
+		case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
+		case nl::node::type::bitmap:
+		{
+			auto bmp = n.get_bitmap();
+			if (bmp)
+				ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << ">";
+			else
+				ofs << " <bitmap (null)>";
+			break;
+		}
+		default: break;
+		}
+		ofs << "  (" << n.size() << " children)\n";
+
+		if (depth >= max_depth) return;
+		for (auto child : n)
+			dump_cs_node(ofs, child, depth + 1, max_depth);
+	}
+
+	// One-shot CashShopGL.img dump — reveals origins/vectors of every node
+	// under the English cash-shop tree so button positions can be computed
+	// from the data rather than guessed.
+	static void dump_cashshop_nodes_once()
+	{
+		static bool done = false;
+		if (done) return;
+		done = true;
+
+		std::ofstream ofs("cashshopgl_ui_dump.txt");
+		if (!ofs) return;
+
+		ofs << "=== CashShopGL.img (top-level children) ===\n";
+		for (auto c : nl::nx::ui["CashShopGL.img"])
+			ofs << "  " << c.name() << " (" << c.size() << ")\n";
+
+		ofs << "\n=== CashShopGL.img / BaseFrame (depth 5) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["BaseFrame"], 0, 5);
+		ofs << "\n=== CashShopGL.img / MainMenu (depth 5) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["MainMenu"], 0, 5);
+		ofs << "\n=== CashShopGL.img / LeftMenu (depth 5) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["LeftMenu"], 0, 5);
+		ofs << "\n=== CashShopGL.img / RightMenu (depth 5) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["RightMenu"], 0, 5);
+		ofs << "\n=== CashShopGL.img / Popup (depth 5) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["Popup"], 0, 5);
+		ofs << "\n=== CashShopGL.img / Effect (depth 4) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["Effect"], 0, 4);
+		ofs << "\n=== CashShopGL.img / PicturePlate (depth 4) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["PicturePlate"], 0, 4);
+		ofs << "\n=== CashShopGL.img / ToolTip (depth 4) ===\n";
+		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["ToolTip"], 0, 4);
+
+		ofs.close();
+	}
+
 	UICashShop::UICashShop() : preview_index(0), menu_index(1), promotion_index(0), mvp_grade(1), mvp_exp(0.07f), list_offset(0)
 	{
+		dump_cashshop_nodes_once();
+
+		// Primary English cash-shop sprites live in CashShopGL.img. A few
+		// elements (item search/effect/char/list) don't have CashShopGL
+		// equivalents, so they fall back to CashShop.img's Korean nodes.
 		nl::node CashShop = nl::nx::ui["CashShop.img"];
+		nl::node CashShopGL = nl::nx::ui["CashShopGL.img"];
+
 		nl::node Base = CashShop["Base"];
-		nl::node backgrnd = Base["backgrnd"];
-		nl::node BestNew = Base["BestNew"];
+		nl::node BaseFrame = CashShopGL["BaseFrame"];
+		nl::node backgrnd = BaseFrame["background"];
 		nl::node Preview = Base["Preview"];
-		nl::node CSTab = CashShop["CSTab"];
-		nl::node CSGLChargeNX = CSTab["CSGLChargeNX"];
-		nl::node CSStatus = CashShop["CSStatus"];
-		nl::node CSPromotionBanner = CashShop["CSPromotionBanner"];
-		nl::node CSMVPBanner = CashShop["CSMVPBanner"];
-		nl::node CSItemSearch = CashShop["CSItemSearch"];
-		nl::node CSChar = CashShop["CSChar"];
+		nl::node CSItemSearch = BaseFrame["CSItemSearch"];
 		nl::node CSList = CashShop["CSList"];
-		nl::node CSEffect = CashShop["CSEffect"];
+		nl::node MainItem = CashShopGL["MainMenu"]["MainItem"];
+		nl::node Popup = CashShopGL["Popup"];
 
 		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(BestNew, Point<int16_t>(139, 346));
 
-		BestNew_dim = Texture(BestNew).get_dimensions();
+		// BestNew banner has Korean text baked in — omit. Leave dimensions
+		// zeroed out (item_none fallback still works).
+		BestNew_dim = Point<int16_t>();
 
 		for (size_t i = 0; i < 3; i++)
 			preview_sprites[i] = Preview[i];
@@ -68,18 +143,18 @@ namespace ms
 
 		buttons[Buttons::BtPreview1]->set_state(Button::State::PRESSED);
 
-		buttons[Buttons::BtExit] = std::make_unique<MapleButton>(CSTab["BtExit"], Point<int16_t>(5, 728));
-		buttons[Buttons::BtChargeNX] = std::make_unique<MapleButton>(CSGLChargeNX["BtChargeNX"], Point<int16_t>(5, 554));
-		buttons[Buttons::BtChargeRefresh] = std::make_unique<MapleButton>(CSGLChargeNX["BtChargeRefresh"], Point<int16_t>(92, 554));
+		// English header/exit buttons from CashShopGL/BaseFrame.
+		// The bitmaps carry absolute 1024x768 positions via negative origin
+		// vectors (e.g. BtExit origin = (-962,-10) → draws at (962,10)), so
+		// pass Point(0,0) and let the origin place them on the canvas.
+		buttons[Buttons::BtExit] = std::make_unique<MapleButton>(BaseFrame["BtExit"]);
+		buttons[Buttons::BtHelp] = std::make_unique<MapleButton>(BaseFrame["BtHelp"]);
+		buttons[Buttons::BtCoupon] = std::make_unique<MapleButton>(BaseFrame["BtCoupon"]);
 
-		for (size_t i = 0; i < 9; i++)
-			menu_tabs[i] = CSTab["Tab"][i];
-
-		buttons[Buttons::BtChargeRefresh] = std::make_unique<MapleButton>(CSGLChargeNX["BtChargeRefresh"], Point<int16_t>(92, 554));
-		buttons[Buttons::BtWish] = std::make_unique<MapleButton>(CSStatus["BtWish"], Point<int16_t>(226, 6));
-		buttons[Buttons::BtMileage] = std::make_unique<MapleButton>(CSStatus["BtMileage"], Point<int16_t>(869, 4));
-		buttons[Buttons::BtHelp] = std::make_unique<MapleButton>(CSStatus["BtHelp"], Point<int16_t>(997, 4));
-		buttons[Buttons::BtCoupon] = std::make_unique<MapleButton>(CSStatus["BtCoupon"], Point<int16_t>(950, 4));
+		// Korean-only elements (CSTab/Tab menu banners, CSStatus/BtWish,
+		// CSStatus/BtMileage, CSPromotionBanner, CSChar avatar buttons,
+		// CSMVPBanner) are deliberately not instantiated — there are no
+		// equivalents in CashShopGL.img that match this layout 1:1.
 
 		Player& player = Stage::get().get_player();
 		std::string pname = player.get_stats().get_name();
@@ -88,51 +163,20 @@ namespace ms
 		job_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA, pjob);
 		name_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, pname);
 
-		promotion_pos = Point<int16_t>(138, 40);
-		sprites.emplace_back(CSPromotionBanner["shadow"], promotion_pos);
+		promotion_pos = Point<int16_t>();
+		mvp_pos = Point<int16_t>();
 
-		promotion_sprites.emplace_back(CSPromotionBanner["basic"]);
+		// English search bar under BaseFrame/CSItemSearch.
+		sprites.emplace_back(CSItemSearch["background"]);
 
-		buttons[Buttons::BtNext] = std::make_unique<MapleButton>(CSPromotionBanner["BtNext"], promotion_pos);
-		buttons[Buttons::BtPrev] = std::make_unique<MapleButton>(CSPromotionBanner["BtPrev"], promotion_pos);
-
-		for (size_t i = 0; i < 7; i++)
-			mvp_sprites[i] = CSMVPBanner["grade"][i];
-
-		mvp_pos = Point<int16_t>(63, 681);
-		buttons[Buttons::BtDetailPackage] = std::make_unique<MapleButton>(CSMVPBanner["BtDetailPackage"], mvp_pos);
-		buttons[Buttons::BtNonGrade] = std::make_unique<MapleButton>(CSMVPBanner["BtNonGrade"], mvp_pos);
-
-		buttons[Buttons::BtDetailPackage]->set_active(mvp_grade);
-		buttons[Buttons::BtNonGrade]->set_active(!mvp_grade);
-
-		mvp_gauge = Gauge(
-			Gauge::Type::CASHSHOP,
-			CSMVPBanner["gage"][0],
-			CSMVPBanner["gage"][2],
-			CSMVPBanner["gage"][1],
-			84,
-			0.0f
-		);
-
-		Point<int16_t> search_pos = Point<int16_t>(0, 36);
-		sprites.emplace_back(CSItemSearch["backgrnd"], search_pos);
-		sprites.emplace_back(CSItemSearch["search"], search_pos + Point<int16_t>(35, 8));
-
-		buttons[Buttons::BtBuyAvatar] = std::make_unique<MapleButton>(CSChar["BtBuyAvatar"], Point<int16_t>(642, 305));
-		buttons[Buttons::BtDefaultAvatar] = std::make_unique<MapleButton>(CSChar["BtDefaultAvatar"], Point<int16_t>(716, 305));
-		buttons[Buttons::BtInventory] = std::make_unique<MapleButton>(CSChar["BtInventory"], Point<int16_t>(938, 305));
-		buttons[Buttons::BtSaveAvatar] = std::make_unique<MapleButton>(CSChar["BtSaveAvatar"], Point<int16_t>(864, 305));
-		buttons[Buttons::BtTakeoffAvatar] = std::make_unique<MapleButton>(CSChar["BtTakeoffAvatar"], Point<int16_t>(790, 305));
-
-		charge_charset = Charset(CSGLChargeNX["Number"], Charset::Alignment::RIGHT);
+		// Charge NX numeric charset — fall back to CashShop/Base/Number.
+		charge_charset = Charset(Base["Number"], Charset::Alignment::RIGHT);
 
 		item_base = CSList["Base"];
 		item_line = Base["line"];
 		item_none = Base["noItem"];
-
-		for (nl::node item_label : CSEffect)
-			item_labels.emplace_back(item_label);
+		// Korean CSEffect labels omitted; item_labels stays empty so no
+		// HOT/NEW/SALE sticker draws with Korean text.
 
 		items.push_back({ 5220000, 20000001, Item::Label::HOT,		34000,	11 });
 		items.push_back({ 5220000, 20000002, Item::Label::HOT,		34000,	11 });
@@ -155,7 +199,11 @@ namespace ms
 		{
 			div_t div = std::div(i, 7);
 
-			buttons[Buttons::BtBuy + i] = std::make_unique<MapleButton>(CSList["BtBuy"], Point<int16_t>(146, 523) + Point<int16_t>(124 * div.rem, 205 * div.quot));
+			// CashShopGL's MainItem/BtBuy is the English "Buy" button. Its
+			// bitmap has origin (-81, -54) relative to its containing cell,
+			// so subtract that offset so Point(..., ...) still addresses the
+			// cell's top-left corner.
+			buttons[Buttons::BtBuy + i] = std::make_unique<MapleButton>(MainItem["BtBuy"], Point<int16_t>(146 - 81, 523 - 54) + Point<int16_t>(124 * div.rem, 205 * div.quot));
 
 			item_name[i] = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::MINESHAFT);
 			item_price[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GRAY);
@@ -188,17 +236,13 @@ namespace ms
 
 		update_items();
 
-		// === Sub-panel backgrounds ===
-		nl::node csui = nl::nx::ui["CashShop.img"];
-		if (csui.size() > 0)
-		{
-			wishlist_bg = Texture(csui["CSWish"]["backgrnd"]);
-			gift_bg = Texture(csui["CSGift"]["backgrnd"]);
-			coupon_bg = Texture(csui["CSCoupon"]["backgrnd"]);
-			search_bg = Texture(csui["CSSearch"]["backgrnd"]);
-			cs_inventory_bg = Texture(csui["CSInventory"]["backgrnd"]);
-			purchase_bg = Texture(csui["CSPurchase"]["backgrnd"]);
-		}
+		// === Sub-panel backgrounds (English — CashShopGL/Popup) ===
+		// Popup/Buy/backgrnd, Popup/Cupon/backgrnd, Popup/Gift/backgrnd,
+		// Popup/Notice/backgrnd are the English popup chrome. Wishlist and
+		// Search have no dedicated Popup entry, so leave those empty.
+		gift_bg = Texture(Popup["Gift"]["backgrnd"]);
+		coupon_bg = Texture(Popup["Cupon"]["backgrnd"]);
+		purchase_bg = Texture(Popup["Buy"]["backgrnd"]);
 		active_subpanel = SUBPANEL_NONE;
 
 		dimension = Texture(backgrnd).get_dimensions();
@@ -210,7 +254,8 @@ namespace ms
 
 		UIElement::draw_sprites(inter);
 
-		menu_tabs[menu_index].draw(position + Point<int16_t>(0, 63), inter);
+		// Korean menu_tabs / promotion_sprites / mvp_sprites / charge_charset
+		// draws removed — those elements have no English equivalent.
 
 		Point<int16_t> label_pos = position + Point<int16_t>(4, 3);
 		job_label.draw(label_pos);
@@ -218,23 +263,10 @@ namespace ms
 		size_t length = job_label.width();
 		name_label.draw(label_pos + Point<int16_t>(length + 10, 0));
 
-		promotion_sprites[promotion_index].draw(position + promotion_pos, inter);
-
-		mvp_sprites[mvp_grade].draw(position + mvp_pos, inter);
-		mvp_gauge.draw(position + mvp_pos);
-
-		Point<int16_t> charge_pos = position + Point<int16_t>(107, 388);
-
-		charge_charset.draw("0", charge_pos + Point<int16_t>(0, 30 * 1));
-		charge_charset.draw("3,300", charge_pos + Point<int16_t>(0, 30 * 2));
-		charge_charset.draw("0", charge_pos + Point<int16_t>(0, 30 * 3));
-		charge_charset.draw("8,698,565", charge_pos + Point<int16_t>(0, 30 * 4));
-		charge_charset.draw("0", charge_pos + Point<int16_t>(0, 30 * 5));
-
 		if (items.size() > 0)
 			item_line.draw(position + Point<int16_t>(139, 566), inter);
 		else
-			item_none.draw(position + Point<int16_t>(137, 372) + Point<int16_t>(BestNew_dim.x() / 2, list_slider.getvertical().length() / 2) - item_none.get_dimensions() / 2, inter);
+			item_none.draw(position + Point<int16_t>(137, 372) - item_none.get_dimensions() / 2 + Point<int16_t>(0, list_slider.getvertical().length() / 2), inter);
 
 		for (size_t i = 0; i < MAX_ITEMS; i++)
 		{
@@ -248,8 +280,7 @@ namespace ms
 				item_base.draw(position + Point<int16_t>(137, 372) + Point<int16_t>(124 * div.rem, 205 * div.quot), inter);
 				item.draw(DrawArgument(position + Point<int16_t>(164, 473) + Point<int16_t>(124 * div.rem, 205 * div.quot), 2.0f, 2.0f));
 
-				if (item.label != Item::Label::NONE)
-					item_labels[item.label + 1].draw(position + Point<int16_t>(152, 372) + Point<int16_t>(124 * div.rem, 205 * div.quot), inter);
+				// Korean CSEffect labels omitted.
 
 				item_name[i].draw(position + Point<int16_t>(192, 480) + Point<int16_t>(124 * div.rem, 205 * div.quot));
 
@@ -271,13 +302,9 @@ namespace ms
 
 		UIElement::draw_buttons(inter);
 
-		// Draw active sub-panel
+		// Draw active sub-panel (English popups only).
 		switch (active_subpanel)
 		{
-		case SUBPANEL_WISHLIST:
-			if (wishlist_bg.is_valid())
-				wishlist_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
 		case SUBPANEL_GIFT:
 			if (gift_bg.is_valid())
 				gift_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
@@ -285,14 +312,6 @@ namespace ms
 		case SUBPANEL_COUPON:
 			if (coupon_bg.is_valid())
 				coupon_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
-		case SUBPANEL_SEARCH:
-			if (search_bg.is_valid())
-				search_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
-		case SUBPANEL_INVENTORY:
-			if (cs_inventory_bg.is_valid())
-				cs_inventory_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
 			break;
 		case SUBPANEL_PURCHASE:
 			if (purchase_bg.is_valid())
@@ -306,8 +325,6 @@ namespace ms
 	void UICashShop::update()
 	{
 		UIElement::update();
-
-		mvp_gauge.update(mvp_exp);
 	}
 
 	Button::State UICashShop::button_pressed(uint16_t buttonid)
@@ -326,6 +343,9 @@ namespace ms
 			uint16_t width = Setting<Width>::get().load();
 			uint16_t height = Setting<Height>::get().load();
 
+			// Restore the user's pre-cashshop UI scale (transition() forced
+			// it to 1.0 so the 1024x768 cash shop UI fit the window exactly).
+			Constants::Constants::get().set_ui_scale(get_pre_cashshop_ui_scale());
 			Constants::Constants::get().set_viewwidth(width);
 			Constants::Constants::get().set_viewheight(height);
 
@@ -434,6 +454,15 @@ namespace ms
 	{
 		UI& ui = UI::get();
 		ui.change_state(UI::State::GAME);
+
+		// Restore UI scale + physical window size that were overridden in
+		// SetCashShopHandler::transition(). Without this the game world would
+		// remain confined to the 1024x768 cash-shop window at scale 1.0.
+		uint16_t width = Setting<Width>::get().load();
+		uint16_t height = Setting<Height>::get().load();
+		Constants::Constants::get().set_ui_scale(get_pre_cashshop_ui_scale());
+		Constants::Constants::get().set_viewwidth(width);
+		Constants::Constants::get().set_viewheight(height);
 
 		Stage& stage = Stage::get();
 		Player& player = stage.get_player();

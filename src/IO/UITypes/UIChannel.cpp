@@ -24,6 +24,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Configuration.h"
+#include "../../Net/ChannelLoadData.h"
 #include "../../Net/Packets/GameplayPackets.h"
 
 #ifdef USE_NX
@@ -37,7 +38,12 @@ namespace ms
 		uint8_t selected_world = Configuration::get().get_worldid();
 		current_channel = Configuration::get().get_channelid();
 		selected_channel = current_channel;
-		channel_count = 20;
+
+		// Prefer the real channel count published by the server; fall back
+		// to 20 only if the login handshake never populated it.
+		uint8_t real_count = ChannelLoadData::get().get_count(
+			static_cast<int8_t>(selected_world));
+		channel_count = real_count > 0 ? real_count : 20;
 
 		nl::node source = nl::nx::ui["UIWindow2.img"]["Channel"];
 
@@ -220,6 +226,12 @@ namespace ms
 	{
 		if (selected_channel != current_channel)
 		{
+			// Persist the new channel so UIChannel and other consumers of
+			// Configuration::get_channelid() pick up the right value after
+			// the reconnect completes.
+			Configuration::get().set_channelid(selected_channel);
+			current_channel = selected_channel;
+
 			UI::get().disable();
 			ChangeChannelPacket(selected_channel).dispatch();
 		}

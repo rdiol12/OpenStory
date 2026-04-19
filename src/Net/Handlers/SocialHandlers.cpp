@@ -181,6 +181,9 @@ namespace ms
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(senior_name + " has invited you to join their family.", UIChatBar::LineType::YELLOW);
 
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				statusbar->notify();
+
 			break;
 		}
 		case 0x0B: // Buff notification from family member
@@ -885,6 +888,9 @@ namespace ms
 							AllianceAcceptInvitePacket(alliance_id).dispatch();
 					}
 				);
+
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->notify();
 			}
 			break;
 		}
@@ -1251,6 +1257,9 @@ namespace ms
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
+
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				statusbar->notify();
 
 			break;
 		}

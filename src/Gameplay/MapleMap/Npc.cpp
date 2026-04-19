@@ -346,13 +346,40 @@ namespace ms
 			nl::node start_check = check["0"];
 			if (!start_check) continue;
 
+			// Must also have an end-check — quests without one are typically
+			// internal/scripted stubs that aren't player-pickable.
+			if (!check["1"])
+				continue;
+
 			// Check if this NPC starts the quest
 			int32_t start_npc = start_check["npc"].get_integer();
 			if (start_npc <= 0 || start_npc != npcid)
 				continue;
 
-			// Skip auto-start quests (they don't need a bulb indicator)
+			// Skip auto-start / scripted / pre-complete quests (no bulb)
 			if (start_check["normalAutoStart"].get_integer() != 0)
+				continue;
+			if (start_check["autoStart"].get_integer() != 0)
+				continue;
+			if (start_check["autoPreComplete"].get_integer() != 0)
+				continue;
+			if (start_check["startscript"].get_integer() != 0)
+				continue;
+
+			// QuestInfo gating — hidden/blocked/scripted quests should not show
+			if (qnode["blocked"].get_integer() != 0)
+				continue;
+			if (qnode["autoStart"].get_integer() != 0)
+				continue;
+			if (qnode["autoPreComplete"].get_integer() != 0)
+				continue;
+
+			// Real player-facing quests have a name and an area; event/hidden
+			// quests that share an NPC ID usually lack one or both.
+			std::string qname = qnode["name"].get_string();
+			if (qname.empty())
+				continue;
+			if (qnode["area"].get_integer() <= 0)
 				continue;
 
 			// Level checks

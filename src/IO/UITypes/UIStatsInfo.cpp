@@ -75,7 +75,10 @@ namespace ms
 		buttons[Buttons::BT_ABILITY] = std::make_unique<MapleButton>(detail["BtAbility"], Point<int16_t>(212, 0));
 		buttons[Buttons::BT_DETAIL_DETAILCLOSE] = std::make_unique<MapleButton>(detail["BtHpUp"], Point<int16_t>(212, 0));
 
+		// HyperStat is not used in v83. Disable both hyperstat buttons so they don't
+		// intercept clicks intended for BT_DETAILOPEN (which shares the same screen region).
 		buttons[Buttons::BT_HYPERSTATOPEN]->set_active(false);
+		buttons[Buttons::BT_HYPERSTATCLOSE]->set_active(false);
 		buttons[Buttons::BT_DETAILCLOSE]->set_active(false);
 		buttons[Buttons::BT_ABILITY]->set_active(false);
 		buttons[Buttons::BT_ABILITY]->set_state(Button::State::DISABLED);

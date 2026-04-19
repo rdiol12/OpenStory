@@ -34,6 +34,7 @@
 #include "../../IO/UITypes/UIStatsInfo.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Net/Packets/LoginPackets.h"
 
 namespace ms
 {
@@ -44,7 +45,17 @@ namespace ms
 		auto cashshop = UI::get().get_element<UICashShop>();
 
 		if (cashshop)
+		{
 			cashshop->exit_cashshop();
+		}
+		else
+		{
+			// Normal in-game channel change: after reconnecting to the new
+			// channel server we must re-identify the character, otherwise the
+			// server has no idea who connected and the client just stalls.
+			Player& player = Stage::get().get_player();
+			PlayerLoginPacket(player.get_oid()).dispatch();
+		}
 	}
 
 	void ChangeStatsHandler::handle(InPacket& recv) const
@@ -250,7 +261,7 @@ namespace ms
 	{
 		uint8_t size = recv.read_byte();
 
-		auto macro_ui = UI::get().get_element<UISkillMacro>();
+		auto skillbook = UI::get().get_element<UISkillBook>();
 
 		for (uint8_t i = 0; i < size; i++)
 		{
@@ -260,8 +271,8 @@ namespace ms
 			int32_t skill2 = recv.read_int();
 			int32_t skill3 = recv.read_int();
 
-			if (macro_ui)
-				macro_ui->set_macro(i, name, shout, skill1, skill2, skill3);
+			if (skillbook)
+				skillbook->load_macro(i, name, shout, skill1, skill2, skill3);
 		}
 	}
 

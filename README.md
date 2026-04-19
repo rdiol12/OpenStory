@@ -1,11 +1,19 @@
 # OpenStory
 
-quest system is fully implemented 
-
-
 A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient).
 
-**Status: Playable** -- functional for gameplay, UI polish ongoing.
+**Status: Playable** — functional for gameplay, UI polish ongoing.
+
+## Screenshots
+
+### Status Bar
+![Status Bar](docs/images/statusbar.png)
+
+### Emoji Support & Minimap
+![Emoji & Minimap](docs/images/emoji-minimap.png)
+
+### Quest UI & NPC Quest Indicators
+![Quest UI](docs/images/quest-ui.png)
 
 ## Features
 
@@ -43,9 +51,12 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
+- **Status Bar**: Rebuilt/polished status bar UI (HP/MP/EXP, character menu, chat controls). See screenshot above.
+- **NPC Dialog reliability**: Fixed intermittent "NPC chat UI doesn't open" bug. Root cause was `UIStateGame::remove` calling `unique_ptr::release()` (which leaks instead of freeing), leaving a null entry that wedged the next dialog. Handler also now force-removes stale dialog before opening a new one.
+- **NPC Quest Indicator**: Tightened the "available quest" bulb above NPCs so it only shows for quests the player can actually pick up (filters out auto-start, auto-pre-complete, blocked, script-started, and quests with no area / no info entry).
+- **In-game Channel Switcher**: Now draws only the real channels reported by the server for the current world, instead of hard-coding 20 slots. Login server list response populates a `ChannelLoadData` cache that `UIChannel` reads at construction.
 - **TestingHandlers refactor**: Split the 1200+ line catch-all TestingHandlers into proper domain files: WeatherHandlers, ClockHandlers, FieldHandlers, UIControlHandlers, QuestHandlers, MiscHandlers. Moved login handlers to LoginHandlers, fame to PlayerInteractionHandlers, cash shop handlers to CashShopHandlers, hammer/vega to InventoryHandlers.
 - **Fame/Defame fix**: Fixed fame buttons sending character ID instead of map object OID (server silently dropped the packet). Also fixed FameResponseHandler reading fame value as int instead of short.
-- **Bot Inventory**: View another player's inventory from the character info window (custom feature).
 - **UIClock NX sprites**: Clock UI now uses NX-based sprites instead of programmatic drawing.
 - **Event System (Custom - WIP)**: Live event list UI using NX EventList sprites. Server sends events via EVENT_INFO (0xC3) packet, client requests via REQUEST_EVENT_INFO (0xF1). Shows event name, description, status (In Progress/Ended), item rewards with tooltips, and activates UIClock countdown for the first active event. *Custom protocol -- not supported by Cosmic server out of the box.*
 - **UIOptionMenu overhaul**: Full settings panel with working sliders for BGM/SFX volume, HP/MP warning thresholds, graphics/effects quality. Slider percentage labels displayed. Menu always centered on screen.

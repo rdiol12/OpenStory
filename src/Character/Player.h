@@ -188,6 +188,15 @@ namespace ms
 		int32_t heal_tick_counter = 0;
 		static constexpr int32_t HEAL_TICK_INTERVAL = 300; // ~10 seconds at 30fps
 
+		// Track last observed HP so we can detect server-driven damage (DoT,
+		// magic, status) that bypasses Player::damage()/show_damage() and
+		// therefore never sets the invincible window. When HP drops we start
+		// a lockout that blocks the regen tick — otherwise auto-heal can
+		// fire while the player is visibly being hit.
+		int16_t last_seen_hp = -1;
+		int32_t hit_lockout_ticks = 0;
+		static constexpr int32_t HIT_LOCKOUT_TICKS = 90; // ~3s at 30fps
+
 	public:
 		int32_t get_chair_itemid() const { return chair_itemid; }
 		void set_chair(int32_t itemid);

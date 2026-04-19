@@ -46,7 +46,9 @@ namespace ms
 			{
 				barfront.draw(args + DrawArgument(Point<int16_t>(0, 0), Point<int16_t>(length, 0)));
 				barmid.draw(args);
-				barend.draw(args + Point<int16_t>(length + 8, 20));
+				// v83 gauge end-cap (2x13) sits flush at the tip of the fill.
+				// (The original +8,+20 offset targeted post-Big-Bang gauges.)
+				barend.draw(args + Point<int16_t>(length, 0));
 			}
 			else if (type == Type::CASHSHOP)
 			{

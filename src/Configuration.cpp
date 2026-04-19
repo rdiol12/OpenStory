@@ -31,6 +31,8 @@ namespace ms
 		settings.emplace<VSync>();
 		settings.emplace<FontPathNormal>();
 		settings.emplace<FontPathBold>();
+		settings.emplace<FontPathEmoji>();
+		settings.emplace<FontPathCJK>();
 		settings.emplace<BGMVolume>();
 		settings.emplace<SFXVolume>();
 		settings.emplace<SaveLogin>();
@@ -84,6 +86,7 @@ namespace ms
 		settings.emplace<GraphicsQuality>();
 		settings.emplace<EffectsQuality>();
 		settings.emplace<MouseSpeed>();
+		settings.emplace<ScreenshotFolder>();
 		settings.emplace<HPWarning>();
 		settings.emplace<MPWarning>();
 		settings.emplace<AllowWhisper>();
@@ -151,9 +154,14 @@ namespace ms
 
 		if (config.is_open())
 		{
-			// Save settings line by line
+			// Save settings line by line. Defensive null-skip: TypeMap::get()
+			// uses operator[] which can insert a null unique_ptr if a type is
+			// looked up before being registered in the constructor.
 			for (auto& setting : settings)
+			{
+				if (!setting.second) continue;
 				config << setting.second->to_string() << std::endl;
+			}
 		}
 	}
 

@@ -231,8 +231,21 @@ namespace ms
 			chair_anim.update();
 
 		// Idle HP/MP regen — send HEAL_OVER_TIME every ~10 seconds
-		// Reset and pause counter while attacking, getting hit, in hit stun, or dead
-		if (state == Char::State::DIED || is_invincible() || attacking)
+		// Reset and pause counter while attacking, getting hit, in hit stun, or dead.
+		// Also detect server-driven HP drops (DoT / magic / status) that
+		// never route through Player::damage() and would otherwise leave
+		// the invincible window un-set, letting regen fire during a hit.
+		int16_t observed_hp = stats.get_stat(MapleStat::Id::HP);
+
+		if (last_seen_hp >= 0 && observed_hp < last_seen_hp)
+			hit_lockout_ticks = HIT_LOCKOUT_TICKS;
+
+		last_seen_hp = observed_hp;
+
+		if (hit_lockout_ticks > 0)
+			hit_lockout_ticks--;
+
+		if (state == Char::State::DIED || is_invincible() || attacking || hit_lockout_ticks > 0)
 		{
 			heal_tick_counter = 0;
 		}

@@ -31,6 +31,12 @@ namespace ms
 		void transition() const;
 	};
 
+	// Returns the UI scale that was active immediately before the cash shop
+	// transition. The cash shop layout is authored at 1:1 for a 1024x768
+	// window, so the transition forces UI_SCALE to 1.0. Call this on exit
+	// to restore the user's previous scale.
+	float get_pre_cashshop_ui_scale();
+
 	// Handler for Cash Shop operation responses (buy, coupon, etc.)
 	class CashShopOperationHandler : public PacketHandler
 	{

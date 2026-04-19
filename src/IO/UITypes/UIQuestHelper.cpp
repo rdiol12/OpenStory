@@ -28,15 +28,98 @@
 #include <nlnx/nx.hpp>
 #endif
 
+#include <fstream>
+
 namespace ms
 {
 	QuestDragState UIQuestHelper::quest_drag;
+
+	// Debug: recursively dump an NX node to ofs with indentation.
+	// Includes type + basic value/dimensions so we can see what's actually there.
+	static void dump_nx_node(std::ofstream& ofs, nl::node n, int depth, int max_depth = 4)
+	{
+		if (!n) return;
+
+		for (int i = 0; i < depth; i++) ofs << "  ";
+		ofs << n.name() << " [" << (int)n.data_type() << "]";
+
+		switch (n.data_type())
+		{
+		case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
+		case nl::node::type::real:    ofs << " = " << (double)n; break;
+		case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
+		case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
+		case nl::node::type::bitmap:
+		{
+			auto bmp = n.get_bitmap();
+			if (bmp)
+				ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << ">";
+			else
+				ofs << " <bitmap (null)>";
+			break;
+		}
+		case nl::node::type::audio:   ofs << " <audio>"; break;
+		default: break;
+		}
+		ofs << "  (" << n.size() << " children)\n";
+
+		if (depth >= max_depth) return;
+		for (auto child : n)
+			dump_nx_node(ofs, child, depth + 1, max_depth);
+	}
+
+	static void dump_quest_ui_nodes_once()
+	{
+		// Re-dump every launch (the previous file on disk is overwritten)
+		static bool done = false;
+		if (done) return;
+		done = true;
+
+		std::ofstream ofs("quest_ui_dump.txt");
+		if (!ofs) return;
+
+		ofs << "=== UIWindow.img / QuestAlarm ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["QuestAlarm"], 0, 5);
+		ofs << "\n=== UIWindow2.img / QuestAlarm ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestAlarm"], 0, 5);
+		ofs << "\n=== UIWindow.img / QuestBulb ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["QuestBulb"], 0, 5);
+		ofs << "\n=== UIWindow2.img / QuestBulb ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestBulb"], 0, 5);
+		ofs << "\n=== UIWindow2.img / QuestIcon ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestIcon"], 0, 4);
+		ofs << "\n=== UIWindow2.img / QuestGuide ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestGuide"], 0, 4);
+		ofs << "\n=== UIWindow2.img / QuestMessengerAlice ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestMessengerAlice"], 0, 4);
+		ofs << "\n=== UIWindow2.img / QuestMessengerThomas ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestMessengerThomas"], 0, 4);
+		ofs << "\n=== StatusBar3.img / Quest ===\n";
+		dump_nx_node(ofs, nl::nx::ui["StatusBar3.img"]["Quest"], 0, 5);
+		ofs << "\n=== (top-level check) UIWindow.img root children ===\n";
+		for (auto c : nl::nx::ui["UIWindow.img"])
+			ofs << "  " << c.name() << " (" << c.size() << ")\n";
+		ofs << "\n=== (top-level check) UIWindow2.img root children ===\n";
+		for (auto c : nl::nx::ui["UIWindow2.img"])
+			ofs << "  " << c.name() << " (" << c.size() << ")\n";
+
+		ofs << "\n=== UIWindow.img / Quest ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["Quest"], 0, 4);
+		ofs << "\n=== UIWindow2.img / Quest ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["Quest"], 0, 4);
+		ofs << "\n=== UIWindow2.img / Quest / quest_info ===\n";
+		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["Quest"]["quest_info"], 0, 5);
+
+		ofs.close();
+	}
 
 	UIQuestHelper::UIQuestHelper(const QuestLog& ql) :
 		UIDragElement<PosQUESTHELPER>(Point<int16_t>(200, 20)), questlog(ql),
 		minimized(false), show_messenger(false), hovered_close_questid(-1),
 		reorder_drag_index(-1)
 	{
+		dump_quest_ui_nodes_once();
+
 		// === QuestAlarm (UIWindow.img — v83 primary) ===
 		nl::node alarm1 = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
 		if (alarm1)
@@ -120,6 +203,48 @@ namespace ms
 			messenger_thomas_notice = Texture(thomas["notice"]);
 		}
 
+		// === QuestBulb animations — used as the "minimize to floating bulb" mode ===
+		// Try several NX paths: different v83 client builds kept the bulb art in
+		// different locations. First match wins; missing paths just leave the
+		// animation empty and the bulb mode falls back to the slim title bar.
+		{
+			nl::node bulb_root;
+			const char* bulb_paths[] = { "QuestBulb", "QuestAlarm/QuestBulb", "QuestAlarm/Bulb" };
+			for (const char* p : bulb_paths)
+			{
+				std::string path(p);
+				size_t slash = path.find('/');
+				nl::node n = (slash == std::string::npos)
+					? nl::nx::ui["UIWindow2.img"][path]
+					: nl::nx::ui["UIWindow2.img"][path.substr(0, slash)][path.substr(slash + 1)];
+				if (n)
+				{
+					bulb_root = n;
+					break;
+				}
+				n = (slash == std::string::npos)
+					? nl::nx::ui["UIWindow.img"][path]
+					: nl::nx::ui["UIWindow.img"][path.substr(0, slash)][path.substr(slash + 1)];
+				if (n)
+				{
+					bulb_root = n;
+					break;
+				}
+			}
+
+			if (bulb_root)
+			{
+				// Typical child nodes: "open"/"close" or "0"/"1"
+				nl::node open_n = bulb_root["open"];
+				if (!open_n) open_n = bulb_root["0"];
+				nl::node close_n = bulb_root["close"];
+				if (!close_n) close_n = bulb_root["1"];
+
+				if (open_n) bulb_open_anim = Animation(open_n);
+				if (close_n) bulb_close_anim = Animation(close_n);
+			}
+		}
+
 		// === QuestGuide marks ===
 		nl::node guide = nl::nx::ui["UIWindow2.img"]["QuestGuide"];
 		if (guide)
@@ -174,14 +299,16 @@ namespace ms
 			}
 		}
 
-		// Set dimension
+		// Set dimension — expanded uses bg_max header + bg_center tiled + bg_bottom cap
 		if (bg_min.is_valid())
 		{
 			int16_t w = bg_min.get_dimensions().x();
-			int16_t min_h = bg_min.get_dimensions().y() - bg_min.get_origin().y();
+			int16_t header_h = bg_max.is_valid()
+				? (bg_max.get_dimensions().y() - bg_max.get_origin().y())
+				: (bg_min.get_dimensions().y() - bg_min.get_origin().y());
 			int16_t center_h = bg_center.is_valid() ? bg_center.get_dimensions().y() : 0;
 			int16_t bottom_h = bg_bottom.is_valid() ? bg_bottom.get_dimensions().y() : 0;
-			dimension = Point<int16_t>(w, min_h + center_h + bottom_h);
+			dimension = Point<int16_t>(w, header_h + center_h + bottom_h);
 		}
 		else
 			dimension = Point<int16_t>(200, 60);
@@ -237,10 +364,10 @@ namespace ms
 	{
 		int16_t y = 0;
 
-		// Draw quest name (bold dark) — click to collapse/expand
+		// Quest name (bold dark) — click to collapse/expand
 		tq.name.draw(pos + Point<int16_t>(0, y));
 
-		// Draw X button (BtDelete sprite) right after quest name
+		// X button (BtDelete sprite) right after quest name
 		if (close_btn_normal.is_valid())
 		{
 			int16_t name_w = tq.name.width();
@@ -255,9 +382,9 @@ namespace ms
 		{
 			if (!tq.requirements.empty())
 			{
-				for (auto& line : tq.requirements)
+				for (size_t i = 0; i < tq.requirements.size(); i++)
 				{
-					line.draw(pos + Point<int16_t>(4, y));
+					tq.requirements[i].draw(pos + Point<int16_t>(4, y));
 					y += 15;
 				}
 			}
@@ -273,30 +400,33 @@ namespace ms
 
 	void UIQuestHelper::draw(float alpha) const
 	{
+		// Use backgrndmax header when expanded, backgrndmin when minimized.
+		const Texture& header_tex = (!minimized && bg_max.is_valid()) ? bg_max : bg_min;
+
 		Point<int16_t> content_pos = position;
 
-		if (bg_min.is_valid())
+		if (header_tex.is_valid())
 		{
-			bg_min.draw(DrawArgument(position));
-			content_pos = position - bg_min.get_origin();
+			header_tex.draw(DrawArgument(position));
+			content_pos = position - header_tex.get_origin();
 		}
 
 		if (!minimized)
 		{
-			int16_t min_h = bg_min.is_valid() ? (bg_min.get_dimensions().y() - bg_min.get_origin().y()) : 20;
-			Point<int16_t> below = position + Point<int16_t>(0, min_h);
+			int16_t header_h = header_tex.is_valid()
+				? (header_tex.get_dimensions().y() - header_tex.get_origin().y())
+				: 20;
+			Point<int16_t> below = position + Point<int16_t>(0, header_h);
 
 			// Calculate total content height
 			int16_t content_h = 8; // top padding
 			for (auto& tq : tracked_quests)
-				content_h += get_quest_entry_height(tq) + 8; // 8px spacing between quests
-
+				content_h += get_quest_entry_height(tq) + 8;
 			if (tracked_quests.empty())
 				content_h = 28;
-
 			content_h = std::max(content_h, (int16_t)20);
 
-			// Tile bg_center
+			// Tile bg_center then cap with bg_bottom
 			if (bg_center.is_valid())
 			{
 				int16_t tile_h = bg_center.get_dimensions().y();
@@ -663,6 +793,8 @@ namespace ms
 	void UIQuestHelper::refresh_quest_info(TrackedQuest& tq)
 	{
 		tq.requirements.clear();
+		tq.requirements_complete.clear();
+		tq.all_complete = false;
 
 		if (tq.questid <= 0)
 			return;
@@ -705,11 +837,13 @@ namespace ms
 				item_name = "Item " + std::to_string(itemid);
 
 			std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(count);
-			Color::Name color = Color::Name::BLACK;
+			bool done = have >= count;
+			Color::Name color = done ? Color::Name::EMPEROR : Color::Name::BLACK;
 
 			tq.requirements.push_back(
 				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
 			);
+			tq.requirements_complete.push_back(done);
 		}
 
 		// Mob requirements — parse progress from quest data string
@@ -742,11 +876,13 @@ namespace ms
 				mob_name = "Monster " + std::to_string(mobid);
 
 			std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(count);
-			Color::Name color = Color::Name::BLACK;
+			bool done = killed >= count;
+			Color::Name color = done ? Color::Name::EMPEROR : Color::Name::BLACK;
 
 			tq.requirements.push_back(
 				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
 			);
+			tq.requirements_complete.push_back(done);
 			mob_idx++;
 		}
 
@@ -760,7 +896,17 @@ namespace ms
 				tq.requirements.push_back(
 					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Talk to " + npc_name, 145, false)
 				);
+				// Can't track NPC-talked state client-side without server flag; leave unchecked.
+				tq.requirements_complete.push_back(false);
 			}
+		}
+
+		// Compute overall completion — all tracked requirements done.
+		if (!tq.requirements_complete.empty())
+		{
+			tq.all_complete = true;
+			for (bool c : tq.requirements_complete)
+				if (!c) { tq.all_complete = false; break; }
 		}
 
 		// Progress fallback
@@ -783,7 +929,9 @@ namespace ms
 			return;
 
 		int16_t w = bg_min.get_dimensions().x();
-		int16_t min_h = bg_min.get_dimensions().y() - bg_min.get_origin().y();
+		int16_t header_h = bg_max.is_valid()
+			? (bg_max.get_dimensions().y() - bg_max.get_origin().y())
+			: (bg_min.get_dimensions().y() - bg_min.get_origin().y());
 
 		int16_t content_h = 8; // top padding
 		if (!tracked_quests.empty())
@@ -803,7 +951,7 @@ namespace ms
 		int16_t tiled_h = tiles * tile_h;
 		int16_t bottom_h = bg_bottom.is_valid() ? bg_bottom.get_dimensions().y() : 0;
 
-		expanded_dimension = Point<int16_t>(w, min_h + tiled_h + bottom_h);
+		expanded_dimension = Point<int16_t>(w, header_h + tiled_h + bottom_h);
 
 		if (!minimized)
 			dimension = expanded_dimension;

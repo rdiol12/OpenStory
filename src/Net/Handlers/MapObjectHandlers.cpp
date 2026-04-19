@@ -25,8 +25,36 @@
 #include "../../Gameplay/MapleMap/Summon.h"
 #include "../../Gameplay/MapleMap/Dragon.h"
 
+#include <cstdio>
+#include <cstdarg>
+#include <ctime>
+
 namespace ms
 {
+	static void mob_debug_log(const char* fmt, ...)
+	{
+		static FILE* f = nullptr;
+		if (!f)
+		{
+			f = std::fopen("mob_debug.log", "w");
+			if (!f) return;
+		}
+		std::time_t t = std::time(nullptr);
+		std::tm lt{};
+#ifdef _WIN32
+		localtime_s(&lt, &t);
+#else
+		localtime_r(&t, &lt);
+#endif
+		std::fprintf(f, "[%02d:%02d:%02d] ", lt.tm_hour, lt.tm_min, lt.tm_sec);
+		va_list ap;
+		va_start(ap, fmt);
+		std::vfprintf(f, fmt, ap);
+		va_end(ap);
+		std::fputc('\n', f);
+		std::fflush(f);
+	}
+
 	void SpawnCharHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -250,6 +278,9 @@ namespace ms
 
 		recv.skip(4);
 
+		mob_debug_log("SPAWN_MOB oid=%d id=%d pos=(%d,%d) stance=%d fh=%u effect=%d team=%d newspawn=%d",
+			oid, id, position.x(), position.y(), (int)stance, (unsigned)fh, (int)effect, (int)team, (effect == -2) ? 1 : 0);
+
 		Stage::get().get_mobs().spawn(
 			{ oid, id, 0, stance, fh, effect == -2, team, position }
 		);
@@ -260,6 +291,8 @@ namespace ms
 		int32_t oid = recv.read_int();
 		int8_t animation = recv.read_byte();
 
+		mob_debug_log("KILL_MOB oid=%d animation=%d", oid, (int)animation);
+
 		Stage::get().get_mobs().remove(oid, animation);
 	}
 
@@ -267,6 +300,8 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 		int32_t oid = recv.read_int();
+
+		mob_debug_log("SPAWN_MOB_C oid=%d mode=%d avail=%d", oid, (int)mode, (int)recv.available());
 
 		if (mode == 0)
 		{

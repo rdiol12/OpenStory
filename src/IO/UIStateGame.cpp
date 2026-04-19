@@ -287,6 +287,11 @@ namespace ms
 
 								break;
 							}
+							case KeyAction::Id::SCREENSHOT:
+							{
+								Window::get().take_screenshot();
+								break;
+							}
 							case KeyAction::Id::SKILLS:
 							{
 								emplace<UISkillBook>(
@@ -852,7 +857,7 @@ namespace ms
 		if (auto& element = elements[type])
 		{
 			element->deactivate();
-			element.release();
+			element.reset();
 		}
 	}
 

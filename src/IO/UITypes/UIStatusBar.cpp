@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStatusBar.h"
 
+#include <cmath>
+#include <fstream>
+#include <functional>
+
 #include "../../Graphics/Geometry.h"
 #include "UIBuddyList.h"
 #include "UIGameSettings.h"
@@ -32,6 +36,10 @@
 #include "UIReport.h"
 
 #include "../../Net/Packets/SocialPackets.h"
+#include "../../Net/Packets/PlayerPackets.h"
+#include "../../Data/SkillData.h"
+#include "../../Data/ItemData.h"
+#include "../Keyboard.h"
 #include "UIOptionMenu.h"
 #include "UIQuit.h"
 #include "UISkillBook.h"
@@ -83,6 +91,7 @@ namespace ms
 		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
 
 		has_notification = false;
+		notice_pulse_tick = 0;
 
 		// === Background ===
 		bar_backgrnd = Texture(mainbar["backgrnd"]);
@@ -204,6 +213,10 @@ namespace ms
 		buttons[BT_EXITDUNGEON]->set_active(false);
 		buttons[BF_BT_CASHSHOP]->set_active(false);
 
+		// BtCharacter duplicates BtStat (both open UIStatsInfo); the v83
+		// toolbar only uses BtStat, so hide BtCharacter.
+		buttons[BT_CHARACTER]->set_active(false);
+
 
 		// === Chat buttons ===
 		buttons[BT_CHATCLOSE]  = std::make_unique<MapleButton>(mainbar["chatClose"]);
@@ -264,6 +277,85 @@ namespace ms
 		// === Quick slot ===
 		nl::node qs = mainbar["quickSlot"];
 		quickslot_bg = Texture(qs["quickSlot"]);
+
+		// Programmatic key-name labels for the 8 quickslot cells.
+		// The v83 sprite does not contain these labels, so we draw them
+		// in white (with a NAMETAG background for readability) over the
+		// top-left corner of each cell.
+		static const char* QS_LABEL_NAMES[8] = {
+			"Shft", "Ins", "Hme", "PgU",
+			"Ctl",  "Del", "End", "PgD"
+		};
+		for (int i = 0; i < 8; i++)
+			qs_key_labels[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, Text::Background::NAMETAG, QS_LABEL_NAMES[i]);
+
+		// One-shot dump of the quickSlot NX subtree (origins + sizes) so we
+		// know the exact layout of the panel sprite and any key-label bitmaps.
+		{
+			static bool qs_dumped2 = false;
+			if (!qs_dumped2)
+			{
+				qs_dumped2 = true;
+				std::ofstream ofs("quickslot_ui_dump.txt");
+				if (ofs)
+				{
+					std::function<void(nl::node, int, int)> walk;
+					walk = [&](nl::node n, int depth, int max_depth)
+					{
+						if (!n) return;
+						for (int i = 0; i < depth; i++) ofs << "  ";
+						ofs << n.name() << " [" << (int)n.data_type() << "]";
+						switch (n.data_type())
+						{
+						case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
+						case nl::node::type::real:    ofs << " = " << (double)n; break;
+						case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
+						case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
+						case nl::node::type::bitmap:
+						{
+							auto bmp = n.get_bitmap();
+							if (bmp)
+								ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << " origin(" << n.x() << "," << n.y() << ")>";
+							else
+								ofs << " <bitmap (null)>";
+							break;
+						}
+						default: break;
+						}
+						ofs << "  (" << n.size() << " children)\n";
+						if (depth >= max_depth) return;
+						for (auto child : n) walk(child, depth + 1, max_depth);
+					};
+					ofs << "=== StatusBar2.img (top-level children) ===\n";
+					for (auto c : nl::nx::ui["StatusBar2.img"])
+						ofs << "  " << c.name() << " (" << c.size() << ")\n";
+					ofs << "\n=== StatusBar2.img/mainBar (depth 2) ===\n";
+					walk(nl::nx::ui["StatusBar2.img"]["mainBar"], 0, 2);
+					ofs << "\n=== StatusBar2.img/mainBar/quickSlot (full) ===\n";
+					walk(qs, 0, 8);
+					ofs << "\n=== StatusBar3.img (top-level children) ===\n";
+					for (auto c : nl::nx::ui["StatusBar3.img"])
+						ofs << "  " << c.name() << " (" << c.size() << ")\n";
+					ofs << "\n=== StatusBar3.img (depth 3) ===\n";
+					walk(nl::nx::ui["StatusBar3.img"], 0, 3);
+					ofs << "\n=== UIWindow2.img children (look for key) ===\n";
+					for (auto c : nl::nx::ui["UIWindow2.img"])
+						ofs << "  " << c.name() << " (" << c.size() << ")\n";
+					ofs << "\n=== UIWindow.img children (look for key) ===\n";
+					for (auto c : nl::nx::ui["UIWindow.img"])
+						ofs << "  " << c.name() << " (" << c.size() << ")\n";
+					ofs << "\n=== Basic.img children ===\n";
+					for (auto c : nl::nx::ui["Basic.img"])
+						ofs << "  " << c.name() << " (" << c.size() << ")\n";
+
+					ofs << "\n=== StatusBar2.img/mainBar/gauge (full) ===\n";
+					walk(nl::nx::ui["StatusBar2.img"]["mainBar"]["gauge"], 0, 6);
+
+					ofs << "\n=== UIWindow2.img/KeyConfig (full) ===\n";
+					walk(nl::nx::ui["UIWindow2.img"]["KeyConfig"], 0, 4);
+				}
+			}
+		}
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
 		buttons[BT_QS_OPEN]->set_active(true);
 		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"]);
@@ -480,9 +572,15 @@ namespace ms
 		joblabel.draw(position + Point<int16_t>(-435, -21));
 		namelabel.draw(position + Point<int16_t>(-435, -36));
 
-		// Draw notice sprite when there are pending notifications
+		// Draw notice sprite when there are pending notifications.
+		// Pulse the alpha with a ~1.2s period so it's clearly visible at a
+		// glance — static draw blended into the bar too easily before.
 		if (has_notification && notice_sprite.is_valid())
-			notice_sprite.draw(DrawArgument(position));
+		{
+			float phase = static_cast<float>(notice_pulse_tick) * 0.09f;
+			float pulse = 0.55f + 0.45f * (0.5f + 0.5f * std::sin(phase));
+			notice_sprite.draw(DrawArgument(position, pulse));
+		}
 
 		// Draw cooltime return indicator (NX origin positions it)
 		if (cooltime_return.is_valid())
@@ -519,15 +617,52 @@ namespace ms
 		{
 			if (quickslot_bg.is_valid())
 				quickslot_bg.draw(DrawArgument(position));
+
+			// Draw a readable key-name label in the top-left of each cell
+			// area. The v83 panel sprite does NOT include these labels.
+			// NAMETAG background pill keeps them readable over the sprite.
+			for (int16_t i = 0; i < 8; ++i)
+			{
+				Point<int16_t> tl = quickslot_slot_pos(i);
+				qs_key_labels[i].draw(DrawArgument(tl + Point<int16_t>(2, 1)));
+			}
+
+			// Draw bound icons centered inside each cell area.
+			const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
+			int16_t cell_w = 30;
+			int16_t cell_h = 30;
+			for (int16_t i = 0; i < static_cast<int16_t>(QUICKSLOT_KEYS.size()); ++i)
+			{
+				int32_t keycode = QUICKSLOT_KEYS[i];
+				auto it = maplekeys.find(keycode);
+				if (it == maplekeys.end())
+					continue;
+
+				const Keyboard::Mapping& m = it->second;
+				if (m.type == KeyType::Id::NONE || m.action == 0)
+					continue;
+
+				Texture icon = get_quickslot_icon(m.type, m.action);
+				if (icon.is_valid())
+				{
+					// Center 32x32 icon inside the larger cell rect.
+					Point<int16_t> tl = quickslot_slot_pos(i);
+					Point<int16_t> center = tl + Point<int16_t>((cell_w - 32) / 2,
+					                                             (cell_h - 32) / 2);
+					icon.draw(DrawArgument(center));
+				}
+			}
 		}
 
-		// Draw buff tray background
-		if (buff_backgrnd.is_valid())
-			buff_backgrnd.draw(DrawArgument(position + Point<int16_t>(184, -70)));
-
-		// Draw alarm area
-		if (alarm_backgrnd.is_valid())
-			alarm_backgrnd.draw(DrawArgument(position + Point<int16_t>(-512, -70)));
+		// Buff tray (StatusBar3.img/buff/backgrnd) and alarm tray
+		// (StatusBar3.img/alarm/backgrnd) are post-Big-Bang UI elements that
+		// appear as large grid-like panels ("numpad" shaped) on screen.
+		// v83 does not use these — keep the textures loaded but suppress
+		// drawing them.
+		// if (buff_backgrnd.is_valid())
+		//     buff_backgrnd.draw(DrawArgument(position + Point<int16_t>(184, -70)));
+		// if (alarm_backgrnd.is_valid())
+		//     alarm_backgrnd.draw(DrawArgument(position + Point<int16_t>(-512, -70)));
 
 		// Draw buttons on top
 		UIElement::draw_buttons(alpha);
@@ -556,6 +691,10 @@ namespace ms
 		sp_notify.update();
 		noncombat_notify.update();
 		alarm_anim.update();
+
+		// Pulse counter for notice sprite (only advances when active)
+		if (has_notification)
+			notice_pulse_tick++;
 	}
 
 	Button::State UIStatusBar::button_pressed(uint16_t id)
@@ -970,6 +1109,203 @@ namespace ms
 
 		if (buttons.count(BT_NOTICE))
 			buttons[BT_NOTICE]->set_active(false);
+	}
+
+	// === Quickslot drop / render ===
+
+	// Layout constants for the v83 quickslot panel.
+	// Per NX dump: quickSlot bitmap is 145x93 with origin (-143, 143),
+	// so drawing at `position=(512, VHEIGHT)` places the panel top-left at
+	// `(position.x + 143, position.y - 143)`.
+	static constexpr int16_t QS_PANEL_OFFSET_X = 143;
+	static constexpr int16_t QS_PANEL_OFFSET_Y = -143;
+	// First slot top-left offset inside the panel, step between slots.
+	// Tweak these to align with the visible cube squares.
+	static constexpr int16_t QS_CELL_OFFSET_X = 8;
+	static constexpr int16_t QS_CELL_OFFSET_Y = 15;
+	static constexpr int16_t QS_CELL_W   = 30;
+	static constexpr int16_t QS_CELL_H   = 30;
+	static constexpr int16_t QS_COL_STEP = 34;
+	static constexpr int16_t QS_ROW_STEP = 34;
+
+	Point<int16_t> UIStatusBar::quickslot_panel_pos() const
+	{
+		return position + Point<int16_t>(QS_PANEL_OFFSET_X, QS_PANEL_OFFSET_Y);
+	}
+
+	Point<int16_t> UIStatusBar::quickslot_slot_pos(int16_t slot) const
+	{
+		int16_t col = slot % 4;
+		int16_t row = slot / 4;
+		return quickslot_panel_pos() + Point<int16_t>(QS_CELL_OFFSET_X + col * QS_COL_STEP,
+		                                               QS_CELL_OFFSET_Y + row * QS_ROW_STEP);
+	}
+
+	int16_t UIStatusBar::quickslot_slot_at(Point<int16_t> cursorpos) const
+	{
+		if (!show_quickslot)
+			return -1;
+
+		for (int16_t i = 0; i < 8; i++)
+		{
+			Point<int16_t> tl = quickslot_slot_pos(i);
+			Rectangle<int16_t> rect(tl, tl + Point<int16_t>(QS_CELL_W, QS_CELL_H));
+			if (rect.contains(cursorpos))
+				return i;
+		}
+		return -1;
+	}
+
+	Texture UIStatusBar::get_quickslot_icon(KeyType::Id type, int32_t action) const
+	{
+		if (action == 0)
+			return Texture();
+
+		auto iter = qs_icon_cache.find(action * 8 + type);
+		if (iter != qs_icon_cache.end())
+			return iter->second;
+
+		// Match the keyboard UI (UIKeyConfig::get_skill_texture / get_item_texture):
+		// skills use NORMAL icon, items use the non-raw icon variant.
+		Texture tx;
+		if (type == KeyType::Id::SKILL)
+			tx = SkillData::get(action).get_icon(SkillData::Icon::NORMAL);
+		else if (type == KeyType::Id::ITEM)
+			tx = ItemData::get(action).get_icon(false);
+
+		// v83 skill/item icons have origin (0, 32) so a raw draw at `pos`
+		// renders 32 px ABOVE `pos` (matching StatefulIcon's compensation).
+		// Shift so the texture's origin becomes (0, 0) — top-left at `pos`.
+		tx.shift(Point<int16_t>(0, 32));
+
+		qs_icon_cache[action * 8 + type] = tx;
+		return tx;
+	}
+
+	void UIStatusBar::assign_quickslot(int16_t slot, KeyType::Id type, int32_t action)
+	{
+		if (slot < 0 || slot >= 8)
+			return;
+
+		uint8_t key = QUICKSLOT_KEYS[slot];
+
+		// Persist locally so subsequent keypresses work immediately.
+		UI::get().get_keyboard().assign(key, static_cast<uint8_t>(type), action);
+
+		// Notify the server so the mapping persists across sessions.
+		std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> updates;
+		updates.emplace_back(static_cast<KeyConfig::Key>(key), type, action);
+		ChangeKeyMapPacket(updates).dispatch();
+	}
+
+	bool UIStatusBar::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		int16_t slot = quickslot_slot_at(cursorpos);
+		if (slot < 0)
+			return false; // drop outside slots - let caller fall through
+
+		Icon::IconType itype = const_cast<Icon&>(icon).get_type();
+		int32_t action = icon.get_action_id();
+
+		if (itype == Icon::IconType::SKILL)
+			assign_quickslot(slot, KeyType::Id::SKILL, action);
+		else if (itype == Icon::IconType::ITEM)
+			assign_quickslot(slot, KeyType::Id::ITEM, action);
+
+		return true;
+	}
+
+	Cursor::State UIStatusBar::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		// If cursor is over a quickslot cube that has a binding, allow the
+		// user to pick it up and drag it (either to another cube, or off the
+		// quickslot to clear the binding).
+		if (show_quickslot)
+		{
+			int16_t slot = quickslot_slot_at(cursorpos);
+			if (slot >= 0)
+			{
+				uint8_t key = QUICKSLOT_KEYS[slot];
+				const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
+				auto it = maplekeys.find(static_cast<int32_t>(key));
+				if (it != maplekeys.end())
+				{
+					const Keyboard::Mapping& m = it->second;
+					if ((m.type == KeyType::Id::SKILL || m.type == KeyType::Id::ITEM)
+						&& m.action != 0)
+					{
+						if (clicked)
+						{
+							// Build a fresh Icon owning its own raw texture.
+							// The Icon ctor shifts (0,32), so pass the raw
+							// (origin 0,32) texture — not the cache's already-
+							// shifted one.
+							Texture raw;
+							if (m.type == KeyType::Id::SKILL)
+								raw = SkillData::get(m.action).get_icon(SkillData::Icon::NORMAL);
+							else
+								raw = ItemData::get(m.action).get_icon(false);
+
+							auto icon = std::make_unique<Icon>(
+								std::make_unique<QuickslotDragType>(key, m.type, m.action),
+								raw,
+								-1);
+
+							// Clear the binding immediately; if the drop
+							// lands on a cube, send_icon reassigns it.
+							clear_quickslot(key);
+
+							// Compute cursor offset relative to the icon's
+							// top-left so dragdraw follows the grip point.
+							Point<int16_t> tl = quickslot_slot_pos(slot);
+							int16_t cell_w = 30, cell_h = 30;
+							Point<int16_t> center = tl + Point<int16_t>(
+								(cell_w - 32) / 2, (cell_h - 32) / 2);
+
+							icon->start_drag(cursorpos - center);
+
+							Icon* raw_ptr = icon.get();
+							qs_drag_icons[key] = std::move(icon);
+							UI::get().drag_icon(raw_ptr);
+
+							return Cursor::State::GRABBING;
+						}
+						else
+						{
+							return Cursor::State::CANGRAB;
+						}
+					}
+				}
+			}
+		}
+
+		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIStatusBar::clear_quickslot(uint8_t key)
+	{
+		UI::get().get_keyboard().remove(key);
+
+		std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> updates;
+		updates.emplace_back(static_cast<KeyConfig::Key>(key), KeyType::Id::NONE, 0);
+		ChangeKeyMapPacket(updates).dispatch();
+	}
+
+	UIStatusBar::QuickslotDragType::QuickslotDragType(uint8_t k, KeyType::Id t, int32_t a)
+		: key(k), type(t), action(a) {}
+
+	void UIStatusBar::QuickslotDragType::drop_on_stage() const
+	{
+		// Binding was already cleared at drag-start. Nothing to do.
+	}
+
+	Icon::IconType UIStatusBar::QuickslotDragType::get_type()
+	{
+		if (type == KeyType::Id::SKILL)
+			return Icon::IconType::SKILL;
+		if (type == KeyType::Id::ITEM)
+			return Icon::IconType::ITEM;
+		return Icon::IconType::NONE;
 	}
 
 }

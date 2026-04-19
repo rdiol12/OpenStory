@@ -27,6 +27,7 @@
 
 #include "../../Data/ItemData.h"
 #include "../../Constants.h"
+#include "../../Graphics/Geometry.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -135,6 +136,15 @@ namespace ms
 						dot_hovered.draw(DrawArgument(dot_pos));
 					else
 						dot_normal.draw(DrawArgument(dot_pos));
+
+					// Explicit highlight overlay so the hovered option is
+					// always clearly visible even if the list0/list1 NX
+					// sprites are missing or too subtle to distinguish.
+					if (is_hovered)
+					{
+						ColorBox highlight(324, line_h, Color::Name::YELLOW, 0.25f);
+						highlight.draw(DrawArgument(row_pos));
+					}
 				}
 			}
 

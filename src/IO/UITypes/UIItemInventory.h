@@ -82,6 +82,7 @@ namespace ms
 			Icon::IconType get_type() override;
 			int16_t get_source_slot() const override { return source; }
 			InventoryType::Id get_source_tab() const override { return sourcetab; }
+			int32_t get_action_id() const override { return item_id; }
 
 		private:
 			InventoryType::Id sourcetab;

@@ -140,7 +140,7 @@ namespace ms
 		else
 			strid = std::to_string(skill_id);
 
-		std::string jobid = std::to_string(skill_id / 10000);
+		std::string jobid = string_format::extend_id(skill_id / 10000, 3);
 		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid]["level"][skill_level];
 
 		const PassiveBuff* buff = iter->second.get();
