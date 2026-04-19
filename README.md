@@ -52,6 +52,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 
 ### Latest
 - **Status Bar**: Rebuilt/polished status bar UI (HP/MP/EXP, character menu, chat controls). See screenshot above.
+- **HP/MP/EXP flash animations**: The HP and MP gauges now play their animated low-resource overlay (`ani_hp_gauge` / `ani_mp_gauge`, plus the AB-job variant `ani_hp_gauge_ab`) when the bar drops below 30%. The EXP gauge and the notice icon pulse via alpha-cycled draws so status changes are visible at a glance.
 - **NPC Dialog reliability**: Fixed intermittent "NPC chat UI doesn't open" bug. Root cause was `UIStateGame::remove` calling `unique_ptr::release()` (which leaks instead of freeing), leaving a null entry that wedged the next dialog. Handler also now force-removes stale dialog before opening a new one.
 - **NPC Quest Indicator**: Tightened the "available quest" bulb above NPCs so it only shows for quests the player can actually pick up (filters out auto-start, auto-pre-complete, blocked, script-started, and quests with no area / no info entry).
 - **In-game Channel Switcher**: Now draws only the real channels reported by the server for the current world, instead of hard-coding 20 slots. Login server list response populates a `ChannelLoadData` cache that `UIChannel` reads at construction.
