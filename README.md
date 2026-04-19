@@ -6,7 +6,7 @@ A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](h
 
 ## Screenshots
 
-### Status Bar - wip  ui need fixing all the buttons work
+### Status Bar - wip  ui need fixing
 ![Status Bar](docs/images/statusbar.png)
 
 ### Emoji Support & Minimap
