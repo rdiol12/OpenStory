@@ -48,6 +48,15 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - **Daniel Allendorf & Ryan Payton** -- Original [HeavenClient](https://github.com/HeavenClient/HeavenClient)
 - **rdiol12** -- v83 Cosmic compatibility, UI systems, packet handlers
 
+## todo
+- fix login world selection char creation flow currently ui is broken
+- add notifications alers ui
+- party is currently broken
+- family ui is currently broken and missing most fetures
+- nx shop ui is currently broken 
+- fix closing the game
+- probably more stuff are missing/broken
+
 ## Changelog
 
 ### Latest
@@ -85,6 +94,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 | Graphics/Effects Quality | Working | Client-only, no server changes needed |
 
 ### Recent Fixes
+- fixed some generic mssage ui displaying with incorrect coordinates for typing indicator and worng buttons position 
 - **Quest complete effect**: Fixed QuestClear animation path (`Quest/clear` -> `QuestClear`) to match NX data; quest complete light pillar now shows from both SHOW_STATUS_INFO and QUEST_CLEAR handlers
 - **Three Snails ammo check**: Skill now blocked if player lacks required snail shell items, preventing ghost MP drain
 - **Packet handler fixes (Cosmic compatibility)**: Fixed critical packet format mismatches causing stream corruption:
