@@ -19,28 +19,27 @@
 
 #include "../UIDragElement.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
 #include "../Components/Textfield.h"
 
 #include <cstdint>
 #include <string>
-#include <vector>
 
 namespace ms
 {
-	// Compose dialog for MapleTV cash items. Shows 5 text fields + OK/Cancel
-	// buttons on top of UIWindow.img/MapleTV/backgrnd. On OK, builds a
-	// UseMapleTVPacket and dispatches it to the server. Draggable by the
-	// top of the window (default 30px title strip).
-	class UIMapleTV : public UIDragElement<PosMAPLETV>
+	// Compose dialog for Item Megaphone cash items (5076xxx). Renders
+	// UIWindow2.img/ItemMegaphone/backgrnd (236x182) with a single message
+	// field, a whisper-ear checkbox, and an item-attach drop area that
+	// lets the broadcaster attach one inventory item for preview.
+	class UIItemMegaphone : public UIDragElement<PosITEMMEGAPHONE>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::MAPLETV;
+		static constexpr Type TYPE = UIElement::Type::ITEMMEGAPHONE;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		UIMapleTV();
+		UIItemMegaphone();
 
-		// slot / itemid of the MapleTV cash item being consumed.
 		void configure_item(int16_t slot, int32_t itemid);
 
 		void draw(float inter) const override;
@@ -58,22 +57,18 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_SEND,
-			BT_TO
+			BT_SEND
 		};
 
 		void send_broadcast();
-		void focus_field(int idx);
-		void prompt_victim();
 
-		Textfield lines[5];
-		Textfield victim_field;
+		Textfield msg_field;
+		Texture check_icon;
 		Text prompt_label;
-		Text victim_label;
-		int focused_idx;
+
+		bool whisper_enabled;
 
 		int16_t item_slot;
 		int32_t item_id;
-		bool is_heart_tv;
 	};
 }

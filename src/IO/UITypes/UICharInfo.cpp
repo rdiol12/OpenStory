@@ -165,9 +165,6 @@ namespace ms
 			return Button::State::NORMAL;
 		case Buttons::BtItem:
 		{
-			static FILE* itemdbg = fopen("charinfo_item_btn.txt", "a");
-			if (itemdbg) { fprintf(itemdbg, "BtItem pressed: bot_valid=%d char_id=%d\n", bot_inventory.is_valid(), bot_inventory.char_id); fflush(itemdbg); }
-
 			if (bot_inventory.is_valid())
 			{
 				bot_tab_active = true;

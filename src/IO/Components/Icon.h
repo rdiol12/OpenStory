@@ -35,6 +35,7 @@ namespace ms
 			EQUIP,
 			ITEM,
 			KEY,
+			MACRO,
 			NUM_TYPES
 		};
 

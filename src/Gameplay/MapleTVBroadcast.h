@@ -17,47 +17,39 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "MapObjects.h"
+#include "../Template/Singleton.h"
 
-#include "../Spawn.h"
-
-#include "../../IO/Cursor.h"
-
-#include <queue>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace ms
 {
-	class MapNpcs
+	// Tracks the world-wide MapleTV broadcast that's currently on the air.
+	// Map-embedded TV sprites read this state to decide what avatar/message
+	// to composite onto themselves.
+	class MapleTVBroadcast : public Singleton<MapleTVBroadcast>
 	{
 	public:
-		// Draw all NPCs on a layer
-		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
-		// Update all NPCs
-		void update(const Physics& physics);
+		void start(const std::string& sender_name,
+			const std::vector<std::string>& lines,
+			const std::string& victim_name,
+			int32_t duration_ms);
 
-		// Add an NPC to the spawn queue
-		void spawn(NpcSpawn&& spawn);
-		// Remove the NPC with the specified oid
-		void remove(int32_t oid);
-		// Remove all NPCs
-		void clear();
+		void stop();
+		void update();
 
-		// Returns a reference to the MapObject's object
-		MapObjects* get_npcs();
-
-		// Refresh quest marks on all NPCs (call when quest state changes)
-		void refresh_quest_marks();
-
-		// Send mouse input to clickable NPCs
-		Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);
+		bool active() const { return active_; }
+		const std::string& sender_name() const { return sender_name_; }
+		const std::string& victim_name() const { return victim_name_; }
+		const std::vector<std::string>& lines() const { return lines_; }
+		int32_t remaining_ms() const { return remaining_ms_; }
 
 	private:
-		MapObjects npcs;
-
-		std::queue<NpcSpawn> spawns;
-
-		// Last observed NpcResponseTracker revision — refresh quest marks
-		// whenever it changes so recovered NPCs get their bulbs back.
-		uint32_t last_tracker_rev = 0;
+		bool active_ = false;
+		std::string sender_name_;
+		std::string victim_name_;
+		std::vector<std::string> lines_;
+		int32_t remaining_ms_ = 0;
 	};
 }

@@ -19,6 +19,7 @@
 
 #include "Npc.h"
 
+#include "../../Net/NpcResponseTracker.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
 
 namespace ms
@@ -44,6 +45,19 @@ namespace ms
 		}
 
 		npcs.update(physics);
+
+		// Expire stale TalkToNPC requests. Refresh indicators whenever the
+		// tracker's revision changes — covers both new unavailability (tick
+		// flagged a timeout) and recovery (a response cleared an NPC that
+		// was previously flagged unavailable, restoring its bulb).
+		NpcResponseTracker::get().tick();
+
+		uint32_t rev = NpcResponseTracker::get().revision();
+		if (rev != last_tracker_rev)
+		{
+			last_tracker_rev = rev;
+			refresh_quest_marks();
+		}
 	}
 
 	void MapNpcs::spawn(NpcSpawn&& spawn)
@@ -87,6 +101,7 @@ namespace ms
 			{
 				if (pressed)
 				{
+					NpcResponseTracker::get().mark_pending(npc->get_npcid());
 					TalkToNPCPacket(npc->get_oid()).dispatch();
 
 					return Cursor::State::IDLE;

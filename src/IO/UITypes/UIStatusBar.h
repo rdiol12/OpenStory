@@ -283,6 +283,17 @@ namespace ms
 		Texture notice_sprite;
 		uint32_t notice_pulse_tick;
 
+		// Gauge-change flash state: start a short timer whenever HP/MP/EXP
+		// drops, and draw the animated overlay while the timer is alive,
+		// not only when the resource is below 30%.
+		float prev_hp_pct;
+		float prev_mp_pct;
+		float prev_exp_pct;
+		uint16_t hp_flash_ticks;
+		uint16_t mp_flash_ticks;
+		uint16_t exp_flash_ticks;
+		static constexpr uint16_t FLASH_DURATION_TICKS = 20;
+
 		// Pre-allocated draw objects
 		ColorBox menu_bg;
 		ColorBox sys_bg;

@@ -215,22 +215,15 @@ namespace ms
 	void ShowItemEffectHandler::handle(InPacket& recv) const
 	{
 		// v83: int cid, int itemid
-		// Shows an item-use visual effect on a character
+		// Toggles a persistent item-use aura on a character. itemid=0 clears.
 		if (recv.length() < 8)
 			return;
 
 		int32_t cid = recv.read_int();
 		int32_t itemid = recv.read_int();
 
-		// Load the item effect animation from Effect.wz
-		nl::node effect_node = nl::nx::effect["ItemEff.img"][std::to_string(itemid)];
-
-		if (effect_node)
-		{
-			Optional<Char> character = Stage::get().get_character(cid);
-			if (character)
-				character->show_attack_effect(Animation(effect_node), 0);
-		}
+		if (auto character = Stage::get().get_character(cid))
+			character->set_item_effect(itemid);
 	}
 
 	// Opcode 196 (0xC4) — SHOW_CHAIR

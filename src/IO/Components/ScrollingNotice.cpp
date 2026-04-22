@@ -23,7 +23,10 @@ namespace ms
 	{
 		width = 800;
 		background = ColorBox(width, 23, Color::Name::BLACK, 0.535f);
-		notice = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::YELLOW);
+		// Huge maxwidth so long server announcements never wrap onto a
+		// second line that would spill below the black bar.
+		notice = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::YELLOW,
+			"", 32767);
 
 		xpos.set(0.0);
 		active = false;

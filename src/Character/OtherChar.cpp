@@ -36,6 +36,8 @@ namespace ms
 
 		attackspeed = 6;
 		attacking = false;
+
+		apply_nametag_style(jb);
 	}
 
 	int8_t OtherChar::update(const Physics& physics)

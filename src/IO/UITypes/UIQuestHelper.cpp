@@ -21,105 +21,25 @@
 #include "../Components/MapleButton.h"
 #include "../UI.h"
 #include "../../Audio/Audio.h"
+#include "../../Configuration.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+
+#include <sstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
-#include <fstream>
-
 namespace ms
 {
 	QuestDragState UIQuestHelper::quest_drag;
-
-	// Debug: recursively dump an NX node to ofs with indentation.
-	// Includes type + basic value/dimensions so we can see what's actually there.
-	static void dump_nx_node(std::ofstream& ofs, nl::node n, int depth, int max_depth = 4)
-	{
-		if (!n) return;
-
-		for (int i = 0; i < depth; i++) ofs << "  ";
-		ofs << n.name() << " [" << (int)n.data_type() << "]";
-
-		switch (n.data_type())
-		{
-		case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
-		case nl::node::type::real:    ofs << " = " << (double)n; break;
-		case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
-		case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
-		case nl::node::type::bitmap:
-		{
-			auto bmp = n.get_bitmap();
-			if (bmp)
-				ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << ">";
-			else
-				ofs << " <bitmap (null)>";
-			break;
-		}
-		case nl::node::type::audio:   ofs << " <audio>"; break;
-		default: break;
-		}
-		ofs << "  (" << n.size() << " children)\n";
-
-		if (depth >= max_depth) return;
-		for (auto child : n)
-			dump_nx_node(ofs, child, depth + 1, max_depth);
-	}
-
-	static void dump_quest_ui_nodes_once()
-	{
-		// Re-dump every launch (the previous file on disk is overwritten)
-		static bool done = false;
-		if (done) return;
-		done = true;
-
-		std::ofstream ofs("quest_ui_dump.txt");
-		if (!ofs) return;
-
-		ofs << "=== UIWindow.img / QuestAlarm ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["QuestAlarm"], 0, 5);
-		ofs << "\n=== UIWindow2.img / QuestAlarm ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestAlarm"], 0, 5);
-		ofs << "\n=== UIWindow.img / QuestBulb ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["QuestBulb"], 0, 5);
-		ofs << "\n=== UIWindow2.img / QuestBulb ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestBulb"], 0, 5);
-		ofs << "\n=== UIWindow2.img / QuestIcon ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestIcon"], 0, 4);
-		ofs << "\n=== UIWindow2.img / QuestGuide ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestGuide"], 0, 4);
-		ofs << "\n=== UIWindow2.img / QuestMessengerAlice ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestMessengerAlice"], 0, 4);
-		ofs << "\n=== UIWindow2.img / QuestMessengerThomas ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["QuestMessengerThomas"], 0, 4);
-		ofs << "\n=== StatusBar3.img / Quest ===\n";
-		dump_nx_node(ofs, nl::nx::ui["StatusBar3.img"]["Quest"], 0, 5);
-		ofs << "\n=== (top-level check) UIWindow.img root children ===\n";
-		for (auto c : nl::nx::ui["UIWindow.img"])
-			ofs << "  " << c.name() << " (" << c.size() << ")\n";
-		ofs << "\n=== (top-level check) UIWindow2.img root children ===\n";
-		for (auto c : nl::nx::ui["UIWindow2.img"])
-			ofs << "  " << c.name() << " (" << c.size() << ")\n";
-
-		ofs << "\n=== UIWindow.img / Quest ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow.img"]["Quest"], 0, 4);
-		ofs << "\n=== UIWindow2.img / Quest ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["Quest"], 0, 4);
-		ofs << "\n=== UIWindow2.img / Quest / quest_info ===\n";
-		dump_nx_node(ofs, nl::nx::ui["UIWindow2.img"]["Quest"]["quest_info"], 0, 5);
-
-		ofs.close();
-	}
 
 	UIQuestHelper::UIQuestHelper(const QuestLog& ql) :
 		UIDragElement<PosQUESTHELPER>(Point<int16_t>(200, 20)), questlog(ql),
 		minimized(false), show_messenger(false), hovered_close_questid(-1),
 		reorder_drag_index(-1)
 	{
-		dump_quest_ui_nodes_once();
-
 		// === QuestAlarm (UIWindow.img — v83 primary) ===
 		nl::node alarm1 = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
 		if (alarm1)
@@ -731,6 +651,23 @@ namespace ms
 		return bounds.contains(cursorpos);
 	}
 
+	// Persist the current tracked quest ids to Configuration as a
+	// comma-separated list so the pin state survives client restarts.
+	// Writes the whole config file immediately — ~Configuration() only
+	// runs on a clean shutdown, so flushing on every pin change avoids
+	// losing the state if the client is killed.
+	static void save_tracked_quests(const std::vector<int16_t>& ids)
+	{
+		std::ostringstream oss;
+		for (size_t i = 0; i < ids.size(); ++i)
+		{
+			if (i > 0) oss << ',';
+			oss << ids[i];
+		}
+		Setting<TrackedQuests>::get().save(oss.str());
+		Configuration::get().save();
+	}
+
 	void UIQuestHelper::track_quest(int16_t questid)
 	{
 		if (questid <= 0)
@@ -751,6 +688,10 @@ namespace ms
 		refresh_quest_info(tq);
 		tracked_quests.push_back(std::move(tq));
 		recalc_dimension();
+
+		std::vector<int16_t> ids;
+		for (const auto& t : tracked_quests) ids.push_back(t.questid);
+		save_tracked_quests(ids);
 	}
 
 	void UIQuestHelper::untrack_quest(int16_t questid)
@@ -761,33 +702,76 @@ namespace ms
 			tracked_quests.end()
 		);
 		recalc_dimension();
+
+		std::vector<int16_t> ids;
+		for (const auto& t : tracked_quests) ids.push_back(t.questid);
+		save_tracked_quests(ids);
 	}
 
 	void UIQuestHelper::auto_track()
 	{
 		const auto& started = questlog.get_started();
 
-		if (started.empty())
+		// On first call this session, restore whatever the player had
+		// pinned in the previous client session from Configuration.
+		static bool restored_once = false;
+		if (!restored_once)
 		{
-			tracked_quests.clear();
-			recalc_dimension();
-			return;
+			restored_once = true;
+			std::string saved = Setting<TrackedQuests>::get().load();
+			if (!saved.empty())
+			{
+				std::stringstream ss(saved);
+				std::string tok;
+				while (std::getline(ss, tok, ','))
+				{
+					if (tok.empty()) continue;
+					int16_t qid = 0;
+					try { qid = static_cast<int16_t>(std::stoi(tok)); }
+					catch (...) { continue; }
+					if (qid <= 0) continue;
+					if (started.find(qid) == started.end()) continue; // skip finished/abandoned
+					if (static_cast<int>(tracked_quests.size()) >= MAX_TRACKED) break;
+
+					// Skip duplicates
+					bool dup = false;
+					for (const auto& t : tracked_quests)
+						if (t.questid == qid) { dup = true; break; }
+					if (dup) continue;
+
+					TrackedQuest tq;
+					tq.questid = qid;
+					tq.collapsed = false;
+					refresh_quest_info(tq);
+					tracked_quests.push_back(std::move(tq));
+				}
+				recalc_dimension();
+			}
 		}
 
-		// Track all started quests (up to MAX_TRACKED) if none are tracked
-		if (tracked_quests.empty())
+		// Drop any tracked entries whose quest is no longer started
+		// (e.g. the player turned it in or abandoned it).
 		{
-			int count = 0;
-			for (auto it = started.rbegin(); it != started.rend() && count < MAX_TRACKED; ++it, ++count)
+			size_t before = tracked_quests.size();
+			tracked_quests.erase(
+				std::remove_if(tracked_quests.begin(), tracked_quests.end(),
+					[&](const TrackedQuest& tq) {
+						return started.find(tq.questid) == started.end();
+					}),
+				tracked_quests.end());
+			if (before != tracked_quests.size())
 			{
-				TrackedQuest tq;
-				tq.questid = it->first;
-				tq.collapsed = false;
-				refresh_quest_info(tq);
-				tracked_quests.push_back(std::move(tq));
+				recalc_dimension();
+				std::vector<int16_t> ids;
+				for (const auto& t : tracked_quests) ids.push_back(t.questid);
+				save_tracked_quests(ids);
 			}
-			recalc_dimension();
 		}
+
+		// Do NOT auto-pin every started quest: if we did, every in-progress
+		// row in the quest log would show the "tracked" icon and suppress
+		// the "in progress" icon entirely. Players pin quests manually
+		// (drag-and-drop from quest log / track button).
 	}
 
 	void UIQuestHelper::refresh_quest_info(TrackedQuest& tq)
@@ -918,9 +902,37 @@ namespace ms
 
 	void UIQuestHelper::refresh_all()
 	{
+		// Drop entries whose quest is no longer in the started map (completed
+		// or forfeited on the server). Without this, completed quests would
+		// remain visibly pinned with stale data after the server confirms
+		// turn-in.
+		const auto& started = questlog.get_started();
+		size_t before = tracked_quests.size();
+		tracked_quests.erase(
+			std::remove_if(tracked_quests.begin(), tracked_quests.end(),
+				[&](const TrackedQuest& tq) {
+					return started.find(tq.questid) == started.end();
+				}),
+			tracked_quests.end());
+
 		for (auto& tq : tracked_quests)
 			refresh_quest_info(tq);
 		recalc_dimension();
+
+		if (before != tracked_quests.size())
+		{
+			std::vector<int16_t> ids;
+			for (const auto& t : tracked_quests) ids.push_back(t.questid);
+			save_tracked_quests(ids);
+		}
+	}
+
+	bool UIQuestHelper::is_tracked(int16_t questid) const
+	{
+		for (const auto& tq : tracked_quests)
+			if (tq.questid == questid)
+				return true;
+		return false;
 	}
 
 	void UIQuestHelper::recalc_dimension()

@@ -100,10 +100,10 @@ namespace ms
 		statoffsets[StatLabel::HP] = Point<int16_t>(74, 116);
 		statoffsets[StatLabel::MP] = Point<int16_t>(74, 134);
 		statoffsets[StatLabel::AP] = Point<int16_t>(91, 175);
-		statoffsets[StatLabel::STR] = Point<int16_t>(73, 204);
-		statoffsets[StatLabel::DEX] = Point<int16_t>(73, 222);
-		statoffsets[StatLabel::INT] = Point<int16_t>(73, 240);
-		statoffsets[StatLabel::LUK] = Point<int16_t>(73, 258);
+		statoffsets[StatLabel::STR] = Point<int16_t>(73, 201);
+		statoffsets[StatLabel::DEX] = Point<int16_t>(73, 219);
+		statoffsets[StatLabel::INT] = Point<int16_t>(73, 237);
+		statoffsets[StatLabel::LUK] = Point<int16_t>(73, 255);
 
 		// Detailed
 		statlabels[StatLabel::DAMAGE_DETAILED] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
@@ -112,27 +112,34 @@ namespace ms
 		statlabels[StatLabel::FINAL_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::IGNORE_DEFENSE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::CRITICAL_RATE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::CRITICAL_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		statlabels[StatLabel::CRITICAL_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::STATUS_RESISTANCE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::KNOCKBACK_RESISTANCE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::DEFENSE] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 		statlabels[StatLabel::SPEED] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 		statlabels[StatLabel::JUMP] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::HONOR] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		statlabels[StatLabel::HONOR] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
+		statlabels[StatLabel::MAGIC_ACC_V83] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
+		statlabels[StatLabel::MAGIC_AVOID_V83] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
+		statlabels[StatLabel::STANCE_V83] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
 
-		statoffsets[StatLabel::DAMAGE_DETAILED] = Point<int16_t>(73, 38);
-		statoffsets[StatLabel::DAMAGE_BONUS] = Point<int16_t>(100, 56);
-		statoffsets[StatLabel::BOSS_DAMAGE] = Point<int16_t>(196, 56);
-		statoffsets[StatLabel::FINAL_DAMAGE] = Point<int16_t>(100, 74);
-		statoffsets[StatLabel::IGNORE_DEFENSE] = Point<int16_t>(196, 74);
-		statoffsets[StatLabel::CRITICAL_RATE] = Point<int16_t>(100, 92);
-		statoffsets[StatLabel::CRITICAL_DAMAGE] = Point<int16_t>(73, 110);
-		statoffsets[StatLabel::STATUS_RESISTANCE] = Point<int16_t>(100, 128);
-		statoffsets[StatLabel::KNOCKBACK_RESISTANCE] = Point<int16_t>(196, 128);
-		statoffsets[StatLabel::DEFENSE] = Point<int16_t>(73, 146);
-		statoffsets[StatLabel::SPEED] = Point<int16_t>(100, 164);
-		statoffsets[StatLabel::JUMP] = Point<int16_t>(196, 164);
-		statoffsets[StatLabel::HONOR] = Point<int16_t>(73, 283);
+		statoffsets[StatLabel::DAMAGE_DETAILED] = Point<int16_t>(73, 34);
+		statoffsets[StatLabel::DAMAGE_BONUS] = Point<int16_t>(100, 70);   // min crit
+		statoffsets[StatLabel::BOSS_DAMAGE] = Point<int16_t>(146, 52);   // crit chance
+		statoffsets[StatLabel::FINAL_DAMAGE] = Point<int16_t>(196, 70);  // max crit
+		statoffsets[StatLabel::IGNORE_DEFENSE] = Point<int16_t>(196, 88);
+		statoffsets[StatLabel::STANCE_V83]     = Point<int16_t>(196, 106);  // stance — below ignore def
+		statoffsets[StatLabel::CRITICAL_RATE] = Point<int16_t>(100, 88);  // boss att — below 50
+		statoffsets[StatLabel::CRITICAL_DAMAGE] = Point<int16_t>(73, 106);
+		statoffsets[StatLabel::STATUS_RESISTANCE] = Point<int16_t>( 94, 106);  // status resist
+		statoffsets[StatLabel::KNOCKBACK_RESISTANCE] = Point<int16_t>(98, 160);  // weapon acc
+		statoffsets[StatLabel::MAGIC_ACC_V83]        = Point<int16_t>(98, 178);  // magic acc — below weapon acc
+		statoffsets[StatLabel::DEFENSE] = Point<int16_t>(98, 124);  // weapon def — below status resist, nudged right
+		statoffsets[StatLabel::CRITICAL_DAMAGE] = Point<int16_t>(98, 142);  // magic def — below weapon def
+		statoffsets[StatLabel::SPEED] = Point<int16_t>(100, 232);
+		statoffsets[StatLabel::JUMP] = Point<int16_t>(196, 232);
+		statoffsets[StatLabel::HONOR]             = Point<int16_t>(98, 196);  // weapon avoid — below magic acc
+		statoffsets[StatLabel::MAGIC_AVOID_V83]   = Point<int16_t>(98, 214);  // magic avoid — below weapon avoid
 
 		update_all_stats();
 		update_stat(MapleStat::Id::JOB);
@@ -226,20 +233,38 @@ namespace ms
 			statlabels[StatLabel::DAMAGE].change_color(Color::Name::EMPEROR);
 
 		statlabels[StatLabel::DAMAGE_DETAILED].change_text(std::to_string(stats.get_mindamage()) + " ~ " + std::to_string(stats.get_maxdamage()));
-		statlabels[StatLabel::DAMAGE_BONUS].change_text("0%");
-		statlabels[StatLabel::BOSS_DAMAGE].change_text(std::to_string(static_cast<int32_t>(stats.get_bossdmg() * 100)) + "%");
-		statlabels[StatLabel::FINAL_DAMAGE].change_text("0%");
-		statlabels[StatLabel::IGNORE_DEFENSE].change_text(std::to_string(static_cast<int32_t>(stats.get_ignoredef())) + "%");
-		statlabels[StatLabel::CRITICAL_RATE].change_text(std::to_string(static_cast<int32_t>(stats.get_critical() * 100)) + "%");
-		statlabels[StatLabel::CRITICAL_DAMAGE].change_text("0.00%");
+		// Critical Chance row — clear the old post-BB placeholders and
+		// put the real crit % here.
+		statlabels[StatLabel::DAMAGE_BONUS].change_text(
+			std::to_string(static_cast<int32_t>(stats.get_mincrit() * 100)) + "%");
+		statlabels[StatLabel::BOSS_DAMAGE].change_text(
+			std::to_string(static_cast<int32_t>(stats.get_critical() * 100)) + "%");
+		statlabels[StatLabel::FINAL_DAMAGE].change_text(
+			std::to_string(static_cast<int32_t>(stats.get_maxcrit() * 100)) + "%");
+		statlabels[StatLabel::IGNORE_DEFENSE].change_text(std::to_string(static_cast<int32_t>(stats.get_ignoredef() * 100)) + "%");
+		statlabels[StatLabel::CRITICAL_RATE].change_text(
+			std::to_string(static_cast<int32_t>(stats.get_bossdmg() * 100)) + "%");
+		statlabels[StatLabel::CRITICAL_DAMAGE].change_text(
+			std::to_string(stats.get_total(EquipStat::Id::MDEF)));
 		statlabels[StatLabel::STATUS_RESISTANCE].change_text(std::to_string(static_cast<int32_t>(stats.get_resistance())));
-		statlabels[StatLabel::KNOCKBACK_RESISTANCE].change_text("0%");
+		statlabels[StatLabel::KNOCKBACK_RESISTANCE].change_text(
+			std::to_string(stats.get_total(EquipStat::Id::ACC)));
 
 		update_buffed(StatLabel::DEFENSE, EquipStat::Id::WDEF);
 
 		statlabels[StatLabel::SPEED].change_text(std::to_string(stats.get_total(EquipStat::Id::SPEED)) + "%");
 		statlabels[StatLabel::JUMP].change_text(std::to_string(stats.get_total(EquipStat::Id::JUMP)) + "%");
-		statlabels[StatLabel::HONOR].change_text(std::to_string(stats.get_honor()));
+		statlabels[StatLabel::HONOR].change_text(
+			std::to_string(stats.get_total(EquipStat::Id::AVOID)));
+		// v83 has a single ACC / AVOID — both weapon and magic captions
+		// get the same underlying value.
+		statlabels[StatLabel::MAGIC_ACC_V83].change_text(
+			std::to_string(stats.get_total(EquipStat::Id::ACC)));
+		statlabels[StatLabel::MAGIC_AVOID_V83].change_text(
+			std::to_string(stats.get_total(EquipStat::Id::AVOID)));
+		statlabels[StatLabel::STANCE_V83].change_text(
+			std::to_string(static_cast<int32_t>(stats.get_stance() * 100)) + "%");
+
 	}
 
 	void UIStatsInfo::update_stat(MapleStat::Id stat)
@@ -367,7 +392,8 @@ namespace ms
 			}
 			case Buttons::BT_DETAILOPEN:
 			{
-				set_detail(true);
+				// Toggle — same button opens and closes the detail pane.
+				set_detail(!showdetail);
 				break;
 			}
 			case Buttons::BT_DETAILCLOSE:
@@ -396,8 +422,8 @@ namespace ms
 	{
 		showdetail = enabled;
 
-		buttons[Buttons::BT_DETAILOPEN]->set_active(!enabled);
-		buttons[Buttons::BT_DETAILCLOSE]->set_active(enabled);
+		// The single Details button handles both open and close, so it
+		// stays active; only the inner ABILITY + inner-close toggle.
 		buttons[Buttons::BT_ABILITY]->set_active(enabled);
 		buttons[Buttons::BT_DETAIL_DETAILCLOSE]->set_active(enabled);
 	}
@@ -408,7 +434,14 @@ namespace ms
 		Button::State newstate = nowap ? Button::State::NORMAL : Button::State::DISABLED;
 
 		for (int i = Buttons::BT_HP; i <= Buttons::BT_AUTO; i++)
+		{
 			buttons[i]->set_state(newstate);
+			// Also toggle active — UIElement::send_cursor routes clicks
+			// based on is_active() only, so a DISABLED-but-active button
+			// in the same screen region would swallow clicks meant for
+			// BT_DETAILOPEN.
+			buttons[i]->set_active(nowap);
+		}
 
 		hasap = nowap;
 	}

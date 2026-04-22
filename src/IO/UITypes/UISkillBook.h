@@ -58,6 +58,9 @@ namespace ms
 
 		// Called by SkillMacrosHandler at login
 		void load_macro(uint8_t index, const std::string& name, bool shout, int32_t s1, int32_t s2, int32_t s3);
+		// Fire the 3 skills of the macro via combat.use_move. Called
+		// when a hotkey bound to (KeyType::MACRO, index) is pressed.
+		void trigger_macro(int32_t index);
 
 	protected:
 		Button::State button_pressed(uint16_t id) override;
@@ -79,6 +82,25 @@ namespace ms
 
 		private:
 			int32_t skill_id;
+		};
+
+		// Drops into KeyConfig as a Mapping(KeyType::MACRO, macro_index)
+		// so pressing that hotkey later fires the macro.
+		class MacroIcon : public Icon::Type
+		{
+		public:
+			MacroIcon(int32_t macro_index);
+
+			void drop_on_stage() const override {}
+			void drop_on_equips(EquipSlot::Id) const override {}
+			bool drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const override { return true; }
+			void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
+			void set_count(int16_t) override {}
+			Icon::IconType get_type() override { return Icon::IconType::MACRO; }
+			int32_t get_action_id() const override { return macro_index; }
+
+		private:
+			int32_t macro_index;
 		};
 
 		class SkillDisplayMeta
@@ -189,6 +211,13 @@ namespace ms
 		Textfield macro_name_field;          // single shared bottom field
 		std::string macro_names[MACRO_COUNT];
 		bool macro_shouts[MACRO_COUNT];
+		Texture macro_check_sprite;
+		Texture macro_select_sprite;
+		Texture macro_handle_sprites[MACRO_COUNT];   // per-row macro icons
+		std::unique_ptr<Icon> macro_row_icons[MACRO_COUNT];
+		// Queue of skill ids pending from a triggered macro — fired one
+		// at a time in update() once the player can attack again.
+		std::vector<int32_t> pending_macro_skills;
 		int32_t macro_skills[MACRO_COUNT][3];
 
 		void macro_select_row(int16_t row);

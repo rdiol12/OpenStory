@@ -105,6 +105,12 @@ namespace ms
 	{
 		for (auto& type : elementorder)
 		{
+			// AVATARBANNER is drawn explicitly by UI::draw after the
+			// scrolling world-notice, so it sits above every other layer.
+			// Skipping here prevents a double-composite.
+			if (type == UIElement::Type::AVATARBANNER)
+				continue;
+
 			auto& element = elements[type];
 
 			if (element && element->is_active())
@@ -525,6 +531,7 @@ namespace ms
 				case KeyType::Id::FACE:
 				case KeyType::Id::ITEM:
 				case KeyType::Id::SKILL:
+				case KeyType::Id::MACRO:
 				{
 					Stage::get().send_key(type, action, pressed);
 					break;

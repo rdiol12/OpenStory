@@ -59,6 +59,7 @@ namespace ms
 		void load_action_icons();
 		void load_item_icons();
 		void load_skill_icons();
+		void load_macro_icons();
 
 		void safe_close();
 
@@ -134,6 +135,7 @@ namespace ms
 
 		std::map<int32_t, std::unique_ptr<Icon>> item_icons;
 		std::map<int32_t, std::unique_ptr<Icon>> skill_icons;
+		std::map<int32_t, std::unique_ptr<Icon>> macro_icons;
 
 		// Used to determine if mapping belongs to predefined action, e.g. attack, pick up, faces, etc.
 		std::vector<Keyboard::Mapping> action_mappings;

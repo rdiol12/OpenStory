@@ -22,6 +22,11 @@
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIShop.h"
 
+#include "../NpcResponseTracker.h"
+
+#include <utility>
+#include <vector>
+
 namespace ms
 {
 	void NpcDialogueHandler::handle(InPacket& recv) const
@@ -29,14 +34,43 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		int8_t msgtype = recv.read_byte(); // 0 - textonly, 1 - yes/no, 4 - selection, 12 - accept/decline
+
+		// Server responded — drop the stale-response timer for this NPC.
+		NpcResponseTracker::get().clear_pending(npcid);
+
+		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
+
+		// msgtype 14 (getDimensionalMirror) prefixes the text with a 4-byte
+		// zero int. Skip it so the subsequent read_string lands on the talk.
+		if (msgtype == 14 && recv.length() >= 4)
+			recv.skip_int();
+
 		std::string text = recv.read_string();
 
 		int16_t style = 0;
 
+		// msgtype 0 — two endBytes telling the client which nav buttons to show.
 		if (msgtype == 0 && recv.length() > 0)
 			style = recv.read_short();
+
+		// Read trailing payload into locals so we can forward it after
+		// the fresh UINpcTalk is created.
+		int32_t num_def = 0, num_min = 0, num_max = 0;
+		std::vector<int32_t> style_ids;
+
+		if (msgtype == 3 && recv.length() >= 12)
+		{
+			num_def = recv.read_int();
+			num_min = recv.read_int();
+			num_max = recv.read_int();
+		}
+		else if (msgtype == 7 && recv.length() >= 4)
+		{
+			int32_t count = recv.read_int();
+			for (int32_t i = 0; i < count && recv.length() >= 4; i++)
+				style_ids.push_back(recv.read_int());
+		}
 
 		// Force-remove any stale NpcTalk element so emplace always creates a
 		// fresh one. UIStateGame::remove uses unique_ptr::release() which
@@ -48,12 +82,23 @@ namespace ms
 		UI::get().enable();
 
 		if (auto npctalk = UI::get().get_element<UINpcTalk>())
+		{
+			if (msgtype == 3)
+				npctalk->set_number_bounds(num_def, num_min, num_max);
+			else if (msgtype == 7)
+				npctalk->set_style_ids(std::move(style_ids));
+
 			npctalk->change_text(npcid, msgtype, style, speaker, text);
+		}
 	}
 
 	void OpenNpcShopHandler::handle(InPacket& recv) const
 	{
 		int32_t npcid = recv.read_int();
+
+		// Server responded (shop opened) — drop the stale-response timer.
+		NpcResponseTracker::get().clear_pending(npcid);
+
 		auto oshop = UI::get().get_element<UIShop>();
 
 		if (!oshop)
@@ -92,5 +137,9 @@ namespace ms
 				shop.add_rechargable(itemid, price, pitch, time, rechargeprice, slotmax);
 			}
 		}
+
+		// All items loaded — now we know which categories this shop
+		// carries, so build the buy-side tabs accordingly.
+		shop.finalize_buy_tabs();
 	}
 }

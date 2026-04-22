@@ -54,6 +54,42 @@ namespace ms
 		}
 	};
 
+	// Response for msgType 3 (sendGetNumber): [msgtype=3][response=1][value:int]
+	class NpcTalkNumberPacket : public OutPacket
+	{
+	public:
+		NpcTalkNumberPacket(int32_t value) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
+		{
+			write_byte(3);
+			write_byte(1);
+			write_int(value);
+		}
+	};
+
+	// Response for msgType 7 (getNPCTalkStyle): [msgtype=7][response=1][index:int]
+	class NpcTalkStylePacket : public OutPacket
+	{
+	public:
+		NpcTalkStylePacket(int32_t index) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
+		{
+			write_byte(7);
+			write_byte(1);
+			write_int(index);
+		}
+	};
+
+	// Response for msgType 14 (getDimensionalMirror): [msgtype=14][response=1][selection:int]
+	class NpcTalkMirrorPacket : public OutPacket
+	{
+	public:
+		NpcTalkMirrorPacket(int32_t selection) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
+		{
+			write_byte(14);
+			write_byte(1);
+			write_int(selection);
+		}
+	};
+
 	// Packet which tells the server of an interaction with an NPC shop
 	// Opcode: NPC_SHOP_ACTION(61)
 	class NpcShopActionPacket : public OutPacket

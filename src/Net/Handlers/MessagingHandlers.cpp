@@ -238,15 +238,20 @@ namespace ms
 			break;
 		case 2: // Megaphone (visible only on current map)
 			if (chatbar)
-				chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+				chatbar->send_chatline(message, UIChatBar::LineType::MEGAPHONE);
 			break;
 		case 3: // Super Megaphone (visible on all channels)
 		{
 			recv.read_byte(); // channel
 			recv.read_bool(); // megaphone ear (whisper icon)
 
+			// Super megaphone is a world-wide broadcast — show it as a
+			// scrolling banner across the top of the screen in addition
+			// to the chat line, matching the original client's display.
+			UI::get().set_scrollnotice(message);
+
 			if (chatbar)
-				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+				chatbar->send_chatline(message, UIChatBar::LineType::SUPER_MEGAPHONE);
 			break;
 		}
 		case 4: // Scroll notice (top of screen ticker)
@@ -265,27 +270,61 @@ namespace ms
 			if (chatbar)
 				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
 			break;
-		case 8: // Item megaphone
+		case 8: // Item megaphone (world-wide + shows an attached item)
 		{
 			recv.read_byte(); // channel
 			recv.read_bool(); // megaphone ear (whisper icon)
 
-			// Item data follows (1 byte hasItem, then item info if present)
+			// If a preview item is attached, append its name to the chat
+			// line so readers can see what was broadcast. Packet layout:
+			//   bool has_item; if has_item: int32 itemid; [additional bytes]
+			std::string suffix;
 			if (recv.available())
 			{
 				bool has_item = recv.read_bool();
-				if (has_item && recv.available())
-					recv.skip(recv.length()); // skip item display data
+				if (has_item && recv.length() >= 4)
+				{
+					int32_t itemid = recv.read_int();
+					const ItemData& idata = ItemData::get(itemid);
+					std::string iname = idata.is_valid()
+						? idata.get_name() : ("Item " + std::to_string(itemid));
+					suffix = "  [" + iname + "]";
+				}
 			}
 
+			UI::get().set_scrollnotice(message + suffix);
+
 			if (chatbar)
-				chatbar->send_chatline(message, UIChatBar::LineType::GREEN);
+				chatbar->send_chatline(message + suffix, UIChatBar::LineType::ITEM_MEGAPHONE);
 			break;
 		}
-		case 10: // Triple megaphone (multi-line)
+		case 10: // Triple megaphone (1–3 lines, world-wide)
 		{
-			if (chatbar)
-				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+			// First line already consumed into `message` above. The packet
+			// then carries [extra_count:byte] followed by that many more
+			// strings, then channel + whisper bool.
+			std::vector<std::string> lines;
+			lines.push_back(message);
+
+			int8_t extra_count = 0;
+			if (recv.available())
+				extra_count = recv.read_byte();
+
+			for (int8_t i = 0; i < extra_count && recv.available(); i++)
+				lines.push_back(recv.read_string());
+
+			if (recv.available()) recv.read_byte(); // channel
+			if (recv.available()) recv.read_bool(); // whisper icon
+
+			std::string joined;
+			for (size_t i = 0; i < lines.size(); i++)
+			{
+				if (chatbar)
+					chatbar->send_chatline(lines[i], UIChatBar::LineType::TRIPLE_MEGAPHONE);
+				if (!joined.empty()) joined += "   ";
+				joined += lines[i];
+			}
+			UI::get().set_scrollnotice(joined);
 			break;
 		}
 		default:

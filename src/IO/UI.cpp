@@ -28,6 +28,7 @@
 #include <glfw3.h>
 #endif
 
+#include "UITypes/UIAvatarBanner.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
@@ -65,6 +66,15 @@ namespace ms
 		state->draw(alpha, cursor.get_position());
 
 		scrollingnotice.draw(alpha);
+
+		// The avatar-megaphone receiver banner must sit above every other
+		// UI layer (including the scrolling world-notice that super
+		// megaphones trigger alongside it), so we draw it explicitly as
+		// the final overlay. Its regular entry in the element order is
+		// skipped by UIStateGame::draw to avoid a double-composite.
+		if (auto banner = const_cast<UI*>(this)->get_element<UIAvatarBanner>())
+			if (banner->is_active())
+				banner->draw(alpha);
 
 		cursor.draw(alpha);
 	}

@@ -43,25 +43,24 @@ namespace ms
 
 		if (type == NoticeType::YESNO)
 		{
-			position.shift_y(-8);
 			question = Text(Text::Font::A11M, alignment, Color::Name::WHITE, message, 200);
 		}
 		else if (type == NoticeType::ENTERNUMBER)
 		{
-			position.shift_y(-16);
 			question = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, message, 200);
 		}
 		else if (type == NoticeType::OK)
 		{
 			uint16_t maxwidth = top.width() - 6;
-
-			position.shift_y(-8);
 			question = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, message, maxwidth);
 		}
 
 		height = question.height();
 		dimension = Point<int16_t>(top.width(), top.height() + height + bottom.height());
-		position = Point<int16_t>(position.x() - dimension.x() / 2, position.y() - dimension.y() / 2);
+
+		// Settings store the top-left corner already (that's what
+		// UIDragElement saves). Re-centring on every open caused the
+		// popup to drift left and up each time it was reopened.
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
 		if (type != NoticeType::ENTERNUMBER)
@@ -88,7 +87,7 @@ namespace ms
 			box.draw(DrawArgument(start, Point<int16_t>(0, 29)));
 			start.shift_y(29);
 
-			question.draw(position + Point<int16_t>(13, 13));
+			question.draw(position + Point<int16_t>(13, 8));
 		}
 		else
 		{
@@ -121,16 +120,17 @@ namespace ms
 		return offset;
 	}
 
-	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment) : UINotice(message, NoticeType::YESNO, alignment)
+	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment,
+		int16_t button_x_offset, int16_t button_y_offset) : UINotice(message, NoticeType::YESNO, alignment)
 	{
 		yesnohandler = yh;
 
-		int16_t belowtext = box2offset(false);
+		int16_t belowtext = box2offset(false) + button_y_offset;
 
 		nl::node src = nl::nx::ui["Basic.img"];
 
-		buttons[Buttons::YES] = std::make_unique<MapleButton>(src["BtOK4"], Point<int16_t>(156, belowtext));
-		buttons[Buttons::NO] = std::make_unique<MapleButton>(src["BtCancel4"], Point<int16_t>(198, belowtext));
+		buttons[Buttons::YES] = std::make_unique<MapleButton>(src["BtOK4"], Point<int16_t>(156 + button_x_offset, belowtext));
+		buttons[Buttons::NO] = std::make_unique<MapleButton>(src["BtCancel4"], Point<int16_t>(198 + button_x_offset, belowtext));
 	}
 
 	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler) : UIYesNo(message, yesnohandler, Text::Alignment::CENTER) {}
@@ -180,18 +180,19 @@ namespace ms
 		return Button::State::PRESSED;
 	}
 
-	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity) : UINotice(message, NoticeType::ENTERNUMBER)
+	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity,
+		int16_t field_y_offset, int16_t button_x_offset, int16_t button_y_offset) : UINotice(message, NoticeType::ENTERNUMBER)
 	{
 		numhandler = nh;
 		max = m;
 
-		int16_t belowtext = box2offset(true) - 21;
-		int16_t pos_y = belowtext + 35;
+		int16_t belowtext = box2offset(true) + field_y_offset;
+		int16_t pos_y = belowtext + 35 + button_y_offset;
 
 		nl::node src = nl::nx::ui["Basic.img"];
 
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 156, pos_y);
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel4"], 198, pos_y);
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 156 + button_x_offset, pos_y);
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel4"], 198 + button_x_offset, pos_y);
 
 		numfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY, Rectangle<int16_t>(24, 232, belowtext, belowtext + 20), 10);
 		numfield.change_text(std::to_string(quantity));
@@ -239,7 +240,7 @@ namespace ms
 				return nstate;
 		}
 
-		return UIElement::send_cursor(clicked, cursorpos);
+		return UIDragElement::send_cursor(clicked, cursorpos);
 	}
 
 	void UIEnterNumber::send_key(int32_t keycode, bool pressed, bool escape)
@@ -379,7 +380,7 @@ namespace ms
 				return nstate;
 		}
 
-		return UIElement::send_cursor(clicked, cursorpos);
+		return UIDragElement::send_cursor(clicked, cursorpos);
 	}
 
 	void UIEnterText::send_key(int32_t keycode, bool pressed, bool escape)

@@ -68,6 +68,7 @@ namespace ms
 		load_action_icons();
 		load_item_icons();
 		load_skill_icons();
+		load_macro_icons();
 
 		bind_staged_action_keys();
 	}
@@ -410,6 +411,22 @@ namespace ms
 		}
 	}
 
+	void UIKeyConfig::load_macro_icons()
+	{
+		nl::node src = nl::nx::ui["UIWindow.img"]["SkillMacro"]["Macroicon"];
+		for (auto const& it : staged_mappings)
+		{
+			Keyboard::Mapping mapping = it.second;
+
+			if (mapping.type == KeyType::Id::MACRO)
+			{
+				int32_t idx = mapping.action;
+				Texture tx = src[std::to_string(idx)]["icon"];
+				macro_icons[idx] = std::make_unique<Icon>(std::make_unique<MappingIcon>(mapping), tx, -1);
+			}
+		}
+	}
+
 	/// UI: General
 	void UIKeyConfig::draw(float inter) const
 	{
@@ -434,6 +451,12 @@ namespace ms
 			{
 				auto it = skill_icons.find(mapping.action);
 				if (it != skill_icons.end())
+					ficon = it->second.get();
+			}
+			else if (mapping.type == KeyType::Id::MACRO)
+			{
+				auto it = macro_icons.find(mapping.action);
+				if (it != macro_icons.end())
 					ficon = it->second.get();
 			}
 			else if (is_action_mapping(mapping))
@@ -588,6 +611,11 @@ namespace ms
 					ficon = skill_icons[skill_id].get();
 
 					show_skill(skill_id);
+				}
+				else if (mapping.type == KeyType::Id::MACRO)
+				{
+					int32_t idx = mapping.action;
+					ficon = macro_icons[idx].get();
 				}
 				else if (is_action_mapping(mapping))
 				{
@@ -934,6 +962,7 @@ namespace ms
 		staged_mappings = keyboard->get_maplekeys();
 		load_item_icons();
 		load_skill_icons();
+		load_macro_icons();
 		bind_staged_action_keys();
 		dirty = false;
 	}

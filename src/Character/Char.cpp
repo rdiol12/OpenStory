@@ -25,7 +25,15 @@
 
 namespace ms
 {
-	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE)) {}
+	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NONE, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE))
+	{
+		// Default nametag color is plain white. Player/OtherChar call
+		// apply_nametag_style(job_id) after construction to load the real
+		// NameTag.img style (w/c/e sprite pieces + clr) based on job.
+		// We drop Text::Background::NAMETAG (programmatic black rectangle)
+		// and instead paint the real sprite pieces in Char::draw.
+		name_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+	}
 
 	void Char::draw(double viewx, double viewy, float alpha) const
 	{
@@ -68,8 +76,45 @@ namespace ms
 			if (pet.get_itemid())
 				pet.draw(viewx, viewy, alpha);
 
+		// Looping cash/etc item aura (set by SHOW_ITEM_EFFECT or SPAWN_CHAR).
+		if (item_effect_id != 0)
+			item_effect_anim.draw(DrawArgument(absp), alpha);
+
 		// If ever changing code for namelabel confirm placements with map 10000
-		namelabel.draw(absp + Point<int16_t>(0, -4));
+		// v83 nametag is a 9-slice sprite from NameTag.img/<style>:
+		//   w (left edge)  — origin is its right corner  (pivot on the c join)
+		//   c (center)     — origin is top-left; we stretch it to text width
+		//   e (right edge) — origin is top-left          (pivot on the c join)
+		// Drawing all three at the text anchor point lets each sprite's
+		// origin offset do the vertical alignment automatically, so the bar
+		// sits centered on the name glyphs. The name is drawn last, on top.
+		Point<int16_t> name_center = absp + Point<int16_t>(0, -4);
+		int16_t text_w = namelabel.width();
+
+		if (tag_w.is_valid() || tag_c.is_valid() || tag_e.is_valid())
+		{
+			int16_t c_total = text_w > 0 ? text_w : 1;
+			int16_t half = c_total / 2;
+			// Nudge the sprite down a few px so the bar sits below the
+			// glyph baseline rather than clipping the ascenders.
+			int16_t tag_y = name_center.y() + 5;
+
+			// Left edge (pivot on its right → draw at left-of-center so its
+			// right edge meets the center piece).
+			tag_w.draw(DrawArgument(Point<int16_t>(
+				name_center.x() - half, tag_y)));
+			// Stretched center, spanning the text width.
+			tag_c.draw(DrawArgument(
+				Point<int16_t>(name_center.x() - half, tag_y),
+				Point<int16_t>(c_total, 0)));
+			// Right edge (pivot on its left, draws from center to right).
+			tag_e.draw(DrawArgument(Point<int16_t>(
+				name_center.x() + half, tag_y)));
+		}
+
+		// Pass name_color via DrawArgument so drawtext multiplies the glyph
+		// wordcolor (WHITE) by it, yielding the exact ARGB from NameTag.img.
+		namelabel.draw(DrawArgument(name_center, name_color));
 
 		// Draw guild name below character name
 		if (!guildlabel.get_text().empty())
@@ -101,6 +146,9 @@ namespace ms
 		chatballoon.update();
 		invincible.update();
 		ironbody.update();
+
+		if (item_effect_id != 0)
+			item_effect_anim.update();
 
 
 		for (auto& pet : pets)
@@ -187,6 +235,25 @@ namespace ms
 		float attackspeed = get_real_attackspeed();
 
 		effects.add(toshow, DrawArgument(facing_right), z, attackspeed);
+	}
+
+	void Char::set_item_effect(int32_t itemid)
+	{
+		item_effect_id = itemid;
+
+		if (itemid == 0)
+		{
+			item_effect_anim = Animation();
+			return;
+		}
+
+#ifdef USE_NX
+		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(itemid)]["0"];
+		if (src)
+			item_effect_anim = Animation(src);
+		else
+			item_effect_id = 0;
+#endif
 	}
 
 	void Char::show_effect_id(CharEffect::Id toshow)
@@ -342,6 +409,68 @@ namespace ms
 			return;
 
 		pets[index] = PetLook(iid, name, uniqueid, pos, stance, fhid);
+	}
+
+	PetLook& Char::get_pet(uint8_t index)
+	{
+		return pets[index < 3 ? index : 0];
+	}
+
+	void Char::apply_nametag_style(int32_t job_id)
+	{
+#ifdef USE_NX
+		nl::node nt = nl::nx::ui["NameTag.img"];
+
+		// Candidate styles, first match wins. GM/SuperGM get the yellow
+		// style (11) so they're visually distinct; otherwise we prefer the
+		// job-specific style if the NX dump happens to carry one, then
+		// fall back through the generic "0","10","3","4","5" chain.
+		std::vector<std::string> candidates;
+
+		if (job_id == 900 || job_id == 910)
+			candidates.push_back("11");
+
+		if (job_id > 0)
+			candidates.push_back(std::to_string(job_id));
+
+		candidates.insert(candidates.end(), { "0", "10", "3", "4", "5" });
+
+		nl::node style;
+		for (const auto& k : candidates)
+		{
+			if (nt[k] && nt[k].size() > 0)
+			{
+				style = nt[k];
+				break;
+			}
+		}
+
+		if (!style) return;
+
+		// Load the 9-slice sprite pieces (w = left edge, c = tiled center,
+		// e = right edge). These are the actual in-game nametag background.
+		tag_w = Texture(style["w"]);
+		tag_c = Texture(style["c"]);
+		tag_e = Texture(style["e"]);
+
+		if (nl::node clr_node = style["clr"])
+		{
+			try
+			{
+				int64_t argb = clr_node.get_integer();
+				uint32_t v = static_cast<uint32_t>(argb);
+				uint8_t a = static_cast<uint8_t>((v >> 24) & 0xFF);
+				uint8_t r = static_cast<uint8_t>((v >> 16) & 0xFF);
+				uint8_t g = static_cast<uint8_t>((v >> 8) & 0xFF);
+				uint8_t b = static_cast<uint8_t>(v & 0xFF);
+				if (a == 0) a = 255;
+				name_color = Color(r, g, b, a);
+			}
+			catch (...) {}
+		}
+#else
+		(void)job_id;
+#endif
 	}
 
 	void Char::remove_pet(uint8_t index, bool hunger)

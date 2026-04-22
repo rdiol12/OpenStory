@@ -22,6 +22,10 @@
 
 #include "../../Character/Inventory/Inventory.h"
 #include "../../Character/Inventory/InventoryType.h"
+#include "../../Graphics/Animation.h"
+
+#include <set>
+#include <vector>
 
 namespace ms
 {
@@ -48,6 +52,7 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 		void send_scroll(double yoffset) override;
 		void rightclick(Point<int16_t> cursorpos) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
@@ -117,6 +122,11 @@ namespace ms
 		void change_tab(InventoryType::Id type);
 
 		void request_take_out(int16_t index);
+		// Partial take-out: take the whole stack, then immediately
+		// store `full_count - keep` back. The v83 protocol has no
+		// quantity field on take-out so this is the only way to let
+		// the player keep just some of a stack.
+		void request_take_out_partial(int16_t index, int16_t keep);
 		void request_store(int16_t inv_slot, int32_t itemid, int16_t count);
 		void request_sort();
 		void request_meso_change(bool store_to_storage);
@@ -147,18 +157,48 @@ namespace ms
 		// Player inventory items for current tab
 		std::vector<InventoryEntry> inventory_items;
 
-		// Icon objects for drag-and-drop
+		// Icon objects for drag-and-drop (keyed by item index in the
+		// tab's item vector, not by visual cell).
 		std::map<int16_t, std::unique_ptr<Icon>> storage_icons;
 		std::map<int16_t, std::unique_ptr<Icon>> inv_icons;
 
+		// Visual layout tables: slot_map[visual_cell] = item index (or -1).
+		// Rebuilt on refresh; mutated on same-panel drag/drop so the user
+		// can place items in any cube instead of being forced into the
+		// server's dense 0..N-1 order.
+		std::vector<int16_t> storage_slot_map;
+		std::vector<int16_t> inventory_slot_map;
+
+		// Persist per-itemid visual slot across refreshes so the player's
+		// layout survives take-out/store operations that reshuffle the
+		// server list. Keyed by itemid (storage) or server slot (inv).
+		std::map<int32_t, int16_t> storage_preferred_slot;
+		std::map<int16_t, int16_t> inventory_preferred_slot;
+
+		int16_t drag_source_slot;
+
 		Texture disabled_slot;
 		Texture meso_icon;
+		Animation npc_anim;
+		Animation newitemslot;
 		Text storage_mesolabel;
 		Text player_mesolabel;
 
 		InventoryType::Id current_tab;
-		int16_t storage_selection;
-		int16_t inventory_selection;
+		// Multi-select — click toggles each item in/out of the set.
+		// Retrieve / Store buttons act on every selected item.
+		std::set<int16_t> storage_selection;
+		std::set<int16_t> inventory_selection;
+
+		// Pending partial take-outs — waiting for the take-out response
+		// so we can re-store the excess.
+		struct PendingRestore
+		{
+			int32_t itemid;
+			int16_t keep;
+			InventoryType::Id tab;
+		};
+		std::vector<PendingRestore> pending_restores;
 		Point<int16_t> lastcursorpos;
 		enum DragSource : int8_t { DRAG_NONE, DRAG_STORAGE, DRAG_INVENTORY };
 		DragSource drag_source;
@@ -172,7 +212,7 @@ namespace ms
 		int16_t inventory_grid_x, inventory_grid_y;
 		int16_t cell_size;
 		int16_t storage_cols, inventory_cols;
-		int16_t visible_rows;
+		int16_t storage_rows, inventory_rows;
 		int16_t panel_divider_x;
 
 		enum Buttons : int16_t

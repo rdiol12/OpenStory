@@ -77,6 +77,10 @@ namespace ms
 		void auto_track();
 		void refresh_all();
 
+		// Whether the given quest id is currently pinned in the helper.
+		// Used by UIQuestLog to show the "Quest tracked" icon.
+		bool is_tracked(int16_t questid) const;
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
