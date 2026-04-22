@@ -18,6 +18,10 @@
 #include "UIItemInventory.h"
 
 #include "UINotice.h"
+#include "UIAvatarMegaphone.h"
+#include "UIItemMegaphone.h"
+#include "UIMapleTV.h"
+#include "UIMegaphone.h"
 
 #include "../UI.h"
 
@@ -28,6 +32,10 @@
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Packets/InventoryPackets.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -383,6 +391,72 @@ namespace ms
 					case InventoryType::Id::SETUP:
 					{
 						Stage::get().get_player().use_item(item_id);
+						break;
+					}
+					case InventoryType::Id::CASH:
+					{
+						// Avatar megaphones (539xxxx): Diablo / Cloud 9 /
+						// Lion King — open the AvatarMegaphone compose.
+						if (item_id / 10000 == 539)
+						{
+							UI::get().remove(UIElement::Type::AVATARMEGAPHONE);
+							UI::get().emplace<UIAvatarMegaphone>();
+							if (auto am = UI::get().get_element<UIAvatarMegaphone>())
+								am->configure_item(slot, item_id);
+							break;
+						}
+
+						// Cash megaphones/speakers: prompt for message text,
+						// then dispatch USE_CASH_ITEM with the appropriate
+						// sub-type payload. Non-megaphone cash items fall
+						// through to a generic USE_ITEM dispatch.
+						int32_t category = item_id / 10000;
+						if (category == 507)
+						{
+							int32_t subtype = (item_id / 1000) % 10;
+							int16_t use_slot = slot;
+							int32_t use_id = item_id;
+
+							// Maple TV (5075xxx) — dedicated UIMapleTV window.
+							if (subtype == 5)
+							{
+								UI::get().remove(UIElement::Type::MAPLETV);
+								UI::get().emplace<UIMapleTV>();
+								if (auto tv = UI::get().get_element<UIMapleTV>())
+									tv->configure_item(use_slot, use_id);
+								break;
+							}
+
+							// Regular / Super / Triple megaphone (5070/5071/
+							// 5072/5077) — all share the Megaphone compose
+							// window from UIWindow2.img/Megaphone. Sub-type
+							// 7 reveals the 2 extra text rows; sub-type 2
+							// swaps the bg to backgrnd_super.
+							if (subtype == 0 || subtype == 1 || subtype == 2 || subtype == 7)
+							{
+								UI::get().remove(UIElement::Type::MEGAPHONE);
+								UI::get().emplace<UIMegaphone>();
+								if (auto m = UI::get().get_element<UIMegaphone>())
+									m->configure_item(use_slot, use_id);
+								break;
+							}
+
+							// Item Megaphone (5076xxx) — opens the dedicated
+							// UIItemMegaphone window (UIWindow2.img/
+							// ItemMegaphone/backgrnd 236x182).
+							if (subtype == 6)
+							{
+								UI::get().remove(UIElement::Type::ITEMMEGAPHONE);
+								UI::get().emplace<UIItemMegaphone>();
+								if (auto im = UI::get().get_element<UIItemMegaphone>())
+									im->configure_item(use_slot, use_id);
+								break;
+							}
+						}
+						else
+						{
+							UseItemPacket(slot, item_id).dispatch();
+						}
 						break;
 					}
 				}

@@ -25,6 +25,10 @@
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Graphics/Geometry.h"
+
+#include "../../Constants.h"
+
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 
@@ -80,6 +84,10 @@ namespace ms
 			buttons[i] = std::make_unique<TwoSpriteButton>(selldis[tabnum], sellen[tabnum]);
 		}
 
+		// Buy-side category tabs are created lazily in finalize_buy_tabs()
+		// once the shop's item list is known, so only categories that
+		// actually appear in the shop get a tab.
+
 		int16_t item_y = 124;
 		int16_t item_height = 36;
 
@@ -106,16 +114,21 @@ namespace ms
 		buy_selection = src["select"];
 		sell_selection = src["select2"];
 		meso = src["meso"];
+		// v83 NX only ships a single-frame meso bitmap (UIWindow[2]/Shop[2]/meso
+		// are both 12x12 plain sprites); there is no animation source to load.
 
 		mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
 
+		// 9 item rows are rendered (see BuyState / SellState draw loops),
+		// so the slider's visible-row count and the clamp below must use
+		// 9 — not 5 — or the offset overruns the list by 4 rows.
 		buyslider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 257, 5, 1,
+			Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 257, 9, 1,
 			[&](bool upwards)
 			{
 				int16_t shift = upwards ? -1 : 1;
 				bool above = buystate.offset + shift >= 0;
-				bool below = buystate.offset + shift <= buystate.lastslot - 5;
+				bool below = buystate.offset + shift <= buystate.lastslot - 9;
 
 				if (above && below)
 					buystate.offset += shift;
@@ -123,12 +136,12 @@ namespace ms
 		);
 
 		sellslider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 488, 5, 1,
+			Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 488, 9, 1,
 			[&](bool upwards)
 			{
 				int16_t shift = upwards ? -1 : 1;
 				bool above = sellstate.offset + shift >= 0;
-				bool below = sellstate.offset + shift <= sellstate.lastslot - 5;
+				bool below = sellstate.offset + shift <= sellstate.lastslot - 9;
 
 				if (above && below)
 					sellstate.offset += shift;
@@ -144,13 +157,57 @@ namespace ms
 	{
 		UIElement::draw(alpha);
 
-		npc.draw(DrawArgument(position + Point<int16_t>(58, 85), true));
-		charlook.draw(position + Point<int16_t>(338, 85), false, Stance::Id::STAND1, Expression::Id::DEFAULT);
+		npc.draw(DrawArgument(position + Point<int16_t>(58, 85), true), alpha);
+
+		// Buy-side category tab row — only categories present in the
+		// shop have AreaButtons, so draw in creation order and pack
+		// sequentially from slot 1 (slot 0 is OVERALL).
+		{
+			nl::node tabs = nl::nx::ui["UIWindow2.img"]["Item"]["Tab"];
+			nl::node tab_en = tabs["enabled"];
+			nl::node tab_dis = tabs["disabled"];
+			int16_t tab_y = 100;
+			int16_t ox = 24;
+			int16_t step = 31;
+
+			int16_t slot = 1;
+			for (size_t k = 0; k < 5; k++)
+			{
+				std::string tabnum = std::to_string(k);
+				uint16_t btn_id = static_cast<uint16_t>(Buttons::BUY_TAB_EQUIP + k);
+				auto bit = buttons.find(btn_id);
+				if (bit == buttons.end() || !bit->second) continue;
+
+				Button::State st = bit->second->get_state();
+				bool selected = (st == Button::State::PRESSED
+					|| st == Button::State::MOUSEOVER);
+
+				// Enabled tab sprite is 2 px taller — shift it up so its
+				// bottom edge matches the disabled sprite, otherwise the
+				// hover highlight overlaps the thin separator line just
+				// below the tab row.
+				Texture dis_tex(tab_dis[tabnum]);
+				Texture tab_tex(selected ? tab_en[tabnum] : tab_dis[tabnum]);
+				int16_t height_diff =
+					tab_tex.get_dimensions().y() - dis_tex.get_dimensions().y();
+				Point<int16_t> orig = tab_tex.get_origin();
+				Point<int16_t> p = position
+					+ Point<int16_t>(ox + step * slot, tab_y - height_diff) + orig;
+				tab_tex.draw(DrawArgument(p));
+				slot++;
+			}
+		}
+
+		// Flipped=false → faces the NPC on the left (the default
+		// CharLook facing is right, so false mirrors it leftward).
+		charlook.draw(position + Point<int16_t>(338, 85), /*flipped*/ false,
+			Stance::Id::STAND1, Expression::Id::DEFAULT);
 
 		mesolabel.draw(position + Point<int16_t>(493, 51));
 
 		buystate.draw(position, buy_selection);
 		sellstate.draw(position, sell_selection);
+
 
 		buyslider.draw(position);
 		sellslider.draw(position);
@@ -160,6 +217,8 @@ namespace ms
 
 	void UIShop::update()
 	{
+		npc.update();
+
 		int64_t num_mesos = inventory.get_meso();
 		std::string mesostr = std::to_string(num_mesos);
 		string_format::split_number(mesostr);
@@ -230,6 +289,31 @@ namespace ms
 				changeselltab(InventoryType::Id::CASH);
 
 				return Button::State::IDENTITY;
+
+			case Buttons::OVERALL:
+				changebuytab(InventoryType::Id::NONE);
+
+				return Button::State::IDENTITY;
+			case Buttons::BUY_TAB_EQUIP:
+				changebuytab(InventoryType::Id::EQUIP);
+
+				return Button::State::IDENTITY;
+			case Buttons::BUY_TAB_USE:
+				changebuytab(InventoryType::Id::USE);
+
+				return Button::State::IDENTITY;
+			case Buttons::BUY_TAB_ETC:
+				changebuytab(InventoryType::Id::ETC);
+
+				return Button::State::IDENTITY;
+			case Buttons::BUY_TAB_SETUP:
+				changebuytab(InventoryType::Id::SETUP);
+
+				return Button::State::IDENTITY;
+			case Buttons::BUY_TAB_CASH:
+				changebuytab(InventoryType::Id::CASH);
+
+				return Button::State::IDENTITY;
 			}
 		}
 
@@ -295,6 +379,11 @@ namespace ms
 
 		for (size_t i = 0; i < Buttons::NUM_BUTTONS; i++)
 		{
+			// Some button slots (e.g. buy-tab categories that don't exist
+			// in the current shop) are intentionally missing from the map.
+			auto bit = buttons.find(static_cast<uint16_t>(i));
+			if (bit == buttons.end() || !bit->second)
+				continue;
 			if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
 			{
 				if (buttons[i]->get_state() == Button::State::NORMAL)
@@ -360,7 +449,7 @@ namespace ms
 					}
 				}
 			}
-			else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
+			else if (buttons[i] && buttons[i]->get_state() == Button::State::MOUSEOVER)
 			{
 				buttons[i]->set_state(Button::State::NORMAL);
 			}
@@ -431,6 +520,69 @@ namespace ms
 			sellstate.show_item(slot);
 	}
 
+	void UIShop::finalize_buy_tabs()
+	{
+		// Remove any tabs left over from a previous shop session. Use
+		// erase (not operator[].reset()) so the map never holds null
+		// entries — reset() iterates `buttons` and dereferences each.
+		for (uint16_t i = Buttons::BUY_TAB_EQUIP; i <= Buttons::BUY_TAB_CASH; i++)
+			buttons.erase(i);
+
+		// Which categories does this shop actually carry?
+		bool present[6] = { false, false, false, false, false, false };
+		for (const auto& item : buystate.all_items)
+		{
+			InventoryType::Id t = InventoryType::by_item_id(item.get_id());
+			if (t >= InventoryType::Id::EQUIP && t <= InventoryType::Id::CASH)
+				present[static_cast<size_t>(t)] = true;
+		}
+
+		nl::node src = nl::nx::ui["UIWindow.img"]["Shop"];
+		nl::node sellen = src["TabSell"]["enabled"];
+		nl::node selldis = src["TabSell"]["disabled"];
+
+		// Absolute target row (inside the shop window) for the buy-side
+		// tabs. Must match the row drawn in UIShop::draw (same ox / step
+		// as the inventory UI's 31-px tab spacing).
+		int16_t overall_x = 24;
+		int16_t overall_y = 100;
+		int16_t step = 31;
+
+		// Place each present category tab sequentially right of OVERALL.
+		// TwoSpriteButton draws at (parent + npos - sprite_origin), so
+		// we set npos = target + sprite_origin to land on `target`.
+		int16_t next_slot = 1;
+		const InventoryType::Id order[5] = {
+			InventoryType::Id::EQUIP,
+			InventoryType::Id::USE,
+			InventoryType::Id::ETC,
+			InventoryType::Id::SETUP,
+			InventoryType::Id::CASH
+		};
+		// Use the same tab sprite the draw path uses so the hit-box
+		// dimension matches the visible tab.
+		nl::node tabs = nl::nx::ui["UIWindow2.img"]["Item"]["Tab"];
+		nl::node tab_dis = tabs["disabled"];
+
+		for (size_t k = 0; k < 5; k++)
+		{
+			InventoryType::Id t = order[k];
+			if (!present[static_cast<size_t>(t)]) continue;
+
+			uint16_t btn_id = buy_tab_by_inventory(t);
+			std::string tabnum = std::to_string(k);
+
+			Texture tab_tex(tab_dis[tabnum]);
+			Point<int16_t> dim = tab_tex.get_dimensions();
+			Point<int16_t> target(overall_x + step * next_slot, overall_y);
+
+			// AreaButton for hit-detection; the sprite itself is rendered
+			// in UIShop::draw so we control the position directly.
+			buttons[btn_id] = std::make_unique<AreaButton>(target, dim);
+			next_slot++;
+		}
+	}
+
 	void UIShop::changeselltab(InventoryType::Id type)
 	{
 		uint16_t oldtab = tabbyinventory(sellstate.tab);
@@ -445,7 +597,8 @@ namespace ms
 
 		sellstate.change_tab(inventory, type, meso);
 
-		sellslider.setrows(5, sellstate.lastslot);
+		sellslider.setrows(9, sellstate.lastslot);
+		sellslider.setenabled(sellstate.lastslot > 9);
 
 		for (size_t i = Buttons::SELL0; i < Buttons::SELL8; i++)
 		{
@@ -459,13 +612,42 @@ namespace ms
 	void UIShop::reset(int32_t npcid)
 	{
 		std::string strid = string_format::extend_id(npcid, 7);
-		npc = nl::nx::npc[strid + ".img"]["stand"]["0"];
+		// Load the shopkeeper's animated stand so the portrait breathes /
+		// blinks instead of being a still frame. Follow an "info/link"
+		// redirect (some NPCs point to a base NPC for art) and fall back
+		// to the first state with frames if "stand" is empty.
+		nl::node src = nl::nx::npc[strid + ".img"];
+		std::string link = (std::string)src["info"]["link"];
+		if (!link.empty())
+			src = nl::nx::npc[link + ".img"];
+
+		nl::node chosen;
+		size_t best_frames = 0;
+		for (auto sub : src)
+		{
+			if (sub.name() == "info") continue;
+			size_t n = 0;
+			for (auto f : sub)
+				if (f.data_type() == nl::node::type::bitmap) n++;
+			if (n > best_frames)
+			{
+				best_frames = n;
+				chosen = sub;
+			}
+		}
+		if (!chosen || chosen.size() == 0)
+			chosen = src["stand"];
+		if (chosen.size() > 0)
+			npc = Animation(chosen);
 
 		for (auto& button : buttons)
-			button.second->set_state(Button::State::NORMAL);
+			if (button.second)
+				button.second->set_state(Button::State::NORMAL);
 
-		buttons[Buttons::OVERALL]->set_state(Button::State::PRESSED);
-		buttons[Buttons::EQUIP]->set_state(Button::State::PRESSED);
+		if (buttons[Buttons::OVERALL])
+			buttons[Buttons::OVERALL]->set_state(Button::State::PRESSED);
+		if (buttons[Buttons::EQUIP])
+			buttons[Buttons::EQUIP]->set_state(Button::State::PRESSED);
 
 		buystate.reset();
 		sellstate.reset();
@@ -492,7 +674,10 @@ namespace ms
 		auto buyitem = BuyItem(meso, id, price, pitch, time, chargeprice, buyable);
 		buystate.add(buyitem);
 
-		buyslider.setrows(5, buystate.lastslot);
+		// lastslot reflects the filtered view only; enable slider if
+		// the visible list already overflows.
+		buyslider.setrows(9, buystate.lastslot);
+		buyslider.setenabled(buystate.lastslot > 9);
 	}
 
 	int16_t UIShop::slot_by_position(int16_t y)
@@ -538,6 +723,41 @@ namespace ms
 		default:
 			return 0;
 		}
+	}
+
+	uint16_t UIShop::buy_tab_by_inventory(InventoryType::Id type)
+	{
+		switch (type)
+		{
+		case InventoryType::Id::NONE:
+			return Buttons::OVERALL;
+		case InventoryType::Id::EQUIP:
+			return Buttons::BUY_TAB_EQUIP;
+		case InventoryType::Id::USE:
+			return Buttons::BUY_TAB_USE;
+		case InventoryType::Id::ETC:
+			return Buttons::BUY_TAB_ETC;
+		case InventoryType::Id::SETUP:
+			return Buttons::BUY_TAB_SETUP;
+		case InventoryType::Id::CASH:
+			return Buttons::BUY_TAB_CASH;
+		default:
+			return Buttons::OVERALL;
+		}
+	}
+
+	void UIShop::changebuytab(InventoryType::Id type)
+	{
+		// Highlight only the active buy-side tab.
+		uint16_t old_btn = buy_tab_by_inventory(buystate.filter);
+		uint16_t new_btn = buy_tab_by_inventory(type);
+
+		if (buttons[old_btn]) buttons[old_btn]->set_state(Button::State::NORMAL);
+		if (buttons[new_btn]) buttons[new_btn]->set_state(Button::State::PRESSED);
+
+		buystate.set_filter(type);
+		buyslider.setrows(9, buystate.lastslot);
+		buyslider.setenabled(buystate.lastslot > 9);
 	}
 
 	void UIShop::exit_shop()
@@ -642,10 +862,34 @@ namespace ms
 
 	void UIShop::BuyState::reset()
 	{
+		all_items.clear();
 		items.clear();
+		item_slots.clear();
+		filter = InventoryType::Id::NONE;
 
 		offset = 0;
 		lastslot = 0;
+		selection = -1;
+	}
+
+	void UIShop::BuyState::set_filter(InventoryType::Id f)
+	{
+		filter = f;
+		items.clear();
+		item_slots.clear();
+
+		for (int16_t s = 0; s < static_cast<int16_t>(all_items.size()); s++)
+		{
+			if (filter == InventoryType::Id::NONE
+				|| InventoryType::by_item_id(all_items[s].get_id()) == filter)
+			{
+				items.push_back(all_items[s]);
+				item_slots.push_back(s);
+			}
+		}
+
+		lastslot = static_cast<int16_t>(items.size());
+		offset = 0;
 		selection = -1;
 	}
 
@@ -680,9 +924,16 @@ namespace ms
 
 	void UIShop::BuyState::add(BuyItem item)
 	{
-		items.push_back(item);
+		int16_t server_slot = static_cast<int16_t>(all_items.size());
+		all_items.push_back(item);
 
-		lastslot++;
+		if (filter == InventoryType::Id::NONE
+			|| InventoryType::by_item_id(item.get_id()) == filter)
+		{
+			items.push_back(item);
+			item_slots.push_back(server_slot);
+			lastslot = static_cast<int16_t>(items.size());
+		}
 	}
 
 	void UIShop::BuyState::buy() const
@@ -692,7 +943,7 @@ namespace ms
 
 		const BuyItem& item = items[selection];
 		int16_t buyable = item.get_buyable();
-		int16_t slot = selection;
+		int16_t slot = item_slots[selection];
 		int32_t itemid = item.get_id();
 
 		if (buyable == 0 || buyable > 1)
@@ -708,7 +959,10 @@ namespace ms
 				NpcShopActionPacket(slot, itemid, shortqty, true).dispatch();
 			};
 
-			UI::get().emplace<UIEnterNumber>(question, onenter, max_qty, 1);
+			// Shop's buy-quantity prompt uses its own layout — writing
+			// indicator a bit lower than the default, OK/Cancel buttons
+			// nudged down and to the left so they don't overlap.
+			UI::get().emplace<UIEnterNumber>(question, onenter, max_qty, 1, -23, -50, 0);
 		}
 		else if (buyable > 0)
 		{
@@ -720,7 +974,7 @@ namespace ms
 					NpcShopActionPacket(slot, itemid, 1, true).dispatch();
 			};
 
-			UI::get().emplace<UIYesNo>(question, ondecide);
+			UI::get().emplace<UIYesNo>(question, ondecide, Text::Alignment::CENTER, -60, 14);
 		}
 	}
 
@@ -824,7 +1078,8 @@ namespace ms
 				NpcShopActionPacket(slot, itemid, shortqty, false).dispatch();
 			};
 
-			UI::get().emplace<UIEnterNumber>(question, onenter, sellable, 1);
+			// Same layout as the buy prompt for consistency.
+			UI::get().emplace<UIEnterNumber>(question, onenter, sellable, 1, -23, -50, 0);
 		}
 		else if (sellable > 0)
 		{
@@ -842,7 +1097,7 @@ namespace ms
 					NpcShopActionPacket(slot, itemid, 1, false).dispatch();
 			};
 
-			UI::get().emplace<UIYesNo>(question, ondecide);
+			UI::get().emplace<UIYesNo>(question, ondecide, Text::Alignment::CENTER, -60, 14);
 		}
 	}
 

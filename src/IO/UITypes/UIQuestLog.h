@@ -91,7 +91,7 @@ namespace ms
 			TAB3
 		};
 
-		static constexpr int16_t ROWS = 10;
+		static constexpr int16_t ROWS = 11;
 		static constexpr int16_t ROW_HEIGHT = 24;
 		static constexpr int16_t LIST_Y = 75;
 
@@ -188,6 +188,10 @@ namespace ms
 		int16_t hover_entry;
 		Point<int16_t> last_cursor_pos;
 		bool selected_from_recommended;
+
+		// Cached revision of NpcResponseTracker so we can rebuild the
+		// "Not Available" tab only when the unavailable set actually changes.
+		uint32_t cached_unavail_rev = 0;
 
 		// Quest drag-to-helper state
 		int16_t drag_quest_id;

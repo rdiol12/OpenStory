@@ -21,30 +21,8 @@
 
 #include FT_BITMAP_H
 
-#include <cstdio>
-#include <cstdarg>
-
 namespace
 {
-	// ---------------- Debug logging ----------------
-	// Writes to GraphicsGL_debug.log next to the executable. Opened on first
-	// use, flushed on every line so nothing is lost if the process crashes.
-	static FILE* g_gfx_log = nullptr;
-	static void gfx_log(const char* fmt, ...)
-	{
-		if (!g_gfx_log)
-		{
-			g_gfx_log = std::fopen("GraphicsGL_debug.log", "w");
-			if (!g_gfx_log) return;
-		}
-		std::va_list ap;
-		va_start(ap, fmt);
-		std::vfprintf(g_gfx_log, fmt, ap);
-		va_end(ap);
-		std::fputc('\n', g_gfx_log);
-		std::fflush(g_gfx_log);
-	}
-
 	// Decodes one UTF-8 codepoint starting at `text[i]`. Sets `consumed` to
 	// the byte count (1-4). Falls back to the raw byte on malformed input.
 	inline uint32_t utf8_decode(const char* text, size_t length, size_t i, size_t& consumed)
@@ -332,21 +310,16 @@ namespace ms
 		addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18);
 
 		fontymax += fontborder.y();
-		gfx_log("init: finished addfont calls, fontymax=%d fontborder=(%d,%d)",
-			(int)fontymax, (int)fontborder.x(), (int)fontborder.y());
 
 #ifndef PLATFORM_IOS
 		const std::string FONT_CJK = Setting<FontPathCJK>().get().load();
 		cjk_fallback_path = FONT_CJK;
-		gfx_log("init: FONT_CJK=%s", FONT_CJK.c_str());
 
 		const std::string FONT_EMOJI = Setting<FontPathEmoji>().get().load();
-		gfx_log("init: FONT_EMOJI=%s", FONT_EMOJI.c_str());
 		if (!FONT_EMOJI.empty())
 		{
 			if (FT_New_Face(ftlibrary, FONT_EMOJI.c_str(), 0, &emojiface) == 0)
 			{
-				gfx_log("init: emoji FT_New_Face ok, num_fixed_sizes=%ld", (long)emojiface->num_fixed_sizes);
 				if (emojiface->num_fixed_sizes > 0)
 				{
 					int best = 0;
@@ -358,14 +331,12 @@ namespace ms
 					}
 					if (FT_Select_Size(emojiface, best) != 0)
 					{
-						gfx_log("init: FT_Select_Size failed; disabling emoji face");
 						FT_Done_Face(emojiface);
 						emojiface = nullptr;
 					}
 					else
 					{
 						emoji_strike_size = emojiface->available_sizes[best].height;
-						gfx_log("init: emoji strike %d height=%u", best, (unsigned)emoji_strike_size);
 					}
 				}
 				else
@@ -377,19 +348,13 @@ namespace ms
 					emoji_strike_size = 16;
 					if (FT_Set_Pixel_Sizes(emojiface, 0, emoji_strike_size) != 0)
 					{
-						gfx_log("init: emoji FT_Set_Pixel_Sizes failed; disabling emoji face");
 						FT_Done_Face(emojiface);
 						emojiface = nullptr;
-					}
-					else
-					{
-						gfx_log("init: emoji vector face, pixel size=%u", (unsigned)emoji_strike_size);
 					}
 				}
 			}
 			else
 			{
-				gfx_log("init: emoji FT_New_Face FAILED for %s", FONT_EMOJI.c_str());
 				emojiface = nullptr;
 			}
 		}
@@ -491,9 +456,6 @@ namespace ms
 		}
 
 		FT_Done_Face(face);
-		gfx_log("addfont id=%d name=%s pixelw=%u pixelh=%u width=%d height=%d chars=%zu",
-			(int)id, name, (unsigned)pixelw, (unsigned)pixelh,
-			(int)width, (int)height, fonts[id].chars.size());
 		return true;
 	}
 
@@ -504,10 +466,7 @@ namespace ms
 		FT_Face face;
 		const char* loaded_path = font.path.c_str();
 		if (FT_New_Face(ftlibrary, font.path.c_str(), 0, &face))
-		{
-			gfx_log("load_mono_glyph: FT_New_Face failed for cp=U+%04X path=%s", codepoint, font.path.c_str());
 			return false;
-		}
 
 		// If the primary font has no glyph for this codepoint, try the CJK
 		// fallback face (e.g. malgun.ttf for Korean). This covers MapleStory
@@ -533,7 +492,6 @@ namespace ms
 		if (FT_Set_Pixel_Sizes(face, font.pixelw, font.pixelh))
 		{
 			FT_Done_Face(face);
-			gfx_log("load_mono_glyph: FT_Set_Pixel_Sizes failed for cp=U+%04X", codepoint);
 			return false;
 		}
 
@@ -577,7 +535,6 @@ namespace ms
 		font.chars.emplace(codepoint, ch);
 
 		FT_Done_Face(face);
-		gfx_log("load_mono_glyph: loaded cp=U+%04X ax=%d bw=%d bh=%d", codepoint, (int)ch.ax, (int)w, (int)h);
 		return true;
 	}
 
@@ -587,26 +544,17 @@ namespace ms
 
 		FT_UInt gidx = FT_Get_Char_Index(emojiface, codepoint);
 		if (gidx == 0)
-		{
-			gfx_log("load_emoji_glyph: cp=U+%04X not present in emoji face", codepoint);
 			return false;
-		}
 
 		if (FT_Load_Char(emojiface, codepoint, FT_LOAD_COLOR | FT_LOAD_RENDER))
-		{
-			gfx_log("load_emoji_glyph: FT_Load_Char failed cp=U+%04X", codepoint);
 			return false;
-		}
 
 		FT_GlyphSlot g = emojiface->glyph;
 
 		GLshort strike_w = static_cast<GLshort>(g->bitmap.width);
 		GLshort strike_h = static_cast<GLshort>(g->bitmap.rows);
 		if (strike_w <= 0 || strike_h <= 0)
-		{
-			gfx_log("load_emoji_glyph: cp=U+%04X zero-sized bitmap %dx%d", codepoint, (int)strike_w, (int)strike_h);
 			return false;
-		}
 
 		// Convert bitmap to BGRA. COLRv1 color rendering isn't always available
 		// in FreeType builds, so FT_LOAD_COLOR may still return FT_PIXEL_MODE_GRAY
@@ -634,10 +582,7 @@ namespace ms
 			src_pixels = rgba_buf.data();
 		}
 		else if (g->bitmap.pixel_mode != FT_PIXEL_MODE_BGRA)
-		{
-			gfx_log("load_emoji_glyph: cp=U+%04X unsupported pixel_mode=%d", codepoint, (int)g->bitmap.pixel_mode);
 			return false;
-		}
 
 		GLshort target = static_cast<GLshort>(font.height > 0 ? font.height + 2 : 14);
 
@@ -684,7 +629,6 @@ namespace ms
 		ch.offset = Offset(gx, gy, strike_w, strike_h);
 		ch.color = true;
 		font.chars.emplace(codepoint, ch);
-		gfx_log("load_emoji_glyph: loaded cp=U+%04X strike=%dx%d target=%d", codepoint, (int)strike_w, (int)strike_h, (int)target);
 		return true;
 	}
 
@@ -694,8 +638,6 @@ namespace ms
 
 		auto it = font.chars.find(codepoint);
 		if (it != font.chars.end()) return it->second;
-
-		gfx_log("ensure_glyph: fontid=%d cp=U+%04X (miss, loading)", (int)fontid, codepoint);
 
 		if (is_emoji_codepoint(codepoint) && load_emoji_glyph(font, codepoint))
 		{
@@ -917,7 +859,6 @@ namespace ms
 		if (length == 0)
 			return Text::Layout();
 
-		gfx_log("createlayout: id=%d len=%zu maxw=%d fmt=%d text='%.80s'", (int)id, length, (int)maxwidth, (int)formatted, text.c_str());
 		LayoutBuilder builder(fonts[id], id, alignment, maxwidth, formatted, line_adj);
 
 		const char* p_text = text.c_str();
@@ -1142,7 +1083,6 @@ namespace ms
 		if (text.empty() || color.invisible())
 			return;
 
-		gfx_log("drawtext: id=%d text='%.60s' pos=(%d,%d)", (int)id, text.c_str(), (int)args.getpos().x(), (int)args.getpos().y());
 		const Font& font = fonts[id];
 
 		GLshort x = args.getpos().x();

@@ -20,8 +20,13 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIEvent.h"
+#include "../../IO/UITypes/UIAvatarBanner.h"
 #include "../../IO/UITypes/UIMonsterCarnival.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+
+#include "../../Gameplay/MapleTVBroadcast.h"
+
+#include "Helpers/LoginParser.h"
 
 namespace ms
 {
@@ -281,17 +286,46 @@ namespace ms
 
 	void SendTVHandler::handle(InPacket& recv) const
 	{
-		int8_t has_partner = recv.read_byte(); // 3 = with partner, 1 = solo
-		int8_t type = recv.read_byte(); // 0=normal, 1=star, 2=heart
+		// v83 layout: byte has_partner (1 = solo, 3 = with partner); byte type
+		// (0 normal / 1 star / 2 heart / 4 megassenger); then the sender's
+		// CharLook; then the partner's CharLook (only if has_partner == 3);
+		// then 5 message strings; then int remaining-ms.
+		int8_t has_partner = recv.read_byte();
+		int8_t type = recv.read_byte();
+		(void)type;
 
-		// CharLook + messages follow — complex parsing
+		// We don't render the avatars yet — skip their CharLook bytes but
+		// remember whether a partner/victim was sent so the TV header can
+		// show "sender <3 victim" later (we don't have names from the
+		// CharLook payload in v83, so the header just notes partnered).
+		LoginParser::parse_look(recv);
+		bool has_victim = (has_partner == 3);
+		if (has_victim)
+			LoginParser::parse_look(recv);
+
+		std::vector<std::string> lines;
+		for (int i = 0; i < 5 && recv.available(); i++)
+			lines.push_back(recv.read_string());
+
+		int32_t remaining_ms = 15000;
+		if (recv.length() >= 4)
+			remaining_ms = recv.read_int();
+
+		// Store the broadcast in the shared state. In-map TV Obj sprites
+		// read from MapleTVBroadcast::get() to paint themselves while a
+		// broadcast is on the air — the client does NOT pop a UI dialog
+		// for received broadcasts (UIMapleTV is compose-only).
+		MapleTVBroadcast::get().start("", lines,
+			has_victim ? "partner" : "", remaining_ms);
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[MapleTV] Broadcast received.", UIChatBar::LineType::YELLOW);
 	}
 
 	void RemoveTVHandler::handle(InPacket& recv) const
 	{
-		// Empty packet body
+		MapleTVBroadcast::get().stop();
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[MapleTV] Broadcast ended.", UIChatBar::LineType::YELLOW);
 	}
@@ -307,17 +341,37 @@ namespace ms
 
 	void SetAvatarMegaphoneHandler::handle(InPacket& recv) const
 	{
+		// Cosmic `sendSetAvatarMegaphone` wire layout (exactly):
+		//   int itemid
+		//   string medal+name
+		//   string line1..4 (always 4 — server loops a fixed-size list)
+		//   int channel (channel - 1)
+		//   byte whisper
+		//   addCharLook(sender, megaphone=true)
 		int32_t item_id = recv.read_int();
 		std::string name = recv.read_string();
 
-		// Multiple message strings follow, then channel, ear flag, and CharLook
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[AvatarMegaphone] " + name, UIChatBar::LineType::YELLOW);
+		std::vector<std::string> lines;
+		lines.reserve(4);
+		for (int i = 0; i < 4; i++)
+			lines.push_back(recv.read_string());
+
+		recv.read_int();  // channel
+		recv.read_byte(); // whisper
+
+		LookEntry look = LoginParser::parse_look(recv);
+
+		UI::get().remove(UIElement::Type::AVATARBANNER);
+		UI::get().emplace<UIAvatarBanner>();
+		if (auto banner = UI::get().get_element<UIAvatarBanner>())
+			banner->show(name, lines, item_id, 10000, look);
+		// Messages render inside the banner itself; no chat spam.
 	}
 
 	void ClearAvatarMegaphoneHandler::handle(InPacket& recv) const
 	{
 		recv.read_byte(); // 1
+		UI::get().remove(UIElement::Type::AVATARBANNER);
 	}
 
 	void SpawnKiteHandler::handle(InPacket& recv) const

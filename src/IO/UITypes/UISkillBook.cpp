@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UISkillBook.h"
 
+#include "UIChatBar.h"
+#include "UIKeyConfig.h"
+
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
@@ -27,6 +30,7 @@
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Packets/PlayerPackets.h"
+#include "../../Net/Packets/MessagingPackets.h"
 
 
 #ifdef USE_NX
@@ -51,6 +55,20 @@ namespace ms
 	Icon::IconType UISkillBook::SkillIcon::get_type()
 	{
 		return Icon::IconType::SKILL;
+	}
+
+	UISkillBook::MacroIcon::MacroIcon(int32_t i) : macro_index(i) {}
+
+	void UISkillBook::MacroIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const
+	{
+		auto keyconfig = UI::get().get_element<UIKeyConfig>();
+		if (!keyconfig) return;
+		Keyboard::Mapping mapping = Keyboard::Mapping(KeyType::MACRO, macro_index);
+
+		if (remove)
+			keyconfig->unstage_mapping(mapping);
+		else
+			keyconfig->stage_mapping(cursorposition, mapping);
 	}
 
 	UISkillBook::SkillDisplayMeta::SkillDisplayMeta(int32_t i, int32_t l) : id(i), level(l)
@@ -134,6 +152,17 @@ namespace ms
 		macro_backgrnd = macro["backgrnd"];
 		macro_backgrnd2 = macro["backgrnd2"];
 		macro_backgrnd3 = macro["backgrnd3"];
+		macro_check_sprite = macro["check"];
+		macro_select_sprite = macro["select"];
+		// Macro activation icons (32x32) — each row gets its own style
+		// from Macroicon/0..4. MACRO_COUNT=3 so we use indices 0, 1, 2.
+		{
+			nl::node macro_icons = nl::nx::ui["UIWindow.img"]["SkillMacro"]["Macroicon"];
+			for (int16_t i = 0; i < MACRO_COUNT; i++)
+			{
+				macro_handle_sprites[i] = macro_icons[std::to_string(i)]["icon"];
+			}
+		}
 
 		buttons[Buttons::BT_MACRO_OK] = std::make_unique<MapleButton>(macro["BtOK"], Point<int16_t>(bg_dimensions.x(), 0));
 
@@ -154,11 +183,10 @@ namespace ms
 		macro_slot_gap = 4;          // 32 + 4 = 36 between slot columns
 		macro_row_gap = 12;          // 32 + 12 = 44 between slot rows
 
-		macro_name_origin = Point<int16_t>(14, macro_slots_origin.y() + MACRO_COUNT * (macro_slot_size + macro_row_gap) + 8);
-		macro_name_size = Point<int16_t>(
-			3 * macro_slot_size + 2 * macro_slot_gap, // width matches slot grid
-			18
-		);
+		// Text input box baked into the backdrop — centered around (97, 210)
+		// per in-game click measurement.
+		macro_name_origin = Point<int16_t>(60, 200);
+		macro_name_size = Point<int16_t>(120, 20);
 
 		selected_macro = 0;
 
@@ -169,6 +197,9 @@ namespace ms
 			macro_skills[i][0] = 0;
 			macro_skills[i][1] = 0;
 			macro_skills[i][2] = 0;
+
+			macro_row_icons[i] = std::make_unique<Icon>(
+				std::make_unique<MacroIcon>(i), macro_handle_sprites[i], -1);
 		}
 
 		{
@@ -275,6 +306,29 @@ namespace ms
 			macro_backgrnd2.draw(macro_pos);
 			macro_backgrnd3.draw(macro_pos);
 
+			// Row-selection highlight (drawn under the slot grid)
+			if (macro_select_sprite.is_valid())
+			{
+				Point<int16_t> row_tl = macro_pos + macro_slots_origin
+					+ Point<int16_t>(-1, selected_macro * (macro_slot_size + macro_row_gap) - 6);
+				macro_select_sprite.draw(DrawArgument(row_tl));
+			}
+
+			// Per-row macro activation icon at the right end of each row.
+			// The Macroicon sprite has origin (0, 32) so texture.draw
+			// subtracts that — pass +32 on Y to land on the target top.
+			int16_t handle_x = macro_slots_origin.x() + 3 * macro_slot_size + 2 * macro_slot_gap + 20;
+			int16_t handle_y_offset = -6;  // nudge up
+			for (int16_t i = 0; i < MACRO_COUNT; i++)
+			{
+				if (!macro_handle_sprites[i].is_valid()) continue;
+				Point<int16_t> h_pos = macro_pos + Point<int16_t>(
+					handle_x,
+					macro_slots_origin.y() + i * (macro_slot_size + macro_row_gap)
+						+ handle_y_offset + 32);
+				macro_handle_sprites[i].draw(DrawArgument(h_pos));
+			}
+
 			// 3x3 macro skill slot grid
 			for (int16_t i = 0; i < MACRO_COUNT; i++)
 			{
@@ -295,7 +349,10 @@ namespace ms
 						if (icon.is_valid())
 						{
 							icon.shift(Point<int16_t>(0, 32));
-							icon.draw(DrawArgument(slot_pos + Point<int16_t>(2, 2)));
+							// Third column nudged a bit further left so it
+							// lines up with the backdrop's right cutout.
+							int16_t icon_dx = (s == 2) ? -2 : 1;
+							icon.draw(DrawArgument(slot_pos + Point<int16_t>(icon_dx, -2)));
 						}
 					}
 				}
@@ -303,6 +360,27 @@ namespace ms
 
 			// Bottom name field (for currently selected row)
 			macro_name_field.draw(position);
+
+			// Preview slot to the left of the name field — shows the
+			// macro icon for the currently selected row.
+			if (selected_macro >= 0 && selected_macro < MACRO_COUNT
+				&& macro_handle_sprites[selected_macro].is_valid())
+			{
+				Point<int16_t> preview_pos = macro_pos + Point<int16_t>(15, 189);
+				// Macroicon origin is (0, 32) so the texture's top-left
+				// is at draw_pos.y - 32 — shift y by +32 to land it on
+				// the intended spot.
+				macro_handle_sprites[selected_macro].draw(
+					DrawArgument(preview_pos + Point<int16_t>(0, 32)));
+			}
+
+			// Shout checkbox state indicator — real NX sprite drawn at
+			// its own origin (-161, -235) inside the macro panel.
+			if (macro_shouts[selected_macro] && macro_check_sprite.is_valid())
+			{
+				Point<int16_t> macro_pos = position + Point<int16_t>(bg_dimensions.x(), 0);
+				macro_check_sprite.draw(DrawArgument(macro_pos));
+			}
 		}
 
 
@@ -315,6 +393,21 @@ namespace ms
 
 		if (macro_enabled)
 			macro_name_field.update(position);
+
+		// Drain queued macro skills one per tick when the player is
+		// ready to attack. `combat.use_move` is a no-op while the
+		// previous skill's animation / cooldown is still running, so
+		// we can't just fire all three back to back.
+		if (!pending_macro_skills.empty())
+		{
+			auto& stage = Stage::get();
+			if (stage.get_player().can_attack())
+			{
+				int32_t next_id = pending_macro_skills.front();
+				pending_macro_skills.erase(pending_macro_skills.begin());
+				stage.get_combat().use_move(next_id);
+			}
+		}
 	}
 
 	Button::State UISkillBook::button_pressed(uint16_t id)
@@ -394,18 +487,50 @@ namespace ms
 
 		if (macro_enabled)
 		{
+			// Shout checkbox baked into backdrop around (152, 236).
+			if (clicked)
+			{
+				Point<int16_t> cb_tl = position + Point<int16_t>(bg_dimensions.x(), 0)
+					+ Point<int16_t>(144, 228);
+				Rectangle<int16_t> cb_rect(cb_tl, cb_tl + Point<int16_t>(18, 18));
+				if (cb_rect.contains(cursorpos))
+				{
+					macro_shouts[selected_macro] = !macro_shouts[selected_macro];
+					return Cursor::State::CLICKING;
+				}
+			}
+
 			// Bottom name field (single, edits selected row)
 			Cursor::State tstate = macro_name_field.send_cursor(cursorpos, clicked);
 			if (tstate != Cursor::State::IDLE)
 				return tstate;
 
-			// Row selection: click on a row's slot-grid area to select that row for name editing
 			if (clicked)
 			{
 				Point<int16_t> macro_pos = position + Point<int16_t>(bg_dimensions.x(), 0);
+				int16_t handle_x = macro_slots_origin.x() + 3 * macro_slot_size + 2 * macro_slot_gap + 20;
+				int16_t handle_y_offset = -6;
 
 				for (int16_t i = 0; i < MACRO_COUNT; i++)
 				{
+					// Draggable macro handle at the right end of the row.
+					Point<int16_t> h_tl = macro_pos + Point<int16_t>(
+						handle_x,
+						macro_slots_origin.y() + i * (macro_slot_size + macro_row_gap) + handle_y_offset);
+					Rectangle<int16_t> h_rect(h_tl, h_tl + Point<int16_t>(32, 32));
+
+					if (h_rect.contains(cursorpos))
+					{
+						macro_select_row(i);
+						if (macro_row_icons[i])
+						{
+							macro_row_icons[i]->start_drag(cursorpos - h_tl);
+							UI::get().drag_icon(macro_row_icons[i].get());
+						}
+						return Cursor::State::GRABBING;
+					}
+
+					// Slot grid — click selects the row for name editing.
 					Point<int16_t> row_tl = macro_pos + macro_slots_origin + Point<int16_t>(0, i * (macro_slot_size + macro_row_gap));
 					Point<int16_t> row_br = row_tl + Point<int16_t>(3 * macro_slot_size + 2 * macro_slot_gap, macro_slot_size);
 					Rectangle<int16_t> row_rect(row_tl, row_br);
@@ -637,103 +762,41 @@ namespace ms
 		uint16_t subid = job.get_subjob(joblevel);
 
 		const JobData& data = JobData::get(subid);
-
 		bookicon = data.get_icon();
 		booktext.change_text(data.get_name());
 
-		// Start with NX skill list (shows all available skills for the job)
-		std::vector<int32_t> skill_ids = data.get_skills();
-
-		// For beginner tab, detect actual beginner prefix from skillbook
-		// (custom jobs map to Explorer 0 but character may be Noblesse/Aran)
-		if (joblevel == Job::Level::BEGINNER)
+		// Union of:
+		//  (a) skill IDs defined in NX Skill.wz/<subid>.img (full job tree —
+		//      lets the player see unlearned skills as grey 0-level rows), and
+		//  (b) skill IDs the server has actually granted whose prefix
+		//      (sid / 10000) matches subid.
+		// Beginner tab additionally accepts prefixes 0, 1000, 2000 (different
+		// branches all share the same beginner book).
+		std::vector<int32_t> ids = JobData::get(subid).get_skills();
+		auto push_if_new = [&](int32_t sid)
 		{
-			uint16_t real_beginner = subid;
-			for (auto& entry : skillbook.get_entries())
-			{
-				int32_t prefix = entry.first / 10000;
-				if (prefix == 1000) { real_beginner = 1000; break; }
-				if (prefix == 2000) { real_beginner = 2000; break; }
-			}
+			for (int32_t existing : ids)
+				if (existing == sid)
+					return;
+			ids.push_back(sid);
+		};
 
-			// If actual beginner differs, load NX skills from the right job
-			if (real_beginner != subid)
-			{
-				skill_ids = JobData::get(real_beginner).get_skills();
-				bookicon = JobData::get(real_beginner).get_icon();
-				booktext.change_text(JobData::get(real_beginner).get_name());
-			}
-		}
-
-		// If NX has no skills for this job (custom server jobs),
-		// fall back to skills the player has in this job's ID range
-		if (skill_ids.empty() && subid > 0)
-		{
-			for (auto& entry : skillbook.get_entries())
-			{
-				if (entry.first / 10000 == static_cast<int32_t>(subid))
-					skill_ids.push_back(entry.first);
-			}
-		}
-
-		// Also add any server-sent skills not already in the NX list
 		for (auto& entry : skillbook.get_entries())
 		{
 			int32_t sid = entry.first;
 			int32_t prefix = sid / 10000;
+
 			bool matches = (prefix == static_cast<int32_t>(subid));
-
 			if (joblevel == Job::Level::BEGINNER)
-			{
-				// Check against all beginner prefixes
 				matches = (prefix == 0 || prefix == 1000 || prefix == 2000);
-			}
 
-			if (!matches)
-				continue;
-
-			// Skip if already in list (or duplicate base ID for beginners)
-			bool already = false;
-			for (int32_t existing : skill_ids)
-			{
-				if (existing == sid)
-				{
-					already = true;
-					break;
-				}
-				// For beginners, skip if same base ID already present
-				if (joblevel == Job::Level::BEGINNER && existing % 10000 == sid % 10000)
-				{
-					already = true;
-					break;
-				}
-			}
-
-			if (!already)
-				skill_ids.push_back(sid);
+			if (matches)
+				push_if_new(sid);
 		}
 
-		for (int32_t skill_id : skill_ids)
+		for (int32_t sid : ids)
 		{
-			int32_t level = skillbook.get_level(skill_id);
-			int32_t masterlevel = skillbook.get_masterlevel(skill_id);
-
-			bool invisible = SkillData::get(skill_id).is_invisible();
-
-			if (invisible && masterlevel == 0)
-				continue;
-
-			if (level == 0 && masterlevel == 0)
-			{
-				// Keep core beginner skills and server-sent skills
-				int32_t base = skill_id % 10000;
-				bool is_beginner_core = (base == 1000 || base == 1001 || base == 1002);
-
-				if (!is_beginner_core && !skillbook.has_skill(skill_id))
-					continue;
-			}
-
-			skills.emplace_back(skill_id, level);
+			skills.emplace_back(sid, skillbook.get_level(sid));
 			skillcount++;
 		}
 
@@ -917,8 +980,10 @@ namespace ms
 
 		if (macro_enabled)
 		{
-			macro_name_field.set_state(Textfield::State::NORMAL);
 			macro_name_field.change_text(macro_names[selected_macro]);
+			// Focus immediately so typing starts working without a
+			// second click.
+			macro_name_field.set_state(Textfield::State::FOCUSED);
 		}
 		else
 		{
@@ -951,6 +1016,27 @@ namespace ms
 
 		if (index == selected_macro)
 			macro_name_field.change_text(name);
+	}
+
+	void UISkillBook::trigger_macro(int32_t index)
+	{
+		if (index < 0 || index >= MACRO_COUNT)
+			return;
+
+		// Queue all 3 skills — update() fires them one at a time as
+		// the player becomes ready to attack again, so the second and
+		// third don't get swallowed by can_attack() == false.
+		pending_macro_skills.clear();
+		for (int32_t s = 0; s < 3; s++)
+		{
+			int32_t skill_id = macro_skills[index][s];
+			if (skill_id > 0)
+				pending_macro_skills.push_back(skill_id);
+		}
+
+		// Shout the macro name so nearby players see it in chat.
+		if (macro_shouts[index] && !macro_names[index].empty())
+			GeneralChatPacket(macro_names[index], true).dispatch();
 	}
 
 	void UISkillBook::save_macros()

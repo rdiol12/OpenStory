@@ -463,7 +463,7 @@ namespace ms
 	// The default position of UINotice
 	struct PosNOTICE : public Configuration::PointEntry
 	{
-		PosNOTICE() : PointEntry("PosNOTICE", "(400, 285)") {}
+		PosNOTICE() : PointEntry("PosNOTICE", "(266, 240)") {}
 	};
 
 	// The default position of UIChat and UIRank
@@ -652,6 +652,30 @@ namespace ms
 		PosREPORT() : PointEntry("PosREPORT", "(300, 200)") {}
 	};
 
+	// The default position of UIMapleTV compose window
+	struct PosMAPLETV : public Configuration::PointEntry
+	{
+		PosMAPLETV() : PointEntry("PosMAPLETV", "(400, 80)") {}
+	};
+
+	// The default position of UIMegaphone compose window
+	struct PosMEGAPHONE : public Configuration::PointEntry
+	{
+		PosMEGAPHONE() : PointEntry("PosMEGAPHONE", "(320, 200)") {}
+	};
+
+	// The default position of UIItemMegaphone compose window
+	struct PosITEMMEGAPHONE : public Configuration::PointEntry
+	{
+		PosITEMMEGAPHONE() : PointEntry("PosITEMMEGAPHONE", "(360, 160)") {}
+	};
+
+	// The default position of UIAvatarMegaphone compose window
+	struct PosAVATARMEGAPHONE : public Configuration::PointEntry
+	{
+		PosAVATARMEGAPHONE() : PointEntry("PosAVATARMEGAPHONE", "(350, 180)") {}
+	};
+
 	// The default type of UIMiniMap
 	struct MiniMapType : public Configuration::ByteEntry
 	{
@@ -771,6 +795,12 @@ namespace ms
 	struct AllowFollow : public Configuration::BoolEntry
 	{
 		AllowFollow() : BoolEntry("AllowFollow", "true") {}
+	};
+
+	// Comma-separated list of quest IDs currently pinned in UIQuestHelper.
+	struct TrackedQuests : public Configuration::StringEntry
+	{
+		TrackedQuests() : StringEntry("TrackedQuests", "") {}
 	};
 
 	template <typename T>

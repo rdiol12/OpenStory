@@ -18,11 +18,36 @@
 #include "Npc.h"
 
 #include "../Stage.h"
+#include "../MapleTVBroadcast.h"
 #include "../../Character/QuestLog.h"
+#include "../../Graphics/Text.h"
+#include "../../Net/NpcResponseTracker.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
+
+namespace {
+	// NoLifeNx's get_integer() on a string node uses std::stoll internally and
+	// throws "invalid stoll argument" for non-numeric strings (e.g. v83 quest
+	// Check.img entries where fields like startscript hold a script name).
+	// Use these helpers instead of raw get_integer() when reading WZ fields
+	// whose type may vary.
+	int64_t safe_int(const nl::node& n)
+	{
+		if (!n) return 0;
+		try { return n.get_integer(); } catch (...) {}
+		return 0;
+	}
+
+	bool is_truthy(const nl::node& n)
+	{
+		if (!n) return false;
+		try { if (n.get_integer() != 0) return true; } catch (...) {}
+		try { if (!n.get_string().empty()) return true; } catch (...) {}
+		return false;
+	}
+}
 
 namespace ms
 {
@@ -178,6 +203,83 @@ namespace ms
 			Point<int16_t> mark_pos = absp + Point<int16_t>(22, -origin.y() - 10);
 			quest_mark_anim.draw(DrawArgument(mark_pos), alpha);
 		}
+
+		// MapleTV NPCs display the current world-wide broadcast on their
+		// screen. v83 uses several id bands for per-town sets:
+		//   9201xxx — New Leaf City (9201066)
+		//   9250020..9250100 — classic towns (Aquarium 23, Henesys 42,
+		//     Kerning 43, Ellinia 44, Perion 45, Orbis 46, Ludibrium 26,
+		//     El Nath 24, …)
+		//   9270000..9270999 — later variants (Amoria 00, Lith Harbor 01,
+		//     Sleepywood 02, Omega 03, Korean Folk Town 04, Murung 06,
+		//     Bak Cho 07, …).
+		const bool is_tv =
+			(npcid == 9201066) ||
+			(npcid >= 9250020 && npcid <= 9250100) ||
+			(npcid >= 9270000 && npcid < 9271000);
+		if (is_tv)
+		{
+			auto& b = MapleTVBroadcast::get();
+
+			// The NPC's info node exposes MapleTVmsgX / MapleTVmsgY — the
+			// exact pixel offset (relative to the NPC's feet) where the
+			// broadcast message should be anchored. Values are packed as
+			// short so a raw uint16 > 32767 decodes to a negative int16_t.
+#ifdef USE_NX
+			std::string strid = std::to_string(npcid);
+			if (strid.size() < 7)
+				strid.insert(0, 7 - strid.size(), '0');
+			strid.append(".img");
+			nl::node info = nl::nx::npc[strid]["info"];
+
+			auto read_short = [](nl::node n) -> int16_t
+			{
+				if (!n) return 0;
+				int64_t v = n.get_integer();
+				return static_cast<int16_t>(static_cast<uint16_t>(v));
+			};
+			int16_t msg_x = read_short(info["MapleTVmsgX"]);
+			int16_t msg_y = read_short(info["MapleTVmsgY"]);
+#else
+			int16_t msg_x = -200;
+			int16_t msg_y = -350;
+#endif
+
+			int16_t screen_cx = absp.x() + msg_x;
+			int16_t screen_top_y = absp.y() + msg_y;
+			int16_t screen_w = 180;
+
+			// Diagnostic marker on every MapleTV NPC so we can confirm the
+			// id detection + draw path even when no broadcast is active.
+			{
+				std::string tag = "TV #" + std::to_string(npcid)
+					+ (b.active() ? " [LIVE]" : " [idle]");
+				Text marker(Text::Font::A11M, Text::Alignment::CENTER,
+					b.active() ? Color::Name::YELLOW : Color::Name::LIGHTGREEN,
+					tag, static_cast<uint16_t>(screen_w));
+				marker.draw(Point<int16_t>(screen_cx, screen_top_y - 14));
+			}
+
+			if (b.active())
+			{
+				int16_t y = screen_top_y;
+				if (!b.sender_name().empty())
+				{
+					Text hdr(Text::Font::A12B, Text::Alignment::CENTER,
+						Color::Name::WHITE, b.sender_name(), static_cast<uint16_t>(screen_w));
+					hdr.draw(Point<int16_t>(screen_cx, y));
+					y += 14;
+				}
+				for (const std::string& ln : b.lines())
+				{
+					if (ln.empty()) continue;
+					Text t(Text::Font::A11M, Text::Alignment::CENTER,
+						Color::Name::WHITE, ln, static_cast<uint16_t>(screen_w));
+					t.draw(Point<int16_t>(screen_cx, y));
+					y += 12;
+				}
+			}
+		}
 	}
 
 	int8_t Npc::update(const Physics& physics)
@@ -186,6 +288,18 @@ namespace ms
 			return phobj.fhlayer;
 
 		physics.move_object(phobj);
+
+		// When walking, flip direction if physics reports we hit a foothold
+		// edge (move_object clears TURNATEDGES on collision).
+		if (stance == "move" || stance == "walk")
+		{
+			if (phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
+			{
+				flip = !flip;
+				phobj.hspeed = flip ? 1.0 : -1.0;
+				phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
+			}
+		}
 
 		if (animations.count(stance))
 		{
@@ -222,6 +336,7 @@ namespace ms
 			if (stance == "move" || stance == "walk")
 			{
 				phobj.hspeed = flip ? 1.0 : -1.0;
+				phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 			}
 			else
 			{
@@ -274,6 +389,12 @@ namespace ms
 	{
 		quest_mark_type = QuestMarkType::NONE;
 
+		// If a previous TalkToNPC attempt timed out (server had no handler /
+		// the quest data is missing from this server), never show an
+		// indicator bulb above this NPC.
+		if (NpcResponseTracker::get().is_unavailable(npcid))
+			return;
+
 		const Player& player = Stage::get().get_player();
 		const QuestLog& quests = const_cast<Player&>(player).get_quests();
 		int16_t player_level = static_cast<int16_t>(player.get_stats().get_stat(MapleStat::Id::LEVEL));
@@ -295,7 +416,7 @@ namespace ms
 			nl::node end_check = check["1"];
 			if (!end_check) continue;
 
-			int32_t end_npc = end_check["npc"].get_integer();
+			int32_t end_npc = static_cast<int32_t>(safe_int(end_check["npc"]));
 			if (end_npc != npcid) continue;
 
 			// This NPC completes an in-progress quest — show complete mark
@@ -314,7 +435,7 @@ namespace ms
 			nl::node start_check = check["0"];
 			if (!start_check) continue;
 
-			int32_t start_npc = start_check["npc"].get_integer();
+			int32_t start_npc = static_cast<int32_t>(safe_int(start_check["npc"]));
 			if (start_npc != npcid) continue;
 
 			quest_mark_type = QuestMarkType::IN_PROGRESS;
@@ -323,7 +444,6 @@ namespace ms
 		}
 
 		// Third check: does this NPC have an available quest the player qualifies for?
-		// Only show for quests within 5 levels of the player to avoid marking every NPC
 		for (auto qnode : quest_info)
 		{
 			std::string qid_str = qnode.name();
@@ -352,26 +472,28 @@ namespace ms
 				continue;
 
 			// Check if this NPC starts the quest
-			int32_t start_npc = start_check["npc"].get_integer();
+			int32_t start_npc = static_cast<int32_t>(safe_int(start_check["npc"]));
 			if (start_npc <= 0 || start_npc != npcid)
 				continue;
 
-			// Skip auto-start / scripted / pre-complete quests (no bulb)
-			if (start_check["normalAutoStart"].get_integer() != 0)
+			// Skip auto-start / scripted / pre-complete quests (no bulb). These
+			// fields can be either integers or script-name strings (e.g. v83
+			// Cygnus tutorial), so use is_truthy instead of get_integer().
+			if (is_truthy(start_check["normalAutoStart"]))
 				continue;
-			if (start_check["autoStart"].get_integer() != 0)
+			if (is_truthy(start_check["autoStart"]))
 				continue;
-			if (start_check["autoPreComplete"].get_integer() != 0)
+			if (is_truthy(start_check["autoPreComplete"]))
 				continue;
-			if (start_check["startscript"].get_integer() != 0)
+			if (is_truthy(start_check["startscript"]))
 				continue;
 
 			// QuestInfo gating — hidden/blocked/scripted quests should not show
-			if (qnode["blocked"].get_integer() != 0)
+			if (is_truthy(qnode["blocked"]))
 				continue;
-			if (qnode["autoStart"].get_integer() != 0)
+			if (is_truthy(qnode["autoStart"]))
 				continue;
-			if (qnode["autoPreComplete"].get_integer() != 0)
+			if (is_truthy(qnode["autoPreComplete"]))
 				continue;
 
 			// Real player-facing quests have a name and an area; event/hidden
@@ -379,12 +501,12 @@ namespace ms
 			std::string qname = qnode["name"].get_string();
 			if (qname.empty())
 				continue;
-			if (qnode["area"].get_integer() <= 0)
+			if (safe_int(qnode["area"]) <= 0)
 				continue;
 
 			// Level checks
-			int32_t lvmin = start_check["lvmin"].get_integer();
-			int32_t lvmax = start_check["lvmax"].get_integer();
+			int32_t lvmin = static_cast<int32_t>(safe_int(start_check["lvmin"]));
+			int32_t lvmax = static_cast<int32_t>(safe_int(start_check["lvmax"]));
 
 			if (lvmin > 0 && player_level < lvmin)
 				continue;
@@ -408,7 +530,7 @@ namespace ms
 				bool job_ok = false;
 				for (auto j : job_node)
 				{
-					int32_t required_job = j.get_integer();
+					int32_t required_job = static_cast<int32_t>(safe_int(j));
 					if (required_job == 0 || required_job == player_job)
 					{
 						job_ok = true;
@@ -431,8 +553,8 @@ namespace ms
 				bool prereqs_met = true;
 				for (auto qp : quest_prereq)
 				{
-					int32_t prereq_id = qp["id"].get_integer();
-					int32_t prereq_state = qp["state"].get_integer();
+					int32_t prereq_id = static_cast<int32_t>(safe_int(qp["id"]));
+					int32_t prereq_state = static_cast<int32_t>(safe_int(qp["state"]));
 
 					if (prereq_id > 0)
 					{

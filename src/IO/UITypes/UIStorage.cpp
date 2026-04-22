@@ -27,8 +27,10 @@
 #include "../Components/TwoSpriteButton.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/Look/CharLook.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/Geometry.h"
 
 #include "../../Net/Packets/StoragePackets.h"
 
@@ -143,42 +145,48 @@ namespace ms
 		// Sprites
 		disabled_slot = src["disabled"];
 		meso_icon = nl::nx::ui["UIWindow2.img"]["Shop2"]["meso"];
+		// Reuse the inventory "new item" animated outline for the
+		// selection highlight so it matches the rest of the game UI.
+		newitemslot = nl::nx::ui["UIWindow.img"]["Item"]["New"]["inventory"];
 
-		// Labels
-		storage_mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
-		player_mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
+		// Labels — left-aligned so they sit immediately after the coin icon.
+		storage_mesolabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
+		player_mesolabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
 
-		// Grid layout - 36px cells (matching UIItemInventory), 4 cols both panels
+		// Grid layout — matches the cube strip on the backdrop.
+		// Left panel (storage) is the narrower pane; right panel
+		// (inventory) is wider so it gets more columns and starts
+		// higher up to fit one extra row.
 		cell_size = 36;
+
 		storage_cols = 4;
-		visible_rows = 4;
-
-		// Left panel: storage items below NPC/buttons
+		storage_rows = 6;
 		storage_grid_x = 11;
-		storage_grid_y = 170;
+		storage_grid_y = 102;
 
-		// Right panel: inventory items below tabs (matches left panel grid Y)
-		panel_divider_x = 347;
+		panel_divider_x = 186;
 		if (use_full)
 		{
-			inventory_grid_x = panel_divider_x + 18;
-			inventory_grid_y = 170;
-			inventory_cols = 4;
+			inventory_cols = 16;
+			inventory_rows = 6;
+			inventory_grid_x = panel_divider_x;
+			inventory_grid_y = 100;
 		}
 		else
 		{
-			// No FullBackgrnd — still set up a right panel next to the left panel
 			panel_divider_x = bg_dim.x();
-			inventory_grid_x = panel_divider_x + 10;
+			inventory_grid_x = 0;
 			inventory_grid_y = storage_grid_y;
-			inventory_cols = 4;
+			inventory_cols = 0;
+			inventory_rows = 0;
 		}
 
 		// State
 		current_tab = InventoryType::Id::EQUIP;
-		storage_selection = -1;
-		inventory_selection = -1;
+		storage_selection.clear();
+		inventory_selection.clear();
 		drag_source = DRAG_NONE;
+		drag_source_slot = -1;
 		storage_meso = 0;
 		storage_slots = 0;
 		npc_id = 0;
@@ -192,7 +200,9 @@ namespace ms
 		}
 
 		dimension = Point<int16_t>(min_width, bg_dim.y());
-		dragarea = Point<int16_t>(min_width, 20);
+		// Wider drag-strip — the top 30 px (where the window has no
+		// interactive buttons or slots) can be grabbed to move the UI.
+		dragarea = Point<int16_t>(min_width, 30);
 		active = false;
 	}
 
@@ -200,41 +210,98 @@ namespace ms
 	{
 		UIElement::draw(alpha);
 
-		// Draw storage items (left grid) using Icon objects
-		for (auto& pair : storage_icons)
+		// Animated storage-keeper NPC portrait pinned above the grid.
+		// Tall sprites (Fredrick et al.) get a uniform scale to fit a
+		// 75-px slot; small NPCs draw at native size.
 		{
-			if (pair.second)
+			Point<int16_t> portrait_pos = position + Point<int16_t>(55, 85);
+			auto dim = npc_anim.get_dimensions();
+			constexpr int16_t PORTRAIT_SLOT = 75;
+			float s = 1.0f;
+			if (dim.x() > 0 && dim.y() > 0)
 			{
-				Point<int16_t> iconpos = position + storage_icon_pos(pair.first);
-				pair.second->draw(iconpos);
+				float sx = static_cast<float>(PORTRAIT_SLOT) / dim.x();
+				float sy = static_cast<float>(PORTRAIT_SLOT) / dim.y();
+				s = std::min(sx, sy);
+				if (s > 1.0f) s = 1.0f;
 			}
+			npc_anim.draw(DrawArgument(portrait_pos, s, s, 1.0f), alpha);
 		}
 
-		// Draw inventory items (right grid) using Icon objects
-		for (auto& pair : inv_icons)
-		{
-			if (pair.second)
-			{
-				Point<int16_t> iconpos = position + inventory_icon_pos(pair.first);
-				pair.second->draw(iconpos);
-			}
-		}
-
-		// Draw meso labels
-		if (meso_icon.is_valid())
-		{
-			meso_icon.draw(position + Point<int16_t>(100, 329));
-			if (inventory_cols > 0)
-				meso_icon.draw(position + Point<int16_t>(inventory_grid_x + 100, 329));
-		}
-
-		storage_mesolabel.draw(position + Point<int16_t>(170, 330));
+		// Player's own character portrait above the inventory grid.
 		if (inventory_cols > 0)
-			player_mesolabel.draw(position + Point<int16_t>(inventory_grid_x + 170, 330));
+		{
+			const CharLook& look = Stage::get().get_player().get_look();
+			Point<int16_t> player_pos = position
+				+ Point<int16_t>(panel_divider_x + 30, 60);
+			const_cast<CharLook&>(look).draw(
+				DrawArgument(player_pos, 0.75f, 0.75f, 1.0f), 1.0f);
+		}
+
+		// Selection highlight — only storage items can be highlighted,
+		// so no pass for the inventory panel.
+		for (int16_t s = 0; s < static_cast<int16_t>(storage_slot_map.size()); s++)
+		{
+			int16_t idx = storage_slot_map[s];
+			if (idx >= 0 && storage_selection.count(idx))
+				newitemslot.draw(position + storage_icon_pos(s) + Point<int16_t>(1, 1), alpha);
+		}
+
+		// Draw items at their visual-cell positions. storage_slot_map
+		// and inventory_slot_map are the client-side arrangement —
+		// rebuilt on refresh but mutated by in-panel drag-drop so the
+		// player can put items in any cube they like.
+		for (int16_t s = 0; s < static_cast<int16_t>(storage_slot_map.size()); s++)
+		{
+			int16_t item_idx = storage_slot_map[s];
+			if (item_idx < 0) continue;
+			auto it = storage_icons.find(item_idx);
+			if (it == storage_icons.end() || !it->second) continue;
+			Point<int16_t> iconpos = position + storage_icon_pos(s);
+			it->second->draw(iconpos);
+		}
+		for (int16_t s = 0; s < static_cast<int16_t>(inventory_slot_map.size()); s++)
+		{
+			int16_t item_idx = inventory_slot_map[s];
+			if (item_idx < 0) continue;
+			auto it = inv_icons.find(item_idx);
+			if (it == inv_icons.end() || !it->second) continue;
+			Point<int16_t> iconpos = position + inventory_icon_pos(s);
+			it->second->draw(iconpos);
+		}
+
+		// Meso row: left panel shows the player's current wallet, right
+		// panel shows the storage amount as sent by the server. Labels
+		// draw immediately to the right of each coin icon.
+		const int16_t left_icon_x  = 52;
+		const int16_t left_icon_y  = 318;
+		const int16_t right_icon_x_off = 49;
+		const int16_t right_icon_y = 320;
+
+		// Text baseline — Text draws from the top so pull up to
+		// visually land the digits on the coin's centre line.
+		const int16_t left_label_y_adjust  = -4;
+		const int16_t right_label_y_adjust = -7;
+
+		if (meso_icon.is_valid())
+			meso_icon.draw(position + Point<int16_t>(left_icon_x, left_icon_y));
+		storage_mesolabel.draw(position + Point<int16_t>(left_icon_x + 20, left_icon_y + left_label_y_adjust));
+
+		if (inventory_cols > 0)
+		{
+			if (meso_icon.is_valid())
+				meso_icon.draw(position + Point<int16_t>(panel_divider_x + right_icon_x_off, right_icon_y));
+			player_mesolabel.draw(position + Point<int16_t>(panel_divider_x + right_icon_x_off + 20, right_icon_y + right_label_y_adjust));
+		}
 	}
 
 	void UIStorage::update()
 	{
+		// Advance the NPC portrait animation so the storage keeper
+		// breathes / blinks instead of being a still frame.
+		npc_anim.update();
+		newitemslot.update(6);
+
 		int64_t player_meso = inventory.get_meso();
 
 		std::string storage_mesostr = std::to_string(storage_meso);
@@ -258,22 +325,29 @@ namespace ms
 		Point<int16_t> cursoroffset = cursorpos - position;
 		lastcursorpos = cursoroffset;
 
-		// Show tooltips
-		int16_t sslot = storage_slot_by_cursor(cursoroffset);
-		int16_t islot = inventory_slot_by_cursor(cursoroffset);
+		// Visual-cell → item-index lookup
+		int16_t svisual = storage_slot_by_cursor(cursoroffset);
+		int16_t ivisual = inventory_slot_by_cursor(cursoroffset);
 
-		if (sslot >= 0)
+		int16_t s_item = -1;
+		int16_t i_item = -1;
+		if (svisual >= 0 && svisual < static_cast<int16_t>(storage_slot_map.size()))
+			s_item = storage_slot_map[svisual];
+		if (ivisual >= 0 && ivisual < static_cast<int16_t>(inventory_slot_map.size()))
+			i_item = inventory_slot_map[ivisual];
+
+		if (s_item >= 0)
 		{
 			const auto& items = get_storage_tab(current_tab);
-			if (sslot < static_cast<int16_t>(items.size()))
-				UI::get().show_item(Tooltip::Parent::SHOP, items[sslot].itemid);
+			if (s_item < static_cast<int16_t>(items.size()))
+				UI::get().show_item(Tooltip::Parent::SHOP, items[s_item].itemid);
 			else
 				clear_tooltip();
 		}
-		else if (islot >= 0)
+		else if (i_item >= 0)
 		{
-			if (islot < static_cast<int16_t>(inventory_items.size()))
-				UI::get().show_item(Tooltip::Parent::SHOP, inventory_items[islot].itemid);
+			if (i_item < static_cast<int16_t>(inventory_items.size()))
+				UI::get().show_item(Tooltip::Parent::SHOP, inventory_items[i_item].itemid);
 			else
 				clear_tooltip();
 		}
@@ -282,53 +356,45 @@ namespace ms
 			clear_tooltip();
 		}
 
-		// Handle clicks - initiate drag or select
+		// Handle clicks — clicking an already-highlighted item removes
+		// the highlight; clicking an un-highlighted item starts a drag.
 		if (clicked)
 		{
-			// Check storage grid (left panel)
-			if (sslot >= 0)
+			if (svisual >= 0 && s_item >= 0)
 			{
-				const auto& items = get_storage_tab(current_tab);
-				if (sslot < static_cast<int16_t>(items.size()))
+				auto it = storage_icons.find(s_item);
+				if (it != storage_icons.end() && it->second)
 				{
-					auto it = storage_icons.find(sslot);
-					if (it != storage_icons.end() && it->second)
-					{
-						Point<int16_t> slotpos = storage_icon_pos(sslot);
-						it->second->start_drag(cursoroffset - slotpos);
-						UI::get().drag_icon(it->second.get());
+					Point<int16_t> slotpos = storage_icon_pos(svisual);
+					it->second->start_drag(cursoroffset - slotpos);
+					UI::get().drag_icon(it->second.get());
 
-						drag_source = DRAG_STORAGE;
-						storage_selection = sslot;
-						inventory_selection = -1;
-						clear_tooltip();
-						return Cursor::State::GRABBING;
-					}
+					drag_source = DRAG_STORAGE;
+					drag_source_slot = svisual;
+					clear_tooltip();
+					return Cursor::State::GRABBING;
 				}
-				return Cursor::State::CLICKING;
 			}
+			if (svisual >= 0)
+				return Cursor::State::CLICKING;
 
-			// Check inventory grid (right panel)
-			if (islot >= 0)
+			if (ivisual >= 0 && i_item >= 0)
 			{
-				if (islot < static_cast<int16_t>(inventory_items.size()))
+				auto it = inv_icons.find(i_item);
+				if (it != inv_icons.end() && it->second)
 				{
-					auto it = inv_icons.find(islot);
-					if (it != inv_icons.end() && it->second)
-					{
-						Point<int16_t> slotpos = inventory_icon_pos(islot);
-						it->second->start_drag(cursoroffset - slotpos);
-						UI::get().drag_icon(it->second.get());
+					Point<int16_t> slotpos = inventory_icon_pos(ivisual);
+					it->second->start_drag(cursoroffset - slotpos);
+					UI::get().drag_icon(it->second.get());
 
-						drag_source = DRAG_INVENTORY;
-						inventory_selection = islot;
-						storage_selection = -1;
-						clear_tooltip();
-						return Cursor::State::GRABBING;
-					}
+					drag_source = DRAG_INVENTORY;
+					drag_source_slot = ivisual;
+					clear_tooltip();
+					return Cursor::State::GRABBING;
 				}
-				return Cursor::State::CLICKING;
 			}
+			if (ivisual >= 0)
+				return Cursor::State::CLICKING;
 		}
 
 		return UIDragElement::send_cursor(clicked, cursorpos);
@@ -338,25 +404,77 @@ namespace ms
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;
 
-		// Only allow cross-panel drops:
-		// Storage item (left) dragged to right panel = take out
+		// Cross-panel: storage → inventory = take out
 		if (drag_source == DRAG_STORAGE && in_right_panel(cursoroffset))
 		{
 			icon.drop_on_items(current_tab, EquipSlot::Id::NONE, 0, false);
 			drag_source = DRAG_NONE;
+			drag_source_slot = -1;
 			return true;
 		}
 
-		// Inventory item (right) dragged to left panel = store
+		// Cross-panel: inventory → storage = store
 		if (drag_source == DRAG_INVENTORY && in_left_panel(cursoroffset))
 		{
 			icon.drop_on_items(current_tab, EquipSlot::Id::NONE, 0, false);
 			drag_source = DRAG_NONE;
+			drag_source_slot = -1;
 			return true;
 		}
 
-		// Dropped on same panel or outside — cancel
+		// Same-panel drop — rearrange the visual cell (client-side only).
+		// The server keeps its own sequential order; we just remember
+		// where the player wants each item displayed.
+		if (drag_source == DRAG_STORAGE && in_left_panel(cursoroffset) && drag_source_slot >= 0)
+		{
+			int16_t drop = storage_slot_by_cursor(cursoroffset);
+			if (drop >= 0 && drop < static_cast<int16_t>(storage_slot_map.size())
+				&& drop != drag_source_slot)
+			{
+				int16_t src = drag_source_slot;
+				std::swap(storage_slot_map[src], storage_slot_map[drop]);
+
+				const auto& items = get_storage_tab(current_tab);
+				auto persist = [&](int16_t slot)
+				{
+					int16_t idx = storage_slot_map[slot];
+					if (idx >= 0 && idx < static_cast<int16_t>(items.size()))
+						storage_preferred_slot[items[idx].itemid] = slot;
+				};
+				persist(src);
+				persist(drop);
+			}
+			drag_source = DRAG_NONE;
+			drag_source_slot = -1;
+			return true;
+		}
+
+		if (drag_source == DRAG_INVENTORY && in_right_panel(cursoroffset) && drag_source_slot >= 0)
+		{
+			int16_t drop = inventory_slot_by_cursor(cursoroffset);
+			if (drop >= 0 && drop < static_cast<int16_t>(inventory_slot_map.size())
+				&& drop != drag_source_slot)
+			{
+				int16_t src = drag_source_slot;
+				std::swap(inventory_slot_map[src], inventory_slot_map[drop]);
+
+				auto persist = [&](int16_t slot)
+				{
+					int16_t idx = inventory_slot_map[slot];
+					if (idx >= 0 && idx < static_cast<int16_t>(inventory_items.size()))
+						inventory_preferred_slot[inventory_items[idx].slot] = slot;
+				};
+				persist(src);
+				persist(drop);
+			}
+			drag_source = DRAG_NONE;
+			drag_source_slot = -1;
+			return true;
+		}
+
+		// Outside the window — cancel
 		drag_source = DRAG_NONE;
+		drag_source_slot = -1;
 		return true;
 	}
 
@@ -370,31 +488,83 @@ namespace ms
 	{
 	}
 
-	void UIStorage::rightclick(Point<int16_t> cursorpos)
+	void UIStorage::doubleclick(Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;
 
-		int16_t sslot = storage_slot_by_cursor(cursoroffset);
-		if (sslot >= 0)
+		// Double-click on a storage item:
+		//  - stackable with count > 1 → open quantity prompt, take all
+		//    from server, store back the unwanted excess
+		//  - otherwise → toggle the highlight for multi-retrieve
+		int16_t svisual = storage_slot_by_cursor(cursoroffset);
+		if (svisual >= 0 && svisual < static_cast<int16_t>(storage_slot_map.size()))
 		{
-			const auto& items = get_storage_tab(current_tab);
-			if (sslot < static_cast<int16_t>(items.size()))
+			int16_t s_item = storage_slot_map[svisual];
+			if (s_item >= 0)
 			{
-				storage_selection = sslot;
-				inventory_selection = -1;
-				request_take_out(sslot);
+				const auto& items = get_storage_tab(current_tab);
+				if (s_item < static_cast<int16_t>(items.size())
+					&& current_tab != InventoryType::Id::EQUIP
+					&& items[s_item].count > 1)
+				{
+					int16_t max_qty = items[s_item].count;
+					int16_t index = s_item;
+					auto on_enter = [this, index](int32_t quantity)
+					{
+						request_take_out_partial(index, static_cast<int16_t>(quantity));
+					};
+					UI::get().emplace<UIEnterNumber>(
+						"How many would you like to take out?",
+						on_enter, max_qty, max_qty, -41);
+					return;
+				}
+
+				if (storage_selection.count(s_item))
+					storage_selection.erase(s_item);
+				else
+					storage_selection.insert(s_item);
 			}
 			return;
 		}
 
-		int16_t islot = inventory_slot_by_cursor(cursoroffset);
-		if (islot >= 0)
+		// Double-click on an inventory item stores it immediately;
+		// stackables route through the quantity prompt.
+		int16_t ivisual = inventory_slot_by_cursor(cursoroffset);
+		if (ivisual >= 0 && ivisual < static_cast<int16_t>(inventory_slot_map.size()))
 		{
-			if (islot < static_cast<int16_t>(inventory_items.size()))
+			int16_t i_item = inventory_slot_map[ivisual];
+			if (i_item >= 0 && i_item < static_cast<int16_t>(inventory_items.size()))
 			{
-				inventory_selection = islot;
-				storage_selection = -1;
-				const auto& entry = inventory_items[islot];
+				const auto& entry = inventory_items[i_item];
+				request_store(entry.slot, entry.itemid, entry.count);
+			}
+		}
+	}
+
+	void UIStorage::rightclick(Point<int16_t> cursorpos)
+	{
+		Point<int16_t> cursoroffset = cursorpos - position;
+
+		int16_t svisual = storage_slot_by_cursor(cursoroffset);
+		if (svisual >= 0 && svisual < static_cast<int16_t>(storage_slot_map.size()))
+		{
+			int16_t s_item = storage_slot_map[svisual];
+			if (s_item >= 0)
+			{
+				const auto& items = get_storage_tab(current_tab);
+				if (s_item < static_cast<int16_t>(items.size()))
+					request_take_out(s_item);
+			}
+			return;
+		}
+
+		int16_t ivisual = inventory_slot_by_cursor(cursoroffset);
+		if (ivisual >= 0 && ivisual < static_cast<int16_t>(inventory_slot_map.size()))
+		{
+			int16_t i_item = inventory_slot_map[ivisual];
+			if (i_item >= 0 && i_item < static_cast<int16_t>(inventory_items.size()))
+			{
+				const auto& entry = inventory_items[i_item];
 				request_store(entry.slot, entry.itemid, entry.count);
 			}
 		}
@@ -412,17 +582,63 @@ namespace ms
 		switch (buttonid)
 		{
 		case BT_GET:
-			if (storage_selection >= 0)
-				request_take_out(storage_selection);
+		{
+			// Take out every highlighted storage item. Iterate from
+			// highest index down so earlier take-outs don't shift the
+			// indices we haven't processed yet.
+			std::vector<int16_t> picks(storage_selection.rbegin(), storage_selection.rend());
+			const auto& items = get_storage_tab(current_tab);
+
+			// Fallback: if nothing is highlighted, take out whatever
+			// the cursor is hovering over.
+			if (picks.empty())
+			{
+				int16_t hover = storage_slot_by_cursor(lastcursorpos);
+				if (hover >= 0 && hover < static_cast<int16_t>(storage_slot_map.size()))
+				{
+					int16_t idx = storage_slot_map[hover];
+					if (idx >= 0) picks.push_back(idx);
+				}
+			}
+
+			// Single stackable pick → prompt the player for a partial
+			// quantity. Multi-pick or equip → take each stack in full.
+			if (picks.size() == 1 && picks[0] < static_cast<int16_t>(items.size())
+				&& current_tab != InventoryType::Id::EQUIP
+				&& items[picks[0]].count > 1)
+			{
+				int16_t max_qty = items[picks[0]].count;
+				int16_t index = picks[0];
+				auto on_enter = [this, index](int32_t quantity)
+				{
+					request_take_out_partial(index, static_cast<int16_t>(quantity));
+				};
+				UI::get().emplace<UIEnterNumber>(
+					"How many would you like to take out?",
+					on_enter, max_qty, max_qty, -41);
+				storage_selection.clear();
+				return Button::State::NORMAL;
+			}
+
+			for (int16_t idx : picks)
+				if (idx >= 0 && idx < static_cast<int16_t>(items.size()))
+					request_take_out(idx);
+			storage_selection.clear();
 			return Button::State::NORMAL;
+		}
 
 		case BT_PUT:
-			if (inventory_selection >= 0 && inventory_selection < static_cast<int16_t>(inventory_items.size()))
-			{
-				const auto& entry = inventory_items[inventory_selection];
-				request_store(entry.slot, entry.itemid, entry.count);
-			}
+		{
+			std::vector<int16_t> picks(inventory_selection.rbegin(), inventory_selection.rend());
+			for (int16_t idx : picks)
+				if (idx >= 0 && idx < static_cast<int16_t>(inventory_items.size()))
+				{
+					const auto& entry = inventory_items[idx];
+					request_store(entry.slot, entry.itemid, entry.count);
+				}
+			inventory_selection.clear();
 			return Button::State::NORMAL;
+		}
 
 		case BT_SORT:
 			request_sort();
@@ -469,8 +685,47 @@ namespace ms
 		storage_slots = slots;
 		storage_meso = meso;
 
-		storage_selection = -1;
-		inventory_selection = -1;
+		// Load the storage-keeper NPC's animated stand so it breathes /
+		// blinks in the portrait slot instead of staying a still frame.
+		// v83 pads npc ids to 7 digits + ".img".
+#ifdef USE_NX
+		{
+			std::string strid = std::to_string(npc_id);
+			if (strid.size() < 7)
+				strid.insert(0, 7 - strid.size(), '0');
+			strid.append(".img");
+			nl::node src = nl::nx::npc[strid];
+			std::string link = (std::string)src["info"]["link"];
+			if (!link.empty())
+				src = nl::nx::npc[link + ".img"];
+
+			// Pick the state with the MOST frames so the portrait actually
+			// animates when the NPC has a multi-frame pose (breath / blink).
+			// If every state has only one frame, fall back to `stand` (or
+			// the first non-info state).
+			nl::node chosen;
+			size_t best_frames = 0;
+			for (auto sub : src)
+			{
+				if (sub.name() == "info") continue;
+				size_t n = 0;
+				for (auto f : sub)
+					if (f.data_type() == nl::node::type::bitmap) n++;
+				if (n > best_frames)
+				{
+					best_frames = n;
+					chosen = sub;
+				}
+			}
+			if (!chosen || chosen.size() == 0)
+				chosen = src["stand"];
+			if (chosen.size() > 0)
+				npc_anim = Animation(chosen);
+		}
+#endif
+
+		storage_selection.clear();
+		inventory_selection.clear();
 
 		storage_equip.clear();
 		storage_use.clear();
@@ -479,6 +734,10 @@ namespace ms
 		storage_cash.clear();
 		storage_icons.clear();
 		inv_icons.clear();
+		storage_slot_map.clear();
+		inventory_slot_map.clear();
+		storage_preferred_slot.clear();
+		inventory_preferred_slot.clear();
 
 		current_tab = InventoryType::Id::EQUIP;
 
@@ -495,10 +754,12 @@ namespace ms
 	{
 		clear_tooltip();
 		active = false;
-		storage_selection = -1;
-		inventory_selection = -1;
+		storage_selection.clear();
+		inventory_selection.clear();
 		storage_icons.clear();
 		inv_icons.clear();
+		storage_slot_map.clear();
+		inventory_slot_map.clear();
 	}
 
 	void UIStorage::set_items_for_all(InventoryType::Id types[], size_t ntypes,
@@ -534,6 +795,42 @@ namespace ms
 
 	void UIStorage::modify(InventoryType::Id type)
 	{
+		// Finalise any partial take-outs whose item just landed in the
+		// player's inventory: find the new stack of that itemid in the
+		// relevant tab, figure out how much arrived, and store back the
+		// excess that the player didn't want to keep.
+		for (auto it = pending_restores.begin(); it != pending_restores.end();)
+		{
+			if (it->tab != type) { ++it; continue; }
+
+			int16_t slotmax = inventory.get_slotmax(type);
+			int16_t found_slot = 0;
+			int16_t found_count = 0;
+			for (int16_t slot = 1; slot <= slotmax; ++slot)
+			{
+				if (inventory.get_item_id(type, slot) != it->itemid)
+					continue;
+				int16_t cnt = (type == InventoryType::Id::EQUIP)
+					? 1 : inventory.get_item_count(type, slot);
+				if (cnt > found_count)
+				{
+					found_slot = slot;
+					found_count = cnt;
+				}
+			}
+
+			if (found_slot > 0 && found_count > it->keep)
+			{
+				int16_t excess = found_count - it->keep;
+				StorageStorePacket(found_slot, it->itemid, excess).dispatch();
+				it = pending_restores.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+
 		if (type == current_tab)
 			refresh_inventory_tab();
 	}
@@ -548,6 +845,9 @@ namespace ms
 		storage_icons.clear();
 
 		const auto& items = get_storage_tab(current_tab);
+		int16_t total_cells = storage_cols * storage_rows;
+		storage_slot_map.assign(total_cells, -1);
+
 		for (int16_t i = 0; i < static_cast<int16_t>(items.size()); i++)
 		{
 			int16_t count = (current_tab == InventoryType::Id::EQUIP) ? -1 : items[i].count;
@@ -557,12 +857,38 @@ namespace ms
 				std::make_unique<StorageItemIcon>(i, current_tab),
 				tex, count
 			);
+
+			// Try the player's preferred slot for this itemid; fall back
+			// to the first empty visual cell.
+			int16_t slot = -1;
+			auto pref = storage_preferred_slot.find(items[i].itemid);
+			if (pref != storage_preferred_slot.end()
+				&& pref->second >= 0 && pref->second < total_cells
+				&& storage_slot_map[pref->second] == -1)
+			{
+				slot = pref->second;
+			}
+			if (slot < 0)
+			{
+				for (int16_t s = 0; s < total_cells; s++)
+				{
+					if (storage_slot_map[s] == -1) { slot = s; break; }
+				}
+			}
+			if (slot >= 0)
+			{
+				storage_slot_map[slot] = i;
+				storage_preferred_slot[items[i].itemid] = slot;
+			}
 		}
 	}
 
 	void UIStorage::refresh_inventory_icons()
 	{
 		inv_icons.clear();
+
+		int16_t total_cells = (inventory_cols > 0) ? inventory_cols * inventory_rows : 0;
+		inventory_slot_map.assign(total_cells, -1);
 
 		for (int16_t i = 0; i < static_cast<int16_t>(inventory_items.size()); i++)
 		{
@@ -574,6 +900,27 @@ namespace ms
 				std::make_unique<PlayerItemIcon>(entry.slot, entry.itemid, entry.count),
 				tex, count
 			);
+
+			int16_t slot = -1;
+			auto pref = inventory_preferred_slot.find(entry.slot);
+			if (pref != inventory_preferred_slot.end()
+				&& pref->second >= 0 && pref->second < total_cells
+				&& inventory_slot_map[pref->second] == -1)
+			{
+				slot = pref->second;
+			}
+			if (slot < 0)
+			{
+				for (int16_t s = 0; s < total_cells; s++)
+				{
+					if (inventory_slot_map[s] == -1) { slot = s; break; }
+				}
+			}
+			if (slot >= 0)
+			{
+				inventory_slot_map[slot] = i;
+				inventory_preferred_slot[entry.slot] = slot;
+			}
 		}
 	}
 
@@ -611,8 +958,8 @@ namespace ms
 		buttons[newtab]->set_state(Button::State::PRESSED);
 
 		current_tab = type;
-		storage_selection = -1;
-		inventory_selection = -1;
+		storage_selection.clear();
+		inventory_selection.clear();
 
 		refresh_storage_icons();
 		refresh_inventory_tab();
@@ -638,6 +985,28 @@ namespace ms
 		StorageTakeOutPacket(invtype_byte, static_cast<int8_t>(index)).dispatch();
 	}
 
+	void UIStorage::request_take_out_partial(int16_t index, int16_t keep)
+	{
+		const auto& items = get_storage_tab(current_tab);
+		if (index < 0 || index >= static_cast<int16_t>(items.size()))
+			return;
+
+		const auto& entry = items[index];
+		if (keep <= 0) return;
+		if (keep >= entry.count)
+		{
+			request_take_out(index);
+			return;
+		}
+
+		// Queue the restore before sending the take-out so the modify
+		// callback has the info when the item lands in the inventory.
+		PendingRestore pr{ entry.itemid, keep, current_tab };
+		pending_restores.push_back(pr);
+
+		request_take_out(index);
+	}
+
 	void UIStorage::request_store(int16_t inv_slot, int32_t itemid, int16_t count)
 	{
 		int16_t max_quantity = std::max<int16_t>(1, count);
@@ -650,7 +1019,7 @@ namespace ms
 				StorageStorePacket(inv_slot, itemid, shortqty).dispatch();
 			};
 
-			UI::get().emplace<UIEnterNumber>("How many would you like to store?", on_enter, max_quantity, 1);
+			UI::get().emplace<UIEnterNumber>("How many would you like to store?", on_enter, max_quantity, 1, -22);
 		}
 		else
 		{
@@ -750,7 +1119,7 @@ namespace ms
 		int16_t col = x / cell_size;
 		int16_t row = y / cell_size;
 
-		if (col >= storage_cols || row >= visible_rows) return -1;
+		if (col >= storage_cols || row >= storage_rows) return -1;
 
 		return row * storage_cols + col;
 	}
@@ -767,7 +1136,7 @@ namespace ms
 		int16_t col = x / cell_size;
 		int16_t row = y / cell_size;
 
-		if (col >= inventory_cols || row >= visible_rows) return -1;
+		if (col >= inventory_cols || row >= inventory_rows) return -1;
 
 		return row * inventory_cols + col;
 	}

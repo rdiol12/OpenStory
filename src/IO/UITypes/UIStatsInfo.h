@@ -77,6 +77,10 @@ namespace ms
 			SPEED,
 			JUMP,
 			HONOR,
+			// v83-only extra slots so we can stack weapon/magic pairs
+			MAGIC_ACC_V83,
+			MAGIC_AVOID_V83,
+			STANCE_V83,
 			// Total
 			NUM_LABELS
 		};

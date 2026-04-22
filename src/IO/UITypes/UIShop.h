@@ -22,6 +22,7 @@
 #include "../Components/Slider.h"
 
 #include "../../Character/Look/CharLook.h"
+#include "../../Graphics/Animation.h"
 
 namespace ms
 {
@@ -46,6 +47,10 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void reset(int32_t npcid);
+		// Build the buy-side category tabs — call after the server's
+		// full item list has been added so only categories present in
+		// this shop get a tab.
+		void finalize_buy_tabs();
 		void add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable);
 		void add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice, int16_t buyable);
 
@@ -60,6 +65,8 @@ namespace ms
 		void changeselltab(InventoryType::Id tab);
 		int16_t slot_by_position(int16_t y);
 		uint16_t tabbyinventory(InventoryType::Id type);
+		uint16_t buy_tab_by_inventory(InventoryType::Id type);
+		void changebuytab(InventoryType::Id type);
 		void exit_shop();
 
 		enum Buttons : int16_t
@@ -74,6 +81,11 @@ namespace ms
 			ETC,
 			SETUP,
 			CASH,
+			BUY_TAB_EQUIP,
+			BUY_TAB_USE,
+			BUY_TAB_ETC,
+			BUY_TAB_SETUP,
+			BUY_TAB_CASH,
 			BUY0,
 			BUY1,
 			BUY2,
@@ -98,10 +110,17 @@ namespace ms
 		const CharLook& charlook;
 		const Inventory& inventory;
 
-		Texture npc;
+		Animation npc;
 		Texture buy_selection;
 		Texture sell_selection;
 		Texture meso;
+		// Single shared meso-coin animation overlaid on every item's
+		// price row, so all items blink in sync.
+		Animation meso_anim;
+		// Local frame counter for the char portrait so it animates
+		// independently of whatever the player's world char is doing.
+		mutable uint8_t charframe = 0;
+		mutable uint16_t charframe_delay = 0;
 		Text mesolabel;
 
 		Slider buyslider;
@@ -164,7 +183,15 @@ namespace ms
 
 		struct BuyState
 		{
+			// Full list from the server, plus the filtered view that
+			// the UI actually displays. `item_slots` maps the filtered
+			// index back to the server's buy-list slot, which is what
+			// NpcShopActionPacket expects.
+			std::vector<BuyItem> all_items;
 			std::vector<BuyItem> items;
+			std::vector<int16_t> item_slots;
+			// NONE = no filter (show all).
+			InventoryType::Id filter = InventoryType::Id::NONE;
 			int16_t offset;
 			int16_t lastslot;
 			int16_t selection;
@@ -173,6 +200,7 @@ namespace ms
 			void draw(Point<int16_t> position, const Texture& selected) const;
 			void show_item(int16_t slot);
 			void add(BuyItem item);
+			void set_filter(InventoryType::Id f);
 			void buy() const;
 			void select(int16_t selected);
 		};

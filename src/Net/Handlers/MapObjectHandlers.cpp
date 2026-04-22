@@ -25,36 +25,8 @@
 #include "../../Gameplay/MapleMap/Summon.h"
 #include "../../Gameplay/MapleMap/Dragon.h"
 
-#include <cstdio>
-#include <cstdarg>
-#include <ctime>
-
 namespace ms
 {
-	static void mob_debug_log(const char* fmt, ...)
-	{
-		static FILE* f = nullptr;
-		if (!f)
-		{
-			f = std::fopen("mob_debug.log", "w");
-			if (!f) return;
-		}
-		std::time_t t = std::time(nullptr);
-		std::tm lt{};
-#ifdef _WIN32
-		localtime_s(&lt, &t);
-#else
-		localtime_r(&t, &lt);
-#endif
-		std::fprintf(f, "[%02d:%02d:%02d] ", lt.tm_hour, lt.tm_min, lt.tm_sec);
-		va_list ap;
-		va_start(ap, fmt);
-		std::vfprintf(f, fmt, ap);
-		va_end(ap);
-		std::fputc('\n', f);
-		std::fflush(f);
-	}
-
 	void SpawnCharHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -92,8 +64,8 @@ namespace ms
 		int16_t job = recv.read_short();
 		LookEntry look = LoginParser::parse_look(recv);
 
-		recv.read_int(); // count of 5110000 
-		recv.read_int(); // 'itemeffect'
+		recv.read_int(); // count of 5110000
+		int32_t itemeffect = recv.read_int(); // persistent item-use aura id
 		recv.read_int(); // 'chair'
 
 		Point<int16_t> position = recv.read_point();
@@ -138,6 +110,12 @@ namespace ms
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position }
 		);
+
+		if (itemeffect != 0)
+		{
+			if (auto spawned = Stage::get().get_character(cid))
+				spawned->set_item_effect(itemeffect);
+		}
 	}
 
 	void RemoveCharHandler::handle(InPacket& recv) const
@@ -278,9 +256,6 @@ namespace ms
 
 		recv.skip(4);
 
-		mob_debug_log("SPAWN_MOB oid=%d id=%d pos=(%d,%d) stance=%d fh=%u effect=%d team=%d newspawn=%d",
-			oid, id, position.x(), position.y(), (int)stance, (unsigned)fh, (int)effect, (int)team, (effect == -2) ? 1 : 0);
-
 		Stage::get().get_mobs().spawn(
 			{ oid, id, 0, stance, fh, effect == -2, team, position }
 		);
@@ -291,8 +266,6 @@ namespace ms
 		int32_t oid = recv.read_int();
 		int8_t animation = recv.read_byte();
 
-		mob_debug_log("KILL_MOB oid=%d animation=%d", oid, (int)animation);
-
 		Stage::get().get_mobs().remove(oid, animation);
 	}
 
@@ -300,8 +273,6 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 		int32_t oid = recv.read_int();
-
-		mob_debug_log("SPAWN_MOB_C oid=%d mode=%d avail=%d", oid, (int)mode, (int)recv.available());
 
 		if (mode == 0)
 		{
@@ -722,8 +693,12 @@ namespace ms
 			if (!movements.empty())
 			{
 				const Movement& last = movements.back();
-				// PetLook doesn't support full movement queues,
-				// so just update position and stance from last movement
+				PetLook& pet = character->get_pet(slot);
+				if (pet.get_itemid() != 0)
+				{
+					pet.set_position(last.xpos, last.ypos);
+					pet.set_stance(last.newstate);
+				}
 			}
 		}
 	}
@@ -751,7 +726,15 @@ namespace ms
 		bool talk = !recv.read_bool();
 		// recv.read_bool(); // balloon type - may not be present
 
-		// Pet command animation — no visual handler yet
+		// Map the command byte to a pet stance. Most v83 pet commands (feed,
+		// come, play, etc.) use the ALERT/JUMP stances for visual feedback.
+		if (auto character = Stage::get().get_character(cid))
+		{
+			PetLook& pet = character->get_pet(pet_index);
+			if (pet.get_itemid() != 0)
+				pet.set_stance(static_cast<PetLook::Stance>(
+					animation == 0 ? PetLook::Stance::ALERT : PetLook::Stance::JUMP));
+		}
 	}
 
 	void MoveMonsterResponseHandler::handle(InPacket& recv) const

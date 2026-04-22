@@ -79,6 +79,10 @@ namespace ms
 		settings.emplace<PosSKILLMACRO>();
 		settings.emplace<PosFAMILY>();
 		settings.emplace<PosSYSTEMOPTION>();
+		settings.emplace<PosMAPLETV>();
+		settings.emplace<PosMEGAPHONE>();
+		settings.emplace<PosITEMMEGAPHONE>();
+		settings.emplace<PosAVATARMEGAPHONE>();
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();
@@ -101,6 +105,7 @@ namespace ms
 		settings.emplace<AllowGuildInvite>();
 		settings.emplace<AllowAllianceInvite>();
 		settings.emplace<AllowFollow>();
+		settings.emplace<TrackedQuests>();
 
 		load();
 	}

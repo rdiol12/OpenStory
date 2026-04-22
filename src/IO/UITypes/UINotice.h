@@ -62,7 +62,10 @@ namespace ms
 	class UIYesNo : public UINotice
 	{
 	public:
-		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler, Text::Alignment alignment);
+		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler,
+			Text::Alignment alignment,
+			int16_t button_x_offset = 0,
+			int16_t button_y_offset = 0);
 		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler);
 
 		void draw(float alpha) const override;
@@ -86,7 +89,10 @@ namespace ms
 	class UIEnterNumber : public UINotice
 	{
 	public:
-		UIEnterNumber(std::string message, std::function<void(int32_t number)> numhandler, int32_t max, int32_t quantity);
+		UIEnterNumber(std::string message, std::function<void(int32_t number)> numhandler, int32_t max, int32_t quantity,
+			int16_t field_y_offset = -41,
+			int16_t button_x_offset = 0,
+			int16_t button_y_offset = 0);
 
 		void draw(float alpha) const override;
 		void update() override;

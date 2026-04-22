@@ -25,6 +25,8 @@
 #include "Look/PetLook.h"
 
 #include "../Graphics/EffectLayer.h"
+#include "../Graphics/Color.h"
+#include "../Graphics/Texture.h"
 
 #include "../Gameplay/Combat/DamageNumber.h"
 #include "../Gameplay/MapleMap/MapObject.h"
@@ -108,6 +110,9 @@ namespace ms
 		void show_attack_effect(Animation animation, int8_t z);
 		// Display an animation as an effect on top of the character
 		void show_effect_id(CharEffect::Id toshow);
+		// Start/stop a persistent looping item-use aura (Effect.wz/ItemEff.img).
+		// Pass itemid=0 to clear.
+		void set_item_effect(int32_t itemid);
 		// Display the iron body skill animation
 		void show_iron_body();
 		// Display damage over the characters head
@@ -127,6 +132,12 @@ namespace ms
 		void add_pet(uint8_t index, int32_t iid, const std::string& name, int32_t uniqueid, Point<int16_t> pos, uint8_t stance, int32_t fhid);
 		// Remove a pet with the specified index and reason
 		void remove_pet(uint8_t index, bool hunger);
+		// Access one of the up-to-3 pet slots.
+		PetLook& get_pet(uint8_t index);
+		// Pick the nametag style (text ARGB color) from NameTag.img based
+		// on the character's job. Called by Player/OtherChar after the base
+		// Char constructor, once the job id is known.
+		void apply_nametag_style(int32_t job_id);
 
 		// Return if the character is facing left
 		bool getflip() const;
@@ -174,6 +185,12 @@ namespace ms
 
 	private:
 		Text namelabel;
+		Color name_color;
+		// Nametag 9-slice sprite pieces loaded from NameTag.img/<style>/{w,c,e}.
+		// w = left edge, c = tiled center, e = right edge.
+		Texture tag_w;
+		Texture tag_c;
+		Texture tag_e;
 		Text guildlabel;
 		ChatBalloon chatballoon;
 		EffectLayer effects;
@@ -182,6 +199,11 @@ namespace ms
 		TimedBool ironbody;
 		bool hidden = false;
 		std::list<DamageNumber> damagenumbers;
+
+		// Persistent item-use aura (e.g. cash buff glow). Loops as long as
+		// item_effect_id != 0.
+		Animation item_effect_anim;
+		int32_t item_effect_id = 0;
 
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 	};

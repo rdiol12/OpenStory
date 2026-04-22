@@ -37,83 +37,10 @@
 #include <nlnx/nx.hpp>
 #endif
 
-#include <fstream>
-
 namespace ms
 {
-	// Debug helper — recursively dumps a single NX node (with children up to
-	// max_depth) into ofs. Same shape as UIQuestHelper's dump_nx_node.
-	static void dump_cs_node(std::ofstream& ofs, nl::node n, int depth, int max_depth = 3)
-	{
-		if (!n) return;
-
-		for (int i = 0; i < depth; i++) ofs << "  ";
-		ofs << n.name() << " [" << (int)n.data_type() << "]";
-
-		switch (n.data_type())
-		{
-		case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
-		case nl::node::type::real:    ofs << " = " << (double)n; break;
-		case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
-		case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
-		case nl::node::type::bitmap:
-		{
-			auto bmp = n.get_bitmap();
-			if (bmp)
-				ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << ">";
-			else
-				ofs << " <bitmap (null)>";
-			break;
-		}
-		default: break;
-		}
-		ofs << "  (" << n.size() << " children)\n";
-
-		if (depth >= max_depth) return;
-		for (auto child : n)
-			dump_cs_node(ofs, child, depth + 1, max_depth);
-	}
-
-	// One-shot CashShopGL.img dump — reveals origins/vectors of every node
-	// under the English cash-shop tree so button positions can be computed
-	// from the data rather than guessed.
-	static void dump_cashshop_nodes_once()
-	{
-		static bool done = false;
-		if (done) return;
-		done = true;
-
-		std::ofstream ofs("cashshopgl_ui_dump.txt");
-		if (!ofs) return;
-
-		ofs << "=== CashShopGL.img (top-level children) ===\n";
-		for (auto c : nl::nx::ui["CashShopGL.img"])
-			ofs << "  " << c.name() << " (" << c.size() << ")\n";
-
-		ofs << "\n=== CashShopGL.img / BaseFrame (depth 5) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["BaseFrame"], 0, 5);
-		ofs << "\n=== CashShopGL.img / MainMenu (depth 5) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["MainMenu"], 0, 5);
-		ofs << "\n=== CashShopGL.img / LeftMenu (depth 5) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["LeftMenu"], 0, 5);
-		ofs << "\n=== CashShopGL.img / RightMenu (depth 5) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["RightMenu"], 0, 5);
-		ofs << "\n=== CashShopGL.img / Popup (depth 5) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["Popup"], 0, 5);
-		ofs << "\n=== CashShopGL.img / Effect (depth 4) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["Effect"], 0, 4);
-		ofs << "\n=== CashShopGL.img / PicturePlate (depth 4) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["PicturePlate"], 0, 4);
-		ofs << "\n=== CashShopGL.img / ToolTip (depth 4) ===\n";
-		dump_cs_node(ofs, nl::nx::ui["CashShopGL.img"]["ToolTip"], 0, 4);
-
-		ofs.close();
-	}
-
 	UICashShop::UICashShop() : preview_index(0), menu_index(1), promotion_index(0), mvp_grade(1), mvp_exp(0.07f), list_offset(0)
 	{
-		dump_cashshop_nodes_once();
-
 		// Primary English cash-shop sprites live in CashShopGL.img. A few
 		// elements (item search/effect/char/list) don't have CashShopGL
 		// equivalents, so they fall back to CashShop.img's Korean nodes.

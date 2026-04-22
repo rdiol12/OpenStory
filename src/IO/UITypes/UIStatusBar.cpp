@@ -18,8 +18,6 @@
 #include "UIStatusBar.h"
 
 #include <cmath>
-#include <fstream>
-#include <functional>
 
 #include "../../Graphics/Geometry.h"
 #include "UIBuddyList.h"
@@ -92,6 +90,15 @@ namespace ms
 
 		has_notification = false;
 		notice_pulse_tick = 0;
+
+		// Flash-on-decrease trackers start aligned with the current values so
+		// we don't spuriously flash on the first frame.
+		prev_hp_pct = gethppercent();
+		prev_mp_pct = getmppercent();
+		prev_exp_pct = getexppercent();
+		hp_flash_ticks = 0;
+		mp_flash_ticks = 0;
+		exp_flash_ticks = 0;
 
 		// === Background ===
 		bar_backgrnd = Texture(mainbar["backgrnd"]);
@@ -289,73 +296,6 @@ namespace ms
 		for (int i = 0; i < 8; i++)
 			qs_key_labels[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, Text::Background::NAMETAG, QS_LABEL_NAMES[i]);
 
-		// One-shot dump of the quickSlot NX subtree (origins + sizes) so we
-		// know the exact layout of the panel sprite and any key-label bitmaps.
-		{
-			static bool qs_dumped2 = false;
-			if (!qs_dumped2)
-			{
-				qs_dumped2 = true;
-				std::ofstream ofs("quickslot_ui_dump.txt");
-				if (ofs)
-				{
-					std::function<void(nl::node, int, int)> walk;
-					walk = [&](nl::node n, int depth, int max_depth)
-					{
-						if (!n) return;
-						for (int i = 0; i < depth; i++) ofs << "  ";
-						ofs << n.name() << " [" << (int)n.data_type() << "]";
-						switch (n.data_type())
-						{
-						case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
-						case nl::node::type::real:    ofs << " = " << (double)n; break;
-						case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
-						case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
-						case nl::node::type::bitmap:
-						{
-							auto bmp = n.get_bitmap();
-							if (bmp)
-								ofs << " <bitmap " << bmp.width() << "x" << bmp.height() << " origin(" << n.x() << "," << n.y() << ")>";
-							else
-								ofs << " <bitmap (null)>";
-							break;
-						}
-						default: break;
-						}
-						ofs << "  (" << n.size() << " children)\n";
-						if (depth >= max_depth) return;
-						for (auto child : n) walk(child, depth + 1, max_depth);
-					};
-					ofs << "=== StatusBar2.img (top-level children) ===\n";
-					for (auto c : nl::nx::ui["StatusBar2.img"])
-						ofs << "  " << c.name() << " (" << c.size() << ")\n";
-					ofs << "\n=== StatusBar2.img/mainBar (depth 2) ===\n";
-					walk(nl::nx::ui["StatusBar2.img"]["mainBar"], 0, 2);
-					ofs << "\n=== StatusBar2.img/mainBar/quickSlot (full) ===\n";
-					walk(qs, 0, 8);
-					ofs << "\n=== StatusBar3.img (top-level children) ===\n";
-					for (auto c : nl::nx::ui["StatusBar3.img"])
-						ofs << "  " << c.name() << " (" << c.size() << ")\n";
-					ofs << "\n=== StatusBar3.img (depth 3) ===\n";
-					walk(nl::nx::ui["StatusBar3.img"], 0, 3);
-					ofs << "\n=== UIWindow2.img children (look for key) ===\n";
-					for (auto c : nl::nx::ui["UIWindow2.img"])
-						ofs << "  " << c.name() << " (" << c.size() << ")\n";
-					ofs << "\n=== UIWindow.img children (look for key) ===\n";
-					for (auto c : nl::nx::ui["UIWindow.img"])
-						ofs << "  " << c.name() << " (" << c.size() << ")\n";
-					ofs << "\n=== Basic.img children ===\n";
-					for (auto c : nl::nx::ui["Basic.img"])
-						ofs << "  " << c.name() << " (" << c.size() << ")\n";
-
-					ofs << "\n=== StatusBar2.img/mainBar/gauge (full) ===\n";
-					walk(nl::nx::ui["StatusBar2.img"]["mainBar"]["gauge"], 0, 6);
-
-					ofs << "\n=== UIWindow2.img/KeyConfig (full) ===\n";
-					walk(nl::nx::ui["UIWindow2.img"]["KeyConfig"], 0, 4);
-				}
-			}
-		}
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
 		buttons[BT_QS_OPEN]->set_active(true);
 		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"]);
@@ -511,6 +451,14 @@ namespace ms
 		hpbar.draw(position + Point<int16_t>(-261, -31));
 		mpbar.draw(position + Point<int16_t>(-90, -31));
 
+		// EXP flash-on-drop: no dedicated animation sprite, so re-draw the
+		// expbar to pulse its brightness for the duration of the flash.
+		if (exp_flash_ticks > 0)
+		{
+			float pulse = static_cast<float>(exp_flash_ticks) / FLASH_DURATION_TICKS;
+			expbar.draw(DrawArgument(position + Point<int16_t>(-261, -15), pulse));
+		}
+
 		// Draw extra gauges for special classes
 		// Demon Force gauge (replaces MP for Demon classes)
 		if (jobid >= 3001 && jobid <= 3112)
@@ -527,11 +475,12 @@ namespace ms
 		// Relax EXP gauge (shows bonus EXP from resting)
 		relax_exp_bar.draw(position + Point<int16_t>(-261, -15));
 
-		// Draw gauge animations when HP/MP is low
+		// Draw gauge animations when HP/MP is low OR when the gauge just
+		// dropped (hp_flash_ticks/mp_flash_ticks are decremented in update()).
 		float hp_pct = gethppercent();
 		float mp_pct = getmppercent();
 
-		if (hp_pct < 0.3f)
+		if (hp_pct < 0.3f || hp_flash_ticks > 0)
 		{
 			// Use AB variant for AB jobs
 			if (jobid >= 2000 && jobid < 3000)
@@ -540,7 +489,7 @@ namespace ms
 				ani_hp_gauge.draw(DrawArgument(position + Point<int16_t>(-261, -31)), alpha);
 		}
 
-		if (mp_pct < 0.3f)
+		if (mp_pct < 0.3f || mp_flash_ticks > 0)
 			ani_mp_gauge.draw(DrawArgument(position + Point<int16_t>(-90, -31)), alpha);
 
 		// Draw stat numbers
@@ -677,9 +626,31 @@ namespace ms
 
 		UIElement::update();
 
-		expbar.update(getexppercent());
-		hpbar.update(gethppercent());
-		mpbar.update(getmppercent());
+		float cur_hp = gethppercent();
+		float cur_mp = getmppercent();
+		float cur_exp = getexppercent();
+
+		// Trigger flash whenever a gauge drops. Small epsilon avoids noise
+		// from floating-point jitter in the smoothing inside Gauge::update.
+		constexpr float eps = 0.0005f;
+		if (cur_hp + eps < prev_hp_pct)
+			hp_flash_ticks = FLASH_DURATION_TICKS;
+		if (cur_mp + eps < prev_mp_pct)
+			mp_flash_ticks = FLASH_DURATION_TICKS;
+		if (cur_exp + eps < prev_exp_pct)
+			exp_flash_ticks = FLASH_DURATION_TICKS;
+
+		prev_hp_pct = cur_hp;
+		prev_mp_pct = cur_mp;
+		prev_exp_pct = cur_exp;
+
+		if (hp_flash_ticks) hp_flash_ticks--;
+		if (mp_flash_ticks) mp_flash_ticks--;
+		if (exp_flash_ticks) exp_flash_ticks--;
+
+		expbar.update(cur_exp);
+		hpbar.update(cur_hp);
+		mpbar.update(cur_mp);
 
 		namelabel.change_text(stats.get_name());
 		joblabel.change_text(stats.get_jobname());
@@ -1172,6 +1143,8 @@ namespace ms
 			tx = SkillData::get(action).get_icon(SkillData::Icon::NORMAL);
 		else if (type == KeyType::Id::ITEM)
 			tx = ItemData::get(action).get_icon(false);
+		else if (type == KeyType::Id::MACRO)
+			tx = nl::nx::ui["UIWindow.img"]["SkillMacro"]["Macroicon"][std::to_string(action)]["icon"];
 
 		// v83 skill/item icons have origin (0, 32) so a raw draw at `pos`
 		// renders 32 px ABOVE `pos` (matching StatefulIcon's compensation).
@@ -1211,6 +1184,8 @@ namespace ms
 			assign_quickslot(slot, KeyType::Id::SKILL, action);
 		else if (itype == Icon::IconType::ITEM)
 			assign_quickslot(slot, KeyType::Id::ITEM, action);
+		else if (itype == Icon::IconType::MACRO)
+			assign_quickslot(slot, KeyType::Id::MACRO, action);
 
 		return true;
 	}

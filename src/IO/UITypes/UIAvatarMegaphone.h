@@ -23,24 +23,21 @@
 
 #include <cstdint>
 #include <string>
-#include <vector>
 
 namespace ms
 {
-	// Compose dialog for MapleTV cash items. Shows 5 text fields + OK/Cancel
-	// buttons on top of UIWindow.img/MapleTV/backgrnd. On OK, builds a
-	// UseMapleTVPacket and dispatches it to the server. Draggable by the
-	// top of the window (default 30px title strip).
-	class UIMapleTV : public UIDragElement<PosMAPLETV>
+	// Compose dialog for avatar megaphones (Diablo / Cloud 9 / Lion King /
+	// etc. — 539xxxx cash items). 4 text rows + whisper-ear toggle + OK /
+	// Cancel, drawn on UIWindow.img/AvatarMegaphone/backgrnd (196x193).
+	class UIAvatarMegaphone : public UIDragElement<PosAVATARMEGAPHONE>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::MAPLETV;
+		static constexpr Type TYPE = UIElement::Type::AVATARMEGAPHONE;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		UIMapleTV();
+		UIAvatarMegaphone();
 
-		// slot / itemid of the MapleTV cash item being consumed.
 		void configure_item(int16_t slot, int32_t itemid);
 
 		void draw(float inter) const override;
@@ -58,22 +55,18 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_SEND,
-			BT_TO
+			BT_SEND
 		};
 
 		void send_broadcast();
 		void focus_field(int idx);
-		void prompt_victim();
 
-		Textfield lines[5];
-		Textfield victim_field;
+		Textfield lines[4];
 		Text prompt_label;
-		Text victim_label;
 		int focused_idx;
+		bool whisper_enabled;
 
 		int16_t item_slot;
 		int32_t item_id;
-		bool is_heart_tv;
 	};
 }

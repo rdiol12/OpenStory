@@ -20,6 +20,7 @@
 #include "../Configuration.h"
 
 #include "../IO/UI.h"
+#include "../IO/UITypes/UISkillBook.h"
 
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
@@ -329,6 +330,11 @@ namespace ms
 				break;
 			case KeyType::Id::SKILL:
 				combat.use_move(action);
+				break;
+			case KeyType::Id::MACRO:
+				if (down)
+					if (auto sb = UI::get().get_element<UISkillBook>())
+						sb->trigger_macro(action);
 				break;
 			case KeyType::Id::ITEM:
 				if (down)

@@ -17,63 +17,53 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../UIElement.h"
+#include "../../Character/Look/CharLook.h"
+#include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
-#include "../Components/Textfield.h"
+#include "../../Graphics/Texture.h"
 
-#include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace ms
 {
-	// Compose dialog for MapleTV cash items. Shows 5 text fields + OK/Cancel
-	// buttons on top of UIWindow.img/MapleTV/backgrnd. On OK, builds a
-	// UseMapleTVPacket and dispatches it to the server. Draggable by the
-	// top of the window (default 30px title strip).
-	class UIMapleTV : public UIDragElement<PosMAPLETV>
+	// On-screen receiver banner for avatar megaphones. Each 539xxxx cash
+	// item maps to one of the animated variants at
+	// Map.nx/MapHelper.img/AvatarMegaphone/{Bright,Burning,Heart,Tiger1,Tiger2}.
+	// Frames are ~225x121; the banner plays the loop at the right side of
+	// the screen, overlays the sender name bar, and auto-expires.
+	class UIAvatarBanner : public UIElement
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::MAPLETV;
+		static constexpr Type TYPE = UIElement::Type::AVATARBANNER;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		UIMapleTV();
+		UIAvatarBanner();
 
-		// slot / itemid of the MapleTV cash item being consumed.
-		void configure_item(int16_t slot, int32_t itemid);
+		void show(const std::string& sender,
+			const std::vector<std::string>& lines,
+			int32_t itemid,
+			int32_t duration_ms,
+			const LookEntry& sender_look);
 
 		void draw(float inter) const override;
 		void update() override;
 
-		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-
 		UIElement::Type get_type() const override;
 
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
 	private:
-		enum Buttons : uint16_t
-		{
-			BT_CLOSE,
-			BT_SEND,
-			BT_TO
-		};
+		Animation variant_anim;
+		Texture name_bar;
+		Text sender_text;
+		std::vector<Text> line_texts;
 
-		void send_broadcast();
-		void focus_field(int idx);
-		void prompt_victim();
+		// Sender's character is rendered live from a CharLook built from
+		// the parsed LookEntry in the SET_AVATAR_MEGAPHONE packet.
+		std::unique_ptr<CharLook> sender_look;
 
-		Textfield lines[5];
-		Textfield victim_field;
-		Text prompt_label;
-		Text victim_label;
-		int focused_idx;
-
-		int16_t item_slot;
-		int32_t item_id;
-		bool is_heart_tv;
+		int32_t remaining_ms;
 	};
 }

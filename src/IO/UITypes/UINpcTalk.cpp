@@ -29,6 +29,8 @@
 #include "../../Constants.h"
 #include "../../Graphics/Geometry.h"
 
+#include <cmath>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -44,10 +46,22 @@ namespace ms
 		bottom = UtilDlgEx["s"];
 		nametag = UtilDlgEx["bar"];
 
-		dot_normal = UtilDlgEx["dot0"];
-		dot_hovered = UtilDlgEx["dot1"];
-		list_normal = UtilDlgEx["list0"];
-		list_hovered = UtilDlgEx["list1"];
+		// dot0/dot1/list0/list1 don't exist at UIWindow2.img/UtilDlgEx in v83
+		// and the node lookup was picking up unrelated bitmaps ("QUESTS IN
+		// PROGRESS" stickers) that rendered over each selection row. Try
+		// the v83 path (UIWindow.img/UtilDlgEx) first and only accept nodes
+		// that actually resolve to something.
+		nl::node UtilDlgEx_v83 = nl::nx::ui["UIWindow.img"]["UtilDlgEx"];
+
+		auto pick = [](nl::node a, nl::node b) -> nl::node
+		{
+			return a ? a : b;
+		};
+
+		dot_normal = pick(UtilDlgEx_v83["dot0"], UtilDlgEx["dot0"]);
+		dot_hovered = pick(UtilDlgEx_v83["dot1"], UtilDlgEx["dot1"]);
+		list_normal = pick(UtilDlgEx_v83["list0"], UtilDlgEx["list0"]);
+		list_hovered = pick(UtilDlgEx_v83["list1"], UtilDlgEx["list1"]);
 
 		min_height = 8 * fill.height() + 14;
 
@@ -66,6 +80,15 @@ namespace ms
 		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(UtilDlgEx["BtQGiveup"]);
 
 		name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+
+		// Quest-state icons painted next to SENDSIMPLE option rows:
+		//   QuestIcon/0 = available (!), /1 = in-progress (?), /2 = complete
+		if (nl::node qi = nl::nx::ui["UIWindow.img"]["QuestIcon"])
+		{
+			if (qi["0"] && qi["0"].size() > 0) mark_available  = Animation(qi["0"]);
+			if (qi["1"] && qi["1"].size() > 0) mark_in_progress = Animation(qi["1"]);
+			if (qi["2"] && qi["2"].size() > 0) mark_complete   = Animation(qi["2"]);
+		}
 
 		onmoved = [&](bool upwards)
 		{
@@ -114,36 +137,85 @@ namespace ms
 			int16_t line_h = 16;
 
 			// Draw selection list backgrounds and dots for SENDSIMPLE
-			if (type == TalkType::SENDSIMPLE && !selections.empty())
+			if ((type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR) && !selections.empty())
 			{
 				for (size_t i = 0; i < selections.size(); i++)
 				{
 					auto& sel = selections[i];
-					int16_t row_y = text_y + sel.line * line_h;
+					// Measure the rendered height of everything before this
+					// option so word-wrapped intro text produces the right
+					// Y position (sel.line counts source newlines, not the
+					// visual lines the layout produces).
+					std::string pref_escaped;
+					pref_escaped.reserve(sel.prefix.size() + 8);
+					for (char c : sel.prefix)
+					{
+						if (c == '\n') pref_escaped += "\\n";
+						else pref_escaped += c;
+					}
+					Text prefix_text(Text::Font::A12M, Text::Alignment::LEFT,
+						Color::Name::DARKGREY, Text::Background::NONE,
+						pref_escaped, 320, true);
+					// height() returns the baseline y of the next row after
+					// the prefix; subtract linespace so row_y points at the
+					// TOP of the option's row (where list_bg/dot sprites
+					// would normally anchor).
+					int16_t row_y = text_y + prefix_text.height() - line_h;
 					Point<int16_t> row_pos(text_x - 36, row_y);
 					Point<int16_t> dot_pos(text_x - 14, row_y + 3);
 
 					bool is_hovered = (static_cast<int32_t>(i) == hovered_selection);
 
-					// Draw list row background
-					if (is_hovered)
-						list_hovered.draw(DrawArgument(row_pos));
-					else
-						list_normal.draw(DrawArgument(row_pos));
+					// TEMPORARILY DISABLED — suspected to be drawing wrong
+					// NX sprites ("QUEST IN PROGRESS" banner) over selection
+					// rows. If the red banners vanish after this patch the
+					// culprit is UtilDlgEx/list0/dot0 resolution; if they
+					// remain, another UI element is responsible.
+					//
+					// if (is_hovered)
+					//     list_hovered.draw(DrawArgument(row_pos));
+					// else
+					//     list_normal.draw(DrawArgument(row_pos));
+					//
+					// if (is_hovered)
+					//     dot_hovered.draw(DrawArgument(dot_pos));
+					// else
+					//     dot_normal.draw(DrawArgument(dot_pos));
 
-					// Draw selection dot/bullet
-					if (is_hovered)
-						dot_hovered.draw(DrawArgument(dot_pos));
-					else
-						dot_normal.draw(DrawArgument(dot_pos));
+					// Small grey bullet as a stand-in for the selection dot
+					ColorBox bullet(4, 4, Color::Name::DUSTYGRAY, 1.0f);
+					bullet.draw(DrawArgument(Point<int16_t>(dot_pos.x() + 1, dot_pos.y() + 1)));
 
-					// Explicit highlight overlay so the hovered option is
-					// always clearly visible even if the list0/list1 NX
-					// sprites are missing or too subtle to distinguish.
+					// Quest-state icon (available/in-progress/complete) if
+					// the server tagged this option. Drawn just to the
+					// right of the bullet, before the option's text.
+					const Animation* mark_anim = nullptr;
+					switch (sel.mark)
+					{
+					case QuestMark::AVAILABLE:   mark_anim = &mark_available;  break;
+					case QuestMark::IN_PROGRESS: mark_anim = &mark_in_progress; break;
+					case QuestMark::COMPLETE:    mark_anim = &mark_complete;   break;
+					default: break;
+					}
+					if (mark_anim && mark_anim->get_dimensions().x() > 0)
+					{
+						Point<int16_t> mark_pos(
+							text_x - 6, row_y + line_h / 2);
+						mark_anim->draw(DrawArgument(mark_pos), 1.0f);
+					}
+
+					// Hover indicator: a thin light-blue underline on the
+					// hovered option (subtle enough not to clash with the
+					// blue option text but visible enough to track).
 					if (is_hovered)
 					{
-						ColorBox highlight(324, line_h, Color::Name::YELLOW, 0.25f);
-						highlight.draw(DrawArgument(row_pos));
+						ColorBox underline(
+							static_cast<int16_t>(sel.text.empty() ? 120
+								: static_cast<int16_t>(sel.text.size() * 7)),
+							2,
+							Color::Name::LIGHTBLUE, 0.75f);
+						underline.draw(DrawArgument(
+							Point<int16_t>(text_x, row_y + line_h - 2)));
 					}
 				}
 			}
@@ -151,16 +223,57 @@ namespace ms
 			text.draw(position + Point<int16_t>(166, 48 - y_adj));
 		}
 
-		// Draw text input field for SENDGETTEXT
-		if (type == TalkType::SENDGETTEXT)
+		// Draw text input field for SENDGETTEXT / SENDGETNUMBER
+		if (type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER)
 			input_field.draw(position);
+
+		// Draw SENDSTYLE row list
+		if (type == TalkType::SENDSTYLE && !style_ids.empty())
+		{
+			int16_t y_adj = height - min_height;
+			int16_t text_x = position.x() + 130;
+			int16_t text_y = position.y() + 48 - y_adj;
+			int16_t line_h = 16;
+
+			for (size_t i = 0; i < style_ids.size(); i++)
+			{
+				Point<int16_t> row_pos(text_x - 36, text_y + static_cast<int16_t>(i) * line_h);
+				bool is_hovered = (static_cast<int32_t>(i) == style_hovered);
+				if (is_hovered)
+					list_hovered.draw(DrawArgument(row_pos));
+				else
+					list_normal.draw(DrawArgument(row_pos));
+
+				Point<int16_t> dot_pos(text_x - 14, text_y + static_cast<int16_t>(i) * line_h + 3);
+				if (is_hovered)
+					dot_hovered.draw(DrawArgument(dot_pos));
+				else
+					dot_normal.draw(DrawArgument(dot_pos));
+
+				const std::string& label = (i < style_names.size())
+					? style_names[i] : std::to_string(style_ids[i]);
+
+				Text row_text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+					label, 320);
+				row_text.draw(Point<int16_t>(text_x, text_y + static_cast<int16_t>(i) * line_h));
+			}
+		}
+
 	}
 
 	void UINpcTalk::update()
 	{
 		UIElement::update();
 
-		if (type == TalkType::SENDGETTEXT)
+		++hover_pulse_tick;
+
+		// Advance the quest-mark sprites so their animation loops play
+		// while the NPC selection dialog is on screen.
+		mark_available.update();
+		mark_in_progress.update();
+		mark_complete.update();
+
+		if (type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER)
 			input_field.update(position);
 
 		if (draw_text)
@@ -212,6 +325,20 @@ namespace ms
 						break;
 				}
 
+				break;
+			}
+			case TalkType::SENDNEXT:
+			{
+				// msgtype 5 — Next only; close cancels, Next advances.
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, -1).dispatch();
+						break;
+					case Buttons::NEXT:
+						NpcTalkMorePacket(type, 1).dispatch();
+						break;
+				}
 				break;
 			}
 			case TalkType::SENDYESNO:
@@ -279,8 +406,23 @@ namespace ms
 						NpcTalkMorePacket(type, 0).dispatch();
 						break;
 					case Buttons::OK:
-						NpcTalkMorePacket(type, 1).dispatch();
+					{
+						int32_t value = num_default;
+						try
+						{
+							value = std::stoi(input_field.get_text());
+						}
+						catch (...) {}
+
+						if (num_min != num_max)
+						{
+							if (value < num_min) value = num_min;
+							if (value > num_max) value = num_max;
+						}
+
+						NpcTalkNumberPacket(value).dispatch();
 						break;
+					}
 				}
 
 				break;
@@ -292,6 +434,37 @@ namespace ms
 				{
 					case Buttons::CLOSE:
 						NpcTalkMorePacket(type, 0).dispatch();
+						break;
+				}
+
+				break;
+			}
+			case TalkType::SENDSTYLE:
+			{
+				// msgtype 7 — style picker; selection handled in send_cursor,
+				// OK confirms the currently hovered/selected style.
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, 0).dispatch();
+						break;
+					case Buttons::OK:
+					{
+						int32_t idx = (style_hovered >= 0) ? style_hovered : 0;
+						NpcTalkStylePacket(idx).dispatch();
+						break;
+					}
+				}
+
+				break;
+			}
+			case TalkType::SENDDIMENSIONALMIRROR:
+			{
+				// msgtype 14 — PQ list; close only, selection dispatched in send_cursor
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, -1).dispatch();
 						break;
 				}
 
@@ -310,8 +483,8 @@ namespace ms
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
 
-		// Handle text input field cursor for SENDGETTEXT
-		if (type == TalkType::SENDGETTEXT)
+		// Handle text input field cursor for SENDGETTEXT / SENDGETNUMBER
+		if (type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER)
 		{
 			Cursor::State tstate = input_field.send_cursor(cursor_relative, clicked);
 			if (tstate != Cursor::State::IDLE)
@@ -322,8 +495,37 @@ namespace ms
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
-		// Handle SENDSIMPLE text option clicks
-		if (type == TalkType::SENDSIMPLE && !selections.empty())
+		// Handle SENDSTYLE row clicks (just marks the hovered style).
+		if (type == TalkType::SENDSTYLE && !style_ids.empty())
+		{
+			int16_t y_adj = height - min_height;
+			int16_t text_x = position.x() + 130;
+			int16_t text_y = position.y() + 48 - y_adj;
+			int16_t text_w = 320;
+			int16_t line_h = 16;
+
+			style_hovered = -1;
+			for (size_t i = 0; i < style_ids.size(); i++)
+			{
+				int16_t opt_y = text_y + static_cast<int16_t>(i) * line_h;
+				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
+					cursorpos.y() >= opt_y && cursorpos.y() <= opt_y + line_h)
+				{
+					style_hovered = static_cast<int32_t>(i);
+					if (clicked)
+					{
+						deactivate();
+						NpcTalkStylePacket(static_cast<int32_t>(i)).dispatch();
+						return Cursor::State::IDLE;
+					}
+					return Cursor::State::CANCLICK;
+				}
+			}
+		}
+
+		// Handle SENDSIMPLE / SENDDIMENSIONALMIRROR text option clicks.
+		// Both use embedded #L<i># codes in the text; only the reply packet differs.
+		if ((type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR) && !selections.empty())
 		{
 			// Text area starts at position + (166, 48 - y_adj) for non-slider
 			int16_t y_adj = height - min_height;
@@ -338,10 +540,27 @@ namespace ms
 			for (size_t i = 0; i < selections.size(); i++)
 			{
 				auto& sel = selections[i];
-				int16_t opt_y = text_y + sel.line * line_h;
+				std::string pref_escaped;
+				pref_escaped.reserve(sel.prefix.size() + 8);
+				for (char c : sel.prefix)
+				{
+					if (c == '\n') pref_escaped += "\\n";
+					else pref_escaped += c;
+				}
+				Text prefix_text(Text::Font::A12M, Text::Alignment::LEFT,
+					Color::Name::DARKGREY, Text::Background::NONE,
+					pref_escaped, 320, true);
+
+				// prefix_text.height() is the baseline-y of where THIS
+				// option's glyphs render. Glyphs extend roughly from
+				// (baseline - 14) to baseline — define the hit-test row
+				// around that range so clicking the visible text registers.
+				int16_t baseline = text_y + prefix_text.height();
+				int16_t row_top  = baseline - line_h;
+				int16_t row_bot  = baseline + 2;
 
 				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
-					cursorpos.y() >= opt_y && cursorpos.y() <= opt_y + line_h)
+					cursorpos.y() >= row_top && cursorpos.y() <= row_bot)
 				{
 					hovered_selection = static_cast<int32_t>(i);
 
@@ -349,7 +568,10 @@ namespace ms
 					{
 						hovered_selection = -1;
 						deactivate();
-						NpcTalkMorePacket(sel.index).dispatch();
+						if (type == TalkType::SENDDIMENSIONALMIRROR)
+							NpcTalkMirrorPacket(sel.index).dispatch();
+						else
+							NpcTalkMorePacket(sel.index).dispatch();
 						return Cursor::State::IDLE;
 					}
 					else
@@ -401,8 +623,10 @@ namespace ms
 		case TalkType::SENDGETTEXT:
 		case TalkType::SENDGETNUMBER:
 		case TalkType::SENDSIMPLE:
+		case TalkType::SENDNEXT:
 		case TalkType::SENDSTYLE:
 		case TalkType::SENDACCEPTDECLINE:
+		case TalkType::SENDDIMENSIONALMIRROR:
 			return true;
 		default:
 			return false;
@@ -420,6 +644,14 @@ namespace ms
 
 		for (size_t i = 0; i < tx.size(); i++)
 		{
+			// Strip any ASCII control char below 0x20 except \n and \t —
+			// otherwise the A12M font renders them as a box placeholder
+			// (e.g. "X [] C [] Z [] Space"). This catches \r, \0, \x0b,
+			// \x0c and any other sub-space bytes the server may emit.
+			unsigned char uc = static_cast<unsigned char>(tx[i]);
+			if (uc < 0x20 && uc != '\n' && uc != '\t')
+				continue;
+
 			if (tx[i] != '#')
 			{
 				result += tx[i];
@@ -632,12 +864,74 @@ namespace ms
 				clean_option += option_text[i];
 			}
 
-			selections.push_back({ sel_index, clean_option, line });
+			// Detect quest state tags the server embeds in the option
+			// text ("(Start) …", "(In progress) …", "(Complete) …") and
+			// map them to the QuestMark sprite we'll draw next to the
+			// option. Tags are case-insensitive and can be bracketed by
+			// parentheses or square brackets.
+			QuestMark mark = QuestMark::NONE;
+			{
+				std::string lc;
+				for (char c : clean_option) lc.push_back((char)std::tolower((unsigned char)c));
 
-			// Add to display text as blue clickable-looking text
+				auto consume_tag = [&](const std::string& tag, QuestMark m) -> bool
+				{
+					size_t pos = lc.find(tag);
+					if (pos == std::string::npos) return false;
+					mark = m;
+					// Strip the tag from the visible text so the row just
+					// shows "QuestName" next to the icon.
+					clean_option.erase(pos, tag.size());
+					lc.erase(pos, tag.size());
+					// Also strip leading whitespace that remains.
+					while (!clean_option.empty()
+						&& (clean_option.front() == ' ' || clean_option.front() == ':'))
+					{
+						clean_option.erase(clean_option.begin());
+						lc.erase(lc.begin());
+					}
+					return true;
+				};
+
+				// Order matters: try completes before starts so "(Complete
+				// quest)" doesn't match a naive "start" scan first.
+				consume_tag("(complete)", QuestMark::COMPLETE)
+					|| consume_tag("[complete]", QuestMark::COMPLETE)
+					|| consume_tag("(finish)",   QuestMark::COMPLETE)
+					|| consume_tag("[finish]",   QuestMark::COMPLETE)
+					|| consume_tag("(ready)",    QuestMark::COMPLETE)
+					|| consume_tag("(in progress)", QuestMark::IN_PROGRESS)
+					|| consume_tag("[in progress]", QuestMark::IN_PROGRESS)
+					|| consume_tag("(start)",    QuestMark::AVAILABLE)
+					|| consume_tag("[start]",    QuestMark::AVAILABLE)
+					|| consume_tag("(available)", QuestMark::AVAILABLE);
+			}
+
+			// Ensure each option starts on its own rendered line.
 			if (!result.empty() && result.back() != '\n')
-				result += "\\r\\n";
-			result += "#b" + clean_option + "#k";
+				result += "\n";
+
+			int16_t actual_line = 0;
+			for (char c : result)
+				if (c == '\n')
+					actual_line++;
+
+			// Snapshot the prefix now so draw() can measure visual-row Y
+			// using the real Text layout (handles word-wrapped intro lines).
+			Selection sel;
+			sel.index = sel_index;
+			sel.text = clean_option;
+			sel.line = actual_line;
+			sel.prefix = result;
+			sel.mark = mark;
+			selections.push_back(std::move(sel));
+
+			// Render the option text in blue so it stands out against the
+			// NPC's main dialogue body (DARKGREY). #b turns on blue, #k
+			// turns it off; both are recognised by the Text formatter.
+			result += "#b";
+			result += clean_option;
+			result += "#k";
 			line++;
 
 			pos = text_end + 2; // skip past #l
@@ -654,7 +948,7 @@ namespace ms
 		draw_text = true;
 		formatted_text_pos = 0;
 
-		if (type == TalkType::SENDSIMPLE)
+		if (type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR)
 		{
 			formatted_text = parse_simple_selections(format_text(tx, npcid));
 			draw_text = false; // Show all text immediately for selection menus
@@ -664,11 +958,29 @@ namespace ms
 			formatted_text = format_text(tx, npcid);
 		}
 
-		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, 320);
+		// The Text/LayoutBuilder only treats the two-char escape "\\n" as a
+		// line break; a raw '\n' byte (0x0A) renders as a missing-glyph box.
+		// Convert real newlines to the escape and enable formatted=true so
+		// multi-line NPC dialogue lays out correctly.
+		{
+			std::string escaped;
+			escaped.reserve(formatted_text.size() + 8);
+			for (char c : formatted_text)
+			{
+				if (c == '\n')
+					escaped += "\\n";
+				else
+					escaped += c;
+			}
+			formatted_text = std::move(escaped);
+		}
+
+		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY,
+			Text::Background::NONE, formatted_text, 320, true);
 
 		int16_t text_height = text.height();
 
-		if (type != TalkType::SENDSIMPLE)
+		if (type != TalkType::SENDSIMPLE && type != TalkType::SENDDIMENSIONALMIRROR)
 			text.change_text("");
 
 		if (speakerbyte == 0)
@@ -725,9 +1037,10 @@ namespace ms
 		{
 			case TalkType::SENDSAY:
 			{
-				// Style bytes: high byte = prev, low byte = next
-				bool has_prev = (style >> 8) & 0xFF;
-				bool has_next = style & 0xFF;
+				// endBytes on the wire are [hasPrev][hasNext]; read_short is
+				// little-endian so prev is in the LOW byte and next in the HIGH byte.
+				bool has_prev = style & 0xFF;
+				bool has_next = (style >> 8) & 0xFF;
 
 				if (has_prev && has_next)
 				{
@@ -746,6 +1059,14 @@ namespace ms
 					buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
 					buttons[Buttons::OK]->set_active(true);
 				}
+				break;
+			}
+			case TalkType::SENDNEXT:
+			{
+				// Mode 5 — "Next only" flavour of SENDSAY. No Prev button;
+				// server doesn't expect backwards navigation here.
+				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::NEXT]->set_active(true);
 				break;
 			}
 			case TalkType::SENDYESNO:
@@ -786,6 +1107,16 @@ namespace ms
 			}
 			case TalkType::SENDGETNUMBER:
 			{
+				// Number input field (same widget as GETTEXT, prefilled with default)
+				int16_t field_y = y_cord - 25;
+				input_field = Textfield(
+					Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK,
+					Rectangle<int16_t>(Point<int16_t>(166, field_y), Point<int16_t>(460, field_y + 18)),
+					16
+				);
+				input_field.change_text(std::to_string(num_default));
+				input_field.set_state(Textfield::State::FOCUSED);
+
 				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
 				buttons[Buttons::OK]->set_active(true);
 				break;
@@ -793,6 +1124,19 @@ namespace ms
 			case TalkType::SENDSIMPLE:
 			{
 				// Only close button — options are clicked in the text area
+				break;
+			}
+			case TalkType::SENDSTYLE:
+			{
+				// Style picker (hair/face/skin). Close button stays; style rows
+				// are clicked in the text area. OK confirms current selection.
+				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::OK]->set_active(true);
+				break;
+			}
+			case TalkType::SENDDIMENSIONALMIRROR:
+			{
+				// PQ entrance list — close only; rows are clicked in the text area.
 				break;
 			}
 			default:
@@ -806,4 +1150,50 @@ namespace ms
 		position = Point<int16_t>(vw / 2 - top.width() / 2, vh / 2 - height / 2);
 		dimension = Point<int16_t>(top.width(), height + 120);
 	}
+
+	void UINpcTalk::set_number_bounds(int32_t def, int32_t lo, int32_t hi)
+	{
+		num_default = def;
+		num_min = lo;
+		num_max = hi;
+
+		if (type == TalkType::SENDGETNUMBER)
+			input_field.change_text(std::to_string(def));
+	}
+
+	void UINpcTalk::set_style_ids(std::vector<int32_t> ids)
+	{
+		style_ids = std::move(ids);
+		style_hovered = style_ids.empty() ? -1 : 0;
+
+		// Resolve each style id to a human-readable name so the list shows
+		// "Black Amour" instead of "30030". Categories by id prefix:
+		//   20000-29999 → Face, 30000-39999 → Hair, otherwise → Skin/raw id.
+#ifdef USE_NX
+		style_names.clear();
+		style_names.reserve(style_ids.size());
+
+		for (int32_t id : style_ids)
+		{
+			std::string idstr = std::to_string(id);
+			std::string nm;
+
+			if (id >= 30000 && id < 40000)
+				nm = (std::string)nl::nx::string["Eqp.img"]["Eqp"]["Hair"][idstr]["name"];
+			else if (id >= 20000 && id < 30000)
+				nm = (std::string)nl::nx::string["Eqp.img"]["Eqp"]["Face"][idstr]["name"];
+
+			if (nm.empty())
+				nm = idstr;
+
+			style_names.push_back(std::move(nm));
+		}
+#else
+		style_names.clear();
+		style_names.reserve(style_ids.size());
+		for (int32_t id : style_ids)
+			style_names.push_back(std::to_string(id));
+#endif
+	}
+
 }

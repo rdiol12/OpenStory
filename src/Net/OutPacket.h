@@ -89,6 +89,7 @@ namespace ms
 			SORT_ITEMS = 70,
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
+			USE_CASH_ITEM = 79,
 			SCROLL_EQUIP = 86,
 
 			/// Player

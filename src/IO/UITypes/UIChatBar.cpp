@@ -24,9 +24,12 @@
 #include "../../Net/Packets/MessagingPackets.h"
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
+#include "../../Gameplay/Stage.h"
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <functional>
 #include <list>
 #include <sstream>
 
@@ -76,7 +79,7 @@ namespace ms
 
 	UIChatBar::UIChatBar(Point<int16_t> pos) : UIElement(pos, Point<int16_t>(500, 60))
 	{
-		chatopen = true;
+		chatopen = false;
 		chatfieldopen = false;
 		chattarget = CHT_ALL;
 		party_id = -1;
@@ -112,9 +115,15 @@ namespace ms
 		tapbar = chat["tapBar"];
 		tapbartop = chat["tapBarOver"];
 
+		// Small megaphone icons (UIWindow.img/Megaphone/0..3, 13x12 each)
+		// painted before megaphone / super / item / triple chat lines.
+		nl::node mega_icons = nl::nx::ui["UIWindow.img"]["Megaphone"];
+		for (int i = 0; i < 4; i++)
+			megaphone_icons[i] = Texture(mega_icons[std::to_string(i)]);
+
 		chatbox = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
 
-		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(-435, -58), Point<int16_t>(-40, -35)), 0);
+		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(-435, -62), Point<int16_t>(-40, -39)), 0);
 
 		set_chat_open(chatopen);
 
@@ -251,7 +260,59 @@ namespace ms
 				if (msgy < chattop)
 					continue;
 
-				rowtexts.at(rowid).draw(DrawArgument(Point<int16_t>(4, msgy)), chatclip);
+				// Megaphone rows: paint a colored strip ALIGNED WITH the
+				// actual text row (so it sits behind the glyphs, not
+				// above or below), then draw name → icon → message.
+				auto mega_it = mega_rows.find(rowid);
+				if (mega_it != mega_rows.end())
+				{
+					const MegaRow& mr = mega_it->second;
+
+					Color::Name bg_color = Color::Name::WHITE;
+					switch (mr.icon)
+					{
+					case 0: bg_color = Color::Name::BLUE;   break; // regular
+					case 1: bg_color = Color::Name::PINK;   break; // super
+					case 2: bg_color = Color::Name::GREEN;  break; // item
+					case 3: bg_color = Color::Name::YELLOW; break; // triple
+					}
+
+					// A12M glyph top sits at msgy + (linespace - bearing) ≈
+					// msgy+5; bottom ≈ msgy+17. Strip matches that band
+					// exactly so it sits BEHIND the glyphs only, and uses
+					// a softer alpha so the text stays legible.
+					int16_t strip_top = msgy + 5;
+					int16_t strip_h   = 13;
+					ColorBox row_bg(496, strip_h, bg_color, 0.18f);
+					row_bg.draw(DrawArgument(Point<int16_t>(2, strip_top)));
+
+					int16_t x = 4;
+
+					if (!mr.namepart.empty())
+					{
+						mr.namepart.draw(
+							DrawArgument(Point<int16_t>(x, msgy)), chatclip);
+						x += mr.namepart.width() + 2;
+					}
+
+					// Center the 12-tall megaphone icon over the strip.
+					if (mr.icon >= 0 && mr.icon < 4
+						&& megaphone_icons[mr.icon].is_valid())
+					{
+						int16_t icon_y = strip_top + (strip_h - 12) / 2;
+						megaphone_icons[mr.icon].draw(
+							DrawArgument(Point<int16_t>(x, icon_y)));
+						x += megaphone_icons[mr.icon].width() + 2;
+					}
+
+					mr.msgpart.draw(
+						DrawArgument(Point<int16_t>(x, msgy)), chatclip);
+				}
+				else
+				{
+					rowtexts.at(rowid).draw(
+						DrawArgument(Point<int16_t>(4, msgy)), chatclip);
+				}
 			}
 
 			slider.draw(Point<int16_t>(position.x(), getchattop() + 5));
@@ -483,6 +544,7 @@ namespace ms
 		slider.setrows(rowpos, chatrows, rowmax);
 
 		Color::Name color;
+		int8_t icon = -1;
 
 		switch (type)
 		{
@@ -504,16 +566,69 @@ namespace ms
 		case GREEN:
 			color = Color::Name::GREEN;
 			break;
+		// Megaphone lines each pick a distinct icon and text color so
+		// viewers can tell the broadcast sub-type at a glance.
+		case MEGAPHONE:
+			color = Color::Name::BLUE;
+			icon = 0;
+			break;
+		case SUPER_MEGAPHONE:
+			color = Color::Name::PINK;
+			icon = 1;
+			break;
+		case ITEM_MEGAPHONE:
+			color = Color::Name::GREEN;
+			icon = 2;
+			break;
+		case TRIPLE_MEGAPHONE:
+			color = Color::Name::YELLOW;
+			icon = 3;
+			break;
 		default:
 			color = Color::Name::WHITE;
 			break;
 		}
 
+		// Reserve room for the icon + a small gap when the row has one.
+		uint16_t text_maxwidth = (icon >= 0) ? 464 : 480;
+
 		rowtexts.emplace(
 			std::piecewise_construct,
 			std::forward_as_tuple(rowmax),
-			std::forward_as_tuple(Text::Font::A12M, Text::Alignment::LEFT, color, line, 480)
+			std::forward_as_tuple(Text::Font::A12M, Text::Alignment::LEFT, color, line, text_maxwidth)
 		);
+
+		if (icon >= 0)
+		{
+			rowicons[rowmax] = icon;
+
+			// Split the broadcast on the name/message separator so the icon
+			// can sit between the player name and the colon. Try " : "
+			// first (v83 canonical), then fall back to ":" for servers
+			// that skip the surrounding spaces.
+			std::string name_part;
+			std::string msg_part = line;
+			size_t sep = line.find(" : ");
+			size_t sep_len = 3;
+			if (sep == std::string::npos)
+			{
+				sep = line.find(':');
+				sep_len = 1;
+			}
+			if (sep != std::string::npos)
+			{
+				name_part = line.substr(0, sep);
+				msg_part  = line.substr(sep, sep_len == 3 ? std::string::npos : std::string::npos);
+			}
+
+			MegaRow row;
+			row.icon = icon;
+			row.namepart = Text(Text::Font::A12M, Text::Alignment::LEFT,
+				color, name_part, text_maxwidth);
+			row.msgpart = Text(Text::Font::A12M, Text::Alignment::LEFT,
+				color, msg_part, text_maxwidth);
+			mega_rows[rowmax] = std::move(row);
+		}
 	}
 
 	void UIChatBar::send_chatline(const std::string& line, LineType type)
@@ -849,6 +964,7 @@ namespace ms
 
 	void UIChatBar::send_chat_message(const std::string& message)
 	{
+
 		std::list<int32_t> recipients;
 
 		switch (chattarget)

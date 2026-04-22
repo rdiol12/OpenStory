@@ -76,6 +76,8 @@ namespace ms
 
 		set_state(Char::State::STAND);
 		set_direction(true);
+
+		apply_nametag_style(stats.get_stat(MapleStat::Id::JOB));
 	}
 
 	Player::Player() : Char(0, {}, "") {}

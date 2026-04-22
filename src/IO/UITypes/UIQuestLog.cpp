@@ -27,10 +27,15 @@
 #include "UINpcTalk.h"
 #include "UIQuestHelper.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/Npc.h"
+#include "../../Net/NpcResponseTracker.h"
 #include "../../Net/Packets/QuestPackets.h"
 
 #include <algorithm>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "../../Constants.h"
 
 #ifdef USE_NX
@@ -39,12 +44,44 @@
 
 namespace ms
 {
+	// Map a v83 job id to a short branch name. Many quests list every job in
+	// a branch (e.g. Warrior = 100, 110, 111, 112, 120, 121, 122, 130, 131,
+	// 132) — we collapse to the first-tier name so the requirement line stays
+	// readable and fits in the detail panel.
+	static std::string job_short_name(int32_t jobid)
+	{
+		if (jobid == 0) return "Beginner";
+		int32_t base = (jobid / 100) * 100;
+		switch (base)
+		{
+			case 100:  return "Warrior";
+			case 200:  return "Magician";
+			case 300:  return "Bowman";
+			case 400:  return "Thief";
+			case 500:  return "Pirate";
+			// Cygnus
+			case 1000: return "Noblesse";
+			case 1100: return "Dawn Warrior";
+			case 1200: return "Blaze Wizard";
+			case 1300: return "Wind Archer";
+			case 1400: return "Night Walker";
+			case 1500: return "Thunder Breaker";
+			// Legend
+			case 2000: return "Legend";
+			case 2100: return "Aran";
+		}
+		return "Job " + std::to_string(jobid);
+	}
+
 	UIQuestLog::UIQuestLog(const QuestLog& ql) :
 		UIDragElement<PosQUEST>(Point<int16_t>(280, 20)), questlog(ql), offset(0),
 		selected_entry(-1), hover_entry(-1), selected_from_recommended(false), show_detail(false),
 		detail_scroll(0), detail_content_height(0),
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),
 		detail_area(0), detail_order(0), detail_auto_start(false),
+		// Default to "My Level" filter enabled so the Available tab only
+		// shows quests the player actually qualifies for. Users can toggle
+		// "All Level" to see everything.
 		detail_auto_complete(false), filter_my_level(true),
 		filter_my_location(false), show_recommended(true), show_quest_alarm(false),
 		drag_quest_id(-1), drag_started(false)
@@ -101,7 +138,8 @@ namespace ms
 		auto tab2_bounds = buttons[Buttons::TAB2]->bounds(Point<int16_t>(0, 0));
 		int16_t tab3_x = tab2_bounds.get_right_bottom().x() + 2;
 		int16_t tab3_y = tab2_bounds.get_left_top().y();
-		int16_t tab3_w = tab2_bounds.get_right_bottom().x() - tab2_bounds.get_left_top().x();
+		// Wider than the other tabs to fit the "Not Available" label.
+		int16_t tab3_w = 90;
 		int16_t tab3_h = tab2_bounds.get_right_bottom().y() - tab2_bounds.get_left_top().y();
 		buttons[Buttons::TAB3] = std::make_unique<AreaButton>(Point<int16_t>(tab3_x, tab3_y), Point<int16_t>(tab3_w, tab3_h));
 
@@ -328,9 +366,9 @@ namespace ms
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
 		// Pre-allocate draw objects
-		tab_bg_active = ColorBox(60, 20, Color::Name::ENDEAVOUR, 1.0f);
-		tab_bg_inactive = ColorBox(60, 20, Color::Name::MINESHAFT, 0.6f);
-		tab_label_text = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "Weekly", 60, false);
+		tab_bg_active = ColorBox(90, 20, Color::Name::ENDEAVOUR, 1.0f);
+		tab_bg_inactive = ColorBox(90, 20, Color::Name::MINESHAFT, 0.6f);
+		tab_label_text = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE, "Not Available", 90, false);
 		hover_bg_recommend = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::YELLOW, 0.12f);
 		sel_bg_recommend = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::MALIBU, 0.2f);
 		hover_bg_normal = ColorBox(dimension.x() - 30, ROW_HEIGHT, Color::Name::WHITE, 0.15f);
@@ -362,13 +400,33 @@ namespace ms
 
 	static std::string strip_quest_codes(const std::string& desc);
 
+	// Many v83 NX dumps are stitched from KMS/TMS/CMS sources; quests that
+	// only exist in the CJK regions come through with their original
+	// Chinese / Japanese / Korean strings. Filter them out of the list so
+	// the English UI doesn't show untranslated entries.
+	// UTF-8 lead bytes 0xE3..0xED cover U+3000..U+D7FF which is CJK ideographs,
+	// Hiragana/Katakana, Hangul syllables and CJK symbols.
+	static bool has_cjk(const std::string& s)
+	{
+		for (unsigned char c : s)
+		{
+			if (c >= 0xE3 && c <= 0xED)
+				return true;
+		}
+		return false;
+	}
+
 	void UIQuestLog::load_quests()
 	{
 		available_entries.clear();
 		recommended_entries.clear();
 		active_entries.clear();
 		completed_entries.clear();
-		// weekly_entries is not cleared here — it's managed separately
+		weekly_entries.clear();
+
+		// The "Not Available" tab is populated with quests whose start NPC
+		// has stopped responding to TalkToNPC — see NpcResponseTracker.
+		const auto& unavailable_npcs = NpcResponseTracker::get().get_unavailable();
 
 		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
 		nl::node quest_check = nl::nx::quest["Check.img"];
@@ -391,6 +449,10 @@ namespace ms
 			if (qnode)
 				name = strip_quest_codes(qnode["name"].get_string());
 
+			// Skip quests whose NX name is CJK (untranslated KMS/TMS/CMS data).
+			if (has_cjk(name))
+				continue;
+
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
@@ -406,7 +468,17 @@ namespace ms
 			int32_t area = qnode ? static_cast<int32_t>(qnode["area"].get_integer()) : 0;
 			QuestEntry e{ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false), area };
 			e.icon_type = pick_quest_icon(qid, Buttons::TAB1, false);
-			active_entries.push_back(std::move(e));
+
+			// Route in-progress quests whose *end* NPC (the one the player
+			// must talk to in order to complete the quest) stopped responding
+			// into the "Not Available" tab. Using "0"/start_npc here would
+			// mis-flag quests whose start NPC happens to be offline but whose
+			// turn-in NPC is still fine.
+			int32_t qnpc = quest_check[std::to_string(qid)]["1"]["npc"].get_integer();
+			if (qnpc > 0 && unavailable_npcs.count(static_cast<int32_t>(qnpc)))
+				weekly_entries.push_back(std::move(e));
+			else
+				active_entries.push_back(std::move(e));
 		}
 
 		// TAB2: Completed quests (from server)
@@ -419,6 +491,10 @@ namespace ms
 
 			if (qnode)
 				name = strip_quest_codes(qnode["name"].get_string());
+
+			// Skip quests whose NX name is CJK (untranslated KMS/TMS/CMS data).
+			if (has_cjk(name))
+				continue;
 
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
@@ -568,6 +644,11 @@ namespace ms
 
 			// Quest is available — get name
 			std::string name = strip_quest_codes(qnode["name"].get_string());
+
+			// Skip quests whose NX name is CJK (untranslated KMS/TMS/CMS data).
+			if (has_cjk(name))
+				continue;
+
 			if (name.empty())
 				name = "Quest " + std::to_string(qid);
 
@@ -580,37 +661,56 @@ namespace ms
 					continue;
 			}
 
-			// Location filter — show quests whose start NPC is in the current map.
+			// Location filter — show quests whose start NPC lives anywhere
+			// in the same continent as the player (Maple Island, Victoria,
+			// Ossyria, etc. — grouped by the first digit of the map id).
+			// We build the set of NPC ids on the current continent lazily
+			// from Map.nx and cache by continent prefix.
 			if (filter_my_location)
 			{
 				int32_t current_map = Stage::get().get_mapid();
-				bool npc_in_current_map = false;
+				int32_t continent = current_map / 100000000;
 
-				// Build map id string with 9-digit zero padding ("000000000.img")
-				char map_img[20];
-				std::snprintf(map_img, sizeof(map_img), "%09d.img", current_map);
-
-				// Map node path: Map/Map<prefix>/<mapid>.img/life
-				int32_t prefix = current_map / 100000000;
-				std::string map_folder = "Map" + std::to_string(prefix);
-				nl::node map_node = nl::nx::map["Map"][map_folder][map_img]["life"];
-				if (map_node)
+				static std::unordered_map<int32_t, std::unordered_set<int32_t>> continent_npc_cache;
+				auto cache_it = continent_npc_cache.find(continent);
+				if (cache_it == continent_npc_cache.end())
 				{
-					for (auto life : map_node)
+					std::unordered_set<int32_t> npc_ids;
+					std::string folder = "Map" + std::to_string(continent);
+					nl::node map_root = nl::nx::map["Map"][folder];
+					for (auto map_img : map_root)
 					{
-						if (life["type"].get_string() == "n")
+						nl::node life = map_img["life"];
+						if (!life) continue;
+						for (auto l : life)
 						{
-							std::string life_id = life["id"].get_string();
-							if (!life_id.empty() && std::stoi(life_id) == start_npc)
+							// Tolerate both string and integer id/type.
+							nl::node type_n = l["type"];
+							nl::node id_n   = l["id"];
+							bool is_npc = false;
+							if (type_n.data_type() == nl::node::type::string)
+								is_npc = (type_n.get_string() == "n");
+							else if (type_n.data_type() == nl::node::type::integer)
+								is_npc = ((int64_t)type_n == 'n');
+							if (!is_npc) continue;
+
+							int32_t npc_id = 0;
+							if (id_n.data_type() == nl::node::type::string)
 							{
-								npc_in_current_map = true;
-								break;
+								const std::string& s = id_n.get_string();
+								if (!s.empty()) { try { npc_id = std::stoi(s); } catch (...) {} }
 							}
+							else if (id_n.data_type() == nl::node::type::integer)
+							{
+								npc_id = static_cast<int32_t>((int64_t)id_n);
+							}
+							if (npc_id > 0) npc_ids.insert(npc_id);
 						}
 					}
+					cache_it = continent_npc_cache.emplace(continent, std::move(npc_ids)).first;
 				}
 
-				if (!npc_in_current_map)
+				if (cache_it->second.find(start_npc) == cache_it->second.end())
 					continue;
 			}
 
@@ -686,10 +786,21 @@ namespace ms
 			int32_t area_v = qnode ? static_cast<int32_t>(qnode["area"].get_integer()) : 0;
 			QuestEntry e{ qid, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name, 220, false), area_v };
 			e.icon_type = pick_quest_icon(qid, Buttons::TAB0, is_recommended);
-			if (is_recommended)
+
+			// If the quest's start NPC is flagged unavailable, it belongs
+			// in the "Not Available" tab rather than the available list.
+			if (start_npc > 0 && unavailable_npcs.count(static_cast<int32_t>(start_npc)))
+			{
+				weekly_entries.push_back(std::move(e));
+			}
+			else if (is_recommended)
+			{
 				recommended_entries.push_back(std::move(e));
+			}
 			else
+			{
 				available_entries.push_back(std::move(e));
+			}
 		}
 
 		// Sort recommended/available by level only (TAB0 has its own Recommend header)
@@ -759,56 +870,134 @@ namespace ms
 		show_detail = false;
 	}
 
+	// Whether all item-count and mob-kill requirements on the end-check
+	// side of a started quest are satisfied. Mirrors the logic in
+	// UIQuestHelper::refresh_quest_info but skips the end-NPC talk
+	// (not observable client-side) and skips quests with no material
+	// requirements at all. Returns false if the quest isn't started.
+	static bool is_quest_completable(int16_t qid, const QuestLog& questlog)
+	{
+		auto it = questlog.get_started().find(qid);
+		if (it == questlog.get_started().end())
+			return false;
+
+		nl::node end_check = nl::nx::quest["Check.img"][std::to_string(qid)]["1"];
+		if (!end_check)
+			return false;
+
+		const Inventory& inv = Stage::get().get_player().get_inventory();
+		bool has_any_req = false;
+
+		for (auto item_node : end_check["item"])
+		{
+			int32_t itemid = item_node["id"].get_integer();
+			int32_t count  = item_node["count"].get_integer();
+			if (itemid <= 0 || count <= 0)
+				continue;
+			has_any_req = true;
+			if (inv.get_total_item_count(itemid) < count)
+				return false;
+		}
+
+		const std::string& qdata = it->second;
+		int mob_idx = 0;
+		for (auto mob_node : end_check["mob"])
+		{
+			int32_t mobid = mob_node["id"].get_integer();
+			int32_t count = mob_node["count"].get_integer();
+			if (mobid <= 0 || count <= 0) { mob_idx++; continue; }
+			has_any_req = true;
+
+			int32_t killed = 0;
+			size_t off = static_cast<size_t>(mob_idx) * 3;
+			if (off + 3 <= qdata.size())
+			{
+				try { killed = std::stoi(qdata.substr(off, 3)); }
+				catch (...) { killed = 0; }
+			}
+			if (killed < count)
+				return false;
+			mob_idx++;
+		}
+
+		return has_any_req;
+	}
+
 	uint8_t UIQuestLog::pick_quest_icon(int16_t qid, uint16_t tab_id, bool is_recommended) const
 	{
 		// Sprite semantics (from UIWindow.img/Quest):
 		//   icon0 (static !)       — available to accept  (start)
-		//   icon1 (static ?)       — ready to turn in     (end)
-		//   icon2 (animated !)     — available (animated, new/highlighted)
-		//   icon3 (animated ?)     — in-progress          (talk to NPC)
-		//   icon4 (static ?)       — completable
-		//   icon5 (animated star)  — event/special quest
+		//   icon1 (static ?)       — ready to turn in     (end / done)
+		//   icon2 (animated !)     — "Quest in progress" legend — animated start highlight
+		//   icon3 (animated ?)     — "Quest tracked" legend — pinned in quest helper
+		//   icon4 (static ?)       — "Ready to complete"
+		//   icon5 (animated star)  — event / weekly / unavailable fallback
 		//   icon6 (animated !)     — party quest start
-		//   icon7 (animated ?)     — party quest end
+		//   icon7 (animated ?)     — guild quest (or party quest end if no guild flag)
 		//   icon8 (animated clock !) — time-limited start
-		//   icon9 (animated clock ?) — time-limited end
-		//   icon10 (static ?)      — blitz / special end
+		//   icon9 (animated clock ?) — repeatable / time-limited in-progress
+		//   icon10 (static ?)      — event quest (blitz / special end)
 		//   iconQM0/QM1            — unknown / generic marker
 
 		nl::node qinfo = nl::nx::quest["QuestInfo.img"][std::to_string(qid)];
 		nl::node chk_start = nl::nx::quest["Check.img"][std::to_string(qid)]["0"];
 		nl::node chk_end   = nl::nx::quest["Check.img"][std::to_string(qid)]["1"];
 
-		// Time-limited: has timeLimit field or an event end date
+		// Time-limited: has explicit timer minutes in QuestInfo
 		bool time_limited = false;
 		if (qinfo && (qinfo["timeLimit"].get_integer() > 0 || qinfo["timeLimit2"].get_integer() > 0))
 			time_limited = true;
-		if (chk_start && !chk_start["end"].get_string().empty())
-			time_limited = true;
 
-		// Party quest
-		bool party = false;
-		if (chk_start && chk_start["partyQuest"].get_integer() != 0)
-			party = true;
+		// Event: has a date window (start/end) or eventQuest flag.
+		// NOTE: TAB0 filters quests with non-empty start "end" in load_quests,
+		// so this only matters for quests that survive that filter (started
+		// event quests or dumps with the separate eventQuest field).
+		bool event = false;
+		if (qinfo && qinfo["eventQuest"].get_integer() != 0)
+			event = true;
+		if (chk_start && !chk_start["end"].get_string().empty())
+			event = true;
+
+		// Repeatable (daily / weekly interval between retakes)
+		bool repeatable = false;
+		if (chk_start && chk_start["interval"].get_integer() > 0)
+			repeatable = true;
+
+		// Party / guild (guild only present in some dumps — graceful no-op otherwise)
+		bool party = chk_start && chk_start["partyQuest"].get_integer() != 0;
+		bool guild = chk_start && chk_start["guild"].get_integer() != 0;
 
 		switch (tab_id)
 		{
 		case Buttons::TAB0: // Available (start-side → "!" icons)
-			if (time_limited) return 8;  // clock !
-			if (party)        return 6;  // party !
-			if (is_recommended) return 2;  // animated ! (highlighted available)
-			return 0;                      // static ! (generic available)
+			if (event)          return 10; // static ? (event quest)
+			if (time_limited)   return 8;  // clock !
+			if (guild)          return 7;  // guild marker
+			if (party)          return 6;  // party !
+			if (repeatable)     return 9;  // repeatable ?
+			// `is_recommended` previously fell through to icon 2, but
+			// icon 2 is the "Quest in progress" animated marker — drawing
+			// it here made available quests look like they were already
+			// accepted. Available quests always use icon 0 (static !).
+			return 0;                       // static ! (generic available)
 
 		case Buttons::TAB1: // In-progress (end-side → "?" icons)
-			if (time_limited) return 9;  // clock ?
-			if (party)        return 7;  // party ?
-			return 3;                    // animated ? (in progress)
+			if (event)          return 10;
+			if (time_limited)   return 9;  // clock ? (also used for repeatable)
+			if (guild)          return 7;
+			if (party)          return 6;  // party start-side marker
+			if (is_quest_completable(qid, questlog))
+				return 4;                  // "Ready to complete"
+			if (auto helper = UI::get().get_element<UIQuestHelper>())
+				if (helper->is_tracked(qid))
+					return 3;              // "Quest tracked"
+			return 2;                      // "Quest in progress"
 
-		case Buttons::TAB2: // Completed (end-side → static ?)
-			return 4;                    // static ? (completable/done)
+		case Buttons::TAB2: // Completed (already turned in)
+			return 1;                      // static ? — "Accept quest" / done
 
-		case Buttons::TAB3: // Weekly / repeatable / event
-			return 5;                    // animated star (event/special)
+		case Buttons::TAB3: // Weekly / unavailable fallback
+			return 5;                      // animated star
 
 		default:
 			return 0;
@@ -826,21 +1015,33 @@ namespace ms
 	void UIQuestLog::draw_entry_icon(uint8_t icon_type, Point<int16_t> pos, float alpha) const
 	{
 		DrawArgument arg(pos);
+
+		// Fallback helper: some v83 NX dumps are missing animation frames for
+		// certain icons — draw the known-good quest_icon_anim (icon3) instead
+		// of a silent empty frame so the row always has a visible marker.
+		auto draw_anim_or_fallback = [&](const Animation& a)
+		{
+			if (a.get_dimensions().x() > 0)
+				a.draw(arg, alpha);
+			else
+				quest_icon_anim.draw(arg, alpha);
+		};
+
 		switch (icon_type)
 		{
 		case 0:  if (icon0.is_valid())       icon0.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
 		case 1:  if (icon1.is_valid())       icon1.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
-		case 2:  icon2_anim.draw(arg, alpha); break;
+		case 2:  draw_anim_or_fallback(icon2_anim); break;
 		case 3:  quest_icon_anim.draw(arg, alpha); break;
 		case 4:  if (icon4.is_valid())       icon4.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
-		case 5:  icon5_anim.draw(arg, alpha); break;
-		case 6:  icon6_anim.draw(arg, alpha); break;
-		case 7:  icon7_anim.draw(arg, alpha); break;
-		case 8:  icon8_anim.draw(arg, alpha); break;
-		case 9:  icon9_anim.draw(arg, alpha); break;
+		case 5:  draw_anim_or_fallback(icon5_anim); break;
+		case 6:  draw_anim_or_fallback(icon6_anim); break;
+		case 7:  draw_anim_or_fallback(icon7_anim); break;
+		case 8:  draw_anim_or_fallback(icon8_anim); break;
+		case 9:  draw_anim_or_fallback(icon9_anim); break;
 		case 10: if (icon10.is_valid())      icon10.draw(arg); else quest_icon_anim.draw(arg, alpha); break;
-		case 11: iconQM0_anim.draw(arg, alpha); break;
-		case 12: iconQM1_anim.draw(arg, alpha); break;
+		case 11: draw_anim_or_fallback(iconQM0_anim); break;
+		case 12: draw_anim_or_fallback(iconQM1_anim); break;
 		default: quest_icon_anim.draw(arg, alpha); break;
 		}
 	}
@@ -922,6 +1123,15 @@ namespace ms
 
 	void UIQuestLog::update()
 	{
+		// Rebuild quest tabs when the set of unresponsive NPCs changes so
+		// the "Not Available" tab stays in sync in realtime.
+		uint32_t rev = NpcResponseTracker::get().revision();
+		if (rev != cached_unavail_rev)
+		{
+			cached_unavail_rev = rev;
+			load_quests();
+		}
+
 		UIElement::update();
 		icon2_anim.update();
 		icon5_anim.update();
@@ -1230,20 +1440,44 @@ namespace ms
 			if (lvmin > 0)
 				detail_level_req = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Level " + std::to_string(lvmin) + "+", 120, false);
 
-			// Job requirement
+			// Job requirement — collapse to branch names so the line fits in
+			// the panel. Quests that list every job-tier in a branch would
+			// otherwise wrap across multiple lines and spill into the next
+			// section.
 			nl::node job_node = start_check["job"];
 			if (job_node)
 			{
-				std::string job_str = "Job: ";
-				bool first = true;
+				// Preserve first-seen ordering so Warrior/Mag/Bow/Thief/Pirate
+				// stays in a predictable order rather than alphabetical.
+				std::vector<std::string> ordered_names;
+				std::unordered_set<std::string> seen;
+				bool any_zero = false;
 				for (auto j : job_node)
 				{
-					int32_t jobid = j.get_integer();
-					if (!first) job_str += ", ";
-					job_str += std::to_string(jobid);
-					first = false;
+					int32_t jobid = 0;
+					try { jobid = static_cast<int32_t>(j.get_integer()); }
+					catch (...) { continue; }
+					if (jobid == 0) { any_zero = true; continue; }
+					std::string n = job_short_name(jobid);
+					if (seen.insert(n).second)
+						ordered_names.push_back(n);
 				}
-				if (!first)
+
+				std::string job_str = "Job: ";
+				if (any_zero && ordered_names.empty())
+				{
+					job_str += "Any";
+				}
+				else
+				{
+					for (size_t i = 0; i < ordered_names.size(); ++i)
+					{
+						if (i > 0) job_str += ", ";
+						job_str += ordered_names[i];
+					}
+				}
+
+				if (!ordered_names.empty() || any_zero)
 					detail_job_req = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, job_str, 200, false);
 			}
 
@@ -1650,7 +1884,7 @@ namespace ms
 			if (list_empty && tab == Buttons::TAB3)
 			{
 				static Text weekly_empty(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY,
-					"No weekly quests available.\nCheck back later!", 200, true);
+					"No unavailable quests.\nNPCs will appear here if the\nserver fails to respond.", 200, true);
 				weekly_empty.draw(position + Point<int16_t>(dimension.x() / 2, LIST_Y + 60));
 			}
 		}
@@ -1742,33 +1976,37 @@ namespace ms
 			const auto& layout = (tab == Buttons::TAB1) ? active_row_layout :
 				(tab == Buttons::TAB3) ? weekly_row_layout : completed_row_layout;
 
+			// Dividers are drawn as compact separators (DIVIDER_H) rather
+			// than stealing a full ROW_HEIGHT slot, so the visible list
+			// fits more quest names. The draw loop walks until entries
+			// fill the visible pixel band instead of a fixed ROWS count.
+			constexpr int16_t DIVIDER_H = 8;
+			const int16_t list_bottom = LIST_Y + ROWS * ROW_HEIGHT;
+
 			int16_t entry_y = LIST_Y;
-			for (int16_t i = 0; i < ROWS; i++)
+			size_t idx = offset;
+			while (idx < layout.size() && entry_y < list_bottom)
 			{
-				size_t idx = offset + i;
-
-				if (idx >= layout.size())
-					break;
-
 				int16_t entry_index = layout[idx];
-				int16_t row_h = ROW_HEIGHT;
 
 				if (entry_index < 0)
 				{
-					// Divider between area groups
+					// Divider between area groups — compact, not a full row
 					if (drop_texture.is_valid())
-						drop_texture.draw(DrawArgument(position + Point<int16_t>(8, entry_y + (ROW_HEIGHT - drop_texture.get_dimensions().y()) / 2)));
-					entry_y += row_h;
+						drop_texture.draw(DrawArgument(position + Point<int16_t>(8, entry_y + (DIVIDER_H - drop_texture.get_dimensions().y()) / 2)));
+					entry_y += DIVIDER_H;
+					idx++;
 					continue;
 				}
 
 				if ((size_t)entry_index >= entries.size())
 				{
-					entry_y += row_h;
+					entry_y += ROW_HEIGHT;
+					idx++;
 					continue;
 				}
 
-				row_h = row_height_for(entries[entry_index]);
+				int16_t row_h = row_height_for(entries[entry_index]);
 
 				if (hover_entry >= 0 && (size_t)hover_entry == idx)
 					hover_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
@@ -1776,13 +2014,20 @@ namespace ms
 				if (selected_entry >= 0 && selected_entry == entry_index)
 					sel_bg_normal.draw(DrawArgument(position + Point<int16_t>(8, entry_y), Point<int16_t>(0, row_h)));
 
-				// Draw the per-quest icon (from ? legend panel) instead of a generic bulb
+				// Draw the per-quest icon (from ? legend panel) instead of a generic bulb.
+				// For TAB1, recompute the icon each frame so the "tracked" marker
+				// updates immediately when the player pins or unpins a quest in
+				// the helper. Other tabs use the cached icon computed at load.
 				Point<int16_t> icon_pos = position + Point<int16_t>(14, entry_y + 4);
-				draw_entry_icon(entries[entry_index].icon_type, icon_pos, alpha);
+				uint8_t draw_icon = entries[entry_index].icon_type;
+				if (tab == Buttons::TAB1)
+					draw_icon = pick_quest_icon(entries[entry_index].id, Buttons::TAB1, false);
+				draw_entry_icon(draw_icon, icon_pos, alpha);
 
 				entries[entry_index].name.draw(position + Point<int16_t>(32, entry_y - 2));
 
 				entry_y += row_h;
+				idx++;
 			}
 		}
 
@@ -1925,9 +2170,16 @@ namespace ms
 			// Scrollable content starts after header with padding
 			int16_t y_offset = header_h + 10;
 
-			// Helper: check if a y position (after scroll) is within the visible content area
+			// Helper: check if a y position (after scroll) is within the visible content area.
+			// Uses a small top pad (8 px) so items disappear promptly as their
+			// top crosses the header, preventing sprite overflow into the
+			// header area. Bottom cull is strict at (detail_h - 70). The h
+			// parameter is accepted for API symmetry but unused in the top
+			// check — using row_h would make tall sprites linger overlapping
+			// the header, which is the exact overflow we want to avoid.
 			#define DETAIL_Y(yo) ((yo) - ds)
-			#define IN_VIEW(yo) (DETAIL_Y(yo) >= header_h && DETAIL_Y(yo) < (detail_h - 70))
+			#define IN_VIEW_H(yo, h) (((DETAIL_Y(yo) + 8) > header_h) && (DETAIL_Y(yo) < (detail_h - 70)))
+			#define IN_VIEW(yo) IN_VIEW_H(yo, 8)
 
 			// Absolute screen Y bounds for the scrollable content area.
 			// Used to per-glyph clip multi-line text that crosses the header boundary
@@ -1945,9 +2197,9 @@ namespace ms
 				int16_t say_h = say_preview_text.height();
 				if (say_h <= 0) say_h = 14;
 
-				// Block overlaps visible band? (render even if partially off so clipping runs)
-				bool block_in_view = (DETAIL_Y(y_offset) + say_h > header_h)
-					&& (DETAIL_Y(y_offset) < (detail_h - 70));
+				// Block overlaps visible band? Cull only at the bottom —
+				// Range<> clips the text glyph-wise when it crosses the header.
+				bool block_in_view = DETAIL_Y(y_offset) < (detail_h - 70);
 				if (block_in_view)
 				{
 					say_preview_text.draw(
@@ -1968,7 +2220,13 @@ namespace ms
 			{
 				if (e.icon.is_valid())
 				{
-					if (IN_VIEW(y_offset))
+					// Row height needs to fit the sprite when it's taller than 32px.
+					// Compute up-front so IN_VIEW_H culls based on the actual extent.
+					int16_t row_h = 36;
+					int16_t sprite_h = e.icon.get_dimensions().y();
+					if (sprite_h + 4 > row_h) row_h = sprite_h + 4;
+
+					if (IN_VIEW_H(y_offset, row_h))
 					{
 						auto io = e.icon.get_origin();
 						auto id = e.icon.get_dimensions();
@@ -1986,18 +2244,11 @@ namespace ms
 						e.name.draw(detail_pos + Point<int16_t>(name_x, DETAIL_Y(y_offset) + 10));
 						e.count.draw(detail_pos + Point<int16_t>(count_draw_x, DETAIL_Y(y_offset) + 10));
 					}
-					// Row height needs to fit the sprite when it's taller than 32px.
-					int16_t row_h = 36;
-					if (e.icon.is_valid())
-					{
-						int16_t sprite_h = e.icon.get_dimensions().y();
-						if (sprite_h + 4 > row_h) row_h = sprite_h + 4;
-					}
 					y_offset += row_h;
 				}
 				else
 				{
-					if (IN_VIEW(y_offset))
+					if (IN_VIEW_H(y_offset, 18))
 					{
 						e.name.draw(detail_pos + Point<int16_t>(25, DETAIL_Y(y_offset)));
 						e.count.draw(detail_pos + Point<int16_t>(count_x, DETAIL_Y(y_offset)));
@@ -2029,9 +2280,13 @@ namespace ms
 				for (auto& rew : detail_rewards)
 					draw_entry(rew, 200);
 
-				// "Obtain selectively" sub-header + items (player picks one)
+				// "Obtain selectively" sub-header + items (player picks one).
+				// Extra top gap so this section reads as separate from the
+				// unconditional rewards above it.
 				if (!detail_rewards_select.empty())
 				{
+					y_offset += 12;
+
 					if (IN_VIEW(y_offset))
 					{
 						if (obtain_select_texture.is_valid())
@@ -2042,15 +2297,19 @@ namespace ms
 							sel_label.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
 						}
 					}
-					y_offset += 16;
+					y_offset += 20;
 
 					for (auto& rew : detail_rewards_select)
 						draw_entry(rew, 200);
 				}
 
-				// "Obtain randomly" sub-header + items (server rolls from pool)
+				// "Obtain randomly" sub-header + items (server rolls from pool).
+				// Extra top gap so this section visually breaks away from the
+				// previous reward block and its items.
 				if (!detail_rewards_prob.empty())
 				{
+					y_offset += 12;
+
 					if (IN_VIEW(y_offset))
 					{
 						if (prob_texture.is_valid())
@@ -2061,7 +2320,7 @@ namespace ms
 							prob_label.draw(detail_pos + Point<int16_t>(18, DETAIL_Y(y_offset)));
 						}
 					}
-					y_offset += 16;
+					y_offset += 20;
 
 					for (auto& rew : detail_rewards_prob)
 						draw_entry(rew, 200);
@@ -2115,7 +2374,8 @@ namespace ms
 				const Texture& g_bar = detail_gauge_bar.is_valid() ? detail_gauge_bar : gauge2_bar;
 				const Texture& g_spot = detail_gauge_spot.is_valid() ? detail_gauge_spot : gauge2_spot;
 
-				if (g_frame.is_valid() && IN_VIEW(y_offset))
+				int16_t gauge_h = g_frame.is_valid() ? g_frame.get_dimensions().y() : 18;
+				if (g_frame.is_valid() && IN_VIEW_H(y_offset, gauge_h))
 				{
 					Point<int16_t> gauge_pos = detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset));
 					g_frame.draw(DrawArgument(gauge_pos));
@@ -2161,11 +2421,10 @@ namespace ms
 			if (desc_h <= 0) desc_h = 16;
 
 			{
-				// Block overlaps visible band? (render even when partially off
-				// so the glyph-level vertical clip runs and the text slides
-				// smoothly under the header / above the bottom edge)
-				bool desc_in_view = (DETAIL_Y(y_offset) + desc_h > header_h)
-					&& (DETAIL_Y(y_offset) < (detail_h - 70));
+				// Block overlaps visible band? Cull only at the bottom —
+				// the glyph-level vertical clip runs above header_h so the
+				// text slides smoothly under the redrawn header region.
+				bool desc_in_view = DETAIL_Y(y_offset) < (detail_h - 70);
 				if (desc_in_view)
 				{
 					detail_quest_desc.draw(
@@ -2213,6 +2472,7 @@ namespace ms
 
 			#undef DETAIL_Y
 			#undef IN_VIEW
+			#undef IN_VIEW_H
 
 			detail_quest_name.draw(detail_pos + Point<int16_t>(18, 30));
 
@@ -2350,8 +2610,13 @@ namespace ms
 		if (drag_quest_id >= 0 && !clicking)
 			drag_quest_id = -1;
 
-		if (Cursor::State new_state = search.send_cursor(cursorpos, clicking))
-			return new_state;
+		// Gate the search Textfield to the header strip only — its own rect
+		// can overlap LIST_Y and steal clicks from the first quest row.
+		if (cursorpos.y() < position.y() + LIST_Y)
+		{
+			if (Cursor::State new_state = search.send_cursor(cursorpos, clicking))
+				return new_state;
+		}
 
 		// Track hover and click on quest entries
 		{
@@ -2403,29 +2668,31 @@ namespace ms
 			}
 			else
 			{
-				// TAB1/TAB2/TAB3: flat list with area-group dividers
+				// TAB1/TAB2/TAB3: flat list with area-group dividers.
+				// Mirrors the compact-divider pixel-walk used by draw().
 				const auto& entries = (tab == Buttons::TAB1) ? active_entries :
 					(tab == Buttons::TAB3) ? weekly_entries : completed_entries;
 				const auto& layout = (tab == Buttons::TAB1) ? active_row_layout :
 					(tab == Buttons::TAB3) ? weekly_row_layout : completed_row_layout;
 
-				int16_t entry_y = LIST_Y;
-				for (int16_t i = 0; i < ROWS; i++)
-				{
-					size_t idx = offset + i;
-					if (idx >= layout.size())
-						break;
+				constexpr int16_t DIVIDER_H = 8;
+				const int16_t list_bottom = LIST_Y + ROWS * ROW_HEIGHT;
 
+				int16_t entry_y = LIST_Y;
+				size_t idx = offset;
+				while (idx < layout.size() && entry_y < list_bottom)
+				{
 					int16_t entry_index = layout[idx];
-					int16_t row_h = ROW_HEIGHT;
 
 					if (entry_index < 0)
 					{
-						// divider row is not clickable — still advances y
-						entry_y += row_h;
+						// divider row is not clickable — compact advance
+						entry_y += DIVIDER_H;
+						idx++;
 						continue;
 					}
 
+					int16_t row_h = ROW_HEIGHT;
 					if ((size_t)entry_index < entries.size())
 						row_h = row_height_for(entries[entry_index]);
 
@@ -2457,6 +2724,7 @@ namespace ms
 					}
 
 					entry_y += row_h;
+					idx++;
 				}
 			}
 
@@ -2533,6 +2801,47 @@ namespace ms
 			if (it != buttons.end() && it->second)
 				it->second->set_active(true);
 		}
+
+		// The base send_cursor flips hovered tabs to MOUSEOVER and un-hovered
+		// tabs back to NORMAL — which clobbers the "this is the active tab"
+		// PRESSED state we set in change_tab(). Re-pin the current tab to
+		// PRESSED so its enabled bitmap keeps showing while the cursor is
+		// elsewhere, and force the other tabs back to NORMAL unless they're
+		// currently being hovered.
+		uint16_t active_id = (tab == Buttons::TAB3) ? Buttons::TAB3 : (Buttons::TAB0 + tab);
+		const uint16_t all_tab_ids[] = { Buttons::TAB0, Buttons::TAB1, Buttons::TAB2, Buttons::TAB3 };
+		for (uint16_t id : all_tab_ids)
+		{
+			auto it = buttons.find(id);
+			if (it == buttons.end() || !it->second) continue;
+			if (id == active_id)
+			{
+				it->second->set_state(Button::State::PRESSED);
+			}
+			else if (it->second->get_state() == Button::State::PRESSED)
+			{
+				// Stale PRESSED on a non-active tab (can happen after a tab
+				// switch before the cursor moves) — revert to NORMAL.
+				it->second->set_state(Button::State::NORMAL);
+			}
+		}
+
+		// Keep the MY_LEVEL / MY_LOCATION filter buttons visually pressed
+		// while their filter is active. When the filter is off, force
+		// NORMAL regardless of hover so the toggle state is always
+		// unambiguous (some NX data has near-identical bitmaps for
+		// mouseOver and pressed, which makes hover look "stuck pressed").
+		auto pin_toggle_btn = [&](uint16_t id, bool active)
+		{
+			auto it = buttons.find(id);
+			if (it == buttons.end() || !it->second) return;
+			Button::State current = it->second->get_state();
+			if (current == Button::State::DISABLED) return;
+			it->second->set_state(active ? Button::State::PRESSED : Button::State::NORMAL);
+		};
+		pin_toggle_btn(Buttons::MY_LEVEL, filter_my_level);
+		pin_toggle_btn(Buttons::BT_MYLOCATION, filter_my_location);
+
 		return result;
 	}
 
@@ -2808,9 +3117,9 @@ namespace ms
 			load_quests();
 			return Button::State::NORMAL;
 		case Buttons::MY_LEVEL:
-			filter_my_level = true;
+			filter_my_level = !filter_my_level;
 			load_quests();
-			return Button::State::NORMAL;
+			return filter_my_level ? Button::State::PRESSED : Button::State::NORMAL;
 		case Buttons::BT_SEARCH:
 			search_text = search.get_text();
 			load_quests();
@@ -2820,9 +3129,9 @@ namespace ms
 			load_quests();
 			return Button::State::NORMAL;
 		case Buttons::BT_MYLOCATION:
-			filter_my_location = true;
+			filter_my_location = !filter_my_location;
 			load_quests();
-			return Button::State::NORMAL;
+			return filter_my_location ? Button::State::PRESSED : Button::State::NORMAL;
 		case Buttons::BT_NEXT:
 		{
 			const auto& entries = (tab == Buttons::TAB0) ? available_entries :

@@ -60,7 +60,14 @@ namespace ms
 			YELLOW,
 			PINK,
 			LIGHTBLUE,
-			GREEN
+			GREEN,
+			// Dedicated megaphone line styles — render a tiny megaphone
+			// icon (UIWindow.img/Megaphone/0..3) before the text so these
+			// broadcasts are visually distinct from regular chat.
+			MEGAPHONE,        // Cheap / Regular  (5070 / 5071) — icon 0
+			SUPER_MEGAPHONE,  // Super            (5072)        — icon 1
+			ITEM_MEGAPHONE,   // Item             (5076)        — icon 2
+			TRIPLE_MEGAPHONE  // Triple           (5077)        — icon 3
 		};
 
 		struct PartyMember
@@ -163,6 +170,20 @@ namespace ms
 		size_t lastpos;
 
 		std::unordered_map<int16_t, Text> rowtexts;
+		// Per-row icon id (0..3 from UIWindow.img/Megaphone) painted before
+		// the text on megaphone-broadcast rows. -1 = no icon.
+		std::unordered_map<int16_t, int8_t> rowicons;
+		// For megaphone rows we split "Name : message" into two Text
+		// fragments so the icon can sit between them.
+		struct MegaRow
+		{
+			Text namepart;
+			Text msgpart;
+			int8_t icon = -1;
+		};
+		std::unordered_map<int16_t, MegaRow> mega_rows;
+		// Cached megaphone icon textures loaded once in the constructor.
+		Texture megaphone_icons[4];
 		ColorBox chatbox;
 		int16_t chatrows;
 		int16_t rowpos;
