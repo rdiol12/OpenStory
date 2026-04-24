@@ -345,7 +345,10 @@ namespace ms
 			{ KeyAction::Id::MONSTERCOLLECTION, 39 },
 			{ KeyAction::Id::SOULWEAPON, 40 },
 			{ KeyAction::Id::MAPLENEWS, 41 },
-			{ KeyAction::Id::FAMILY, 42 },
+			// v83 NX is missing icons 31..49, so FAMILY (nominal idx 42)
+			// falls back to the BOSSPARTY sprite at 27 — a group-of-people
+			// icon is visually distinct from GUILD (17) and present in v83.
+			{ KeyAction::Id::FAMILY, 27 },
 		};
 
 		for (auto& [action, idx] : menu_actions)
@@ -485,7 +488,6 @@ namespace ms
 			if (ubicon.second)
 				if (std::find(bound_actions.begin(), bound_actions.end(), ubicon.first) == bound_actions.end())
 					ubicon.second->draw(position + unbound_actions_pos[ubicon.first] + unbound_center);
-
 
 	}
 
@@ -1086,6 +1088,7 @@ namespace ms
 		case KeyAction::Id::MAINMENU:
 		case KeyAction::Id::SCREENSHOT:
 		case KeyAction::Id::MONSTERBOOK:
+		case KeyAction::Id::FAMILY:
 			return KeyType::Id::MENU;
 		case KeyAction::Id::PICKUP:
 		case KeyAction::Id::SIT:

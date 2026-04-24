@@ -323,6 +323,20 @@ namespace ms
 		if (state != State::ACTIVE || !playable)
 			return;
 
+		// DEBUG: while the status bar's sprite preview is active, LEFT
+		// and RIGHT scroll through valid sprite indexes instead of
+		// moving the player.
+		if (down && type == KeyType::Id::ACTION &&
+			(action == KeyAction::Id::LEFT || action == KeyAction::Id::RIGHT))
+		{
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+			{
+				int delta = (action == KeyAction::Id::RIGHT) ? +1 : -1;
+				if (sb->preview_step(delta))
+					return;
+			}
+		}
+
 		switch (type)
 		{
 			case KeyType::Id::ACTION:

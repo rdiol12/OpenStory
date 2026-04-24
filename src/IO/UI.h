@@ -51,6 +51,9 @@ namespace ms
 		void send_cursor(bool pressed);
 		void send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate);
 		bool is_mouse_held() const;
+		// Current mouse-cursor position (used by scroll dispatch so
+		// the wheel routes to the UI under the cursor).
+		Point<int16_t> get_cursor_position() const;
 		void send_focus(int focused);
 		void send_scroll(double yoffset);
 		void send_close();

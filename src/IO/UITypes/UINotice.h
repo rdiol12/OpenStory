@@ -121,7 +121,8 @@ namespace ms
 	class UIEnterText : public UINotice
 	{
 	public:
-		UIEnterText(std::string message, std::function<void(const std::string& text)> texthandler, int32_t maxlength = 15);
+		UIEnterText(std::string message, std::function<void(const std::string& text)> texthandler, int32_t maxlength = 15,
+			int16_t field_y_offset = 0, int16_t button_x_offset = 0, int16_t button_y_offset = 0);
 
 		void draw(float alpha) const override;
 		void update() override;
@@ -142,6 +143,86 @@ namespace ms
 
 		std::function<void(const std::string& text)> texthandler;
 		Textfield textfield;
+	};
+
+	// Wide 286x146 modal used specifically for the "You have died"
+	// popup. Sources the backdrop from UIWindow.img/Notice/0 so the
+	// death dialog reads as a proper standalone panel instead of the
+	// small generic Basic.img/Notice6 frame used by UIOk.
+	class UIDeathNotice : public UIDragElement<PosNOTICE>
+	{
+	public:
+		static constexpr Type TYPE = UIElement::Type::NOTICE;
+		static constexpr bool FOCUSED = true;
+		static constexpr bool TOGGLED = false;
+
+		UIDeathNotice(std::string message, std::function<void(bool ok)> okhandler);
+
+		void draw(float alpha) const override;
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
+
+	private:
+		enum Buttons : int16_t { OK };
+
+		std::function<void(bool ok)> okhandler;
+		Texture backdrop;
+		Text question;
+	};
+
+	// Small v83 "invite banner" that appears above the notice button.
+	// Sourced from UIWindow.img/FadeYesNo — a single flat backdrop with
+	// a type-icon and tiny OK/Cancel buttons. 12 backdrop/icon variants
+	// (backgrnd..backgrnd11 / icon0..icon11) correspond to the
+	// different invite types in v83.
+	class UIAlarmInvite : public UIDragElement<PosNOTICE>
+	{
+	public:
+		static constexpr Type TYPE = UIElement::Type::NOTICE;
+		static constexpr bool FOCUSED = true;
+		static constexpr bool TOGGLED = false;
+
+		// variant  = which backgrnd/icon pair to use (0..11).
+		UIAlarmInvite(std::string message,
+			std::function<void(bool yes)> handler,
+			int variant = 0);
+
+		void draw(float alpha) const override;
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
+
+	private:
+		enum Buttons : int16_t { ACCEPT, DECLINE };
+
+		std::function<void(bool yes)> handler;
+		Texture backdrop;
+		Texture icon;
+		Text label;
+	};
+
+	// A button-less notice window used for "Waiting for partner..."
+	// and similar blocking-but-passive status prompts. The owner has
+	// to remove it explicitly via UI::remove(UIElement::Type::NOTICE).
+	class UIWaitNotice : public UINotice
+	{
+	public:
+		UIWaitNotice(std::string message);
+
+		void draw(float alpha) const override;
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t) override { return Button::State::NORMAL; }
 	};
 
 	class UIOk : public UINotice

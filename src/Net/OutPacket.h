@@ -137,8 +137,18 @@ namespace ms
 			/// Messenger
 			MESSENGER = 126,
 
-			/// Family
-			FAMILY_OPERATION = 364,
+			/// Family — opcodes 0x91..0x99 (v83 Cosmic/HeavenMS).
+			OPEN_FAMILY_PEDIGREE = 145,
+			OPEN_FAMILY = 146,
+			ADD_FAMILY = 147,
+			SEPARATE_FAMILY_BY_SENIOR = 148,
+			SEPARATE_FAMILY_BY_JUNIOR = 149,
+			ACCEPT_FAMILY = 150,
+			USE_FAMILY = 151,
+			CHANGE_FAMILY_MESSAGE = 152,
+			FAMILY_SUMMON_RESPONSE = 153,
+			// Legacy alias kept for any leftover callers.
+			FAMILY_OPERATION = USE_FAMILY,
 
 			/// RPS Game
 			RPS_ACTION = 231,

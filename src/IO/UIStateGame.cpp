@@ -435,6 +435,11 @@ namespace ms
 								break;
 							}
 							case KeyAction::Id::FAMILY:
+							// v83 Maple never shipped icon 42 so the KeyConfig
+							// "Family" slot in this NX ends up being dragged from
+							// the MEDALS sprite (action 26). Treat MEDALS as a
+							// Family hotkey since MEDALS has no real handler here.
+							case KeyAction::Id::MEDALS:
 							{
 								emplace<UIFamily>();
 								break;
@@ -649,10 +654,21 @@ namespace ms
 
 	void UIStateGame::send_scroll(double yoffset)
 	{
+		// Route scroll only to the topmost UI under the cursor so the
+		// chat bar doesn't consume wheel events when the player is
+		// hovering the trade window / inventory / any other panel.
+		Point<int16_t> cursorpos = UI::get().get_cursor_position();
+		if (UIElement* front = get_front(cursorpos))
+		{
+			front->send_scroll(yoffset);
+			return;
+		}
+
+		// No UI under the cursor — fall back to broadcast so chat
+		// still scrolls when the player's mouse is over the map.
 		for (auto& type : elementorder)
 		{
 			auto& element = elements[type];
-
 			if (element && element->is_active())
 				element->send_scroll(yoffset);
 		}

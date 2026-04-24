@@ -63,6 +63,15 @@ namespace ms
 		void notify();
 		void clear_notification();
 
+		// DEBUG: preview FloatNotice/Notice sprites from /float and /notice# commands.
+		void set_preview_float(int idx);
+		void set_preview_notice(int idx);
+		void clear_preview();
+		// Debug scrollers — advance the preview index by +1/-1, wrapping
+		// around the range for the current mode. Returns true if the
+		// preview is active (so the caller can suppress normal input).
+		bool preview_step(int delta);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -113,9 +122,8 @@ namespace ms
 			BT_MENU_MONSTERLIFE,
 			BT_MENU_MSN,
 			BT_MENU_AFREECATV,
-			// System sub-panel
+			// System sub-panel (v83: 5 buttons — Channel, JoyPad, KeySetting, Option, Quit)
 			BT_SYS_CHANNEL,
-			BT_SYS_GAMEOPTION,
 			BT_SYS_GAMEQUIT,
 			BT_SYS_JOYPAD,
 			BT_SYS_KEYSETTING,
@@ -280,6 +288,10 @@ namespace ms
 
 		// Notice/notification state
 		bool has_notification;
+
+		// DEBUG preview state for sprite browser commands.
+		int preview_mode = 0;     // 0 off, 1 FloatNotice, 2 Notice
+		int preview_idx = 0;
 		Texture notice_sprite;
 		uint32_t notice_pulse_tick;
 
@@ -294,8 +306,16 @@ namespace ms
 		uint16_t exp_flash_ticks;
 		static constexpr uint16_t FLASH_DURATION_TICKS = 20;
 
-		// Pre-allocated draw objects
-		ColorBox menu_bg;
-		ColorBox sys_bg;
+		// 3-piece tiled backdrop for the Menu / System sub-panels
+		// (StatusBar2.img/mainBar/{Menu,System}/backgrnd/0..2).
+		Texture menu_bg_top, menu_bg_mid, menu_bg_bot;
+		Texture sys_bg_top,  sys_bg_mid,  sys_bg_bot;
+		// Fade alpha for each sub-panel (0 hidden .. 1 fully visible).
+		float menu_fade = 0.0f;
+		float sys_fade  = 0.0f;
+
+		void draw_tiled_panel(Point<int16_t> tl, int16_t panel_w, int16_t panel_h,
+			const Texture& top, const Texture& mid, const Texture& bot,
+			float fade_alpha) const;
 	};
 }

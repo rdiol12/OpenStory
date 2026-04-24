@@ -49,6 +49,15 @@ namespace ms
 		}
 	}
 
+	void MapleButton::draw(Point<int16_t> parentpos, float alpha) const
+	{
+		if (alpha <= 0.0f)
+			return;
+
+		textures[state].draw(DrawArgument(position + parentpos, alpha));
+		animations[state].draw(position + parentpos, alpha);
+	}
+
 	void MapleButton::update()
 	{
 		if (active)

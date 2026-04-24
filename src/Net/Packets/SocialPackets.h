@@ -79,24 +79,110 @@ namespace ms
 
 	// --- Family Packets ---
 
-	// Use family special ability (rep bonus, teleport, etc.)
+	// Use family special ability.
+	//  - Buffs (drop/exp/combo):         FamilyUsePacket(type)
+	//  - Teleport to / Summon member:    FamilyUsePacket(type, target_name)
+	// Cosmic's FamilyUseHandler does `readInt()` and, for REUNION/SUMMON,
+	// also `readString()` for the target.
 	class FamilyUsePacket : public OutPacket
 	{
 	public:
-		FamilyUsePacket(int32_t type) : OutPacket(OutPacket::Opcode::FAMILY_OPERATION)
+		FamilyUsePacket(int32_t type) : OutPacket(OutPacket::Opcode::USE_FAMILY)
 		{
 			write_int(type);
 		}
+
+		FamilyUsePacket(int32_t type, const std::string& target_name)
+			: OutPacket(OutPacket::Opcode::USE_FAMILY)
+		{
+			write_int(type);
+			write_string(target_name);
+		}
 	};
 
-	// Accept family join request
+	// Invite a player to become my junior (ADD_FAMILY, 0x93).
+	// Cosmic's FamilyAddHandler reads a single character-name string.
+	class FamilyAddPacket : public OutPacket
+	{
+	public:
+		FamilyAddPacket(const std::string& name) : OutPacket(OutPacket::Opcode::ADD_FAMILY)
+		{
+			write_string(name);
+		}
+	};
+
+	// Leave the family (self). Cosmic's FamilySeparateHandler treats an
+	// empty-payload packet on opcode 0x95 as "by junior" — i.e. me
+	// breaking the relation with my senior.
+	class FamilySeparateLeavePacket : public OutPacket
+	{
+	public:
+		FamilySeparateLeavePacket()
+			: OutPacket(OutPacket::Opcode::SEPARATE_FAMILY_BY_JUNIOR)
+		{
+		}
+	};
+
+	// Ask server for the tree / pedigree chart (OPEN_FAMILY_PEDIGREE).
+	class FamilyPedigreeRequestPacket : public OutPacket
+	{
+	public:
+		FamilyPedigreeRequestPacket(int32_t cid)
+			: OutPacket(OutPacket::Opcode::OPEN_FAMILY_PEDIGREE)
+		{
+			write_int(cid);
+		}
+	};
+
+	// Set the family motto / precepts (leader only; max 200 chars).
+	// Cosmic's FamilyPreceptsHandler reads a single string.
+	class FamilyPreceptsPacket : public OutPacket
+	{
+	public:
+		FamilyPreceptsPacket(const std::string& text)
+			: OutPacket(OutPacket::Opcode::CHANGE_FAMILY_MESSAGE)
+		{
+			write_string(text);
+		}
+	};
+
+	// Accept / decline a family-summon invite. Cosmic's handler reads
+	// a family-name string (discarded) plus a single byte flag.
+	class FamilySummonResponsePacket : public OutPacket
+	{
+	public:
+		FamilySummonResponsePacket(const std::string& family_name, bool accept)
+			: OutPacket(OutPacket::Opcode::FAMILY_SUMMON_RESPONSE)
+		{
+			write_string(family_name);
+			write_byte(accept ? 1 : 0);
+		}
+	};
+
+	// Decline messenger invite by sending a note back to the inviter.
+	class MessengerDeclinePacket : public OutPacket
+	{
+	public:
+		MessengerDeclinePacket(const std::string& inviter_name, const std::string& text)
+			: OutPacket(OutPacket::Opcode::MESSENGER)
+		{
+			write_byte(5);  // NOTE (decline message)
+			write_string(text);
+			write_string(inviter_name);
+			write_byte(0);
+		}
+	};
+
+	// Accept family join request. Cosmic's AcceptFamilyHandler reads
+	// int inviterId, a (discarded) string, and a byte accept-flag.
 	class FamilyAcceptPacket : public OutPacket
 	{
 	public:
-		FamilyAcceptPacket(int32_t inviter_id) : OutPacket(OutPacket::Opcode::FAMILY_OPERATION)
+		FamilyAcceptPacket(int32_t inviter_id) : OutPacket(OutPacket::Opcode::ACCEPT_FAMILY)
 		{
-			write_byte(1);  // ACCEPT
 			write_int(inviter_id);
+			write_string("");
+			write_byte(1);  // accept = true
 		}
 	};
 

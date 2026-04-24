@@ -49,5 +49,9 @@ namespace ms
 		float step;
 
 		Type type;
+
+		// Tick counter for the animated shine sweep drawn over the
+		// filled portion. `mutable` since draw() is const.
+		mutable int16_t shine_tick = 0;
 	};
 }

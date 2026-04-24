@@ -22,78 +22,86 @@
 #include "../../Graphics/Texture.h"
 #include "../../Graphics/Text.h"
 
+#include <vector>
+
 namespace ms
 {
-	class UIFamily : public UIDragElement<PosFAMILY>
+	class UIFamilyTree : public UIDragElement<PosFAMILYTREE>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::FAMILY;
+		static constexpr Type TYPE = UIElement::Type::FAMILYTREE;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
 
-		UIFamily();
+		UIFamilyTree();
 
 		void draw(float inter) const override;
 		void update() override;
 
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
-		// Called from packet handlers
-		void set_family_info(const std::string& leader, int32_t rep, int32_t total_rep, int32_t todays_rep = 0);
-		void set_entitlement_usage(int ordinal, int times_used);
-		void set_family_message(const std::string& message);
-		void set_senior(const std::string& name);
-		void add_junior(const std::string& name);
+		// Cleared + rebuilt from FamilyChartResultHandler each refresh.
+		void clear_entries();
+		void add_entry(int32_t cid, int32_t parent_id, int32_t job,
+			int32_t level, bool online, int32_t rep, int32_t total_rep,
+			int32_t reps_to_senior, int32_t todays_rep, int32_t channel,
+			int32_t time_online, const std::string& name, bool is_viewed);
+
+		// Authoritative leader id — sourced from FamilyInfoResultHandler.
+		void set_leader_id(int32_t leader_id);
+
+		void set_family_name(const std::string& name);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void cycle_ability(int delta);
-		void refresh_ability_text();
-		void refresh_junior_text();
-
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_TREE,
-			BT_SPECIAL,
+			BT_BYE,
 			BT_JUNIOR_ENTRY,
-			BT_FAMILY_PRECEPT,
 			BT_LEFT,
 			BT_RIGHT,
-			BT_OK,
 			NUM_BUTTONS
 		};
 
-		static constexpr int NUM_ABILITIES = 5;
-		std::vector<Texture> right_icons;
-		std::string ability_names[NUM_ABILITIES];
-		int ability_used[NUM_ABILITIES] = { 0, 0, 0, 0, 0 };
-		int selected_ability;
+		struct Entry
+		{
+			int32_t cid;
+			int32_t parent_id;
+			int32_t job;
+			int32_t level;
+			bool online;
+			int32_t rep;
+			int32_t total_rep;
+			int32_t todays_rep;
+			std::string name;
+			bool is_viewed;
+		};
 
-		std::string leader_name;
-		std::string senior_name;
-		std::vector<std::string> juniors;
-		int32_t reputation;
-		int32_t total_reputation;
-		int junior_page;
+		std::vector<Entry> entries;
+		int32_t leader_id = 0;
+		int32_t current_viewed_id = 0;
 
-		mutable Text title_label;
-		mutable Text leader_label;
-		mutable Text message_label;
-		mutable Text senior_label;
-		mutable Text rep_label;
-		mutable Text total_rep_label;
-		mutable Text today_rep_label;
-		mutable Text junior_label;
-		mutable Text ability_name_label;
-		mutable Text ability_cost_label;
-		mutable Text ability_uses_label;
-		mutable Text ability_target_label;
-		mutable Text ability_duration_label;
-		mutable Text ability_effect_label;
+		// Populated by draw() so send_cursor knows which plate was
+		// clicked (cid → screen-space plate rectangle).
+		mutable std::vector<std::pair<int32_t, Rectangle<int16_t>>> plate_hitboxes;
+
+		// Frame counter drives the hover-highlight alpha pulse.
+		mutable uint32_t tick = 0;
+
+		Texture plate_leader;
+		Texture plate_others;
+		Texture selected;
+
+		mutable Text name_label;
+		mutable Text level_label;
+		mutable Text job_label;
+		mutable Text size_label;
+		mutable Text family_name_label;
 	};
 }
