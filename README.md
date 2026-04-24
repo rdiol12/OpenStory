@@ -60,7 +60,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
-- **statusbar menue. and. system buttons now display the correct nx when clicking 
+- **statusbar menu and system buttons now display the correct nx when clicking 
 - **Family UI**: Rebuilt on `UIWindow2.img/Family` with motto/name, 
 - **Family Tree UI**: New `UIFamilyTree` drawing leader, grand-senior, senior, me, sibling, juniors, and grand-juniors from real `parent_id` chains with clickable plates. dropped yhe artows keys as they runied the ui click the plate insted p 
 - **Family packets**: Added v83 Cosmic opcodes 0x91–0x99 and rewrote `FamilyAcceptPacket` / `FamilyUsePacket` payloads.
