@@ -52,7 +52,7 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 - fix login world selection char creation flow currently ui is broken
 - add notifications alers ui
 - party is currently broken
-- family ui is currently broken and missing most fetures
+- family ui is currently broken and missing most fetures - ✅ 
 - nx shop ui is currently broken 
 - fix closing the game
 - probably more stuff are missing/broken
@@ -60,8 +60,8 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
-- **Family UI**: Rebuilt on `UIWindow2.img/Family` with motto/name, junior count N/2, rep, today's rep, 5 abilities with cost and uses-left.
-- **Family Tree UI**: New `UIFamilyTree` drawing leader, grand-senior, senior, me, sibling, juniors, and grand-juniors from real `parent_id` chains with clickable plates.
+- **Family UI**: Rebuilt on `UIWindow2.img/Family` with motto/name, 
+- **Family Tree UI**: New `UIFamilyTree` drawing leader, grand-senior, senior, me, sibling, juniors, and grand-juniors from real `parent_id` chains with clickable plates. dropped yhe artows keys as they runied the ui click the plate insted p 
 - **Family packets**: Added v83 Cosmic opcodes 0x91–0x99 and rewrote `FamilyAcceptPacket` / `FamilyUsePacket` payloads.
 - **Family handlers**: Pedigree chart + info + entitlement usage are now forwarded to the UIs; `FamilyResultHandler` prints readable red error messages.
 - **FAMILY hotkey**: `get_keytype` now returns MENU for FAMILY and the KeyConfig icon falls back to sprite 27 since v83 has no icon at index 42.
