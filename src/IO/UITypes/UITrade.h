@@ -18,8 +18,11 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "../Components/Textfield.h"
 #include "../../Data/ItemData.h"
 #include "../../Character/Inventory/Inventory.h"
+
+#include <vector>
 
 namespace ms
 {
@@ -27,7 +30,12 @@ namespace ms
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::TRADE;
-		static constexpr bool FOCUSED = true;
+		// Keep FOCUSED=false so the user can still click the status bar
+		// (inventory / equip / stats buttons) and press hotkeys while a
+		// trade is open. With FOCUSED=true the dispatcher routes every
+		// cursor/key event exclusively to the trade window, which made
+		// opening the inventory to drag items in impossible.
+		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
 		UITrade();
@@ -37,6 +45,14 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> position) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		void send_scroll(double yoffset) override;
+		// Double-clicking a slot on my side of the trade removes that item.
+		void doubleclick(Point<int16_t> cursorpos) override;
+		// Receive a dragged inventory icon and, if the drop landed on
+		// one of our 9 slots, dispatch a TradeSetItemPacket so the
+		// server mirrors the item on both sides.
+		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
+		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
 
@@ -65,6 +81,8 @@ namespace ms
 		{
 			BT_CONFIRM,
 			BT_CANCEL,
+			BT_ENTER,    // chat-send button sitting by the input box
+			BT_REPORT,   // opens UIReport for the trade partner
 			NUM_BUTTONS
 		};
 
@@ -106,5 +124,22 @@ namespace ms
 		Text confirmed_text;
 		Text confirm_btn_text;
 		Text cancel_btn_text;
+
+		// Rolling list of trade-chat lines shown in the right panel.
+		std::vector<Text> chat_lines;
+		static constexpr size_t MAX_CHAT_LINES = 12;
+
+		// Editable input box below the chat log. Enter sends via
+		// TradeChatPacket; text appears locally as a "You:" line.
+		Textfield chat_input;
+
+		// Rendered at the same anchor as the fat cursor so the typed
+		// text sits flush with the writing indicator instead of at the
+		// Textfield's own internal draw position.
+		mutable Text chat_input_text;
+
+		// Mouse-wheel scroll offset into the chat log. 0 = newest line
+		// pinned to bottom; increasing scroll reveals older lines.
+		int chat_scroll = 0;
 	};
 }

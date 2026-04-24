@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Gauge.h"
 
+#include "../../Graphics/Geometry.h"
+
+#include <cmath>
+
 namespace ms
 {
 	Gauge::Gauge(Type type, Texture front, int16_t max, float percent) : type(type), barfront(front), maximum(max), percentage(percent)
@@ -49,6 +53,29 @@ namespace ms
 				// v83 gauge end-cap (2x13) sits flush at the tip of the fill.
 				// (The original +8,+20 offset targeted post-Big-Bang gauges.)
 				barend.draw(args + Point<int16_t>(length, 0));
+
+				// Animated glint — a thin bright band sweeps left→right
+				// across the fill every ~2.3s, drawn on top of the
+				// gauge sprite so it reads as a glossy highlight.
+				constexpr int16_t SHINE_PERIOD = 140;
+				constexpr int16_t SHINE_WIDTH = 6;
+				constexpr int16_t SHINE_START_PAD = 20;
+				shine_tick = (shine_tick + 1) % SHINE_PERIOD;
+
+				int16_t sweep_range = length + SHINE_START_PAD * 2;
+				int16_t shine_x = static_cast<int16_t>(
+					static_cast<int32_t>(shine_tick) * sweep_range / SHINE_PERIOD
+				) - SHINE_START_PAD;
+
+				if (shine_x > -SHINE_WIDTH && shine_x < length)
+				{
+					int16_t draw_x = std::max<int16_t>(shine_x, 0);
+					int16_t draw_w = std::min<int16_t>(SHINE_WIDTH, length - draw_x);
+					int16_t gauge_h = barfront.height() > 0 ? barfront.height() : 6;
+
+					ColorBox glint(draw_w, gauge_h, Color::Name::WHITE, 0.40f);
+					glint.draw(DrawArgument(args.getpos() + Point<int16_t>(draw_x, 0)));
+				}
 			}
 			else if (type == Type::CASHSHOP)
 			{
@@ -63,26 +90,32 @@ namespace ms
 
 	void Gauge::update(float t)
 	{
-		if (target != t)
+		target = t;
+
+		float diff = target - percentage;
+		float absdiff = std::fabs(diff);
+
+		if (absdiff < 0.0005f)
 		{
-			target = t;
-			step = (target - percentage) / 24;
+			percentage = target;
+			return;
 		}
 
-		if (percentage != target)
-		{
-			percentage += step;
+		// Exponential ease-out: close ~12% of the remaining gap each
+		// tick. Big jumps ramp quickly then settle in smoothly, instead
+		// of the old constant 1/24 linear crawl.
+		float move = diff * 0.12f;
 
-			if (step < 0.0f)
-			{
-				if (target - percentage >= step)
-					percentage = target;
-			}
-			else if (step > 0.0f)
-			{
-				if (target - percentage <= step)
-					percentage = target;
-			}
-		}
+		// Floor the per-tick movement so small remaining gaps still
+		// close in finite time instead of creeping forever.
+		const float min_step = 0.0015f;
+		if (std::fabs(move) < min_step)
+			move = (diff > 0.0f) ? min_step : -min_step;
+
+		// Don't overshoot.
+		if ((diff > 0.0f && move > diff) || (diff < 0.0f && move < diff))
+			move = diff;
+
+		percentage += move;
 	}
 }

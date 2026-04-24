@@ -30,6 +30,10 @@ namespace ms
 		MapleButton(nl::node src);
 
 		void draw(Point<int16_t> position) const;
+		// Draw at the given alpha. Ignores the `active` flag so the
+		// caller can render a faded-in/out button even when it is not
+		// yet live for input.
+		void draw(Point<int16_t> position, float alpha) const;
 		void update();
 		Rectangle<int16_t> bounds(Point<int16_t> parentpos) const;
 		int16_t width() const;

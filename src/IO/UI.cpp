@@ -155,6 +155,11 @@ namespace ms
 		state->send_scroll(yoffset);
 	}
 
+	Point<int16_t> UI::get_cursor_position() const
+	{
+		return cursor.get_position();
+	}
+
 	void UI::send_close()
 	{
 		state->send_close();

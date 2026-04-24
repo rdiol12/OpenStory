@@ -34,6 +34,7 @@
 #include "../../IO/UITypes/UIGuildBBS.h"
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UIFamily.h"
+#include "../../IO/UITypes/UIFamilyTree.h"
 #include "../../IO/UITypes/UIAlliance.h"
 #include "../../IO/UITypes/UIWedding.h"
 #include "../../IO/UITypes/UIRPSGame.h"
@@ -95,7 +96,7 @@ namespace ms
 			int32_t from_cid = recv.read_int();
 			std::string from_name = recv.read_string();
 
-			UI::get().emplace<UIYesNo>(
+			UI::get().emplace<UIAlarmInvite>(
 				from_name + " wants to be your buddy.",
 				[from_cid](bool yes)
 				{
@@ -284,7 +285,7 @@ namespace ms
 			if (display_name.substr(0, 4) == "PS: ")
 				display_name = display_name.substr(4);
 
-			UI::get().emplace<UIYesNo>(
+			UI::get().emplace<UIAlarmInvite>(
 				display_name + " has invited you to their party.",
 				[partyid, from_name](bool yes)
 				{
@@ -608,7 +609,7 @@ namespace ms
 
 			int32_t my_cid = Stage::get().get_player().get_oid();
 
-			UI::get().emplace<UIYesNo>(
+			UI::get().emplace<UIAlarmInvite>(
 				inviter + " has invited you to their guild.",
 				[guild_id, my_cid, inviter](bool yes)
 				{
@@ -880,7 +881,7 @@ namespace ms
 				std::string inviter = recv.read_string();
 				recv.skip(2); // padding short
 
-				UI::get().emplace<UIYesNo>(
+				UI::get().emplace<UIAlarmInvite>(
 					inviter + " has invited your guild to join their alliance.",
 					[alliance_id](bool yes)
 					{
@@ -1255,6 +1256,23 @@ namespace ms
 			int32_t messenger_id = recv.read_int();
 			recv.read_byte(); // 0
 
+			UI::get().emplace<UIAlarmInvite>(
+				from + " has invited you to a Messenger conversation.",
+				[from](bool yes)
+				{
+					if (yes)
+					{
+						// Open a fresh messenger session — server joins
+						// the invited chat automatically after OPEN.
+						MessengerOpenPacket().dispatch();
+					}
+					else
+					{
+						MessengerDeclinePacket(from, "").dispatch();
+					}
+				}
+			);
+
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
 
@@ -1405,26 +1423,35 @@ namespace ms
 		int32_t viewed_id = recv.read_int();
 		int32_t entry_count = recv.read_int();
 
-		if (auto family = UI::get().get_element<UIFamily>())
-		{
-			for (int32_t i = 0; i < entry_count && recv.available(); i++)
-			{
-				int32_t cid = recv.read_int();
-				int32_t parent_id = recv.read_int();
-				recv.read_short();  // job id
-				recv.read_byte();   // level
-				recv.read_bool();   // isOnline
-				recv.read_int();    // current rep
-				recv.read_int();    // total rep
-				recv.read_int();    // reps to senior
-				recv.read_int();    // todays rep
-				recv.read_int();    // channel
-				recv.read_int();    // time online (minutes)
-				std::string name = recv.read_string();
+		auto tree = UI::get().get_element<UIFamilyTree>();
+		auto family = UI::get().get_element<UIFamily>();
 
-				if (cid != viewed_id)
-					family->add_junior(name);
-			}
+		if (tree)
+			tree->clear_entries();
+
+		for (int32_t i = 0; i < entry_count && recv.available(); i++)
+		{
+			int32_t cid = recv.read_int();
+			int32_t parent_id = recv.read_int();
+			int16_t job = recv.read_short();
+			int8_t level = recv.read_byte();
+			bool online = recv.read_bool();
+			int32_t current_rep_e = recv.read_int();
+			int32_t total_rep_e = recv.read_int();
+			int32_t reps_to_senior = recv.read_int();
+			int32_t todays_rep_e = recv.read_int();
+			int32_t channel = recv.read_int();
+			int32_t time_online = recv.read_int();
+			std::string name = recv.read_string();
+
+			if (tree)
+				tree->add_entry(cid, parent_id, job, level, online,
+					current_rep_e, total_rep_e, reps_to_senior,
+					todays_rep_e, channel, time_online, name,
+					cid == viewed_id);
+
+			if (family && cid != viewed_id)
+				family->add_junior(name);
 		}
 
 		// Post-entry data: member info counts
@@ -1463,19 +1490,35 @@ namespace ms
 		std::string family_name = recv.read_string();
 		std::string message = recv.read_string();
 
-		// Entitlement data
+		// Entitlement (ability) usage data — for each ability the
+		// server tells us how many times the player has used it today.
+		struct EntUse { int32_t ordinal; int32_t used; };
+		std::vector<EntUse> entitlements;
+
 		if (recv.available())
 		{
 			int32_t entitlement_count = recv.read_int();
 			for (int32_t i = 0; i < entitlement_count && recv.available(); i++)
 			{
-				recv.read_int(); // entitlement ordinal
-				recv.read_int(); // used count
+				int32_t ord = recv.read_int();
+				int32_t used = recv.read_int();
+				entitlements.push_back({ ord, used });
 			}
 		}
 
 		if (auto family = UI::get().get_element<UIFamily>())
-			family->set_family_info(family_name, current_rep, total_rep);
+		{
+			family->set_family_info(family_name, current_rep, total_rep, todays_rep);
+			family->set_family_message(message);
+			for (auto& e : entitlements)
+				family->set_entitlement_usage(e.ordinal, e.used);
+		}
+
+		if (auto tree = UI::get().get_element<UIFamilyTree>())
+		{
+			tree->set_leader_id(leader_id);
+			tree->set_family_name(family_name);
+		}
 	}
 
 	void FamilyResultHandler::handle(InPacket& recv) const
@@ -1483,8 +1526,33 @@ namespace ms
 		int32_t type = recv.read_int();
 		int32_t mesos = recv.read_int();
 
+		// Map Cosmic's FamilyResult codes to readable messages.
+		const char* text = nullptr;
+		UIChatBar::LineType colour = UIChatBar::LineType::RED;
+		switch (type)
+		{
+		case 65: text = "Player not found."; break;
+		case 69: text = "Target is on a different map or hidden."; break;
+		case 72: text = "Level difference is too great (max 20)."; break;
+		case 73: text = "Target already has a pending family invite."; break;
+		case 74: text = "Target is already being summoned by another family."; break;
+		case 75: text = "You can't teleport to that location right now."; break;
+		case 77: text = "Target is too low-level to be a junior."; break;
+		default:
+			text = nullptr;
+			break;
+		}
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] Result type " + std::to_string(type) + " (mesos: " + std::to_string(mesos) + ")", UIChatBar::LineType::YELLOW);
+		{
+			if (text)
+				chatbar->send_chatline(text, colour);
+			else
+				chatbar->send_chatline(
+					"[Family] Result type " + std::to_string(type)
+					+ " (mesos: " + std::to_string(mesos) + ")",
+					UIChatBar::LineType::YELLOW);
+		}
 	}
 
 	void FamilyJoinRequestHandler::handle(InPacket& recv) const
@@ -1492,8 +1560,21 @@ namespace ms
 		int32_t player_id = recv.read_int();
 		std::string name = recv.read_string();
 
+		UI::get().emplace<UIAlarmInvite>(
+			name + " wants to join your family.",
+			[player_id](bool yes)
+			{
+				if (yes)
+					FamilyAcceptPacket(player_id).dispatch();
+				// Decline = do nothing; server times out the request.
+			}
+		);
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[Family] " + name + " wants to join your family!", UIChatBar::LineType::YELLOW);
+
+		if (auto statusbar = UI::get().get_element<UIStatusBar>())
+			statusbar->notify();
 	}
 
 	void FamilyJoinRequestResultHandler::handle(InPacket& recv) const
@@ -1545,8 +1626,19 @@ namespace ms
 		std::string from = recv.read_string();
 		std::string family_name = recv.read_string();
 
+		UI::get().emplace<UIAlarmInvite>(
+			from + " from the " + family_name + " family is summoning you. Accept?",
+			[family_name](bool yes)
+			{
+				FamilySummonResponsePacket(family_name, yes).dispatch();
+			}
+		);
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[Family] " + from + " is summoning you!", UIChatBar::LineType::YELLOW);
+
+		if (auto statusbar = UI::get().get_element<UIStatusBar>())
+			statusbar->notify();
 	}
 
 	void FamilyPrivilegeListHandler::handle(InPacket& recv) const

@@ -126,7 +126,7 @@ namespace ms
 				static FILE* ddbg = fopen("death_debug.txt", "a");
 				if (ddbg) { fprintf(ddbg, "DIED: HP=0, showing dialog\n"); fflush(ddbg); }
 
-				UI::get().emplace<UIOk>("You have died. Press OK to return to the nearest town.", [](bool ok) {
+				UI::get().emplace<UIDeathNotice>("You have died. Press OK to return to the nearest town.", [](bool ok) {
 					static FILE* ddbg2 = fopen("death_debug.txt", "a");
 					if (ddbg2) { fprintf(ddbg2, "OK pressed: ok=%d, dispatching ChangeMapPacket\n", ok); fflush(ddbg2); }
 					ChangeMapPacket(true, -1, "", false).dispatch();

@@ -598,6 +598,12 @@ namespace ms
 		PosFAMILY() : PointEntry("PosFAMILY", "(200, 100)") {}
 	};
 
+	// The default position of UIFamilyTree
+	struct PosFAMILYTREE : public Configuration::PointEntry
+	{
+		PosFAMILYTREE() : PointEntry("PosFAMILYTREE", "(100, 50)") {}
+	};
+
 	// The default position of UISystemOption
 	struct PosSYSTEMOPTION : public Configuration::PointEntry
 	{

@@ -78,6 +78,7 @@ namespace ms
 		settings.emplace<PosRANKING>();
 		settings.emplace<PosSKILLMACRO>();
 		settings.emplace<PosFAMILY>();
+		settings.emplace<PosFAMILYTREE>();
 		settings.emplace<PosSYSTEMOPTION>();
 		settings.emplace<PosMAPLETV>();
 		settings.emplace<PosMEGAPHONE>();

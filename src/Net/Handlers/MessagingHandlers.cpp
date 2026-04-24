@@ -26,6 +26,7 @@
 
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIQuestHelper.h"
 #include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStatusBar.h"
@@ -232,7 +233,8 @@ namespace ms
 			if (chatbar)
 				chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::BLUE);
 			break;
-		case 1: // Popup notice (server-side popup, also show in chat)
+		case 1: // Popup notice — show a modal OK dialog AND echo in chat.
+			UI::get().emplace<UIOk>(message, [](bool){});
 			if (chatbar)
 				chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::YELLOW);
 			break;
@@ -265,11 +267,25 @@ namespace ms
 			if (chatbar)
 				chatbar->send_chatline(message, UIChatBar::LineType::LIGHTBLUE);
 			break;
-		case 7: // NPC broadcast (item megaphone with NPC)
-			recv.read_int(); // npcid
+		case 7: // NPC broadcast — show the NPC face + speech bubble panel
+			// in addition to the chat line.
+		{
+			int32_t npcid = recv.read_int();
+
+			// Force-remove any stale NpcTalk so emplace creates a fresh one.
+			UI::get().remove(UIElement::Type::NPCTALK);
+			UI::get().emplace<UINpcTalk>();
+			UI::get().enable();
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+			{
+				// msgtype 0 = plain "next" dialog with OK button.
+				npctalk->change_text(npcid, 0, 0, 0, message);
+			}
+
 			if (chatbar)
 				chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
 			break;
+		}
 		case 8: // Item megaphone (world-wide + shows an attached item)
 		{
 			recv.read_byte(); // channel

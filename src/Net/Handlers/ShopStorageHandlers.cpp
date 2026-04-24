@@ -24,6 +24,7 @@
 #include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UITrade.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIHiredMerchant.h"
 #include "../../IO/UITypes/UIPersonalShop.h"
 #include "../../IO/UITypes/UIMinigame.h"
@@ -338,28 +339,27 @@ namespace ms
 			int8_t type = recv.read_byte();
 			std::string inviter = recv.read_string();
 
-			// Read trailing bytes
-			if (recv.available())
-				recv.skip(4);
+			// The invite carries the room id the inviter already
+			// created. On accept we VISIT that room rather than
+			// CREATEing a new one (the old code skipped this int).
+			int32_t room_id = recv.available() >= 4 ? recv.read_int() : 0;
 
 			if (type == 3) // Trade invite
 			{
 				// Show accept/decline dialog
-				UI::get().emplace<UIYesNo>(
+				UI::get().emplace<UIAlarmInvite>(
 					"Trade request from " + inviter + ". Accept?",
-					[](bool yes)
+					[room_id](bool yes)
 					{
 						if (yes)
-						{
-							// Create and visit the trade
-							TradeCreatePacket().dispatch();
-						}
+							TradeVisitPacket(room_id).dispatch();
 						else
-						{
 							TradeDeclinePacket().dispatch();
-						}
 					}
 				);
+
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->notify();
 			}
 			break;
 		}

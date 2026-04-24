@@ -60,11 +60,18 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## Changelog
 
 ### Latest
+- **Family UI**: Rebuilt on `UIWindow2.img/Family` with motto/name, junior count N/2, rep, today's rep, 5 abilities with cost and uses-left.
+- **Family Tree UI**: New `UIFamilyTree` drawing leader, grand-senior, senior, me, sibling, juniors, and grand-juniors from real `parent_id` chains with clickable plates.
+- **Family packets**: Added v83 Cosmic opcodes 0x91–0x99 and rewrote `FamilyAcceptPacket` / `FamilyUsePacket` payloads.
+- **Family handlers**: Pedigree chart + info + entitlement usage are now forwarded to the UIs; `FamilyResultHandler` prints readable red error messages.
+- **FAMILY hotkey**: `get_keytype` now returns MENU for FAMILY and the KeyConfig icon falls back to sprite 27 since v83 has no icon at index 42.
+- **UIEnterText offsets**: Added `field_y_offset` / `button_x_offset` / `button_y_offset` params matching `UIEnterNumber`.
+- **Trade UI overhaul**: Item grids, CharLook portraits, scrollable chat, drag-drop quantity prompt, double-click remove, `UIWaitNotice` on confirm.
+- **UIEnterNumber crash fix**: Invalid input no longer emplaces a `UIOk` that destroys the dialog and leaves a dangling `this` in the ok handler.
 - **Storage UI (v83 FullBackgrnd)**: now work currectly
 - **Shop UI**: now draw tabs based on items he sell
-- **Skill Book Macro panel (now work currectly 
-
-- **added megaphone support and avatar massage support 
+- **Skill Book Macro panel**: now work currectly
+- **added megaphone support and avatar massage support**
 - **Chat starts closed**: `UIChatBar::UIChatBar` initializes `chatopen = false` so the chat log panel doesn't cover the screen on login until the player explicitly opens it.
 - **Status Bar**: Rebuilt/polished status bar UI (HP/MP/EXP, character menu, chat controls). See screenshot above.
 - **HP/MP/EXP flash animations**: The HP and MP gauges now play their animated low-resource overlay (`ani_hp_gauge` / `ani_mp_gauge`, plus the AB-job variant `ani_hp_gauge_ab`) when the bar drops below 30%. The EXP gauge and the notice icon pulse via alpha-cycled draws so status changes are visible at a glance.

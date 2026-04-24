@@ -19,6 +19,9 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "UIStatusBar.h"
+#include "UINotice.h"
+#include "UITrade.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
@@ -964,6 +967,83 @@ namespace ms
 
 	void UIChatBar::send_chat_message(const std::string& message)
 	{
+		if (message == "/notice")
+		{
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+			{
+				sb->notify();
+				send_chatline("[/notice] notification on", LineType::YELLOW);
+			}
+			return;
+		}
+
+		if (message == "/noticeoff")
+		{
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+			{
+				sb->clear_notification();
+				send_chatline("[/noticeoff] notification off", LineType::YELLOW);
+			}
+			return;
+		}
+
+		// DEBUG: /float <N>  → preview FloatNotice balloon N (0..145).
+		//        /float off  → clear preview.
+		if (message.rfind("/float", 0) == 0)
+		{
+			std::string arg = (message.length() > 7) ? message.substr(7) : "";
+			if (arg == "off" || arg.empty())
+			{
+				if (auto sb = UI::get().get_element<UIStatusBar>())
+					sb->clear_preview();
+				send_chatline("[/float] preview off", LineType::YELLOW);
+			}
+			else
+			{
+				int idx = std::atoi(arg.c_str());
+				if (auto sb = UI::get().get_element<UIStatusBar>())
+					sb->set_preview_float(idx);
+				send_chatline("[/float] FloatNotice index " + std::to_string(idx), LineType::YELLOW);
+			}
+			return;
+		}
+
+		// DEBUG: /invite  → pops a test UIAlarmInvite banner so you can
+		//                   see the Basic.img/AlarmInfo sprite without
+		//                   needing a real server invite.
+		if (message == "/invite")
+		{
+			UI::get().emplace<UIAlarmInvite>(
+				"TestPlayer wants to invite you. Accept?",
+				[this](bool yes)
+				{
+					send_chatline(yes ? "[/invite] accepted" : "[/invite] declined",
+						LineType::YELLOW);
+				});
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+				sb->notify();
+			return;
+		}
+
+		// DEBUG: /notice# <N>  → preview UIWindow.img/Notice frame N (0..4)
+		if (message.rfind("/notice#", 0) == 0)
+		{
+			std::string arg = (message.length() > 9) ? message.substr(9) : "";
+			if (arg == "off" || arg.empty())
+			{
+				if (auto sb = UI::get().get_element<UIStatusBar>())
+					sb->clear_preview();
+				send_chatline("[/notice#] preview off", LineType::YELLOW);
+			}
+			else
+			{
+				int idx = std::atoi(arg.c_str());
+				if (auto sb = UI::get().get_element<UIStatusBar>())
+					sb->set_preview_notice(idx);
+				send_chatline("[/notice#] Notice frame " + std::to_string(idx), LineType::YELLOW);
+			}
+			return;
+		}
 
 		std::list<int32_t> recipients;
 
