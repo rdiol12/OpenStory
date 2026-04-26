@@ -18,6 +18,7 @@
 #include "UIWhisper.h"
 
 #include "../UI.h"
+#include "UIChatBar.h"
 #include "../Components/MapleButton.h"
 #include "../Components/AreaButton.h"
 
@@ -248,7 +249,14 @@ namespace ms
 
 		WhisperPacket(target_name, message).dispatch();
 
-		// Add to local chat display
+		// Echo into the global chat bar in PINK so the player sees
+		// their own outgoing whisper alongside replies.
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(
+				"To " + target_name + " <Whisper>: " + message,
+				UIChatBar::LineType::PINK);
+
+		// Also keep a copy in the whisper window's own chat history.
 		ChatLine line;
 		line.text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MALIBU, "To " + target_name + ": " + message);
 		line.color = Color::Name::MALIBU;

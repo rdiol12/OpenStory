@@ -17,40 +17,54 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
+#include "../UIElement.h"
+#include "../Components/Textfield.h"
+
+#include "../../Graphics/Text.h"
+
 #include <cstdint>
-#include <map>
+#include <string>
 
 namespace ms
 {
-	struct BuddyEntry
-	{
-		int32_t cid = 0;
-		std::string name;
-		int8_t status = 0;
-		int32_t channel = -1;
-		std::string group;
-
-		bool online() const { return channel >= 0; }
-	};
-
-	class BuddyList
+	// Memo / nickname popup. Backdrop is UIWindow2.img/UserList/Nickname
+	// (252x162). Saves to BuddyMemoStore on OK.
+	class UIBuddyNickname : public UIElement
 	{
 	public:
-		void update(const std::map<int32_t, BuddyEntry>& entries);
-		void set_capacity(int8_t cap);
-		void clear();
+		static constexpr Type TYPE = UIElement::Type::BUDDYNICKNAME;
+		static constexpr bool FOCUSED = true;
+		static constexpr bool TOGGLED = true;
 
-		// Single-buddy partial update used by sub 0x14 (channel change /
-		// log on/off). Returns the prior `online()` so the caller can
-		// emit a "logged in/out" message only when the bit flipped.
-		bool update_channel(int32_t cid, int32_t channel);
+		UIBuddyNickname(int32_t cid, const std::string& real_name);
 
-		const std::map<int32_t, BuddyEntry>& get_entries() const;
-		int8_t get_capacity() const;
+		void draw(float inter) const override;
+		void update() override;
+
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		std::map<int32_t, BuddyEntry> buddies;
-		int8_t capacity = 50;
+		enum Buttons : uint16_t
+		{
+			BT_CLOSE,
+			BT_OK
+		};
+
+		void commit();
+
+		int32_t target_cid;
+		std::string target_name;
+
+		Text title;
+		Text label_real;
+		Text label_memo;
+		Textfield nickname_field;   // small, top-right — the displayed alias
+		Textfield memo_field;       // large area below — long memo text
 	};
 }

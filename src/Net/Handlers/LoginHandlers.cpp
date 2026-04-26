@@ -21,9 +21,12 @@
 
 #include "../Packets/LoginPackets.h"
 
+#include <algorithm>
+
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../Character/AccountCharStore.h"
 #include "../../IO/UITypes/UIGender.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UILoginWait.h"
@@ -172,6 +175,16 @@ namespace ms
 			for (uint8_t i = 0; i < charcount; ++i)
 				characters.emplace_back(LoginParser::parse_charentry(recv));
 
+			// Tee the parsed list into AccountCharStore so the in-game
+			// UI (left pane of UIUserList) can read it after we hand
+			// off to the channel server. Cosmic doesn't push this list
+			// again post-login, so this is the only place to capture it.
+			std::vector<AccountCharStore::Entry> store_entries;
+			store_entries.reserve(characters.size());
+			for (const auto& ce : characters)
+				store_entries.push_back({ ce.id, ce.stats.name });
+			AccountCharStore::get().set(std::move(store_entries));
+
 			int8_t pic = recv.read_byte();
 			int32_t slots = recv.read_int();
 
@@ -216,6 +229,12 @@ namespace ms
 		// Parse info on the new character
 		CharEntry character = LoginParser::parse_charentry(recv);
 
+		// Mirror into AccountCharStore so the in-game left pane sees
+		// the freshly-created char without needing a relog.
+		auto store_list = AccountCharStore::get().list();
+		store_list.push_back({ character.id, character.stats.name });
+		AccountCharStore::get().set(std::move(store_list));
+
 		// Read the updated character selection
 		if (auto charselect = UI::get().get_element<UICharSelect>())
 			charselect->add_character(std::move(character));
@@ -248,6 +267,15 @@ namespace ms
 		}
 		else
 		{
+			// Drop from AccountCharStore so the in-game left pane stops
+			// showing a deleted character.
+			auto store_list = AccountCharStore::get().list();
+			store_list.erase(
+				std::remove_if(store_list.begin(), store_list.end(),
+					[cid](const AccountCharStore::Entry& e) { return e.cid == cid; }),
+				store_list.end());
+			AccountCharStore::get().set(std::move(store_list));
+
 			if (auto charselect = UI::get().get_element<UICharSelect>())
 				charselect->remove_character(cid);
 		}

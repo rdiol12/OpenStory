@@ -51,7 +51,8 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## todo
 - fix login world selection char creation flow currently ui is broken
 - add notifications alers ui - ✅
-- party is currently broken
+- buddy system — ~90% working; some options in the context menu are not implemented or not supported by Cosmic
+- party tab — still ongoing
 - family ui is currently broken and missing most fetures - ✅ 
 - nx shop ui is currently broken 
 - fix closing the game
