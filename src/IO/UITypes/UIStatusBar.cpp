@@ -33,6 +33,7 @@
 #include "UIKeyConfig.h"
 #include "UIQuestLog.h"
 #include "UINotice.h"
+#include "UINotificationList.h"
 #include "UIReport.h"
 
 #include "../../Net/Packets/SocialPackets.h"
@@ -947,10 +948,14 @@ namespace ms
 			return Button::State::NORMAL;
 
 		case BT_NOTICE:
-			// Passive indicator — clicking does nothing. Notifications
-			// clear via notify()/clear_notification() from callers that
-			// actually resolve them.
+		{
+			// Open the notification drawer anchored above this button.
+			// The popup positions itself so its bottom-right corner is
+			// the button's top-left.
+			Point<int16_t> btn_pos = position + buttons[BT_NOTICE]->bounds(Point<int16_t>(0, 0)).get_left_top();
+			UI::get().emplace<UINotificationList>(btn_pos);
 			return Button::State::NORMAL;
+		}
 
 		case BT_CHANNEL:
 		case BT_SYS_CHANNEL:

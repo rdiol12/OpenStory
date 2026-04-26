@@ -520,8 +520,10 @@ namespace ms
 
 			std::string line = from + " <Whisper>: " + message;
 
+			// PINK is the v83-canonical whisper color; admins still
+			// land WHITE so GM messages stand out.
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, from_admin ? UIChatBar::LineType::WHITE : UIChatBar::LineType::RED);
+				chatbar->send_chatline(line, from_admin ? UIChatBar::LineType::WHITE : UIChatBar::LineType::PINK);
 
 			if (auto whisper = UI::get().get_element<UIWhisper>())
 				whisper->recv_whisper(from, message, from_admin);

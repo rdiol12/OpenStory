@@ -19,6 +19,7 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/MapleFrame.h"
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
 
@@ -39,6 +40,10 @@ namespace ms
 		void update() override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
+		void rightclick(Point<int16_t> cursorpos) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -131,17 +136,81 @@ namespace ms
 		int friend_total = 50;
 		std::vector<Sprite> friend_sprites;
 		Texture friend_grid[4];
-		Text friends_online_text;
+		mutable Text friends_online_text;
 		Text friends_cur_location;
 		Text friends_name;
 		Text friends_group_name;
 		Slider friends_slider;
 
+		// Reusable per-row labels for the buddy tab.
+		mutable Text buddy_row_name;
+		mutable Text buddy_row_status;
+		mutable Text buddy_group_header;
+		mutable Text buddy_account_label;
+
+		// Group expansion state (group name → expanded?). Group folders
+		// default expanded the first time they appear.
+		mutable std::map<std::string, bool> buddy_group_expanded;
+
+		// Hitboxes refreshed every draw() so cursor handling can map a
+		// click to the right buddy / arrow.
+		struct BuddyRowHit
+		{
+			int32_t cid;
+			Rectangle<int16_t> rect;
+		};
+		mutable std::vector<BuddyRowHit> buddy_row_hits;
+		mutable std::vector<std::pair<std::string, Rectangle<int16_t>>>
+			buddy_arrow_hits;
+		mutable int32_t hovered_buddy_cid = 0;
+
+		// Party member row hits — refreshed each draw so right-click can
+		// open UIPartyMemberMenu over the right row.
+		struct PartyRowHit
+		{
+			int32_t cid;
+			std::string name;
+			Rectangle<int16_t> rect;
+		};
+		mutable std::vector<PartyRowHit> party_row_hits;
+
+		Texture buddy_arrow_open;
+		Texture buddy_arrow_closed;
+
+		// Hover tooltip backdrop — UIToolTip.img/Item/Frame2 (the same
+		// 9-slice frame TextTooltip uses for item hovers).
+		MapleFrame tooltip_frame;
+		Texture    tooltip_cover;
+
+		// Per-group, per-side scroll offsets. Kept around so legacy
+		// rect plumbing still compiles; the live behaviour is now a
+		// single global scroll for the entire buddy list.
+		struct GroupScroll
+		{
+			int16_t left  = 0;
+			int16_t right = 0;
+			Rectangle<int16_t> left_rect;
+			Rectangle<int16_t> right_rect;
+		};
+		mutable std::map<std::string, GroupScroll> buddy_group_scroll;
+
+		// Global scroll for the buddy list. Wheel anywhere over the
+		// list area shifts everything — group headers, rows, dividers
+		// — so content past the location-text floor becomes reachable
+		// instead of being clipped.
+		mutable int16_t buddy_list_scroll  = 0;
+		mutable int16_t buddy_list_max     = 0;
+		mutable Rectangle<int16_t> buddy_list_rect;
+
 		// Boss tab
 		std::vector<Sprite> boss_sprites;
 
 		// Blacklist tab
-		uint16_t blacklist_tab;
+		uint16_t blacklist_tab = 8; // BT_TAB_BLACKLIST_INDIVIDUAL — must
+		                             // be a valid button id from the
+		                             // start, otherwise tab re-pin reads
+		                             // garbage memory and crashes when
+		                             // the user enters the Blacklist tab.
 		Texture blacklist_title;
 		Texture blacklist_grid[3];
 		Text blacklist_name;

@@ -514,6 +514,34 @@ namespace ms
 		PosBUDDYLIST() : PointEntry("PosBUDDYLIST", "(120, 120)") {}
 	};
 
+	// The default position of UIAddBuddy (the add-buddy popup). Default
+	// (0,0) is a sentinel — UIAddBuddy treats (0,0) as "use the spawn
+	// position the caller passed" so it lands flush to the right of the
+	// user-list panel on first open. Drag-end overwrites this with the
+	// real coords so subsequent opens remember the user's placement.
+	struct PosADDBUDDY : public Configuration::PointEntry
+	{
+		PosADDBUDDY() : PointEntry("PosADDBUDDY", "(0, 0)") {}
+	};
+
+	// The default position of UIBuddyGroup (the manage-groups popup).
+	struct PosBUDDYGROUP : public Configuration::PointEntry
+	{
+		PosBUDDYGROUP() : PointEntry("PosBUDDYGROUP", "(0, 0)") {}
+	};
+
+	// The default position of UIPartySettings (PopupSettings dialog).
+	struct PosPARTYSETTINGS : public Configuration::PointEntry
+	{
+		PosPARTYSETTINGS() : PointEntry("PosPARTYSETTINGS", "(420, 200)") {}
+	};
+
+	// The default position of UIPartyInvite (PopupInvite dialog).
+	struct PosPARTYINVITE : public Configuration::PointEntry
+	{
+		PosPARTYINVITE() : PointEntry("PosPARTYINVITE", "(420, 100)") {}
+	};
+
 	// The default position of UIStorage
 	struct PosSTORAGE : public Configuration::PointEntry
 	{

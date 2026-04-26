@@ -493,9 +493,8 @@ namespace ms
 		Point<int16_t> cursoroffset = cursorpos - position;
 
 		// Double-click on a storage item:
-		//  - stackable with count > 1 → open quantity prompt, take all
-		//    from server, store back the unwanted excess
-		//  - otherwise → toggle the highlight for multi-retrieve
+		//  - stackable with count > 1 → open quantity prompt
+		//  - otherwise → take it out (single retrieve)
 		int16_t svisual = storage_slot_by_cursor(cursoroffset);
 		if (svisual >= 0 && svisual < static_cast<int16_t>(storage_slot_map.size()))
 		{
@@ -519,10 +518,8 @@ namespace ms
 					return;
 				}
 
-				if (storage_selection.count(s_item))
-					storage_selection.erase(s_item);
-				else
-					storage_selection.insert(s_item);
+				if (s_item < static_cast<int16_t>(items.size()))
+					request_take_out(s_item);
 			}
 			return;
 		}
@@ -545,6 +542,8 @@ namespace ms
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;
 
+		// Right-click on a storage item toggles the multi-retrieve
+		// highlight; the Retrieve button then acts on the full set.
 		int16_t svisual = storage_slot_by_cursor(cursoroffset);
 		if (svisual >= 0 && svisual < static_cast<int16_t>(storage_slot_map.size()))
 		{
@@ -553,19 +552,28 @@ namespace ms
 			{
 				const auto& items = get_storage_tab(current_tab);
 				if (s_item < static_cast<int16_t>(items.size()))
-					request_take_out(s_item);
+				{
+					if (storage_selection.count(s_item))
+						storage_selection.erase(s_item);
+					else
+						storage_selection.insert(s_item);
+				}
 			}
 			return;
 		}
 
+		// Right-click on an inventory item toggles the bulk-store
+		// highlight; the Store (BT_PUT) button then stores the full set.
 		int16_t ivisual = inventory_slot_by_cursor(cursoroffset);
 		if (ivisual >= 0 && ivisual < static_cast<int16_t>(inventory_slot_map.size()))
 		{
 			int16_t i_item = inventory_slot_map[ivisual];
 			if (i_item >= 0 && i_item < static_cast<int16_t>(inventory_items.size()))
 			{
-				const auto& entry = inventory_items[i_item];
-				request_store(entry.slot, entry.itemid, entry.count);
+				if (inventory_selection.count(i_item))
+					inventory_selection.erase(i_item);
+				else
+					inventory_selection.insert(i_item);
 			}
 		}
 	}

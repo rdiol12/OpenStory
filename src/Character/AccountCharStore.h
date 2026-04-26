@@ -17,40 +17,35 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
 #include <cstdint>
-#include <map>
+#include <string>
+#include <vector>
 
 namespace ms
 {
-	struct BuddyEntry
-	{
-		int32_t cid = 0;
-		std::string name;
-		int8_t status = 0;
-		int32_t channel = -1;
-		std::string group;
-
-		bool online() const { return channel >= 0; }
-	};
-
-	class BuddyList
+	// Client-side cache of the account's full character list. Cosmic
+	// only sends this during CharSelect (just before the user picks a
+	// character) — once the channel server takes over, the data is
+	// gone. We tee the CharlistHandler payload into this singleton so
+	// the in-game UI (e.g. UIUserList's account-chars pane) can keep
+	// referring to it after the world handoff.
+	class AccountCharStore
 	{
 	public:
-		void update(const std::map<int32_t, BuddyEntry>& entries);
-		void set_capacity(int8_t cap);
+		struct Entry
+		{
+			int32_t cid = 0;
+			std::string name;
+		};
+
+		static AccountCharStore& get();
+
+		void set(std::vector<Entry> chars);
 		void clear();
-
-		// Single-buddy partial update used by sub 0x14 (channel change /
-		// log on/off). Returns the prior `online()` so the caller can
-		// emit a "logged in/out" message only when the bit flipped.
-		bool update_channel(int32_t cid, int32_t channel);
-
-		const std::map<int32_t, BuddyEntry>& get_entries() const;
-		int8_t get_capacity() const;
+		const std::vector<Entry>& list() const;
 
 	private:
-		std::map<int32_t, BuddyEntry> buddies;
-		int8_t capacity = 50;
+		AccountCharStore() = default;
+		std::vector<Entry> chars;
 	};
 }

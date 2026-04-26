@@ -20,6 +20,8 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "UIStatusBar.h"
+
+#include "../NotificationCenter.h"
 #include "UINotice.h"
 #include "UITrade.h"
 
@@ -28,6 +30,7 @@
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Character/BuddyList.h"
 
 #include <algorithm>
 #include <cctype>
@@ -967,6 +970,63 @@ namespace ms
 
 	void UIChatBar::send_chat_message(const std::string& message)
 	{
+		// DEBUG: dump everything in the buddy/friend NX sub-trees so
+		// we can lay out the new buddy UI from real positions.
+		if (message == "/buddydump")
+		{
+#ifdef USE_NX
+			std::ofstream ofs("buddydump.txt");
+			if (ofs)
+			{
+				std::function<void(nl::node, int, int)> walk;
+				walk = [&](nl::node n, int depth, int max_depth)
+				{
+					if (!n) return;
+					for (int i = 0; i < depth; i++) ofs << "  ";
+					ofs << n.name() << " [" << (int)n.data_type() << "]";
+					switch (n.data_type())
+					{
+					case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
+					case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
+					case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
+					case nl::node::type::bitmap:
+					{
+						auto bmp = n.get_bitmap();
+						if (bmp) ofs << " <bmp " << bmp.width() << "x" << bmp.height() << ">";
+						break;
+					}
+					default: break;
+					}
+					ofs << "  (" << n.size() << " kids)\n";
+					if (depth >= max_depth) return;
+					for (auto c : n) walk(c, depth + 1, max_depth);
+				};
+				ofs << "=== UIWindow.img/UserList/Friend (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow.img"]["UserList"]["Friend"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/Main/Friend (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Main"]["Friend"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/AddFriend (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["AddFriend"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/Group (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Group"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/Nickname (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Nickname"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/PopupInvite (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["PopupInvite"], 0, 5);
+				ofs << "\n=== UIWindow2.img/UserList/Search (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Search"], 0, 5);
+				// Right-click context menu — try common locations.
+				ofs << "\n=== UIWindow.img/UserList/Friend/Popup (depth 5) ===\n";
+				walk(nl::nx::ui["UIWindow.img"]["UserList"]["Friend"]["Popup"], 0, 5);
+				ofs << "\n=== Basic.img children (account/popup/right-click candidates) ===\n";
+				for (auto c : nl::nx::ui["Basic.img"])
+					ofs << "  " << c.name() << " (" << c.size() << " kids)\n";
+			}
+			send_chatline("[buddydump] wrote wz/buddydump.txt", LineType::YELLOW);
+#endif
+			return;
+		}
+
 		if (message == "/notice")
 		{
 			if (auto sb = UI::get().get_element<UIStatusBar>())
@@ -984,6 +1044,47 @@ namespace ms
 				sb->clear_notification();
 				send_chatline("[/noticeoff] notification off", LineType::YELLOW);
 			}
+			return;
+		}
+
+		// DEBUG: /notifmock — push a fake buddy-invite into the
+		// notification drawer so the popup layout can be previewed
+		// without a live invite from the server.
+		if (message == "/notifmock")
+		{
+			NotificationCenter::get().push(
+				"Buddy Invite",
+				"TestBuddy wants to be your buddy.",
+				[](bool yes)
+				{
+					if (auto cb = UI::get().get_element<UIChatBar>())
+						cb->send_chatline(
+							yes ? "[/notifmock] accepted" : "[/notifmock] declined",
+							LineType::YELLOW);
+				});
+			NotificationCenter::get().push(
+				"Party Invite",
+				"PartyLeader has invited you to their party.",
+				[](bool yes)
+				{
+					if (auto cb = UI::get().get_element<UIChatBar>())
+						cb->send_chatline(
+							yes ? "[/notifmock] joined party" : "[/notifmock] declined party",
+							LineType::YELLOW);
+				});
+			NotificationCenter::get().push(
+				"Guild Invite",
+				"GuildMaster has invited you to their guild.",
+				[](bool yes)
+				{
+					if (auto cb = UI::get().get_element<UIChatBar>())
+						cb->send_chatline(
+							yes ? "[/notifmock] joined guild" : "[/notifmock] declined guild",
+							LineType::YELLOW);
+				});
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+				sb->notify();
+			send_chatline("[/notifmock] queued 3 mock invites; click the bell on the status bar.", LineType::YELLOW);
 			return;
 		}
 

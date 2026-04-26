@@ -26,6 +26,7 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../IO/NotificationCenter.h"
 
 #include "../Packets/GameplayPackets.h"
 #include "../Packets/SocialPackets.h"
@@ -106,6 +107,18 @@ namespace ms
 				}
 			);
 
+			// Mirror into the notification drawer so the user can
+			// re-resolve from BT_NOTICE on the status bar if the modal
+			// got dismissed without action.
+			NotificationCenter::get().push(
+				"Buddy Invite",
+				from_name + " wants to be your buddy.",
+				[from_cid](bool yes)
+				{
+					if (yes)
+						AcceptBuddyPacket(from_cid).dispatch();
+				});
+
 			if (auto statusbar = UI::get().get_element<UIStatusBar>())
 				statusbar->notify();
 
@@ -121,7 +134,22 @@ namespace ms
 			recv.read_byte(); // 0
 			int32_t channel = recv.read_int();
 
-			// TODO: update buddy's channel in the list and show login/logout message
+			auto& bl = Stage::get().get_player().get_buddylist();
+			bool was_online = bl.update_channel(cid, channel);
+			bool is_online = channel >= 0;
+
+			if (was_online != is_online)
+			{
+				const auto& entries = bl.get_entries();
+				auto it = entries.find(cid);
+				if (it != entries.end())
+				{
+					std::string verb = is_online ? " has logged in." : " has logged out.";
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->send_chatline("[Buddy] " + it->second.name + verb,
+							UIChatBar::LineType::YELLOW);
+				}
+			}
 			break;
 		}
 		case 0x15:
@@ -131,6 +159,31 @@ namespace ms
 			{
 				int8_t capacity = recv.read_byte();
 				Stage::get().get_player().get_buddylist().set_capacity(capacity);
+			}
+			break;
+		}
+		case 0x0B:
+		case 0x0C:
+		case 0x0D:
+		case 0x0F:
+		{
+			// Server-pushed error / status messages. operation byte
+			// itself encodes which: 0x0B list full, 0x0C already on
+			// list, 0x0D their list full, 0x0F target doesn't exist.
+			const char* msg = nullptr;
+			switch (operation)
+			{
+			case 0x0B: msg = "Your buddy list is full.";       break;
+			case 0x0C: msg = "That player is already on your buddy list."; break;
+			case 0x0D: msg = "That player's buddy list is full."; break;
+			case 0x0F: msg = "That character does not exist.";  break;
+			}
+			if (msg)
+			{
+				if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+					messenger->show_status(Color::Name::RED, msg);
+				else if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(msg, UIChatBar::LineType::RED);
 			}
 			break;
 		}
@@ -296,6 +349,17 @@ namespace ms
 				}
 			);
 
+			NotificationCenter::get().push(
+				"Party Invite",
+				display_name + " has invited you to their party.",
+				[partyid, from_name](bool yes)
+				{
+					if (yes)
+						JoinPartyPacket(partyid).dispatch();
+					else
+						DenyPartyInvitePacket(from_name).dispatch();
+				});
+
 			if (auto statusbar = UI::get().get_element<UIStatusBar>())
 				statusbar->notify();
 
@@ -331,54 +395,66 @@ namespace ms
 		}
 		case 0x0C:
 		{
-			// Leave / Expel / Disband
+			// Leave / Expel / Disband. Cosmic packet layout:
+			//   int  party_id
+			//   int  target_cid
+			//   byte status   (0 = disband, 1 = leave/expel)
+			//   if status == 0: int party_id (again)
+			//   if status == 1:
+			//       byte expelled (0 = leave, 1 = expel)
+			//       string target_name
+			//       <full party data>
+			// Reading the discriminator as two separate booleans (the
+			// previous behaviour) walked the cursor off the end of the
+			// disband variant and produced a "stack underflow at 16"
+			// crash on the client.
 			if (recv.length() < 4)
 				break;
 
 			int32_t partyid = recv.read_int();
 			int32_t target_cid = recv.read_int();
-			bool disbanded = recv.read_byte() != 0;
-			bool expelled = recv.read_byte() != 0;
-			std::string target_name = recv.read_string();
+			int8_t status = recv.read_byte();
 
 			int32_t my_cid = Stage::get().get_player().get_oid();
 
-			if (disbanded)
+			if (status == 0)
 			{
+				if (recv.length() >= 4)
+					recv.read_int(); // party_id repeat — unused
+
 				Stage::get().get_player().get_party().clear();
 
 				if (messenger)
-					messenger->show_status(Color::Name::WHITE, "The party has been disbanded.");
-			}
-			else if (expelled && target_cid == my_cid)
-			{
-				Stage::get().get_player().get_party().clear();
-
-				if (messenger)
-					messenger->show_status(Color::Name::RED, "You have been expelled from the party.");
-			}
-			else if (expelled)
-			{
-				if (recv.length() >= 4 * 6)
-					parse_party_data(recv, partyid);
-
-				if (messenger)
-					messenger->show_status(Color::Name::WHITE, target_name + " has been expelled.");
-			}
-			else if (target_cid == my_cid)
-			{
-				Stage::get().get_player().get_party().clear();
-
-				if (messenger)
-					messenger->show_status(Color::Name::WHITE, "You have left the party.");
+					messenger->show_status(Color::Name::WHITE,
+						"The party has been disbanded.");
 			}
 			else
 			{
-				if (recv.length() >= 4 * 6)
-					parse_party_data(recv, partyid);
+				bool expelled = recv.read_byte() != 0;
+				std::string target_name = recv.read_string();
 
-				if (messenger)
-					messenger->show_status(Color::Name::WHITE, target_name + " has left the party.");
+				if (target_cid == my_cid)
+				{
+					Stage::get().get_player().get_party().clear();
+
+					if (messenger)
+						messenger->show_status(
+							expelled ? Color::Name::RED : Color::Name::WHITE,
+							expelled
+								? std::string("You have been expelled from the party.")
+								: std::string("You have left the party."));
+				}
+				else
+				{
+					if (recv.length() >= 4 * 6)
+						parse_party_data(recv, partyid);
+
+					if (messenger)
+						messenger->show_status(Color::Name::WHITE,
+							expelled
+								? target_name + " has been expelled."
+								: target_name + " has left the party.");
+				}
 			}
 
 			break;
@@ -619,6 +695,17 @@ namespace ms
 						DenyGuildInvitePacket(inviter).dispatch();
 				}
 			);
+
+			NotificationCenter::get().push(
+				"Guild Invite",
+				inviter + " has invited you to their guild.",
+				[guild_id, my_cid, inviter](bool yes)
+				{
+					if (yes)
+						AcceptGuildInvitePacket(guild_id, my_cid).dispatch();
+					else
+						DenyGuildInvitePacket(inviter).dispatch();
+				});
 
 			if (auto statusbar = UI::get().get_element<UIStatusBar>())
 				statusbar->notify();
@@ -889,6 +976,15 @@ namespace ms
 							AllianceAcceptInvitePacket(alliance_id).dispatch();
 					}
 				);
+
+				NotificationCenter::get().push(
+					"Alliance Invite",
+					inviter + " has invited your guild to join their alliance.",
+					[alliance_id](bool yes)
+					{
+						if (yes)
+							AllianceAcceptInvitePacket(alliance_id).dispatch();
+					});
 
 				if (auto statusbar = UI::get().get_element<UIStatusBar>())
 					statusbar->notify();
@@ -1262,6 +1358,21 @@ namespace ms
 				{
 					if (yes)
 					{
+						MessengerOpenPacket().dispatch();
+					}
+					else
+					{
+						MessengerDeclinePacket(from, "").dispatch();
+					}
+				});
+
+			NotificationCenter::get().push(
+				"Messenger Invite",
+				from + " has invited you to a Messenger conversation.",
+				[from](bool yes)
+				{
+					if (yes)
+					{
 						// Open a fresh messenger session — server joins
 						// the invited chat automatically after OPEN.
 						MessengerOpenPacket().dispatch();
@@ -1570,6 +1681,15 @@ namespace ms
 			}
 		);
 
+		NotificationCenter::get().push(
+			"Family Join Request",
+			name + " wants to join your family.",
+			[player_id](bool yes)
+			{
+				if (yes)
+					FamilyAcceptPacket(player_id).dispatch();
+			});
+
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[Family] " + name + " wants to join your family!", UIChatBar::LineType::YELLOW);
 
@@ -1633,6 +1753,14 @@ namespace ms
 				FamilySummonResponsePacket(family_name, yes).dispatch();
 			}
 		);
+
+		NotificationCenter::get().push(
+			"Family Summon",
+			from + " from the " + family_name + " family is summoning you.",
+			[family_name](bool yes)
+			{
+				FamilySummonResponsePacket(family_name, yes).dispatch();
+			});
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline("[Family] " + from + " is summoning you!", UIChatBar::LineType::YELLOW);

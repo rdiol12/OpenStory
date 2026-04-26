@@ -63,6 +63,10 @@ namespace ms
 		settings.emplace<PosOPTIONMENU>();
 		settings.emplace<PosCHARINFO>();
 		settings.emplace<PosBUDDYLIST>();
+		settings.emplace<PosADDBUDDY>();
+		settings.emplace<PosBUDDYGROUP>();
+		settings.emplace<PosPARTYSETTINGS>();
+		settings.emplace<PosPARTYINVITE>();
 		settings.emplace<PosSTORAGE>();
 		settings.emplace<PosTRADE>();
 		settings.emplace<PosGUILD>();

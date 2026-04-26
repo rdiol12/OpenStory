@@ -551,7 +551,22 @@ namespace ms
 		{
 			clear_tooltip();
 
-			return UIElement::send_cursor(pressed, cursorpos);
+			Cursor::State ret = UIElement::send_cursor(pressed, cursorpos);
+
+			// UIElement::send_cursor flips the active tab to MOUSEOVER on
+			// hover and back to NORMAL on leave, wiping the PRESSED state
+			// set in button_pressed(). Re-pin it so the current tab keeps
+			// its highlighted look even when the cursor moves elsewhere.
+			uint16_t active_btn = button_by_tab(tab);
+			auto it = buttons.find(active_btn);
+			if (it != buttons.end() && it->second
+				&& it->second->get_state() != Button::State::PRESSED
+				&& it->second->get_state() != Button::State::DISABLED)
+			{
+				it->second->set_state(Button::State::PRESSED);
+			}
+
+			return ret;
 		}
 	}
 

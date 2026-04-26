@@ -15,42 +15,28 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include <string>
-#include <cstdint>
-#include <map>
+#include "AccountCharStore.h"
 
 namespace ms
 {
-	struct BuddyEntry
+	AccountCharStore& AccountCharStore::get()
 	{
-		int32_t cid = 0;
-		std::string name;
-		int8_t status = 0;
-		int32_t channel = -1;
-		std::string group;
+		static AccountCharStore instance;
+		return instance;
+	}
 
-		bool online() const { return channel >= 0; }
-	};
-
-	class BuddyList
+	void AccountCharStore::set(std::vector<Entry> in)
 	{
-	public:
-		void update(const std::map<int32_t, BuddyEntry>& entries);
-		void set_capacity(int8_t cap);
-		void clear();
+		chars = std::move(in);
+	}
 
-		// Single-buddy partial update used by sub 0x14 (channel change /
-		// log on/off). Returns the prior `online()` so the caller can
-		// emit a "logged in/out" message only when the bit flipped.
-		bool update_channel(int32_t cid, int32_t channel);
+	void AccountCharStore::clear()
+	{
+		chars.clear();
+	}
 
-		const std::map<int32_t, BuddyEntry>& get_entries() const;
-		int8_t get_capacity() const;
-
-	private:
-		std::map<int32_t, BuddyEntry> buddies;
-		int8_t capacity = 50;
-	};
+	const std::vector<AccountCharStore::Entry>& AccountCharStore::list() const
+	{
+		return chars;
+	}
 }

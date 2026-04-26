@@ -17,40 +17,51 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
 #include <cstdint>
-#include <map>
+#include <functional>
+#include <string>
+#include <vector>
 
 namespace ms
 {
-	struct BuddyEntry
-	{
-		int32_t cid = 0;
-		std::string name;
-		int8_t status = 0;
-		int32_t channel = -1;
-		std::string group;
-
-		bool online() const { return channel >= 0; }
-	};
-
-	class BuddyList
+	// Drawer-style notification queue feeding UINotificationList. Net
+	// handlers (BuddyListHandler / PartyOperationHandler / GuildHandler
+	// / etc.) push entries here when they receive an invite, in
+	// addition to spawning the modal Yes/No popup. Clicking BT_NOTICE
+	// on the status bar opens the list, where each entry can be
+	// re-resolved (Accept / Decline).
+	class NotificationCenter
 	{
 	public:
-		void update(const std::map<int32_t, BuddyEntry>& entries);
-		void set_capacity(int8_t cap);
+		struct Entry
+		{
+			int32_t id;
+			std::string title;
+			std::string body;
+			std::function<void(bool yes)> resolver;
+		};
+
+		static NotificationCenter& get();
+
+		// Push a new notification. Returns the entry id.
+		int32_t push(std::string title, std::string body,
+			std::function<void(bool yes)> resolver);
+
+		// Resolve and remove an entry. `yes=true` invokes the Accept
+		// path, `yes=false` invokes Decline.
+		void resolve(int32_t id, bool yes);
+
+		// Drop without invoking the resolver (e.g. user dismissed all).
+		void dismiss(int32_t id);
 		void clear();
 
-		// Single-buddy partial update used by sub 0x14 (channel change /
-		// log on/off). Returns the prior `online()` so the caller can
-		// emit a "logged in/out" message only when the bit flipped.
-		bool update_channel(int32_t cid, int32_t channel);
-
-		const std::map<int32_t, BuddyEntry>& get_entries() const;
-		int8_t get_capacity() const;
+		bool empty() const;
+		const std::vector<Entry>& list() const;
 
 	private:
-		std::map<int32_t, BuddyEntry> buddies;
-		int8_t capacity = 50;
+		NotificationCenter() = default;
+
+		int32_t next_id = 1;
+		std::vector<Entry> pending;
 	};
 }

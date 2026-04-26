@@ -34,6 +34,16 @@ namespace ms
 		buddies.clear();
 	}
 
+	bool BuddyList::update_channel(int32_t cid, int32_t channel)
+	{
+		auto it = buddies.find(cid);
+		if (it == buddies.end()) return false;
+
+		bool was_online = it->second.online();
+		it->second.channel = channel;
+		return was_online;
+	}
+
 	const std::map<int32_t, BuddyEntry>& BuddyList::get_entries() const
 	{
 		return buddies;
