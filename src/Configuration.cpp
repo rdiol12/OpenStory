@@ -67,6 +67,7 @@ namespace ms
 		settings.emplace<PosBUDDYGROUP>();
 		settings.emplace<PosPARTYSETTINGS>();
 		settings.emplace<PosPARTYINVITE>();
+		settings.emplace<PosPARTYHELPER>();
 		settings.emplace<PosSTORAGE>();
 		settings.emplace<PosTRADE>();
 		settings.emplace<PosGUILD>();

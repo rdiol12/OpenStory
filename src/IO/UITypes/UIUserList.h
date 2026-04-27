@@ -125,6 +125,25 @@ namespace ms
 		Texture party_member_row[MAX_PARTY_MEMBERS];
 		Texture party_icon_online;
 		Texture party_icon_offline;
+		Texture party_leader_star;          // 9x9 ★ stamped on the leader row
+
+		// Party Search sub-tab — PartyInfo row sprites + per-row
+		// Request button. Each visible row mirrors one pending party
+		// invite from NotificationCenter (Cosmic doesn't ship a list
+		// of recruiting parties, so we surface what we already have).
+		Texture party_search_info_header;   // PartyInfo/0
+		Texture party_search_info_row_a;    // PartyInfo/1
+		Texture party_search_info_row_b;    // PartyInfo/2
+		Texture party_search_info_sep;      // PartyInfo/3
+		Texture party_search_request_tex;   // BtRequest normal sprite
+		mutable Text party_search_row_label;
+		struct SearchRowHit
+		{
+			int32_t notif_id;
+			Rectangle<int16_t> request_hit;
+		};
+		mutable std::vector<SearchRowHit> party_search_hits;
+
 		std::vector<PartyMember> party_members;
 		Text party_member_names[MAX_PARTY_MEMBERS];
 		Text party_member_levels[MAX_PARTY_MEMBERS];

@@ -61,6 +61,12 @@ namespace ms
 			PINK,
 			LIGHTBLUE,
 			GREEN,
+			// Channel-chat colors mandated by the v83 protocol —
+			// Buddy chat reads orange, Alliance chat reads as a soft
+			// light-green band; both are distinct from PINK (party)
+			// and GREEN (guild).
+			ORANGE,
+			LIGHTGREEN,
 			// Dedicated megaphone line styles — render a tiny megaphone
 			// icon (UIWindow.img/Megaphone/0..3) before the text so these
 			// broadcasts are visually distinct from regular chat.

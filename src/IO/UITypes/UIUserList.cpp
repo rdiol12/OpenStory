@@ -22,7 +22,9 @@
 #include "UIBuddyGroup.h"
 #include "UIPartyInvite.h"
 #include "UIPartyMemberMenu.h"
+#include "UIPartySearchStart.h"
 #include "UIPartySettings.h"
+#include "../NotificationCenter.h"
 #include "UINotice.h"
 #include "UIWhisper.h"
 #include "../UI.h"
@@ -96,6 +98,18 @@ namespace ms
 		party_search_grid[1] = PartySearch["request"];
 		party_search_grid[2] = PartySearch["table"];
 
+		// PartyInfo row chrome — header / even / odd / separator. Used
+		// by the Party Search sub-tab to render one row per pending
+		// invite from NotificationCenter.
+		nl::node info = PartySearch["PartyInfo"];
+		party_search_info_header = Texture(info["0"]);
+		party_search_info_row_a  = Texture(info["1"]);
+		party_search_info_row_b  = Texture(info["2"]);
+		party_search_info_sep    = Texture(info["3"]);
+		party_search_request_tex = Texture(PartySearch["BtRequest"]["normal"]["0"]);
+		party_search_row_label   = Text(Text::Font::A11M, Text::Alignment::LEFT,
+			Color::Name::BLACK, "", 0);
+
 		buttons[Buttons::BT_PARTY_SEARCH_LEVEL] = std::make_unique<MapleButton>(PartySearch["BtPartyLevel"]);
 		buttons[Buttons::BT_PARTY_SEARCH_LEVEL]->set_active(false);
 
@@ -115,8 +129,16 @@ namespace ms
 			party_member_jobs[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "", 0);
 		}
 
-		party_icon_online = Party["icon0"];
-		party_icon_offline = Party["icon1"];
+		// `icon0` is a directory with 13x13 / 17x16 sub-bitmaps and
+		// `icon1` doesn't exist as a sibling on UIWindow2/Main/Party at
+		// all — assigning either to a Texture loaded an empty sprite,
+		// which is why the row indicator never showed. Use the explicit
+		// `userOn` / `userOff` 7x7 dots instead.
+		party_icon_online  = Party["userOn"];
+		party_icon_offline = Party["userOff"];
+		// Leader star sprite — 9x9 ★ from the PartySearch sub-tree, used
+		// to mark the party leader's row.
+		party_leader_star  = Party["PartySearch"]["PartyInfo"]["leader"];
 
 		// Buddy Tab
 		nl::node Friend = Main["Friend"];
@@ -260,37 +282,56 @@ namespace ms
 
 				party_row_hits.clear();
 
-				for (size_t i = 0; i < MAX_PARTY_MEMBERS; i++)
+				// Only render a row backdrop per actual member; the
+				// dialog used to draw all 6 default rows even with one
+				// person in the party, which left big empty bars under
+				// the live data.
+				int32_t leader_cid =
+					Stage::get().get_player().get_party().get_leader();
+
+				for (size_t i = 0; i < party_members.size() && i < MAX_PARTY_MEMBERS; i++)
 				{
 					int16_t row_y = party_row0_y + static_cast<int16_t>(i) * party_row_h;
 					Point<int16_t> row_pos = position + Point<int16_t>(party_row_x, row_y);
 
 					party_mine_grid[4].draw(row_pos);
 
-					if (i < party_members.size())
-					{
-						const PartyMember& m = party_members[i];
+					const PartyMember& m = party_members[i];
 
+					// Leader → ★ replaces the dot. Non-leader → online
+					// (filled) or offline (hollow) 7x7 dot. Both scaled
+					// 1.6x so the indicator reads on the row.
+					if (m.cid == leader_cid)
+						party_leader_star.draw(DrawArgument(
+							row_pos + Point<int16_t>(2, 2), 1.6f, 1.6f));
+					else
 						(m.online ? party_icon_online : party_icon_offline)
-							.draw(row_pos + Point<int16_t>(2, 2));
+							.draw(DrawArgument(
+								row_pos + Point<int16_t>(2, 2), 1.6f, 1.6f));
 
-						// Columns: name | job | level. Text is top-anchored
-						// so a negative y offset nudges it visually up.
-						party_member_names[i].draw(row_pos + Point<int16_t>(17, -1));
-						party_member_jobs[i].draw(row_pos + Point<int16_t>(120, -1));
-						party_member_levels[i].draw(row_pos + Point<int16_t>(190, -1));
+					// Columns: name | job | level. Text is top-anchored
+					// so a negative y offset nudges it visually up. The
+					// name column gets an extra nudge so it lines up
+					// with the top of the row sprite.
+					party_member_names[i].draw(row_pos + Point<int16_t>(17, -4));
+					party_member_jobs[i].draw(row_pos + Point<int16_t>(120, -1));
+					party_member_levels[i].draw(row_pos + Point<int16_t>(205, -1));
 
-						party_row_hits.push_back({
-							m.cid, m.name,
-							Rectangle<int16_t>(
-								row_pos,
-								row_pos + Point<int16_t>(party_row_w, party_row_h))
-						});
-					}
+					party_row_hits.push_back({
+						m.cid, m.name,
+						Rectangle<int16_t>(
+							row_pos,
+							row_pos + Point<int16_t>(party_row_w, party_row_h))
+					});
 				}
 
 				if (party_members.empty())
+				{
+					// No party — keep the single placeholder row from
+					// before so the panel doesn't look broken.
+					party_mine_grid[4].draw(position + Point<int16_t>(party_row_x, party_row0_y));
 					party_mine_name.draw(position + Point<int16_t>(27, 130));
+				}
 			}
 			else if (party_tab == Buttons::BT_TAB_PARTY_SEARCH)
 			{
@@ -298,6 +339,77 @@ namespace ms
 				party_search_grid[1].draw(position);
 				party_search_grid[2].draw(position);
 				party_slider.draw(position);
+
+				// Party Search rows — one per pending party invite,
+				// since Cosmic doesn't push a recruiting-list. Header /
+				// alternating-row / separator NX sprites stretched to
+				// fit the table column.
+				constexpr int16_t SEARCH_X     = 11;
+				constexpr int16_t SEARCH_Y0    = 152;
+				constexpr int16_t SEARCH_W     = 191;
+				constexpr int16_t SEARCH_ROW_H = 17;
+				constexpr int16_t SEARCH_HDR_H = 18;
+				constexpr int16_t REQ_W        = 37;
+				constexpr int16_t REQ_H        = 17;
+
+				party_search_hits.clear();
+
+				// Header strip at the top of the list.
+				party_search_info_header.draw(DrawArgument(
+					position + Point<int16_t>(SEARCH_X, SEARCH_Y0),
+					Point<int16_t>(SEARCH_W, SEARCH_HDR_H)));
+
+				int16_t row_y = SEARCH_Y0 + SEARCH_HDR_H + 2;
+				int16_t shown = 0;
+
+				const auto& notes = NotificationCenter::get().list();
+				for (const auto& n : notes)
+				{
+					// Only party invites belong on this list — guild /
+					// alliance / family invites have their own UIs.
+					if (n.title.find("Party") == std::string::npos) continue;
+
+					const Texture& bg = (shown % 2 == 0)
+						? party_search_info_row_a
+						: party_search_info_row_b;
+					bg.draw(DrawArgument(
+						position + Point<int16_t>(SEARCH_X, row_y),
+						Point<int16_t>(SEARCH_W, SEARCH_ROW_H)));
+
+					// Leader name lifted from the invite body — strip
+					// the "X has invited you to their party." suffix
+					// for a tight one-liner.
+					std::string label = n.body;
+					auto cut = label.find(" has invited");
+					if (cut != std::string::npos)
+						label = label.substr(0, cut);
+
+					party_search_row_label.change_text(label);
+					party_search_row_label.draw(
+						position + Point<int16_t>(SEARCH_X + 8, row_y - 1));
+
+					// Per-row Request button — clicking it accepts the
+					// stored notification resolver (which dispatches
+					// JoinPartyPacket on the inviter's party id).
+					Point<int16_t> req_xy = position + Point<int16_t>(
+						SEARCH_X + SEARCH_W - REQ_W - 2, row_y);
+					party_search_request_tex.draw(req_xy);
+
+					party_search_hits.push_back({
+						n.id,
+						Rectangle<int16_t>(req_xy,
+							req_xy + Point<int16_t>(REQ_W, REQ_H))
+					});
+
+					row_y += SEARCH_ROW_H + 1;
+					shown++;
+					if (shown >= 9) break;
+				}
+
+				// Separator at the bottom of the visible row stack.
+				party_search_info_sep.draw(DrawArgument(
+					position + Point<int16_t>(SEARCH_X, row_y),
+					Point<int16_t>(SEARCH_W, 9)));
 			}
 		}
 		else if (tab == Buttons::BT_TAB_FRIEND)
@@ -658,6 +770,24 @@ namespace ms
 		if (dragged)
 			return dstate;
 
+		// Party Search per-row Request hits — accept the matching
+		// notification resolver (which dispatches JoinPartyPacket).
+		if (tab == Buttons::BT_TAB_PARTY
+			&& party_tab == Buttons::BT_TAB_PARTY_SEARCH)
+		{
+			for (const auto& sh : party_search_hits)
+			{
+				if (sh.request_hit.contains(cursorpos))
+				{
+					if (clicked)
+						NotificationCenter::get().resolve(sh.notif_id, true);
+					return clicked
+						? Cursor::State::CLICKING
+						: Cursor::State::CANCLICK;
+				}
+			}
+		}
+
 		hovered_buddy_cid = 0;
 		if (tab == Buttons::BT_TAB_FRIEND)
 		{
@@ -887,6 +1017,12 @@ namespace ms
 				break;
 			case Buttons::BT_PARTY_SETTINGS:
 				UI::get().emplace<UIPartySettings>(false /* settings, not make */);
+				break;
+			case Buttons::BT_PARTY_SEARCH_LEVEL:
+				// Leader-only on the server side; open the start form
+				// regardless and let Cosmic respond with an error
+				// status if the local player isn't actually a leader.
+				UI::get().emplace<UIPartySearchStart>();
 				break;
 
 			// === Blacklist tab footer ===

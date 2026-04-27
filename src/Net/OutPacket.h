@@ -156,9 +156,12 @@ namespace ms
 			/// Report
 			REPORT = 106,
 
-			/// Party Search
-			PARTY_SEARCH_REGISTER = 221,
-			PARTY_SEARCH_START = 222,
+			/// Party Search — Cosmic v83 expects 0xE0 / 0xE1, not the
+			/// 221/222 the original numbering used. The register op is
+			/// a server-side stub on Cosmic; the actual leader-driven
+			/// matchmaking entry point is PARTY_SEARCH_START.
+			PARTY_SEARCH_REGISTER = 224,    // 0xE0
+			PARTY_SEARCH_START    = 225,    // 0xE1
 
 			/// Event
 			REQUEST_EVENT_INFO = 241, // 0xF1

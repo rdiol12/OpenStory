@@ -6,8 +6,10 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Character/BuddyList.h"
 #include "../../Character/OtherChar.h"
+#include "../../Character/Job.h"
 #include "../../Gameplay/MapleMap/MapChars.h"
 
+#include <algorithm>
 #include <set>
 
 #ifdef USE_NX
@@ -42,7 +44,7 @@ namespace ms
 		constexpr int16_t LIST_W      = 191;
 		constexpr int16_t LIST_H      = 219;
 		constexpr int16_t ROW_H       = 18;          // sprite height
-		constexpr int16_t ROW_GAP     = 3;           // visual gap between INVITE buttons
+		constexpr int16_t ROW_GAP     = 2;           // visual gap between INVITE buttons
 		constexpr int16_t ROW_STRIDE  = ROW_H + ROW_GAP;
 		constexpr int16_t MAX_VISIBLE = LIST_H / ROW_STRIDE;
 
@@ -64,11 +66,19 @@ namespace ms
 		table_bg     = Texture(src["table"]);
 		invite_label = Texture(src["invite"]);
 
-		// Per-row INVITE button — load the normal-state sprite. NX
-		// origin is already (0,0) for BtInvite, so we can just stamp
-		// it at any row position.
-		row_invite_tex = Texture(src["BtInvite"]["normal"]["0"]);
+		// Per-row INVITE button — three states stamped manually since
+		// the same sprite is reused for every visible row. NX origin
+		// is already (0,0) for BtInvite, so we can just stamp it at
+		// any row position.
+		row_invite_tex         = Texture(src["BtInvite"]["normal"]["0"]);
+		row_invite_hover_tex   = Texture(src["BtInvite"]["mouseOver"]["0"]);
+		row_invite_pressed_tex = Texture(src["BtInvite"]["pressed"]["0"]);
 
+		// Title-bar X close button. PopupInvite ships no close glyph
+		// in NX, so reuse the standard Basic.img/BtClose3 (the same
+		// sprite UIUserList itself uses).
+		buttons[BT_CLOSE]       = std::make_unique<MapleButton>(
+			nl::nx::ui["Basic.img"]["BtClose3"], Point<int16_t>(244, 7));
 		buttons[BT_INVITE_NAME] = std::make_unique<MapleButton>(src["BtInviteName"]);
 		buttons[BT_COL_NAME]    = std::make_unique<MapleButton>(src["BtName"]);
 		buttons[BT_COL_JOB]     = std::make_unique<MapleButton>(src["BtJob"]);
@@ -95,15 +105,18 @@ namespace ms
 		table_bg.draw(position);
 		invite_label.draw(position);
 
-		name_field.draw(position);
+		// Nudge the typing-caret marker right + up so it sits inside
+		// the input strip rather than flush against the lower-left.
+		name_field.draw(position, Point<int16_t>(4, -3));
 
 		// Refill the recommended list every draw so newly-online buddies
 		// appear without needing an explicit refresh button.
 		rebuild_rows();
 
-		// Plain-text row labels — names from BuddyList. Job/Level stay
-		// blank because the buddy packet doesn't carry that info.
-		Text row_name(Text::Font::A11M, Text::Alignment::LEFT,
+		// Plain-text row labels. NAME from buddy list / map players,
+		// JOB + LEVEL only known for map players (buddy packets don't
+		// carry that info).
+		Text row_text(Text::Font::A11M, Text::Alignment::LEFT,
 			Color::Name::BLACK, "", 0);
 
 		int16_t visible = std::min<int16_t>(static_cast<int16_t>(rows.size()), MAX_VISIBLE);
@@ -113,10 +126,26 @@ namespace ms
 			int16_t idx   = r + list_scroll;
 			if (idx >= static_cast<int16_t>(rows.size())) break;
 
-			row_name.change_text(rows[idx].name);
-			row_name.draw(position + Point<int16_t>(COL_NAME_X, row_y - 1));
+			row_text.change_text(rows[idx].name);
+			row_text.draw(position + Point<int16_t>(COL_NAME_X, row_y - 1));
 
-			row_invite_tex.draw(position + Point<int16_t>(COL_INV_X, row_y));
+			if (!rows[idx].job.empty())
+			{
+				row_text.change_text(rows[idx].job);
+				row_text.draw(position + Point<int16_t>(COL_JOB_X, row_y - 1));
+			}
+
+			if (rows[idx].level > 0)
+			{
+				row_text.change_text(std::to_string(rows[idx].level));
+				row_text.draw(position + Point<int16_t>(COL_LEVEL_X, row_y - 1));
+			}
+
+			// Pick the matching state sprite based on hover index.
+			const Texture& bt = (hovered_row == idx)
+				? row_invite_hover_tex
+				: row_invite_tex;
+			bt.draw(position + Point<int16_t>(COL_INV_X, row_y));
 		}
 
 		UIElement::draw_buttons(inter);
@@ -138,7 +167,8 @@ namespace ms
 
 		// Source 1 — online buddies. Cosmic doesn't ship a "recommended
 		// roster" packet, so we use the buddy list as the obvious
-		// stand-in for inviteable acquaintances.
+		// stand-in for inviteable acquaintances. Buddy packets carry
+		// no job/level info, so those columns stay blank for buddy rows.
 		const auto& entries =
 			Stage::get().get_player().get_buddylist().get_entries();
 		for (const auto& kv : entries)
@@ -146,11 +176,15 @@ namespace ms
 			const BuddyEntry& e = kv.second;
 			if (!e.online()) continue;
 			if (seen.count(e.name)) continue;
-			rows.push_back({ e.name, Rectangle<int16_t>() });
+			InviteRow row;
+			row.name = e.name;
+			rows.push_back(row);
 			seen.insert(e.name);
 		}
 
-		// Source 2 — other characters currently on the same map.
+		// Source 2 — other characters currently on the same map. We
+		// do have job + level for these via OtherChar, so populate
+		// those columns from there.
 		MapObjects* map_chars = Stage::get().get_chars().get_chars();
 		if (map_chars)
 		{
@@ -160,11 +194,39 @@ namespace ms
 				{
 					std::string nm = oc->get_name();
 					if (nm.empty() || seen.count(nm)) continue;
-					rows.push_back({ nm, Rectangle<int16_t>() });
+					InviteRow row;
+					row.name  = nm;
+					row.level = static_cast<int16_t>(oc->get_level());
+					row.job   = Job(oc->get_job()).get_name();
+					rows.push_back(row);
 					seen.insert(nm);
 				}
 			}
 		}
+
+
+		// Sort: below-or-equal-my-level first (ascending), then above
+		// (ascending). Unknown-level rows (buddies, level=0) sort to
+		// the very bottom so the player can scan inviteable peers from
+		// closest match upward.
+		int16_t my_level = static_cast<int16_t>(
+			Stage::get().get_player().get_level());
+		std::sort(rows.begin(), rows.end(),
+			[my_level](const InviteRow& a, const InviteRow& b)
+			{
+				bool a_unknown = a.level <= 0;
+				bool b_unknown = b.level <= 0;
+				if (a_unknown != b_unknown)
+					return !a_unknown;        // knowns before unknowns
+				if (a_unknown && b_unknown)
+					return a.name < b.name;   // alpha within unknowns
+
+				bool a_above = a.level > my_level;
+				bool b_above = b.level > my_level;
+				if (a_above != b_above)
+					return !a_above;          // below-or-equal first
+				return a.level < b.level;     // ascending within group
+			});
 
 		// Refresh per-row hit-rects so click routing tracks the
 		// current scroll position.
@@ -196,10 +258,14 @@ namespace ms
 			return tstate;
 
 		// Per-row INVITE hits — mapped to the buddy at that index.
+		// Track hovered row so the draw pass can swap to the
+		// mouseOver sprite.
+		hovered_row = -1;
 		for (size_t i = 0; i < rows.size(); ++i)
 		{
 			if (rows[i].hit.contains(cursorpos))
 			{
+				hovered_row = static_cast<int16_t>(i);
 				if (clicked)
 					dispatch_invite(rows[i].name);
 				return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
@@ -250,6 +316,9 @@ namespace ms
 	{
 		switch (buttonid)
 		{
+		case BT_CLOSE:
+			deactivate();
+			break;
 		case BT_INVITE_NAME:
 		{
 			std::string name = name_field.get_text();

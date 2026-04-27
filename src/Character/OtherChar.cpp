@@ -133,6 +133,11 @@ namespace ms
 		return level;
 	}
 
+	int16_t OtherChar::get_job() const
+	{
+		return job;
+	}
+
 	int32_t OtherChar::get_skilllevel(int32_t skillid) const
 	{
 		auto iter = skilllevels.find(skillid);

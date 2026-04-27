@@ -30,6 +30,11 @@
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Character/Party.h"
+#include "../../Character/OtherChar.h"
+#include "../../Gameplay/MapleMap/MapChars.h"
+#include "../../Gameplay/MapleMap/MapObjects.h"
+#include "../../Character/Party.h"
 #include "../../Character/BuddyList.h"
 
 #include <algorithm>
@@ -572,6 +577,12 @@ namespace ms
 		case GREEN:
 			color = Color::Name::GREEN;
 			break;
+		case ORANGE:
+			color = Color::Name::ORANGE;
+			break;
+		case LIGHTGREEN:
+			color = Color::Name::LIGHTGREEN;
+			break;
 		// Megaphone lines each pick a distinct icon and text color so
 		// viewers can tell the broadcast sub-type at a glance.
 		case MEGAPHONE:
@@ -1085,6 +1096,130 @@ namespace ms
 			if (auto sb = UI::get().get_element<UIStatusBar>())
 				sb->notify();
 			send_chatline("[/notifmock] queued 3 mock invites; click the bell on the status bar.", LineType::YELLOW);
+			return;
+		}
+
+		// DEBUG: /mockall — fill the buddy list AND the party in one
+		// shot so the friend tab, party tab, member context menu, and
+		// the invite popup's "Recommended" table can all be exercised
+		// without a live group.
+		if (message == "/mockall")
+		{
+			std::map<int32_t, BuddyEntry> buddy_mocks;
+			auto add_buddy = [&](int32_t cid, const char* name, int32_t channel,
+				const char* group) {
+					BuddyEntry e;
+					e.cid     = cid;
+					e.name    = name;
+					e.status  = 0;
+					e.channel = channel;
+					e.group   = group;
+					buddy_mocks[cid] = e;
+				};
+			add_buddy(1001, "MaxTheArcher",  0, "Group Unknown");
+			add_buddy(1002, "Deafmau5",     -1, "Default Group");
+			add_buddy(1003, "Foolish",       4, "Default Group");
+			add_buddy(1004, "HunterPBrown", -1, "Default Group");
+			add_buddy(1005, "ipunchsama",    2, "Friends");
+			add_buddy(1006, "KaiseMystiq",  -1, "Default Group");
+			add_buddy(1007, "Kiyerza",       1, "Friends");
+			add_buddy(1008, "Riverza",      -1, "Group Unknown");
+			Stage::get().get_player().get_buddylist().update(buddy_mocks);
+
+			std::vector<::ms::PartyMember> party_mocks;
+			auto add_member = [&](int32_t cid, const char* name, int16_t job,
+				int16_t level, int32_t channel, int32_t mapid, bool online) {
+					::ms::PartyMember m;
+					m.cid     = cid;
+					m.name    = name;
+					m.job     = job;
+					m.level   = level;
+					m.channel = channel;
+					m.mapid   = mapid;
+					m.online  = online;
+					m.hp      = online ? 1200 : 0;
+					m.maxhp   = 1500;
+					party_mocks.push_back(m);
+				};
+			int32_t my_cid = Stage::get().get_player().get_oid();
+			add_member(my_cid, "Me",          100, 70,  0, 100000000, true);
+			add_member(2001,   "Klaarafia",   200, 65,  0, 100000000, true);
+			add_member(2002,   "Mythros",     412, 80,  2, 910000000, true);
+			add_member(2003,   "BowMaster",   311, 55, -1, 100000000, false);
+			add_member(2004,   "Nightblade",  421, 90,  1, 220000000, true);
+			Stage::get().get_player().get_party().update(998877, party_mocks, my_cid);
+
+			send_chatline("[/mockall] injected 8 buddies + 5 party members.",
+				LineType::YELLOW);
+			return;
+		}
+
+		// DEBUG: /mockall — fill the buddy list AND the party in one
+		// shot so the friend tab, party tab, member context menu, and
+		// the invite popup's "Recommended" table can all be exercised
+		// without a live group. Also spawns a dummy OtherChar next to
+		// the local player whose cid matches one of the mock party
+		// members, so the in-world party-HP overlay has a real
+		// character to render above.
+		if (message == "/mockall")
+		{
+			std::map<int32_t, BuddyEntry> buddy_mocks;
+			auto add_buddy = [&](int32_t cid, const char* name, int32_t channel,
+				const char* group) {
+					BuddyEntry e;
+					e.cid     = cid;
+					e.name    = name;
+					e.status  = 0;
+					e.channel = channel;
+					e.group   = group;
+					buddy_mocks[cid] = e;
+				};
+			add_buddy(1001, "MaxTheArcher",  0, "Group Unknown");
+			add_buddy(1002, "Deafmau5",     -1, "Default Group");
+			add_buddy(1003, "Foolish",       4, "Default Group");
+			add_buddy(1004, "HunterPBrown", -1, "Default Group");
+			add_buddy(1005, "ipunchsama",    2, "Friends");
+			add_buddy(1006, "KaiseMystiq",  -1, "Default Group");
+			add_buddy(1007, "Kiyerza",       1, "Friends");
+			add_buddy(1008, "Riverza",      -1, "Group Unknown");
+			Stage::get().get_player().get_buddylist().update(buddy_mocks);
+
+			std::vector<::ms::PartyMember> party_mocks;
+			auto add_member = [&](int32_t cid, const char* name, int16_t job,
+				int16_t level, int32_t channel, int32_t mapid, bool online) {
+					::ms::PartyMember m;
+					m.cid     = cid;
+					m.name    = name;
+					m.job     = job;
+					m.level   = level;
+					m.channel = channel;
+					m.mapid   = mapid;
+					m.online  = online;
+					m.hp      = online ? 1200 : 0;
+					m.maxhp   = 1500;
+					party_mocks.push_back(m);
+				};
+			int32_t my_cid = Stage::get().get_player().get_oid();
+			add_member(my_cid, "Me",          100, 70,  0, 100000000, true);
+			add_member(2001,   "Klaarafia",   200, 65,  0, 100000000, true);
+			add_member(2002,   "Mythros",     412, 80,  2, 910000000, true);
+			add_member(2003,   "BowMaster",   311, 55, -1, 100000000, false);
+			add_member(2004,   "Nightblade",  421, 90,  1, 220000000, true);
+			Stage::get().get_player().get_party().update(998877, party_mocks, my_cid);
+
+			// Spawn a dummy OtherChar right next to the player with
+			// cid 2001 ("Klaarafia") so the in-world party HP bar
+			// overlay can be visualised. Reuses the player's own
+			// CharLook by copy so the silhouette is recognisable.
+			Player& me = Stage::get().get_player();
+			Point<int16_t> spawn_pos = me.get_position() + Point<int16_t>(60, 0);
+			auto dummy = std::make_unique<::ms::OtherChar>(
+				2001, me.get_look(), 65, 200, "Klaarafia", 0, spawn_pos);
+			if (auto* mc = Stage::get().get_chars().get_chars())
+				mc->add(std::move(dummy));
+
+			send_chatline("[/mockall] injected 8 buddies + 5 party members + 1 dummy char.",
+				LineType::YELLOW);
 			return;
 		}
 

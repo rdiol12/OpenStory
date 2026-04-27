@@ -163,10 +163,15 @@ namespace ms
 			break;
 		case Buttons::BT_REG:
 		{
+			// Cosmic auto-registers partyless players, so the register
+			// op is a no-op there. Leaders use PARTY_SEARCH_START with
+			// real criteria; for the standalone search UI we just fire
+			// the start with a +/-10 level window and "any job" mask.
 			int16_t player_level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
-			int8_t min_lvl = static_cast<int8_t>(std::max(1, player_level - 10));
-			int8_t max_lvl = static_cast<int8_t>(std::min(200, player_level + 10));
-			PartySearchRegisterPacket(0, min_lvl, max_lvl).dispatch();
+			int32_t min_lvl = std::max(1, player_level - 10);
+			int32_t max_lvl = std::min(200, player_level + 10);
+			constexpr int32_t ALL_JOBS_MASK = 0x3FFFFFF; // bits 0..25 set
+			PartySearchStartPacket(min_lvl, max_lvl, 6, ALL_JOBS_MASK).dispatch();
 			status_label.change_text("Registered for party search!");
 			break;
 		}

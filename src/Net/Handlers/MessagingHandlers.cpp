@@ -506,13 +506,21 @@ namespace ms
 
 	void WhisperHandler::handle(InPacket& recv) const
 	{
+		// Per chat.txt:
+		//   0x09 LOCATION|RESULT  → /find reply
+		//   0x0A WHISPER|RESULT   → outgoing whisper delivery confirmation
+		//   0x12 WHISPER|RECEIVE  → incoming whisper
+		// The previous routing mixed up 9 and 10 (treated 9 as
+		// incoming whisper and 10 as find reply), so /find responses
+		// were misparsed and delivery confirmations were silently
+		// reported as someone's location.
 		int8_t mode = recv.read_byte();
 
-		if ((mode == 9 || mode == 18) && !Setting<AllowWhisper>::get().load())
-			return;
-
-		if (mode == 9 || mode == 18) // Whisper received
+		if (mode == 0x12 /* WHISPER|RECEIVE */)
 		{
+			if (!Setting<AllowWhisper>::get().load())
+				return;
+
 			std::string from = recv.read_string();
 			recv.read_byte(); // channel
 			bool from_admin = recv.read_bool();
@@ -528,7 +536,7 @@ namespace ms
 			if (auto whisper = UI::get().get_element<UIWhisper>())
 				whisper->recv_whisper(from, message, from_admin);
 		}
-		else if (mode == 10) // Find reply — "X is on channel Y"
+		else if (mode == 0x09 /* LOCATION|RESULT */) // /find reply
 		{
 			std::string name = recv.read_string();
 			int8_t result = recv.read_byte();
@@ -544,6 +552,21 @@ namespace ms
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
+		}
+		else if (mode == 0x0A /* WHISPER|RESULT */) // delivery confirmation
+		{
+			std::string name = recv.read_string();
+			int8_t result = recv.read_byte();
+
+			if (result == 0)
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(
+						"The user " + name + " is not logged in.",
+						UIChatBar::LineType::RED);
+			}
+			// result == 1 → delivered; no toast (the echo line we
+			// printed when sending is enough confirmation).
 		}
 	}
 
@@ -561,21 +584,38 @@ namespace ms
 		if (type == 3 && !Setting<AllowAllianceChat>::get().load())
 			return;
 
+		// Channel prefix + matching color per chat.txt:
+		//   buddy=orange, party=pink, guild=green, alliance=lightgreen.
 		std::string prefix;
+		UIChatBar::LineType color = UIChatBar::LineType::BLUE;
 
 		switch (type)
 		{
-		case 0: prefix = "[Buddy] "; break;
-		case 1: prefix = "[Party] "; break;
-		case 2: prefix = "[Guild] "; break;
-		case 3: prefix = "[Alliance] "; break;
-		default: prefix = "[Chat] "; break;
+		case 0:
+			prefix = "[Buddy] ";
+			color  = UIChatBar::LineType::ORANGE;
+			break;
+		case 1:
+			prefix = "[Party] ";
+			color  = UIChatBar::LineType::PINK;
+			break;
+		case 2:
+			prefix = "[Guild] ";
+			color  = UIChatBar::LineType::GREEN;
+			break;
+		case 3:
+			prefix = "[Alliance] ";
+			color  = UIChatBar::LineType::LIGHTGREEN;
+			break;
+		default:
+			prefix = "[Chat] ";
+			break;
 		}
 
 		std::string line = prefix + from + ": " + message;
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(line, UIChatBar::LineType::BLUE);
+			chatbar->send_chatline(line, color);
 	}
 
 	void FakeGMNoticeHandler::handle(InPacket& recv) const
