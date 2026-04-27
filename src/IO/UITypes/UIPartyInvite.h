@@ -42,6 +42,7 @@ namespace ms
 	private:
 		enum Buttons : uint16_t
 		{
+			BT_CLOSE,          // X in the title bar
 			BT_INVITE_NAME,    // top-right invite button next to name field
 			BT_COL_NAME,       // sortable column header
 			BT_COL_JOB,
@@ -53,6 +54,8 @@ namespace ms
 		struct InviteRow
 		{
 			std::string name;
+			std::string job;            // empty when not known (buddies)
+			int16_t level = 0;          // 0 when not known
 			Rectangle<int16_t> hit;     // per-row INVITE hit-rect
 		};
 
@@ -65,9 +68,12 @@ namespace ms
 		Texture backgrnd3;
 		Texture table_bg;
 		Texture invite_label;          // INVITE-column header sprite
-		Texture row_invite_tex;        // per-row INVITE button sprite
+		Texture row_invite_tex;        // per-row INVITE button (normal)
+		Texture row_invite_hover_tex;  // per-row INVITE button (mouseOver)
+		Texture row_invite_pressed_tex;// per-row INVITE button (pressed)
 
 		mutable std::vector<InviteRow> rows;
 		mutable int16_t list_scroll = 0;
+		mutable int16_t hovered_row  = -1;
 	};
 }

@@ -72,9 +72,12 @@ namespace ms
 
 		computed_height = body_h;
 		dimension = Point<int16_t>(row_dims.x(), computed_height);
-		// Anchor's bottom-right matches the BT_NOTICE button's top-left
-		// (so the stack grows upward from the status bar).
-		position = anchor - Point<int16_t>(row_dims.x(), computed_height);
+		// Anchor's bottom matches the BT_NOTICE button's top so the
+		// stack grows upward from the status bar; the x offset is
+		// nudged right so the popup sits closer above the bell button
+		// instead of hanging far to its left.
+		constexpr int16_t POCKET_X_NUDGE = 20;
+		position = anchor - Point<int16_t>(row_dims.x() - POCKET_X_NUDGE, computed_height);
 	}
 
 	void UINotificationList::draw(float inter) const

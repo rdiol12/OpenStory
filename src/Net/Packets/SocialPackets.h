@@ -188,15 +188,35 @@ namespace ms
 
 	// --- Party Search Packets ---
 
-	// Register for party search
+	// Register for party search. Cosmic's handler is an empty stub —
+	// players are auto-attached to the search pool when partyless via
+	// `Character.updatePartySearchAvailability(true)`. This packet is
+	// kept for compatibility with other server forks; it sends no
+	// payload.
 	class PartySearchRegisterPacket : public OutPacket
 	{
 	public:
-		PartySearchRegisterPacket(int8_t job_type, int8_t min_level, int8_t max_level) : OutPacket(OutPacket::Opcode::PARTY_SEARCH_REGISTER)
+		PartySearchRegisterPacket() : OutPacket(OutPacket::Opcode::PARTY_SEARCH_REGISTER) {}
+	};
+
+	// Start a party search. Leader-only; the server validates and
+	// queues the leader with PartySearchCoordinator, which auto-pushes
+	// `partySearchInvite` to matching candidates.
+	//   int min_level   — minimum level filter
+	//   int max_level   — maximum level filter (max-min must be ≤ 30)
+	//   int members     — desired member count (Cosmic reads-but-ignores)
+	//   int jobs_mask   — bitmask of accepted job categories
+	class PartySearchStartPacket : public OutPacket
+	{
+	public:
+		PartySearchStartPacket(int32_t min_level, int32_t max_level,
+			int32_t members, int32_t jobs_mask)
+			: OutPacket(OutPacket::Opcode::PARTY_SEARCH_START)
 		{
-			write_byte(job_type);
-			write_byte(min_level);
-			write_byte(max_level);
+			write_int(min_level);
+			write_int(max_level);
+			write_int(members);
+			write_int(jobs_mask);
 		}
 	};
 

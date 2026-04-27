@@ -207,15 +207,15 @@ namespace ms
 			if (local_y + ROW_H <= LIST_Y_START || local_y >= LIST_Y_END)
 				continue;
 
-			// Hover highlight aligned with the text band only (skipping
-			// the gap above each row) so the glow doesn't appear to
-			// float above the group name.
+			// Hover highlight tinted to match the SideMenu mouseOver
+			// backdrop — soft blue band — without inheriting the baked
+			// icon/text from any individual button sprite.
 			if (!hovered_group.empty() && b.current_group == hovered_group)
 			{
 				ColorBox glow(FIELD_RIGHT - GROUP_COL_X, ROW_H - 4,
-					Color::Name::YELLOW, 0.25f);
+					Color::Name::MALIBU, 0.40f);
 				glow.draw(DrawArgument(
-					position + Point<int16_t>(GROUP_COL_X, local_y + 6)));
+					position + Point<int16_t>(GROUP_COL_X, local_y + 9)));
 			}
 
 			// Checkbox nudged 4 px left and 3 px down so it lines up

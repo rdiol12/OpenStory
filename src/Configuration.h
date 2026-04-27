@@ -542,6 +542,13 @@ namespace ms
 		PosPARTYINVITE() : PointEntry("PosPARTYINVITE", "(420, 100)") {}
 	};
 
+	// The default position of UIPartyHelper (the small Quest-Helper-
+	// style side panel listing party member names).
+	struct PosPARTYHELPER : public Configuration::PointEntry
+	{
+		PosPARTYHELPER() : PointEntry("PosPARTYHELPER", "(680,100)") {}
+	};
+
 	// The default position of UIStorage
 	struct PosSTORAGE : public Configuration::PointEntry
 	{

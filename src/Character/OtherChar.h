@@ -50,6 +50,8 @@ namespace ms
 		int8_t get_integer_attackspeed() const override;
 		// Return the character's level.
 		uint16_t get_level() const override;
+		// Return the character's job id.
+		int16_t get_job() const;
 		// Return the character's level of a skill.
 		int32_t get_skilllevel(int32_t skillid) const override;
 
