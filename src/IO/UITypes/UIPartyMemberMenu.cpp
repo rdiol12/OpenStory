@@ -1,3 +1,20 @@
+//////////////////////////////////////////////////////////////////////////////////
+//	This file is part of the continued Journey MMORPG client					//
+//	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
+//																				//
+//	This program is free software: you can redistribute it and/or modify		//
+//	it under the terms of the GNU Affero General Public License as published by	//
+//	the Free Software Foundation, either version 3 of the License, or			//
+//	(at your option) any later version.											//
+//																				//
+//	This program is distributed in the hope that it will be useful,				//
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of				//
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the				//
+//	GNU Affero General Public License for more details.							//
+//																				//
+//	You should have received a copy of the GNU Affero General Public License	//
+//	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
+//////////////////////////////////////////////////////////////////////////////////
 #include "UIPartyMemberMenu.h"
 
 #include "UIWhisper.h"
@@ -18,15 +35,12 @@ namespace ms
 {
 	UIPartyMemberMenu::UIPartyMemberMenu(int32_t cid, const std::string& name,
 		Point<int16_t> spawn, bool is_leader, bool target_is_self)
-		: UIElement(spawn, Point<int16_t>(WIDTH, 0), true),
+		: UIElement(spawn, Point<int16_t>(SideMenuBackdrop::WIDTH, 0), true),
 		  target_cid(cid),
 		  target_name(name)
 	{
 		nl::node menu = nl::nx::ui["UIWindow2.img"]["UserList"]["Main"]["Party"]["SideMenu"];
-
-		top    = menu["top"];
-		mid    = menu["center"];
-		bottom = menu["bottom"];
+		chrome.load(menu);
 
 		const char* button_names[NUM_BUTTONS] = {
 			"BtWhisper", "BtFriend", "BtChat", "BtMessage",
@@ -52,36 +66,25 @@ namespace ms
 			visible.push_back(BT_KICKOUT);
 		}
 
-		int16_t y = TOP_H;
+		int16_t y = SideMenuBackdrop::TOP_H;
 		for (uint16_t id : visible)
 		{
 			buttons[id] = std::make_unique<MapleButton>(
 				menu[button_names[id]],
-				Point<int16_t>(BUTTON_X, y));
-			y += BUTTON_H;
+				Point<int16_t>(SideMenuBackdrop::BUTTON_X, y));
+			y += SideMenuBackdrop::BUTTON_H;
 		}
 
 		visible_count = visible.size();
-		mid_h  = static_cast<int16_t>(visible_count) * BUTTON_H;
-		height = TOP_H + mid_h + BOTTOM_H;
-		dimension = Point<int16_t>(WIDTH, height);
+		height = SideMenuBackdrop::height_for(visible_count);
+		dimension = Point<int16_t>(SideMenuBackdrop::WIDTH, height);
 
 		position = spawn;
 	}
 
 	void UIPartyMemberMenu::draw(float inter) const
 	{
-		Point<int16_t> p = position;
-
-		top.draw(DrawArgument(p));
-		p.shift_y(TOP_H);
-
-		for (size_t row = 0; row < visible_count; row++)
-			mid.draw(DrawArgument(p + Point<int16_t>(0, static_cast<int16_t>(row) * BUTTON_H)));
-
-		p.shift_y(mid_h);
-		bottom.draw(DrawArgument(p));
-
+		chrome.draw(position, visible_count);
 		UIElement::draw_buttons(inter);
 	}
 
@@ -89,7 +92,8 @@ namespace ms
 	{
 		if (clicked)
 		{
-			Rectangle<int16_t> area(position, position + Point<int16_t>(WIDTH, height));
+			Rectangle<int16_t> area(position,
+				position + Point<int16_t>(SideMenuBackdrop::WIDTH, height));
 			if (!area.contains(cursorpos))
 			{
 				deactivate();
@@ -98,6 +102,16 @@ namespace ms
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIPartyMemberMenu::send_key(int32_t keycode, bool pressed, bool escape)
+	{
+		if (!pressed) return;
+		if (escape)
+		{
+			deactivate();
+			return;
+		}
 	}
 
 	Button::State UIPartyMemberMenu::button_pressed(uint16_t buttonid)

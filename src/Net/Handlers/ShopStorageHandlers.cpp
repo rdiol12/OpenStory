@@ -637,17 +637,38 @@ namespace ms
 	}
 
 	// Opcode 306 (0x132) — CONFIRM_SHOP_TRANSACTION
-	// Server confirms a shop buy/sell transaction result
+	// Server confirms a shop buy/sell transaction result. Cosmic's
+	// Shop.buy() / Shop.sell() pick the code; surface the exact reason
+	// instead of a generic "failed" so missing-meso, full-inventory and
+	// slot/itemid-mismatch failures can be told apart in-game.
 	void ConfirmShopTransactionHandler::handle(InPacket& recv) const
 	{
 		int8_t code = recv.read_byte();
 
-		// code 0 = buy success, code 8 = sell/recharge success
-		// Other codes = errors (not enough mesos, inventory full, etc.)
-		if (code != 0 && code != 8)
+		auto messenger = UI::get().get_element<UIStatusMessenger>();
+		if (!messenger) return;
+
+		switch (code)
 		{
-			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
-				messenger->show_status(Color::Name::RED, "Transaction failed.");
+		case 0:  // buy success — silent (inventory packet handles the gain)
+		case 8:  // sell / recharge success — silent
+			break;
+		case 2:
+			messenger->show_status(Color::Name::RED, "You don't have enough mesos.");
+			break;
+		case 3:
+			messenger->show_status(Color::Name::RED, "Your inventory is full.");
+			break;
+		case 5:
+			messenger->show_status(Color::Name::RED, "You can't sell that item.");
+			break;
+		case 9:
+			messenger->show_status(Color::Name::RED, "You don't have enough mesos to recharge.");
+			break;
+		default:
+			messenger->show_status(Color::Name::RED,
+				"Transaction failed (code " + std::to_string(static_cast<int>(code)) + ").");
+			break;
 		}
 	}
 
@@ -761,8 +782,7 @@ namespace ms
 				std::string from = recv.read_string();
 				recv.read_bool(); // quick delivery
 
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("[Duey] Package received from " + from + "!", UIChatBar::LineType::YELLOW);
+				chat::log("[Duey] Package received from " + from + "!", chat::LineType::YELLOW);
 
 				break;
 			}
@@ -796,16 +816,14 @@ namespace ms
 		recv.read_byte(); // 1
 		recv.read_byte(); // 4
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] " + owner_name + "'s shop: " + description, UIChatBar::LineType::YELLOW);
+		chat::log("[HiredMerchant] " + owner_name + "'s shop: " + description, chat::LineType::YELLOW);
 	}
 
 	void DestroyHiredMerchantHandler::handle(InPacket& recv) const
 	{
 		int32_t owner_id = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] A hired merchant has been removed.", UIChatBar::LineType::YELLOW);
+		chat::log("[HiredMerchant] A hired merchant has been removed.", chat::LineType::YELLOW);
 	}
 
 	void UpdateHiredMerchantHandler::handle(InPacket& recv) const
@@ -818,16 +836,14 @@ namespace ms
 		int8_t cur_visitors = recv.read_byte();
 		int8_t max_visitors = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[HiredMerchant] " + description + " (" + std::to_string(cur_visitors) + "/" + std::to_string(max_visitors) + " visitors)", UIChatBar::LineType::YELLOW);
+		chat::log("[HiredMerchant] " + description + " (" + std::to_string(cur_visitors) + "/" + std::to_string(max_visitors) + " visitors)", chat::LineType::YELLOW);
 	}
 
 	void FredrickMessageHandler::handle(InPacket& recv) const
 	{
 		int8_t operation = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Fredrick] Message (op=" + std::to_string(operation) + ")", UIChatBar::LineType::YELLOW);
+		chat::log("[Fredrick] Message (op=" + std::to_string(operation) + ")", chat::LineType::YELLOW);
 	}
 
 	void FredrickHandler::handle(InPacket& recv) const
@@ -836,7 +852,6 @@ namespace ms
 
 		// 0x23 = retrieve items, 0x24 = error
 		// Full parsing would require ItemInfo deserialization
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Fredrick] Response (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+		chat::log("[Fredrick] Response (op=" + std::to_string(op) + ")", chat::LineType::YELLOW);
 	}
 }

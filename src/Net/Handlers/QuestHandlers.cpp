@@ -49,8 +49,7 @@ namespace ms
 				// Set countdown for the first (or most recent) quest timer
 				Stage::get().set_countdown(time_ms / 1000);
 
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("[Quest] Time limit set: " + std::to_string(time_ms / 1000) + " seconds", UIChatBar::LineType::YELLOW);
+				chat::log("[Quest] Time limit set: " + std::to_string(time_ms / 1000) + " seconds", chat::LineType::YELLOW);
 			}
 			break;
 		}
@@ -80,32 +79,28 @@ namespace ms
 			int16_t questid = recv.read_short();
 			(void)questid;
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Quest] You don't meet the requirements for this quest.", UIChatBar::LineType::RED);
+			chat::log("[Quest] You don't meet the requirements for this quest.", chat::LineType::RED);
 
 			break;
 		}
 		case 0x0B:
 		{
 			// Quest failure — not enough mesos
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Quest] You don't have enough mesos.", UIChatBar::LineType::RED);
+			chat::log("[Quest] You don't have enough mesos.", chat::LineType::RED);
 
 			break;
 		}
 		case 0x0D:
 		{
 			// Quest failure — equipment is currently worn
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Quest] Item is currently worn by character.", UIChatBar::LineType::RED);
+			chat::log("[Quest] Item is currently worn by character.", chat::LineType::RED);
 
 			break;
 		}
 		case 0x0E:
 		{
 			// Quest failure — missing required item
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Quest] You don't have the required item.", UIChatBar::LineType::RED);
+			chat::log("[Quest] You don't have the required item.", chat::LineType::RED);
 
 			break;
 		}
@@ -115,8 +110,7 @@ namespace ms
 			int16_t questid = recv.read_short();
 			Stage::get().get_player().get_quests().forfeit(questid);
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Quest] The quest has expired.", UIChatBar::LineType::RED);
+			chat::log("[Quest] The quest has expired.", chat::LineType::RED);
 
 			// Refresh quest log UI if open
 			if (auto questlog_ui = UI::get().get_element<UIQuestLog>())

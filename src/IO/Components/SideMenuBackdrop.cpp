@@ -15,47 +15,36 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
+#include "SideMenuBackdrop.h"
 
-#include "../UIDragElement.h"
-#include "../Components/PopupSettingsChrome.h"
+#include "../../Graphics/DrawArgument.h"
 
-#include "../../Graphics/Text.h"
-#include "../../Configuration.h"
-
-#include <cstdint>
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#include <nlnx/node.hpp>
+#endif
 
 namespace ms
 {
-	// Party settings popup — UIWindow2.img/UserList/PopupSettings
-	// (260x103). Two title sprites are baked into the dialog, one
-	// for "Make" (creating a party) and one for "Settings" (editing
-	// an existing one); we pick the right one at construction.
-	class UIPartySettings : public UIDragElement<PosPARTYSETTINGS>
+	void SideMenuBackdrop::load(const nl::node& menu)
 	{
-	public:
-		static constexpr Type TYPE = UIElement::Type::PARTYSETTINGS;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		top    = menu["top"];
+		mid    = menu["center"];
+		bottom = menu["bottom"];
+	}
 
-		UIPartySettings(bool make_mode);
+	void SideMenuBackdrop::draw(Point<int16_t> pos, size_t visible_count) const
+	{
+		Point<int16_t> p = pos;
 
-		void draw(float inter) const override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		top.draw(DrawArgument(p));
+		p.shift_y(TOP_H);
 
-		UIElement::Type get_type() const override;
+		for (size_t row = 0; row < visible_count; row++)
+			mid.draw(DrawArgument(p + Point<int16_t>(0,
+				static_cast<int16_t>(row) * BUTTON_H)));
 
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		enum Buttons : uint16_t
-		{
-			BT_OK,        // bound to NX BtSave; "OK" to match other popups
-			BT_CANCEL
-		};
-
-		bool make_mode;
-		PopupSettingsChrome chrome;
-	};
+		p.shift_y(static_cast<int16_t>(visible_count) * BUTTON_H);
+		bottom.draw(DrawArgument(p));
+	}
 }

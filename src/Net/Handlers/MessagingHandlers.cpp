@@ -24,6 +24,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
+#include "../../IO/Notifications.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UINpcTalk.h"
@@ -33,6 +34,10 @@
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UIWhisper.h"
 #include "../../Configuration.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -116,6 +121,31 @@ namespace ms
 
 				show_status(Color::Name::WHITE, "You have gained mesos (" + sign + std::to_string(gain) + ")");
 			}
+			else if (static_cast<uint8_t>(mode2) == 0xFE)
+			{
+				// Cosmic: showItemUnavailable() — fired when the player
+				// tries to pick up a drop that's still owned by someone
+				// else (FFA timer hasn't expired, party drop, etc.).
+				// Cosmic also writes two trailing ints (both 0) we just
+				// drain so the stream stays aligned.
+				if (recv.length() >= 8)
+				{
+					recv.read_int();
+					recv.read_int();
+				}
+				show_status(Color::Name::RED, "You can't pick up this item right now.");
+			}
+			else if (static_cast<uint8_t>(mode2) == 0xFF)
+			{
+				// Cosmic: getShowInventoryFull() — same packet shape as
+				// 0xFE; same trailing two ints.
+				if (recv.length() >= 8)
+				{
+					recv.read_int();
+					recv.read_int();
+				}
+				show_status(Color::Name::RED, "Your inventory is full.");
+			}
 			else
 			{
 				show_status(Color::Name::RED, "Mode: 0, Mode 2: " + std::to_string(mode2) + " is not handled.");
@@ -151,9 +181,32 @@ namespace ms
 				Sound(Sound::Name::QUESTCOMPLETE).play();
 				Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);
 
-				// Show notice button alert
-				if (auto statusbar = UI::get().get_element<UIStatusBar>())
-					statusbar->notify();
+				// Notification: toast above status bar + drawer entry.
+				// Accept opens the quest log focused on this quest.
+				std::string qname;
+				nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(qid)];
+				if (info)
+					qname = info["name"].get_string();
+				if (qname.empty())
+					qname = "Quest #" + std::to_string(qid);
+
+				Notifications::notify(
+					"Quest Completed",
+					qname,
+					[qid](bool yes)
+					{
+						if (!yes)
+							return;
+						auto log = UI::get().get_element<UIQuestLog>();
+						if (!log)
+						{
+							UI::get().emplace<UIQuestLog>(
+								Stage::get().get_player().get_quests());
+							log = UI::get().get_element<UIQuestLog>();
+						}
+						if (log)
+							log->focus_completed_quest(qid);
+					});
 			}
 
 			// Refresh NPC quest marks after any quest state change
@@ -380,8 +433,7 @@ namespace ms
 
 		auto linetype = gm ? UIChatBar::LineType::WHITE : static_cast<UIChatBar::LineType>(type);
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(message, linetype);
+		chat::log(message, linetype);
 	}
 
 	void ScrollResultHandler::handle(InPacket& recv) const
@@ -456,8 +508,7 @@ namespace ms
 				std::string sign = (qty < 0) ? "-" : "+";
 				std::string message = "Gained an item: " + name + " (" + sign + std::to_string(qty) + ")";
 
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+				chat::log(message, chat::LineType::BLUE);
 			}
 
 			break;
@@ -530,8 +581,7 @@ namespace ms
 
 			// PINK is the v83-canonical whisper color; admins still
 			// land WHITE so GM messages stand out.
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, from_admin ? UIChatBar::LineType::WHITE : UIChatBar::LineType::PINK);
+			chat::log(line, from_admin ? chat::LineType::WHITE : chat::LineType::PINK);
 
 			if (auto whisper = UI::get().get_element<UIWhisper>())
 				whisper->recv_whisper(from, message, from_admin);
@@ -550,8 +600,7 @@ namespace ms
 			else
 				line = name + " is on Channel " + std::to_string(result) + ".";
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
+			chat::log(line, chat::LineType::YELLOW);
 		}
 		else if (mode == 0x0A /* WHISPER|RESULT */) // delivery confirmation
 		{
@@ -614,8 +663,7 @@ namespace ms
 
 		std::string line = prefix + from + ": " + message;
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(line, color);
+		chat::log(line, color);
 	}
 
 	void FakeGMNoticeHandler::handle(InPacket& recv) const

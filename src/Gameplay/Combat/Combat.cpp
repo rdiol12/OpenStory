@@ -152,7 +152,18 @@ namespace ms
 
 			if (reactor_targets.size())
 				if (Optional<Reactor> reactor = reactor_objs->get(reactor_targets.at(0)))
-					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
+				{
+					// Stance must NOT be 0 or 2 — Cosmic's hitReactor()
+					// silently rejects those for reactor type 2 (the
+					// most common attackable reactor type). Use the
+					// attack's stance byte (player facing + attack
+					// frame), which is always a non-zero value derived
+					// from the actual swing animation.
+					int16_t stance = static_cast<int16_t>(result.stance);
+					if (stance == 0 || stance == 2)
+						stance = attack.toleft ? 1 : 3;
+					DamageReactorPacket(reactor->get_oid(), player.get_position(), stance, 0).dispatch();
+				}
 		}
 		else
 		{

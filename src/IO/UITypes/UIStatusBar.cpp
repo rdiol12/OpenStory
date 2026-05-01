@@ -23,6 +23,7 @@
 
 #include "../../Configuration.h"
 #include "../../Graphics/Geometry.h"
+#include "../NotificationCenter.h"
 #include "UIBuddyList.h"
 #include "UIChannel.h"
 #include "UIEquipInventory.h"
@@ -285,16 +286,18 @@ namespace ms
 
 		// === Quick slot ===
 		nl::node qs = mainbar["quickSlot"];
-		quickslot_bg = Texture(qs["quickSlot"]);
-
-		// v83 StatusBar2 bitmap is a blank 145x93 frame — render key
-		// names programmatically on top of each cell.
-		static const char* QS_LABEL_NAMES[8] = {
-			"Shft", "Ins", "Hme", "PgU",
-			"Ctl",  "Del", "End", "PgD"
-		};
-		for (int i = 0; i < 8; i++)
-			qs_key_labels[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NONE, QS_LABEL_NAMES[i]);
+		// Prefer the v83 `StatusBar.img/base/quickSlot` bitmap — that
+		// one has the Shft/Ctl/Ins/Del/Hme/End/PgU/PgD key labels
+		// baked into the panel frame. Only when it isn't present in
+		// this NX build do we fall back to the StatusBar2 variant
+		// (`mainBar/quickSlot/quickSlot`), which is a blank frame and
+		// would need programmatic labels — left to a separate path.
+		nl::node statusbar_v83 = nl::nx::ui["StatusBar.img"];
+		nl::node v83_labeled = statusbar_v83["base"]["quickSlot"];
+		if (v83_labeled)
+			quickslot_bg = Texture(v83_labeled);
+		else
+			quickslot_bg = Texture(qs["quickSlot"]);
 
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
 		buttons[BT_QS_OPEN]->set_active(true);
@@ -419,13 +422,6 @@ namespace ms
 		{
 			if (quickslot_bg.is_valid())
 				quickslot_bg.draw(DrawArgument(position));
-
-			int16_t cell_label_w = 30;
-			for (int16_t i = 0; i < 8; ++i)
-			{
-				Point<int16_t> tl = quickslot_slot_pos(i);
-				qs_key_labels[i].draw(DrawArgument(tl + Point<int16_t>(cell_label_w / 2, -1)));
-			}
 
 			const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
 			int16_t cell_w = 30;
@@ -628,50 +624,14 @@ namespace ms
 		// Draw main-bar buttons first
 		UIElement::draw_buttons(alpha);
 
-		// Notice-button pulse/blink overlays removed — the UIAlarmInvite
-		// banner (UIWindow.img/FadeYesNo) is the only notification now.
-
-		// DEBUG sprite preview overlays — driven by /float <N> and
-		// /notice# <N> chat commands. Renders the chosen sprite near
-		// the center of the screen so it's easy to browse all entries.
-		if (preview_mode != 0)
-		{
-			int16_t vh = Constants::Constants::get().get_viewheight();
-			Point<int16_t> center(vwidth / 2, vh / 2);
-
-			if (preview_mode == 1)
-			{
-				// FloatNotice/<idx> — 3-piece tiled balloon: 0 left cap,
-				// 1 middle stretch, 2 right cap. Stretch middle to 160px.
-				nl::node fn = nl::nx::ui["UIWindow.img"]["FloatNotice"][std::to_string(preview_idx)];
-				Texture l(fn["0"]);
-				Texture m(fn["1"]);
-				Texture r(fn["2"]);
-				if (l.is_valid())
-				{
-					constexpr int16_t MID_W = 160;
-					int16_t lw = l.width();
-					int16_t mh = m.is_valid() ? m.height() : l.height();
-					Point<int16_t> tl(center.x() - (lw + MID_W + r.width()) / 2, center.y() - mh / 2);
-					l.draw(DrawArgument(tl));
-					if (m.is_valid())
-						m.draw(DrawArgument(tl + Point<int16_t>(lw, 0), Point<int16_t>(MID_W, mh)));
-					if (r.is_valid())
-						r.draw(DrawArgument(tl + Point<int16_t>(lw + MID_W, 0)));
-				}
-			}
-			else if (preview_mode == 2)
-			{
-				// UIWindow.img/Notice/<idx> — single-frame modal bmp.
-				nl::node nt = nl::nx::ui["UIWindow.img"]["Notice"][std::to_string(preview_idx)];
-				Texture t(nt);
-				if (t.is_valid())
-				{
-					Point<int16_t> tl(center.x() - t.width() / 2, center.y() - t.height() / 2);
-					t.draw(DrawArgument(tl));
-				}
-			}
-		}
+		// Pending-notification badge above the bell button. Set by
+		// `notify()` whenever a quest completes, an invite arrives, an
+		// item-effect msg fires, etc., and cleared once the player
+		// opens the notification drawer or otherwise resolves it.
+		// notice_sprite carries its own NX origin so a plain draw at
+		// `position` lands it on top of BtNotice.
+		if (has_notification && notice_sprite.is_valid())
+			notice_sprite.draw(DrawArgument(position));
 
 		// Sub-panel overlays — drawn LAST so they sit above every other
 		// sprite/button in the status bar. Sub-panel buttons have already
@@ -758,6 +718,13 @@ namespace ms
 		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH), 84);
 
 		UIElement::update();
+
+		// Age notification entries; auto-decline anything older than
+		// NotificationCenter::TTL_TICKS (~2 minutes). When the queue
+		// drains we drop the badge but keep the bell button visible.
+		NotificationCenter::get().tick();
+		if (NotificationCenter::get().empty())
+			has_notification = false;
 
 		// Fade sub-panels in/out. Target is 1.0 while shown, 0.0 while
 		// hidden — a ~8-tick ramp gives a smooth fade instead of a pop.
@@ -1175,57 +1142,28 @@ namespace ms
 
 	void UIStatusBar::notify()
 	{
+		// The bell button itself is always active (clickable so the
+		// user can open an empty drawer at any time). Only the notice
+		// badge sprite above the button toggles with has_notification.
 		has_notification = true;
-
-		if (buttons.count(BT_NOTICE))
-			buttons[BT_NOTICE]->set_active(true);
 	}
 
 	void UIStatusBar::clear_notification()
 	{
 		has_notification = false;
-
-		if (buttons.count(BT_NOTICE))
-			buttons[BT_NOTICE]->set_active(false);
 	}
 
-	void UIStatusBar::set_preview_float(int idx)  { preview_mode = 1; preview_idx = idx; }
-	void UIStatusBar::set_preview_notice(int idx) { preview_mode = 2; preview_idx = idx; }
-	void UIStatusBar::clear_preview()             { preview_mode = 0; preview_idx = 0; }
-
-	bool UIStatusBar::preview_step(int delta)
+	Point<int16_t> UIStatusBar::get_notice_anchor() const
 	{
-		if (preview_mode == 0) return false;
-
-		// Collect valid indexes (child names under the active root) and
-		// advance by delta, wrapping around.
-		nl::node root;
-		if (preview_mode == 1)
-			root = nl::nx::ui["UIWindow.img"]["FloatNotice"];
-		else
-			root = nl::nx::ui["UIWindow.img"]["Notice"];
-
-		std::vector<int> indexes;
-		for (auto c : root)
+		auto it = buttons.find(BT_NOTICE);
+		if (it == buttons.end() || !it->second)
 		{
-			std::string n = c.name();
-			if (!n.empty() && std::all_of(n.begin(), n.end(), ::isdigit))
-				indexes.push_back(std::atoi(n.c_str()));
+			// Fallback: roughly where the bell sits at 800x600.
+			int16_t vw = Constants::Constants::get().get_viewwidth();
+			int16_t vh = Constants::Constants::get().get_viewheight();
+			return Point<int16_t>(vw - 8, vh - 36);
 		}
-		if (indexes.empty()) return true;
-		std::sort(indexes.begin(), indexes.end());
-
-		auto it = std::find(indexes.begin(), indexes.end(), preview_idx);
-		int pos;
-		if (it == indexes.end())
-			pos = 0;
-		else
-			pos = static_cast<int>(it - indexes.begin());
-
-		int n = static_cast<int>(indexes.size());
-		pos = ((pos + delta) % n + n) % n;
-		preview_idx = indexes[pos];
-		return true;
+		return position + it->second->bounds(Point<int16_t>(0, 0)).get_left_top();
 	}
 
 	// === Quickslot drop / render ===

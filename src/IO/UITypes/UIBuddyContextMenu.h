@@ -18,6 +18,7 @@
 #pragma once
 
 #include "../UIElement.h"
+#include "../Components/SideMenuBackdrop.h"
 #include "../../Graphics/Texture.h"
 
 #include <cstdint>
@@ -70,25 +71,13 @@ namespace ms
 		int32_t target_cid;
 		std::string target_name;
 
-		Texture top;
-		Texture mid;
-		Texture bottom;
-
-		// SideMenu metrics taken from buddydump:
-		//   top    88x22
-		//   center 85x15 (tiled vertically)
-		//   bottom 85x22
-		//   buttons each 77x14 (origin 0,0 — placed manually)
-		static constexpr int16_t WIDTH        = 88;
-		static constexpr int16_t TOP_H        = 22;
-		static constexpr int16_t BOTTOM_H     = 22;
-		static constexpr int16_t BUTTON_H     = 14;
-		static constexpr int16_t BUTTON_X     = 4;
+		// 3-piece chrome shared with UIPartyMemberMenu — see
+		// Components/SideMenuBackdrop for layout constants.
+		SideMenuBackdrop chrome;
 
 		// Computed from the actually-placed button count rather than
 		// fixed at all 9 — the menu is shorter on the All sub-tab.
-		int16_t mid_h    = 0;
-		int16_t height   = 0;
+		int16_t height       = 0;
 		size_t  visible_count = 0;
 	};
 }

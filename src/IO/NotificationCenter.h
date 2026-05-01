@@ -39,7 +39,16 @@ namespace ms
 			std::string title;
 			std::string body;
 			std::function<void(bool yes)> resolver;
+			// Frames since push (advanced by tick()). At ~60Hz, 7200
+			// ticks = 2 minutes, after which the entry auto-declines.
+			int32_t age = 0;
 		};
+
+		// Maximum entries kept simultaneously. Pushing past the cap
+		// drops the oldest unresolved entry to make room.
+		static constexpr size_t MAX_ENTRIES = 10;
+		// Auto-decline lifespan in update ticks (~60Hz). 3600 ≈ 1 min.
+		static constexpr int32_t TTL_TICKS = 3600;
 
 		static NotificationCenter& get();
 
@@ -54,6 +63,11 @@ namespace ms
 		// Drop without invoking the resolver (e.g. user dismissed all).
 		void dismiss(int32_t id);
 		void clear();
+
+		// Advance entry ages by one tick. Auto-declines anything that
+		// reaches TTL_TICKS. Called once per frame from a UI element
+		// that's always alive (UIToastStack).
+		void tick();
 
 		bool empty() const;
 		const std::vector<Entry>& list() const;

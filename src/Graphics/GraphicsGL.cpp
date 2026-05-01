@@ -888,6 +888,7 @@ namespace ms
 		ay = font.linespace();
 		width = 0;
 		endy = 0;
+		skip_lead_hash = false;
 
 		lines.reserve(16);
 		words.reserve(32);
@@ -899,8 +900,110 @@ namespace ms
 
 	size_t GraphicsGL::LayoutBuilder::add(const char* text, size_t prev, size_t first, size_t last)
 	{
+		// Consume the standalone closing `#` of a macro we processed on
+		// the previous call. The splitter delivers it as its own token,
+		// and we need to push an advance for that byte so byte→x lookups
+		// stay aligned with the source text.
+		if (skip_lead_hash && first < last && text[first] == '#')
+		{
+			skip_lead_hash = false;
+			advances.push_back(ax);
+			first++;
+			if (first >= last)
+				return prev;
+		}
+
 		if (first == last)
 			return prev;
+
+		// Inline image macro: `#v<id>#` / `#i<id>#` (item icon),
+		// `#q<id>#` (quest icon), `#s<id>#` (skill icon),
+		// `#f<id>#` (face icon). Reserve a fixed 32 px slot in the
+		// layout and record (pos, id, kind) so the caller can overlay
+		// the actual bitmap from the right NX source. Close the
+		// current word at the macro's start so its bytes are excluded
+		// from glyph rendering, and skip the closing `#` on the next
+		// add() call.
+		auto image_kind_for = [](char c) -> Text::Layout::ImageKind
+		{
+			switch (c)
+			{
+			case 'q': return Text::Layout::ImageKind::QUEST;
+			case 's': return Text::Layout::ImageKind::SKILL;
+			case 'f': return Text::Layout::ImageKind::FACE;
+			default:  return Text::Layout::ImageKind::ITEM;
+			}
+		};
+		if (formatted && first + 2 <= last
+			&& text[first] == '#'
+			&& (text[first + 1] == 'v' || text[first + 1] == 'i'
+				|| text[first + 1] == 'q' || text[first + 1] == 's'
+				|| text[first + 1] == 'f'))
+		{
+			constexpr int16_t ICON_W = 32;
+
+			int32_t item_id = 0;
+			try
+			{
+				if (last > first + 2)
+					item_id = std::stoi(std::string(text + first + 2, text + last));
+			}
+			catch (...) { item_id = 0; }
+
+			Text::Layout::ImageKind kind = image_kind_for(text[first + 1]);
+
+			// Wrap onto a new line if the icon would overflow the
+			// current line — close the in-flight word at this position
+			// before resetting ax/ay, then continue placing the icon
+			// at the new line's origin.
+			if (ax > 0 && ax + ICON_W > maxwidth)
+			{
+				add_word(prev, first, fontid, color);
+				add_line();
+				endy = ay;
+				ax = 0;
+				ay += font.linespace();
+				if (lines.size() > 0)
+					ay -= line_adj;
+			}
+			else
+			{
+				// Close the pending word right before the macro so its
+				// bytes are excluded from text rendering.
+				add_word(prev, first, fontid, color);
+			}
+
+			int16_t pre_icon_ax = ax;
+			if (item_id > 0)
+			{
+				Text::Layout::Image img;
+				// Place the icon's BOTTOM at the text baseline so the
+				// sprite sits directly across from the glyphs (matches
+				// QuestHelper's row layout). The previous attempt
+				// centered the icon vertically and pushed its top into
+				// the prior line — players saw the icon floating above
+				// the item name instead of next to it.
+				img.pos = Point<int16_t>(pre_icon_ax, ay - ICON_W);
+				img.item_id = item_id;
+				img.size = ICON_W;
+				img.kind = kind;
+				images.push_back(img);
+			}
+
+			ax += ICON_W;
+			if (width < ax) width = ax;
+
+			// Placeholder advances for `#v<id>` (without the closing #).
+			// They aren't in any word so they won't render as glyphs;
+			// the value just keeps byte→x lookups well-defined.
+			for (size_t b = first; b < last; b++)
+				advances.push_back(pre_icon_ax);
+
+			skip_lead_hash = true;
+			// Returning last + 1 makes the caller's next `prev` land
+			// past the closing `#`, so the subsequent word starts there.
+			return last + 1;
+		}
 
 		Text::Font last_font = fontid;
 		Color::Name last_color = color;
@@ -1046,7 +1149,7 @@ namespace ms
 
 		advances.push_back(ax);
 
-		return Text::Layout(lines, advances, width, ay, ax, endy);
+		return Text::Layout(lines, advances, images, width, ay, ax, endy);
 	}
 
 	void GraphicsGL::LayoutBuilder::add_word(size_t word_first, size_t word_last, Text::Font word_font, Color::Name word_color)

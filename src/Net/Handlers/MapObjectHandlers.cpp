@@ -451,11 +451,19 @@ namespace ms
 
 	void HitReactorHandler::handle(InPacket& recv) const
 	{
+		// Cosmic REACTOR_HIT (0x115) layout:
+		//   int   oid
+		//   byte  state
+		//   point pos
+		//   short stance       <- was being read as byte (truncating
+		//                         the high half whenever stance > 255)
+		//   byte  0            <- padding
+		//   byte  frameDelay   <- ~5
 		int32_t oid = recv.read_int();
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
-		int8_t stance = recv.read_byte();
-		recv.read_short(); // unknown
+		int16_t stance = recv.read_short();
+		recv.read_byte();                     // padding (0)
 		int8_t frame_delay = recv.read_byte();
 
 		Stage::get().get_reactors().trigger(oid, state);
@@ -463,12 +471,19 @@ namespace ms
 
 	void SpawnReactorHandler::handle(InPacket& recv) const
 	{
+		// Cosmic REACTOR_SPAWN (0x117) layout:
+		//   int   oid
+		//   int   reactorId
+		//   byte  state
+		//   point pos
+		//   byte  0            <- padding (was mislabelled "facing")
+		//   short 0            <- padding
 		int32_t oid = recv.read_int();
 		int32_t rid = recv.read_int();
 		int8_t state = recv.read_byte();
 		Point<int16_t> point = recv.read_point();
-		int8_t facing = recv.read_byte();     // facingDirection
-		recv.read_short();                     // padding (0)
+		recv.read_byte();                     // padding (0)
+		recv.read_short();                    // padding (0)
 
 		Stage::get().get_reactors().spawn(
 			{ oid, rid, state, point }

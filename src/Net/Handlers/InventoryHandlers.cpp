@@ -201,14 +201,12 @@ namespace ms
 		{
 			recv.read_int(); // 0
 			int32_t hammer_used = recv.read_int();
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[ViciousHammer] Used " + std::to_string(hammer_used) + " times.", UIChatBar::LineType::YELLOW);
+			chat::log("[ViciousHammer] Used " + std::to_string(hammer_used) + " times.", chat::LineType::YELLOW);
 		}
 		else if (op == 0x3D)
 		{
 			recv.read_int(); // 0
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[ViciousHammer] Hammering complete!", UIChatBar::LineType::YELLOW);
+			chat::log("[ViciousHammer] Hammering complete!", chat::LineType::YELLOW);
 		}
 	}
 
@@ -216,7 +214,6 @@ namespace ms
 	{
 		int8_t op = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[VegaScroll] Result (op=" + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+		chat::log("[VegaScroll] Result (op=" + std::to_string(op) + ")", chat::LineType::YELLOW);
 	}
 }

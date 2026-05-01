@@ -39,15 +39,12 @@ namespace ms
 {
 	UIBuddyContextMenu::UIBuddyContextMenu(int32_t cid, const std::string& name,
 		Point<int16_t> spawn, bool online_only_actions)
-		: UIElement(spawn, Point<int16_t>(WIDTH, 0), true),
+		: UIElement(spawn, Point<int16_t>(SideMenuBackdrop::WIDTH, 0), true),
 		  target_cid(cid),
 		  target_name(name)
 	{
 		nl::node menu = nl::nx::ui["UIWindow2.img"]["UserList"]["Main"]["Friend"]["SideMenu"];
-
-		top    = menu["top"];
-		mid    = menu["center"];
-		bottom = menu["bottom"];
+		chrome.load(menu);
 
 		const char* button_names[NUM_BUTTONS] = {
 			"BtMemo", "BtConvert", "BtDelete", "BtWhisper",
@@ -64,19 +61,18 @@ namespace ms
 		else
 			visible = { BT_MEMO, BT_DELETE };
 
-		int16_t y = TOP_H;
+		int16_t y = SideMenuBackdrop::TOP_H;
 		for (uint16_t id : visible)
 		{
 			buttons[id] = std::make_unique<MapleButton>(
 				menu[button_names[id]],
-				Point<int16_t>(BUTTON_X, y));
-			y += BUTTON_H;
+				Point<int16_t>(SideMenuBackdrop::BUTTON_X, y));
+			y += SideMenuBackdrop::BUTTON_H;
 		}
 
 		visible_count = visible.size();
-		mid_h = static_cast<int16_t>(visible_count) * BUTTON_H;
-		height = TOP_H + mid_h + BOTTOM_H;
-		dimension = Point<int16_t>(WIDTH, height);
+		height = SideMenuBackdrop::height_for(visible_count);
+		dimension = Point<int16_t>(SideMenuBackdrop::WIDTH, height);
 
 		// Caller is expected to pass a spawn that already accounts for
 		// where the menu should appear (e.g., after the buddy's name
@@ -86,18 +82,7 @@ namespace ms
 
 	void UIBuddyContextMenu::draw(float inter) const
 	{
-		Point<int16_t> p = position;
-
-		top.draw(DrawArgument(p));
-		p.shift_y(TOP_H);
-
-		// `center` is one slice; tile vertically to fill the button band.
-		for (size_t row = 0; row < visible_count; row++)
-			mid.draw(DrawArgument(p + Point<int16_t>(0, static_cast<int16_t>(row) * BUTTON_H)));
-
-		p.shift_y(mid_h);
-		bottom.draw(DrawArgument(p));
-
+		chrome.draw(position, visible_count);
 		UIElement::draw_buttons(inter);
 	}
 
@@ -106,7 +91,8 @@ namespace ms
 		// Click outside the menu dismisses it (matches UISystemMenu).
 		if (clicked)
 		{
-			Rectangle<int16_t> area(position, position + Point<int16_t>(WIDTH, height));
+			Rectangle<int16_t> area(position,
+				position + Point<int16_t>(SideMenuBackdrop::WIDTH, height));
 			if (!area.contains(cursorpos))
 			{
 				deactivate();

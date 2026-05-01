@@ -51,6 +51,11 @@ namespace ms
 
 		void load_quests();
 
+		// Open the Completed tab and select the entry for `qid` (if it
+		// appears in the completed list). Used by the BT_NOTICE drawer
+		// when the user clicks a "Quest Completed" notification.
+		void focus_completed_quest(int16_t qid);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -210,6 +215,9 @@ namespace ms
 
 		// Detail panel
 		bool show_detail;
+		// Slide animation [0..1]: 0 hidden, 1 fully shown.
+		// Eased toward show_detail in update().
+		float detail_anim_t;
 		int16_t detail_scroll;
 		mutable int16_t detail_content_height;
 		Texture detail_backgrnd;

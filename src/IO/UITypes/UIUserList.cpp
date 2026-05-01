@@ -176,6 +176,17 @@ namespace ms
 		tooltip_frame = MapleFrame(tip);
 		tooltip_cover = Texture(tip["cover"]);
 
+		// Reusable tooltip lines — text changes per draw, but the
+		// underlying Text instance lives forever so we don't allocate
+		// per frame while hovering a buddy row.
+		tt_channel       = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "", 0);
+		tt_whisper_hint  = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE,
+			"Double-click to send a Whisper", 0);
+		tt_rclick_hint   = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE,
+			"Right-Click to open your buddy menu", 0);
+		tt_status        = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::ORANGE, "", 0);
+		tt_memo          = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "", 0);
+
 		buttons[Buttons::BT_FRIEND_ADD] = std::make_unique<MapleButton>(Friend["BtAddFriend"]);
 		buttons[Buttons::BT_FRIEND_ADD_GROUP] = std::make_unique<MapleButton>(Friend["BtAddGroup"]);
 		buttons[Buttons::BT_FRIEND_EXPAND] = std::make_unique<MapleButton>(Friend["BtPlusFriend"]);
@@ -273,12 +284,27 @@ namespace ms
 				// `Party["partyN"]` (which doesn't exist on Cosmic v83)
 				// the moment a member showed up — that's why the panel
 				// went blank as soon as a party formed.
-				party_mine_grid[0].draw(position + Point<int16_t>(10, 115));
+				// Layout knobs for the My Party row stack — gathered up
+				// front so future tweaks don't require hunting through
+				// the draw body for inline literals.
+				constexpr int16_t PARTY_HEADER_X    = 10;
+				constexpr int16_t PARTY_HEADER_Y    = 115;
+				constexpr int16_t PARTY_ROW0_Y      = 133;
+				constexpr int16_t PARTY_ROW_H       = 18;
+				constexpr int16_t PARTY_ROW_X       = 10;
+				constexpr int16_t PARTY_ROW_W       = 235;
+				constexpr int16_t PARTY_ICON_X      = 2;     // inset from row left
+				constexpr int16_t PARTY_ICON_Y      = 2;
+				constexpr float   PARTY_ICON_SCALE  = 1.6f;  // dot/leader-star upscale
+				constexpr int16_t PARTY_NAME_X      = 17;    // column anchors
+				constexpr int16_t PARTY_JOB_X       = 120;
+				constexpr int16_t PARTY_LEVEL_X     = 205;
+				constexpr int16_t PARTY_NAME_NUDGE  = -4;    // text top-anchor lift
+				constexpr int16_t PARTY_TEXT_NUDGE  = -1;
+				constexpr int16_t PARTY_EMPTY_NAME_X = 27;
+				constexpr int16_t PARTY_EMPTY_NAME_Y = 130;
 
-				constexpr int16_t party_row0_y = 133;
-				constexpr int16_t party_row_h  = 18;
-				constexpr int16_t party_row_x  = 10;
-				constexpr int16_t party_row_w  = 235;
+				party_mine_grid[0].draw(position + Point<int16_t>(PARTY_HEADER_X, PARTY_HEADER_Y));
 
 				party_row_hits.clear();
 
@@ -291,8 +317,8 @@ namespace ms
 
 				for (size_t i = 0; i < party_members.size() && i < MAX_PARTY_MEMBERS; i++)
 				{
-					int16_t row_y = party_row0_y + static_cast<int16_t>(i) * party_row_h;
-					Point<int16_t> row_pos = position + Point<int16_t>(party_row_x, row_y);
+					int16_t row_y = PARTY_ROW0_Y + static_cast<int16_t>(i) * PARTY_ROW_H;
+					Point<int16_t> row_pos = position + Point<int16_t>(PARTY_ROW_X, row_y);
 
 					party_mine_grid[4].draw(row_pos);
 
@@ -300,28 +326,27 @@ namespace ms
 
 					// Leader → ★ replaces the dot. Non-leader → online
 					// (filled) or offline (hollow) 7x7 dot. Both scaled
-					// 1.6x so the indicator reads on the row.
+					// up so the indicator reads on the row.
+					Point<int16_t> icon_pos = row_pos + Point<int16_t>(PARTY_ICON_X, PARTY_ICON_Y);
 					if (m.cid == leader_cid)
-						party_leader_star.draw(DrawArgument(
-							row_pos + Point<int16_t>(2, 2), 1.6f, 1.6f));
+						party_leader_star.draw(DrawArgument(icon_pos, PARTY_ICON_SCALE, PARTY_ICON_SCALE));
 					else
 						(m.online ? party_icon_online : party_icon_offline)
-							.draw(DrawArgument(
-								row_pos + Point<int16_t>(2, 2), 1.6f, 1.6f));
+							.draw(DrawArgument(icon_pos, PARTY_ICON_SCALE, PARTY_ICON_SCALE));
 
 					// Columns: name | job | level. Text is top-anchored
 					// so a negative y offset nudges it visually up. The
 					// name column gets an extra nudge so it lines up
 					// with the top of the row sprite.
-					party_member_names[i].draw(row_pos + Point<int16_t>(17, -4));
-					party_member_jobs[i].draw(row_pos + Point<int16_t>(120, -1));
-					party_member_levels[i].draw(row_pos + Point<int16_t>(205, -1));
+					party_member_names[i].draw(row_pos + Point<int16_t>(PARTY_NAME_X, PARTY_NAME_NUDGE));
+					party_member_jobs[i].draw(row_pos + Point<int16_t>(PARTY_JOB_X, PARTY_TEXT_NUDGE));
+					party_member_levels[i].draw(row_pos + Point<int16_t>(PARTY_LEVEL_X, PARTY_TEXT_NUDGE));
 
 					party_row_hits.push_back({
 						m.cid, m.name,
 						Rectangle<int16_t>(
 							row_pos,
-							row_pos + Point<int16_t>(party_row_w, party_row_h))
+							row_pos + Point<int16_t>(PARTY_ROW_W, PARTY_ROW_H))
 					});
 				}
 
@@ -329,8 +354,8 @@ namespace ms
 				{
 					// No party — keep the single placeholder row from
 					// before so the panel doesn't look broken.
-					party_mine_grid[4].draw(position + Point<int16_t>(party_row_x, party_row0_y));
-					party_mine_name.draw(position + Point<int16_t>(27, 130));
+					party_mine_grid[4].draw(position + Point<int16_t>(PARTY_ROW_X, PARTY_ROW0_Y));
+					party_mine_name.draw(position + Point<int16_t>(PARTY_EMPTY_NAME_X, PARTY_EMPTY_NAME_Y));
 				}
 			}
 			else if (party_tab == Buttons::BT_TAB_PARTY_SEARCH)
@@ -344,13 +369,18 @@ namespace ms
 				// since Cosmic doesn't push a recruiting-list. Header /
 				// alternating-row / separator NX sprites stretched to
 				// fit the table column.
-				constexpr int16_t SEARCH_X     = 11;
-				constexpr int16_t SEARCH_Y0    = 152;
-				constexpr int16_t SEARCH_W     = 191;
-				constexpr int16_t SEARCH_ROW_H = 17;
-				constexpr int16_t SEARCH_HDR_H = 18;
-				constexpr int16_t REQ_W        = 37;
-				constexpr int16_t REQ_H        = 17;
+				constexpr int16_t SEARCH_X        = 11;
+				constexpr int16_t SEARCH_Y0       = 152;
+				constexpr int16_t SEARCH_W        = 191;
+				constexpr int16_t SEARCH_ROW_H    = 17;
+				constexpr int16_t SEARCH_HDR_H    = 18;
+				constexpr int16_t SEARCH_ROW_GAP  = 1;     // px between consecutive rows
+				constexpr int16_t SEARCH_LABEL_X  = 8;     // text inset from row left
+				constexpr int16_t SEARCH_LABEL_Y_NUDGE = -1;
+				constexpr int16_t SEARCH_REQ_PAD  = 2;     // request-btn inset from row right
+				constexpr int16_t SEARCH_MAX_ROWS = 9;     // visible cap before scroll
+				constexpr int16_t REQ_W           = 37;
+				constexpr int16_t REQ_H           = 17;
 
 				party_search_hits.clear();
 
@@ -359,7 +389,7 @@ namespace ms
 					position + Point<int16_t>(SEARCH_X, SEARCH_Y0),
 					Point<int16_t>(SEARCH_W, SEARCH_HDR_H)));
 
-				int16_t row_y = SEARCH_Y0 + SEARCH_HDR_H + 2;
+				int16_t row_y = SEARCH_Y0 + SEARCH_HDR_H + SEARCH_ROW_GAP * 2;
 				int16_t shown = 0;
 
 				const auto& notes = NotificationCenter::get().list();
@@ -386,13 +416,13 @@ namespace ms
 
 					party_search_row_label.change_text(label);
 					party_search_row_label.draw(
-						position + Point<int16_t>(SEARCH_X + 8, row_y - 1));
+						position + Point<int16_t>(SEARCH_X + SEARCH_LABEL_X, row_y + SEARCH_LABEL_Y_NUDGE));
 
 					// Per-row Request button — clicking it accepts the
 					// stored notification resolver (which dispatches
 					// JoinPartyPacket on the inviter's party id).
 					Point<int16_t> req_xy = position + Point<int16_t>(
-						SEARCH_X + SEARCH_W - REQ_W - 2, row_y);
+						SEARCH_X + SEARCH_W - REQ_W - SEARCH_REQ_PAD, row_y);
 					party_search_request_tex.draw(req_xy);
 
 					party_search_hits.push_back({
@@ -401,9 +431,9 @@ namespace ms
 							req_xy + Point<int16_t>(REQ_W, REQ_H))
 					});
 
-					row_y += SEARCH_ROW_H + 1;
+					row_y += SEARCH_ROW_H + SEARCH_ROW_GAP;
 					shown++;
-					if (shown >= 9) break;
+					if (shown >= SEARCH_MAX_ROWS) break;
 				}
 
 				// Separator at the bottom of the visible row stack.
@@ -673,36 +703,32 @@ namespace ms
 
 				int16_t ty = tip_pos.y() + 4;
 
+				constexpr int16_t TIP_TEXT_X     = 6;
+				constexpr int16_t TIP_BLANK_GAP  = 5;   // extra px after the whisper hint row
+				constexpr int16_t TIP_MEMO_GAP   = 10;  // gap before the memo block
+
 				if (e.online())
 				{
-					Text(Text::Font::A11M, Text::Alignment::LEFT,
-						Color::Name::WHITE, ch_line, 0)
-						.draw(Point<int16_t>(tip_pos.x() + 6, ty));
+					tt_channel.change_text(ch_line);
+					tt_channel.draw(Point<int16_t>(tip_pos.x() + TIP_TEXT_X, ty));
 					ty += line_h;
 				}
-				Text(Text::Font::A11M, Text::Alignment::LEFT,
-					Color::Name::WHITE, "Double-click to send a Whisper", 0)
-					.draw(Point<int16_t>(tip_pos.x() + 6, ty));
+				tt_whisper_hint.draw(Point<int16_t>(tip_pos.x() + TIP_TEXT_X, ty));
 				ty += line_h * 2;
-				Text(Text::Font::A11M, Text::Alignment::LEFT,
-					Color::Name::WHITE, "Right-Click to open your buddy menu", 0)
-					.draw(Point<int16_t>(tip_pos.x() + 6, ty));
-				ty += line_h + 5;
+				tt_rclick_hint.draw(Point<int16_t>(tip_pos.x() + TIP_TEXT_X, ty));
+				ty += line_h + TIP_BLANK_GAP;
 
-				std::string status_line =
+				tt_status.change_text(
 					(e.online() ? std::string("online") : std::string("offline"))
-					+ ": " + e.name;
-				Text(Text::Font::A11B, Text::Alignment::LEFT,
-					Color::Name::ORANGE, status_line, 0)
-					.draw(Point<int16_t>(tip_pos.x() + 6, ty));
+					+ ": " + e.name);
+				tt_status.draw(Point<int16_t>(tip_pos.x() + TIP_TEXT_X, ty));
 				ty += line_h;
 
 				if (!memo_content.empty())
 				{
-					ty += 10;
-					Text(Text::Font::A11M, Text::Alignment::LEFT,
-						Color::Name::WHITE, memo_content, 0)
-						.draw(Point<int16_t>(tip_pos.x() + 6, ty));
+					ty += TIP_MEMO_GAP;
+					tt_memo.change_text(memo_content);
+					tt_memo.draw(Point<int16_t>(tip_pos.x() + TIP_TEXT_X, ty));
 				}
 			}
 		}

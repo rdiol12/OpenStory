@@ -197,4 +197,15 @@ namespace ms
 		Slider slider;
 		bool dragchattop;
 	};
+
+	// Convenience namespace for the very common
+	//   `if (auto cb = UI::get().get_element<UIChatBar>())
+	//        cb->send_chatline(text, type);`
+	// pattern. Null-safe — silently no-ops if the chat bar isn't
+	// present (e.g. on the title screen).
+	namespace chat
+	{
+		using LineType = UIChatBar::LineType;
+		void log(const std::string& line, LineType type = LineType::YELLOW);
+	}
 }

@@ -173,8 +173,12 @@ namespace ms
 
 	void UIBuddyNickname::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		if (!pressed) return;
+		if (escape)
+		{
 			deactivate();
+			return;
+		}
 	}
 
 	UIElement::Type UIBuddyNickname::get_type() const

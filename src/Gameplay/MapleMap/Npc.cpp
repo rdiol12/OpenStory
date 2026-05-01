@@ -406,37 +406,78 @@ namespace ms
 		nl::node quest_check = nl::nx::quest["Check.img"];
 		nl::node quest_info = nl::nx::quest["QuestInfo.img"];
 
-		// First check: does this NPC have an in-progress quest ready to complete?
+		// In-progress quests. We try to compute completion locally by parsing
+		// the progress string the server sends with each started quest. v83
+		// servers (Cosmic/HeavenMS) encode it as 3-digit decimal counters
+		// concatenated in NX declaration order — all mob objectives first,
+		// then all item objectives. If parsing fails or any objective hasn't
+		// hit its target, fall through to IN_PROGRESS.
 		for (auto& iter : started)
 		{
 			int16_t qid = iter.first;
-			nl::node check = quest_check[std::to_string(qid)];
-			if (!check) continue;
-
-			nl::node end_check = check["1"];
-			if (!end_check) continue;
-
-			int32_t end_npc = static_cast<int32_t>(safe_int(end_check["npc"]));
-			if (end_npc != npcid) continue;
-
-			// This NPC completes an in-progress quest — show complete mark
-			quest_mark_type = QuestMarkType::COMPLETE;
-			quest_mark_anim = mark_complete;
-			return;
-		}
-
-		// Second check: does this NPC have an in-progress quest (not yet completable)?
-		for (auto& iter : started)
-		{
-			int16_t qid = iter.first;
+			const std::string& qdata = iter.second;
 			nl::node check = quest_check[std::to_string(qid)];
 			if (!check) continue;
 
 			nl::node start_check = check["0"];
-			if (!start_check) continue;
+			nl::node end_check = check["1"];
 
-			int32_t start_npc = static_cast<int32_t>(safe_int(start_check["npc"]));
-			if (start_npc != npcid) continue;
+			int32_t start_npc = start_check
+				? static_cast<int32_t>(safe_int(start_check["npc"])) : 0;
+			int32_t end_npc = end_check
+				? static_cast<int32_t>(safe_int(end_check["npc"])) : 0;
+
+			bool is_end_npc = end_check && end_npc == npcid;
+			bool is_start_npc = start_check && start_npc == npcid;
+
+			if (!is_end_npc && !is_start_npc)
+				continue;
+
+			if (is_end_npc)
+			{
+				// Collect required counts from end_check.
+				std::vector<int32_t> required;
+				required.reserve(8);
+				if (end_check["mob"])
+					for (auto m : end_check["mob"])
+						required.push_back(static_cast<int32_t>(safe_int(m["count"])));
+				if (end_check["item"])
+					for (auto i : end_check["item"])
+						required.push_back(static_cast<int32_t>(safe_int(i["count"])));
+
+				// Default to IN_PROGRESS unless we can prove the quest
+				// is ready to turn in. Quests with no mob/item/money
+				// objectives in NX (quizzes, dialogue-driven scripts,
+				// auto-complete chains) aren't actually done — the
+				// server still has work to run when the player talks
+				// to the end NPC. Showing COMPLETE prematurely on
+				// every quest with empty end_check (e.g. Rain's quiz)
+				// stuck the indicator on COMPLETE and never updated
+				// for the next quest in the chain.
+				bool ready = false;
+
+				if (!required.empty())
+				{
+					ready = true;
+					size_t pos = 0;
+					for (int32_t req : required)
+					{
+						if (pos + 3 > qdata.size()) { ready = false; break; }
+						int32_t progress = 0;
+						try { progress = std::stoi(qdata.substr(pos, 3)); }
+						catch (...) { ready = false; break; }
+						pos += 3;
+						if (progress < req) { ready = false; break; }
+					}
+				}
+
+				if (ready)
+				{
+					quest_mark_type = QuestMarkType::COMPLETE;
+					quest_mark_anim = mark_complete;
+					return;
+				}
+			}
 
 			quest_mark_type = QuestMarkType::IN_PROGRESS;
 			quest_mark_anim = mark_in_progress;
@@ -476,19 +517,17 @@ namespace ms
 			if (start_npc <= 0 || start_npc != npcid)
 				continue;
 
-			// Skip auto-start / scripted / pre-complete quests (no bulb). These
-			// fields can be either integers or script-name strings (e.g. v83
-			// Cygnus tutorial), so use is_truthy instead of get_integer().
+			// Skip auto-start / pre-complete quests — these resolve
+			// silently the moment the player meets the requirements
+			// and never need a bulb to attract attention.
 			if (is_truthy(start_check["normalAutoStart"]))
 				continue;
 			if (is_truthy(start_check["autoStart"]))
 				continue;
 			if (is_truthy(start_check["autoPreComplete"]))
 				continue;
-			if (is_truthy(start_check["startscript"]))
-				continue;
 
-			// QuestInfo gating — hidden/blocked/scripted quests should not show
+			// QuestInfo gating — hidden / blocked entries should not show.
 			if (is_truthy(qnode["blocked"]))
 				continue;
 			if (is_truthy(qnode["autoStart"]))
@@ -496,12 +535,10 @@ namespace ms
 			if (is_truthy(qnode["autoPreComplete"]))
 				continue;
 
-			// Real player-facing quests have a name and an area; event/hidden
-			// quests that share an NPC ID usually lack one or both.
+			// Real player-facing quests have a name; event/hidden quests
+			// sharing an NPC ID usually lack one.
 			std::string qname = qnode["name"].get_string();
 			if (qname.empty())
-				continue;
-			if (safe_int(qnode["area"]) <= 0)
 				continue;
 
 			// Level checks
@@ -514,7 +551,10 @@ namespace ms
 			if (lvmax > 0 && player_level > lvmax)
 				continue;
 
-			// Skip quests that are way below player level
+			// Skip quests that are way below player level (only when a
+			// real lvmin is declared — lvmin <= 0 means "no level gate"
+			// and would otherwise filter out every quest for any
+			// character past level 10).
 			if (lvmin > 0 && (player_level - lvmin) > 10)
 				continue;
 

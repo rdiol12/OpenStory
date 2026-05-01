@@ -287,8 +287,7 @@ namespace ms
 		std::string new_name = recv.read_string();
 		recv.read_byte(); // 0
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pet] Name changed to: " + new_name, UIChatBar::LineType::YELLOW);
+		chat::log("[Pet] Name changed to: " + new_name, chat::LineType::YELLOW);
 	}
 
 	void PetExceptionListHandler::handle(InPacket& recv) const
@@ -301,7 +300,6 @@ namespace ms
 		for (int8_t i = 0; i < count; i++)
 			recv.read_int(); // excluded item id
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pet] Exception list updated: " + std::to_string(count) + " items excluded.", UIChatBar::LineType::YELLOW);
+		chat::log("[Pet] Exception list updated: " + std::to_string(count) + " items excluded.", chat::LineType::YELLOW);
 	}
 }

@@ -71,7 +71,28 @@ namespace ms
 				Point<int16_t> position;
 			};
 
-			Layout(const std::vector<Line>& lines, const std::vector<int16_t>& advances, int16_t width, int16_t height, int16_t endx, int16_t endy);
+			// Inline image run — a sprite that replaces a `#X<id>#`
+			// macro in formatted text. The layout reserves
+			// `size` x `size` pixels at `pos` (top-left, in layout
+			// coordinates relative to the Text's draw position) and
+			// stores `item_id` plus a `kind` so the caller can pick
+			// the correct NX source (item / quest / skill / face).
+			enum class ImageKind : int8_t
+			{
+				ITEM = 0,    // #v<id># or #i<id># — Item.wz
+				QUEST = 1,   // #q<id># — UI.wz/UIWindow.img/QuestIcon
+				SKILL = 2,   // #s<id># — Skill.wz/<job>.img/skill/<id>/icon
+				FACE = 3     // #f<id># — Character.wz/Face/<id>.img
+			};
+			struct Image
+			{
+				Point<int16_t> pos;
+				int32_t item_id;
+				int16_t size;
+				ImageKind kind = ImageKind::ITEM;
+			};
+
+			Layout(const std::vector<Line>& lines, const std::vector<int16_t>& advances, const std::vector<Image>& images, int16_t width, int16_t height, int16_t endx, int16_t endy);
 			Layout();
 
 			int16_t width() const;
@@ -79,6 +100,7 @@ namespace ms
 			int16_t advance(size_t index) const;
 			Point<int16_t> get_dimensions() const;
 			Point<int16_t> get_endoffset() const;
+			const std::vector<Image>& get_images() const;
 
 			using iterator = std::vector<Line>::const_iterator;
 			iterator begin() const;
@@ -87,6 +109,7 @@ namespace ms
 		private:
 			std::vector<Line> lines;
 			std::vector<int16_t> advances;
+			std::vector<Image> images;
 			Point<int16_t> dimensions;
 			Point<int16_t> endoffset;
 		};
@@ -110,6 +133,11 @@ namespace ms
 		Point<int16_t> dimensions() const;
 		Point<int16_t> endoffset() const;
 		const std::string& get_text() const;
+
+		// Inline images parsed from #v<id># / #i<id># macros, with
+		// pixel positions resolved against the laid-out text.
+		// Empty when the text contains no item-icon macros.
+		const std::vector<Layout::Image>& images() const;
 
 	private:
 		void reset_layout();

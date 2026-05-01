@@ -17,7 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UISkillBook.h"
 
-#include "UIChatBar.h"
 #include "UIKeyConfig.h"
 
 #include "../UI.h"
@@ -32,6 +31,8 @@
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
 
+
+#include <unordered_set>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -765,40 +766,35 @@ namespace ms
 		bookicon = data.get_icon();
 		booktext.change_text(data.get_name());
 
-		// Union of:
-		//  (a) skill IDs defined in NX Skill.wz/<subid>.img (full job tree —
-		//      lets the player see unlearned skills as grey 0-level rows), and
-		//  (b) skill IDs the server has actually granted whose prefix
-		//      (sid / 10000) matches subid.
-		// Beginner tab additionally accepts prefixes 0, 1000, 2000 (different
-		// branches all share the same beginner book).
-		std::vector<int32_t> ids = JobData::get(subid).get_skills();
-		auto push_if_new = [&](int32_t sid)
+		// Union of two sources, both filtered to prefix == subid:
+		//  (a) NX Skill.wz/<subid>.img — full job tree, so unlearned
+		//      skills appear as grey 0-level rows.
+		//  (b) skillbook entries the server has granted whose prefix
+		//      (sid / 10000) matches subid — covers anything the server
+		//      assigned that NX doesn't list.
+		// Both lists are filtered by prefix so unrelated branches
+		// (e.g. Aran skills on an Explorer beginner) never appear.
+		std::unordered_set<int32_t> seen;
+		auto push = [&](int32_t sid)
 		{
-			for (int32_t existing : ids)
-				if (existing == sid)
-					return;
-			ids.push_back(sid);
-		};
-
-		for (auto& entry : skillbook.get_entries())
-		{
-			int32_t sid = entry.first;
-			int32_t prefix = sid / 10000;
-
-			bool matches = (prefix == static_cast<int32_t>(subid));
-			if (joblevel == Job::Level::BEGINNER)
-				matches = (prefix == 0 || prefix == 1000 || prefix == 2000);
-
-			if (matches)
-				push_if_new(sid);
-		}
-
-		for (int32_t sid : ids)
-		{
+			if (sid / 10000 != static_cast<int32_t>(subid))
+				return;
+			// NX flags mount/item-tied skills (Balrog, spaceship,
+			// custom riding) with invisible = 1. Suppress those even
+			// though they appear under a class's skill list.
+			if (SkillData::get(sid).is_invisible())
+				return;
+			if (!seen.insert(sid).second)
+				return;
 			skills.emplace_back(sid, skillbook.get_level(sid));
 			skillcount++;
-		}
+		};
+
+		for (int32_t sid : data.get_skills())
+			push(sid);
+
+		for (auto& entry : skillbook.get_entries())
+			push(entry.first);
 
 		slider.setrows(ROWS, skillcount);
 		offset = 0;

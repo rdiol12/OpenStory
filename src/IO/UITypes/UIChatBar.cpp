@@ -21,9 +21,7 @@
 #include "../Components/MapleButton.h"
 #include "UIStatusBar.h"
 
-#include "../NotificationCenter.h"
-#include "UINotice.h"
-#include "UITrade.h"
+#include "../Notifications.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
@@ -31,16 +29,9 @@
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Character/Party.h"
-#include "../../Character/OtherChar.h"
-#include "../../Gameplay/MapleMap/MapChars.h"
-#include "../../Gameplay/MapleMap/MapObjects.h"
-#include "../../Character/Party.h"
-#include "../../Character/BuddyList.h"
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
-#include <functional>
 #include <list>
 #include <sstream>
 
@@ -134,7 +125,10 @@ namespace ms
 
 		chatbox = ColorBox(502, 1 + chatrows * CHATROWHEIGHT, Color::Name::BLACK, 0.6f);
 
-		chatfield = Textfield(Text::A11M, Text::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(-435, -62), Point<int16_t>(-40, -39)), 0);
+		// Bump the font from A11M to A12M and lower the bounds top a
+		// few pixels so the typed text sits centered in the input
+		// strip instead of jamming against its top edge.
+		chatfield = Textfield(Text::A12M, Text::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(-435, -59), Point<int16_t>(-40, -39)), 0);
 
 		set_chat_open(chatopen);
 
@@ -653,6 +647,12 @@ namespace ms
 		send_line(line, type);
 	}
 
+	void chat::log(const std::string& line, chat::LineType type)
+	{
+		if (auto cb = UI::get().get_element<UIChatBar>())
+			cb->send_chatline(line, type);
+	}
+
 	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
 	{
 		if (message_cooldowns[line] > 0)
@@ -981,305 +981,6 @@ namespace ms
 
 	void UIChatBar::send_chat_message(const std::string& message)
 	{
-		// DEBUG: dump everything in the buddy/friend NX sub-trees so
-		// we can lay out the new buddy UI from real positions.
-		if (message == "/buddydump")
-		{
-#ifdef USE_NX
-			std::ofstream ofs("buddydump.txt");
-			if (ofs)
-			{
-				std::function<void(nl::node, int, int)> walk;
-				walk = [&](nl::node n, int depth, int max_depth)
-				{
-					if (!n) return;
-					for (int i = 0; i < depth; i++) ofs << "  ";
-					ofs << n.name() << " [" << (int)n.data_type() << "]";
-					switch (n.data_type())
-					{
-					case nl::node::type::integer: ofs << " = " << (int64_t)n; break;
-					case nl::node::type::string:  ofs << " = \"" << n.get_string() << "\""; break;
-					case nl::node::type::vector:  ofs << " = (" << n.x() << "," << n.y() << ")"; break;
-					case nl::node::type::bitmap:
-					{
-						auto bmp = n.get_bitmap();
-						if (bmp) ofs << " <bmp " << bmp.width() << "x" << bmp.height() << ">";
-						break;
-					}
-					default: break;
-					}
-					ofs << "  (" << n.size() << " kids)\n";
-					if (depth >= max_depth) return;
-					for (auto c : n) walk(c, depth + 1, max_depth);
-				};
-				ofs << "=== UIWindow.img/UserList/Friend (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow.img"]["UserList"]["Friend"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/Main/Friend (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Main"]["Friend"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/AddFriend (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["AddFriend"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/Group (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Group"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/Nickname (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Nickname"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/PopupInvite (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["PopupInvite"], 0, 5);
-				ofs << "\n=== UIWindow2.img/UserList/Search (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow2.img"]["UserList"]["Search"], 0, 5);
-				// Right-click context menu — try common locations.
-				ofs << "\n=== UIWindow.img/UserList/Friend/Popup (depth 5) ===\n";
-				walk(nl::nx::ui["UIWindow.img"]["UserList"]["Friend"]["Popup"], 0, 5);
-				ofs << "\n=== Basic.img children (account/popup/right-click candidates) ===\n";
-				for (auto c : nl::nx::ui["Basic.img"])
-					ofs << "  " << c.name() << " (" << c.size() << " kids)\n";
-			}
-			send_chatline("[buddydump] wrote wz/buddydump.txt", LineType::YELLOW);
-#endif
-			return;
-		}
-
-		if (message == "/notice")
-		{
-			if (auto sb = UI::get().get_element<UIStatusBar>())
-			{
-				sb->notify();
-				send_chatline("[/notice] notification on", LineType::YELLOW);
-			}
-			return;
-		}
-
-		if (message == "/noticeoff")
-		{
-			if (auto sb = UI::get().get_element<UIStatusBar>())
-			{
-				sb->clear_notification();
-				send_chatline("[/noticeoff] notification off", LineType::YELLOW);
-			}
-			return;
-		}
-
-		// DEBUG: /notifmock — push a fake buddy-invite into the
-		// notification drawer so the popup layout can be previewed
-		// without a live invite from the server.
-		if (message == "/notifmock")
-		{
-			NotificationCenter::get().push(
-				"Buddy Invite",
-				"TestBuddy wants to be your buddy.",
-				[](bool yes)
-				{
-					if (auto cb = UI::get().get_element<UIChatBar>())
-						cb->send_chatline(
-							yes ? "[/notifmock] accepted" : "[/notifmock] declined",
-							LineType::YELLOW);
-				});
-			NotificationCenter::get().push(
-				"Party Invite",
-				"PartyLeader has invited you to their party.",
-				[](bool yes)
-				{
-					if (auto cb = UI::get().get_element<UIChatBar>())
-						cb->send_chatline(
-							yes ? "[/notifmock] joined party" : "[/notifmock] declined party",
-							LineType::YELLOW);
-				});
-			NotificationCenter::get().push(
-				"Guild Invite",
-				"GuildMaster has invited you to their guild.",
-				[](bool yes)
-				{
-					if (auto cb = UI::get().get_element<UIChatBar>())
-						cb->send_chatline(
-							yes ? "[/notifmock] joined guild" : "[/notifmock] declined guild",
-							LineType::YELLOW);
-				});
-			if (auto sb = UI::get().get_element<UIStatusBar>())
-				sb->notify();
-			send_chatline("[/notifmock] queued 3 mock invites; click the bell on the status bar.", LineType::YELLOW);
-			return;
-		}
-
-		// DEBUG: /mockall — fill the buddy list AND the party in one
-		// shot so the friend tab, party tab, member context menu, and
-		// the invite popup's "Recommended" table can all be exercised
-		// without a live group.
-		if (message == "/mockall")
-		{
-			std::map<int32_t, BuddyEntry> buddy_mocks;
-			auto add_buddy = [&](int32_t cid, const char* name, int32_t channel,
-				const char* group) {
-					BuddyEntry e;
-					e.cid     = cid;
-					e.name    = name;
-					e.status  = 0;
-					e.channel = channel;
-					e.group   = group;
-					buddy_mocks[cid] = e;
-				};
-			add_buddy(1001, "MaxTheArcher",  0, "Group Unknown");
-			add_buddy(1002, "Deafmau5",     -1, "Default Group");
-			add_buddy(1003, "Foolish",       4, "Default Group");
-			add_buddy(1004, "HunterPBrown", -1, "Default Group");
-			add_buddy(1005, "ipunchsama",    2, "Friends");
-			add_buddy(1006, "KaiseMystiq",  -1, "Default Group");
-			add_buddy(1007, "Kiyerza",       1, "Friends");
-			add_buddy(1008, "Riverza",      -1, "Group Unknown");
-			Stage::get().get_player().get_buddylist().update(buddy_mocks);
-
-			std::vector<::ms::PartyMember> party_mocks;
-			auto add_member = [&](int32_t cid, const char* name, int16_t job,
-				int16_t level, int32_t channel, int32_t mapid, bool online) {
-					::ms::PartyMember m;
-					m.cid     = cid;
-					m.name    = name;
-					m.job     = job;
-					m.level   = level;
-					m.channel = channel;
-					m.mapid   = mapid;
-					m.online  = online;
-					m.hp      = online ? 1200 : 0;
-					m.maxhp   = 1500;
-					party_mocks.push_back(m);
-				};
-			int32_t my_cid = Stage::get().get_player().get_oid();
-			add_member(my_cid, "Me",          100, 70,  0, 100000000, true);
-			add_member(2001,   "Klaarafia",   200, 65,  0, 100000000, true);
-			add_member(2002,   "Mythros",     412, 80,  2, 910000000, true);
-			add_member(2003,   "BowMaster",   311, 55, -1, 100000000, false);
-			add_member(2004,   "Nightblade",  421, 90,  1, 220000000, true);
-			Stage::get().get_player().get_party().update(998877, party_mocks, my_cid);
-
-			send_chatline("[/mockall] injected 8 buddies + 5 party members.",
-				LineType::YELLOW);
-			return;
-		}
-
-		// DEBUG: /mockall — fill the buddy list AND the party in one
-		// shot so the friend tab, party tab, member context menu, and
-		// the invite popup's "Recommended" table can all be exercised
-		// without a live group. Also spawns a dummy OtherChar next to
-		// the local player whose cid matches one of the mock party
-		// members, so the in-world party-HP overlay has a real
-		// character to render above.
-		if (message == "/mockall")
-		{
-			std::map<int32_t, BuddyEntry> buddy_mocks;
-			auto add_buddy = [&](int32_t cid, const char* name, int32_t channel,
-				const char* group) {
-					BuddyEntry e;
-					e.cid     = cid;
-					e.name    = name;
-					e.status  = 0;
-					e.channel = channel;
-					e.group   = group;
-					buddy_mocks[cid] = e;
-				};
-			add_buddy(1001, "MaxTheArcher",  0, "Group Unknown");
-			add_buddy(1002, "Deafmau5",     -1, "Default Group");
-			add_buddy(1003, "Foolish",       4, "Default Group");
-			add_buddy(1004, "HunterPBrown", -1, "Default Group");
-			add_buddy(1005, "ipunchsama",    2, "Friends");
-			add_buddy(1006, "KaiseMystiq",  -1, "Default Group");
-			add_buddy(1007, "Kiyerza",       1, "Friends");
-			add_buddy(1008, "Riverza",      -1, "Group Unknown");
-			Stage::get().get_player().get_buddylist().update(buddy_mocks);
-
-			std::vector<::ms::PartyMember> party_mocks;
-			auto add_member = [&](int32_t cid, const char* name, int16_t job,
-				int16_t level, int32_t channel, int32_t mapid, bool online) {
-					::ms::PartyMember m;
-					m.cid     = cid;
-					m.name    = name;
-					m.job     = job;
-					m.level   = level;
-					m.channel = channel;
-					m.mapid   = mapid;
-					m.online  = online;
-					m.hp      = online ? 1200 : 0;
-					m.maxhp   = 1500;
-					party_mocks.push_back(m);
-				};
-			int32_t my_cid = Stage::get().get_player().get_oid();
-			add_member(my_cid, "Me",          100, 70,  0, 100000000, true);
-			add_member(2001,   "Klaarafia",   200, 65,  0, 100000000, true);
-			add_member(2002,   "Mythros",     412, 80,  2, 910000000, true);
-			add_member(2003,   "BowMaster",   311, 55, -1, 100000000, false);
-			add_member(2004,   "Nightblade",  421, 90,  1, 220000000, true);
-			Stage::get().get_player().get_party().update(998877, party_mocks, my_cid);
-
-			// Spawn a dummy OtherChar right next to the player with
-			// cid 2001 ("Klaarafia") so the in-world party HP bar
-			// overlay can be visualised. Reuses the player's own
-			// CharLook by copy so the silhouette is recognisable.
-			Player& me = Stage::get().get_player();
-			Point<int16_t> spawn_pos = me.get_position() + Point<int16_t>(60, 0);
-			auto dummy = std::make_unique<::ms::OtherChar>(
-				2001, me.get_look(), 65, 200, "Klaarafia", 0, spawn_pos);
-			if (auto* mc = Stage::get().get_chars().get_chars())
-				mc->add(std::move(dummy));
-
-			send_chatline("[/mockall] injected 8 buddies + 5 party members + 1 dummy char.",
-				LineType::YELLOW);
-			return;
-		}
-
-		// DEBUG: /float <N>  → preview FloatNotice balloon N (0..145).
-		//        /float off  → clear preview.
-		if (message.rfind("/float", 0) == 0)
-		{
-			std::string arg = (message.length() > 7) ? message.substr(7) : "";
-			if (arg == "off" || arg.empty())
-			{
-				if (auto sb = UI::get().get_element<UIStatusBar>())
-					sb->clear_preview();
-				send_chatline("[/float] preview off", LineType::YELLOW);
-			}
-			else
-			{
-				int idx = std::atoi(arg.c_str());
-				if (auto sb = UI::get().get_element<UIStatusBar>())
-					sb->set_preview_float(idx);
-				send_chatline("[/float] FloatNotice index " + std::to_string(idx), LineType::YELLOW);
-			}
-			return;
-		}
-
-		// DEBUG: /invite  → pops a test UIAlarmInvite banner so you can
-		//                   see the Basic.img/AlarmInfo sprite without
-		//                   needing a real server invite.
-		if (message == "/invite")
-		{
-			UI::get().emplace<UIAlarmInvite>(
-				"TestPlayer wants to invite you. Accept?",
-				[this](bool yes)
-				{
-					send_chatline(yes ? "[/invite] accepted" : "[/invite] declined",
-						LineType::YELLOW);
-				});
-			if (auto sb = UI::get().get_element<UIStatusBar>())
-				sb->notify();
-			return;
-		}
-
-		// DEBUG: /notice# <N>  → preview UIWindow.img/Notice frame N (0..4)
-		if (message.rfind("/notice#", 0) == 0)
-		{
-			std::string arg = (message.length() > 9) ? message.substr(9) : "";
-			if (arg == "off" || arg.empty())
-			{
-				if (auto sb = UI::get().get_element<UIStatusBar>())
-					sb->clear_preview();
-				send_chatline("[/notice#] preview off", LineType::YELLOW);
-			}
-			else
-			{
-				int idx = std::atoi(arg.c_str());
-				if (auto sb = UI::get().get_element<UIStatusBar>())
-					sb->set_preview_notice(idx);
-				send_chatline("[/notice#] Notice frame " + std::to_string(idx), LineType::YELLOW);
-			}
-			return;
-		}
 
 		std::list<int32_t> recipients;
 
