@@ -146,6 +146,8 @@ namespace ms
 
 			int32_t get_id() const;
 			int16_t get_buyable() const;
+			int32_t get_price() const;
+			int32_t get_pitch() const;
 
 		private:
 			Texture icon;

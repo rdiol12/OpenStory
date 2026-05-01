@@ -36,10 +36,22 @@ namespace ms
 		dead = false;
 		hittable = false;
 
-		for (auto sub : src[0])
+		// A reactor is considered hittable if its current state defines
+		// any `event` block — that's the WZ flag indicating "this state
+		// reacts to player input". The previous code only recognised
+		// `event/0/type == 0` (attack-hit), missing reactors that
+		// trigger via skills, multi-step quests, or walk-over but are
+		// still attackable. The server validates the actual hit, so
+		// erring on the permissive side is safe.
+		nl::node spawn_state = src[std::to_string(state)];
+		if (!spawn_state)
+			spawn_state = src[0];
+		for (auto sub : spawn_state)
 			if (sub.name() == "event")
-				if (sub["0"]["type"].get_integer() == 0)
-					hittable = true;
+			{
+				hittable = true;
+				break;
+			}
 
 		nl::node sndsrc = nl::nx::sound["Reactor.img"][strid];
 		hitsound = sndsrc["hit"];

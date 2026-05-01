@@ -18,6 +18,7 @@
 #include "UIShop.h"
 
 #include "UINotice.h"
+#include "UIStatusMessenger.h"
 
 #include "../UI.h"
 
@@ -805,6 +806,16 @@ namespace ms
 		return buyable;
 	}
 
+	int32_t UIShop::BuyItem::get_price() const
+	{
+		return price;
+	}
+
+	int32_t UIShop::BuyItem::get_pitch() const
+	{
+		return pitch;
+	}
+
 	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, Texture cur)
 	{
 		const ItemData& idata = ItemData::get(item_id);
@@ -945,6 +956,20 @@ namespace ms
 		int16_t buyable = item.get_buyable();
 		int16_t slot = item_slots[selection];
 		int32_t itemid = item.get_id();
+
+		// Cosmic's Shop.buy() has 3 currency branches (meso / pitch /
+		// Golden Maple Leaf token). If price == 0 AND pitch == 0, the
+		// server-side code falls through every branch and returns
+		// silently — no shopTransaction reply, so the client otherwise
+		// just looks frozen. Bail out client-side with a status toast
+		// so the player gets an explanation.
+		if (item.get_price() <= 0 && item.get_pitch() <= 0)
+		{
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED,
+					"This item requires a special currency that's not supported.");
+			return;
+		}
 
 		if (buyable == 0 || buyable > 1)
 		{

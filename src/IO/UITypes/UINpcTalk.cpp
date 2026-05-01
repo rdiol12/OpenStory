@@ -29,6 +29,7 @@
 #include "../../Constants.h"
 #include "../../Graphics/Geometry.h"
 
+#include <cctype>
 #include <cmath>
 
 #ifdef USE_NX
@@ -123,10 +124,71 @@ namespace ms
 		nametag.draw(speaker_pos);
 		name.draw(center_pos + Point<int16_t>(0, -4));
 
+		// Overlay inline icons reserved by `#v<id>#`, `#i<id>#`,
+		// `#q<id>#`, `#s<id>#`, `#f<id>#` macros. LayoutBuilder
+		// records each macro's pixel position and kind; we resolve
+		// the bitmap from the appropriate NX source and stamp it on
+		// top of the reserved 32-px slot.
+		auto draw_inline_icons = [&](Point<int16_t> text_origin)
+		{
+			for (const auto& img : text.images())
+			{
+				if (img.item_id <= 0) continue;
+
+				Texture tex;
+				switch (img.kind)
+				{
+				case Text::Layout::ImageKind::ITEM:
+					tex = ItemData::get(img.item_id).get_icon(true);
+					break;
+				case Text::Layout::ImageKind::QUEST:
+				{
+					nl::node qnode = nl::nx::ui["UIWindow.img"]["QuestIcon"][std::to_string(img.item_id)];
+					if (qnode)
+						tex = Texture(qnode);
+					break;
+				}
+				case Text::Layout::ImageKind::SKILL:
+				{
+					// Skill icons live under Skill.wz/<job>.img/skill/
+					// /<skill_id>/icon. Job is derived from the high
+					// digits of the skill id (skillid / 10000).
+					int32_t job = img.item_id / 10000;
+					std::string job_strid = std::to_string(job);
+					while (job_strid.size() < 3) job_strid.insert(0, 1, '0');
+					nl::node snode = nl::nx::skill[job_strid + ".img"]["skill"][std::to_string(img.item_id)]["icon"];
+					if (snode)
+						tex = Texture(snode);
+					break;
+				}
+				case Text::Layout::ImageKind::FACE:
+				{
+					std::string fid = std::to_string(img.item_id);
+					while (fid.size() < 5) fid.insert(0, 1, '0');
+					nl::node fnode = nl::nx::character["Face"][fid + ".img"]["default"]["face"];
+					if (fnode)
+						tex = Texture(fnode);
+					break;
+				}
+				}
+
+				if (!tex.is_valid()) continue;
+
+				Point<int16_t> icon_dims = tex.get_dimensions();
+				Point<int16_t> slot_pos = text_origin + img.pos;
+				Point<int16_t> centered(
+					slot_pos.x() + (img.size - icon_dims.x()) / 2,
+					slot_pos.y() + (img.size - icon_dims.y()) / 2);
+				tex.draw(DrawArgument(centered));
+			}
+		};
+
 		if (show_slider)
 		{
 			int16_t text_min_height = position.y() + top.height() - 1;
-			text.draw(position + Point<int16_t>(162, 19 - offset * 400), Range<int16_t>(text_min_height, text_min_height + height - 18));
+			Point<int16_t> text_origin = position + Point<int16_t>(162, 19 - offset * 400);
+			text.draw(text_origin, Range<int16_t>(text_min_height, text_min_height + height - 18));
+			draw_inline_icons(text_origin);
 			slider.draw(position);
 		}
 		else
@@ -137,7 +199,7 @@ namespace ms
 			int16_t line_h = 16;
 
 			// Draw selection list backgrounds and dots for SENDSIMPLE
-			if ((type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR) && !selections.empty())
+			if (type == TalkType::SENDSIMPLE && !selections.empty())
 			{
 				for (size_t i = 0; i < selections.size(); i++)
 				{
@@ -166,23 +228,11 @@ namespace ms
 
 					bool is_hovered = (static_cast<int32_t>(i) == hovered_selection);
 
-					// TEMPORARILY DISABLED — suspected to be drawing wrong
-					// NX sprites ("QUEST IN PROGRESS" banner) over selection
-					// rows. If the red banners vanish after this patch the
-					// culprit is UtilDlgEx/list0/dot0 resolution; if they
-					// remain, another UI element is responsible.
-					//
-					// if (is_hovered)
-					//     list_hovered.draw(DrawArgument(row_pos));
-					// else
-					//     list_normal.draw(DrawArgument(row_pos));
-					//
-					// if (is_hovered)
-					//     dot_hovered.draw(DrawArgument(dot_pos));
-					// else
-					//     dot_normal.draw(DrawArgument(dot_pos));
-
-					// Small grey bullet as a stand-in for the selection dot
+					// Selection bullet — the UtilDlgEx list / dot sprites
+					// aren't a selection-row hover; they're used by the
+					// quest-progress view (intro text + divider + reqs).
+					// Plain grey bullet here keeps the simple-selection
+					// list visually clean.
 					ColorBox bullet(4, 4, Color::Name::DUSTYGRAY, 1.0f);
 					bullet.draw(DrawArgument(Point<int16_t>(dot_pos.x() + 1, dot_pos.y() + 1)));
 
@@ -204,60 +254,129 @@ namespace ms
 						mark_anim->draw(DrawArgument(mark_pos), 1.0f);
 					}
 
-					// Hover indicator: a thin light-blue underline on the
-					// hovered option (subtle enough not to clash with the
-					// blue option text but visible enough to track).
+					// Translucent hover band so the player can see
+					// which option the cursor is on.
 					if (is_hovered)
 					{
-						ColorBox underline(
-							static_cast<int16_t>(sel.text.empty() ? 120
-								: static_cast<int16_t>(sel.text.size() * 7)),
-							2,
-							Color::Name::LIGHTBLUE, 0.75f);
-						underline.draw(DrawArgument(
-							Point<int16_t>(text_x, row_y + line_h - 2)));
+						constexpr int16_t HIGHLIGHT_W = 360;
+						constexpr int16_t HIGHLIGHT_H = 16;
+						ColorBox band(HIGHLIGHT_W, HIGHLIGHT_H,
+							Color::Name::LIGHTBLUE, 0.30f);
+						band.draw(DrawArgument(
+							Point<int16_t>(text_x - 36, row_y)));
 					}
 				}
 			}
 
-			text.draw(position + Point<int16_t>(166, 48 - y_adj));
+			Point<int16_t> text_origin = position + Point<int16_t>(166, 48 - y_adj);
+
+			// Always draw the NPC text first.
+			text.draw(text_origin);
+			draw_inline_icons(text_origin);
+
+			quest_banner_hits.clear();
+
+			// Quest-progress banner is disabled for now per user
+			// request. Re-enable by flipping this guard to true; the
+			// banner-rendering, hover/click hit-tests and the per-quest
+			// expanded_quest_ids state are all still wired up below.
+			constexpr bool QUEST_BANNER_ENABLED = false;
+			if (QUEST_BANNER_ENABLED
+				&& type != TalkType::SENDSIMPLE
+				&& current_npcid > 0
+				&& list_normal.is_valid())
+			{
+				const auto& quests = Stage::get().get_player().get_quests();
+				const auto& started = quests.get_started();
+				nl::node quest_check = nl::nx::quest["Check.img"];
+
+				int16_t cur_y = text_origin.y() + text.height() + 6;
+				const auto& inv = Stage::get().get_player().get_inventory();
+
+				for (auto& it : started)
+				{
+					int16_t qid = it.first;
+					const std::string& qdata = it.second;
+					nl::node check = quest_check[std::to_string(qid)];
+					if (!check) continue;
+					nl::node sc = check["0"];
+					nl::node ec = check["1"];
+					int32_t sn = sc ? static_cast<int32_t>((int64_t)sc["npc"]) : 0;
+					int32_t en = ec ? static_cast<int32_t>((int64_t)ec["npc"]) : 0;
+					if (sn != current_npcid && en != current_npcid)
+						continue;
+
+					Point<int16_t> banner_pos(text_origin.x() - 8, cur_y);
+
+					bool hovered = (quest_banner_hovered_qid == qid);
+					const Texture& banner_tex =
+						(hovered && list_hovered.is_valid())
+							? list_hovered : list_normal;
+					banner_tex.draw(DrawArgument(banner_pos));
+
+					Point<int16_t> dims = banner_tex.get_dimensions();
+					quest_banner_hits.push_back({
+						qid,
+						Rectangle<int16_t>(banner_pos, banner_pos + dims)
+					});
+					cur_y += dims.y();
+
+					// If expanded, draw the requirements right under
+					// this banner before moving on to the next quest.
+					if (expanded_quest_ids.count(qid) && ec)
+					{
+						int16_t req_y = cur_y + 2;
+
+						size_t qpos = 0;
+						for (auto m : ec["mob"])
+						{
+							int32_t mobid = static_cast<int32_t>((int64_t)m["id"]);
+							int32_t need = static_cast<int32_t>((int64_t)m["count"]);
+							if (mobid <= 0) continue;
+							int32_t have = 0;
+							if (qpos + 3 <= qdata.size())
+							{
+								try { have = std::stoi(qdata.substr(qpos, 3)); }
+								catch (...) { have = 0; }
+							}
+							qpos += 3;
+							std::string mname = (std::string)nl::nx::string["Mob.img"][std::to_string(mobid)]["name"];
+							if (mname.empty())
+								mname = "Monster " + std::to_string(mobid);
+							std::string line = mname + " " + std::to_string(have) + "/" + std::to_string(need);
+							Color::Name col = (have >= need) ? Color::Name::EMPEROR : Color::Name::BLACK;
+							Text req(Text::Font::A11M, Text::Alignment::LEFT, col, line, 320, false);
+							req.draw(Point<int16_t>(text_origin.x(), req_y));
+							req_y += 14;
+						}
+
+						for (auto i : ec["item"])
+						{
+							int32_t itemid = static_cast<int32_t>((int64_t)i["id"]);
+							int32_t need = static_cast<int32_t>((int64_t)i["count"]);
+							if (itemid <= 0) continue;
+							int32_t have = inv.get_total_item_count(itemid);
+							const ItemData& idata = ItemData::get(itemid);
+							std::string iname = idata.is_valid() ? idata.get_name() : ("Item " + std::to_string(itemid));
+							std::string line = iname + " " + std::to_string(have) + "/" + std::to_string(need);
+							Color::Name col = (have >= need) ? Color::Name::EMPEROR : Color::Name::BLACK;
+							Text req(Text::Font::A11M, Text::Alignment::LEFT, col, line, 320, false);
+							req.draw(Point<int16_t>(text_origin.x(), req_y));
+							req_y += 14;
+						}
+
+						cur_y = req_y;
+					}
+
+					// 5 px spacing before the next banner.
+					cur_y += 5;
+				}
+			}
 		}
 
 		// Draw text input field for SENDGETTEXT / SENDGETNUMBER
 		if (type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER)
 			input_field.draw(position);
-
-		// Draw SENDSTYLE row list
-		if (type == TalkType::SENDSTYLE && !style_ids.empty())
-		{
-			int16_t y_adj = height - min_height;
-			int16_t text_x = position.x() + 130;
-			int16_t text_y = position.y() + 48 - y_adj;
-			int16_t line_h = 16;
-
-			for (size_t i = 0; i < style_ids.size(); i++)
-			{
-				Point<int16_t> row_pos(text_x - 36, text_y + static_cast<int16_t>(i) * line_h);
-				bool is_hovered = (static_cast<int32_t>(i) == style_hovered);
-				if (is_hovered)
-					list_hovered.draw(DrawArgument(row_pos));
-				else
-					list_normal.draw(DrawArgument(row_pos));
-
-				Point<int16_t> dot_pos(text_x - 14, text_y + static_cast<int16_t>(i) * line_h + 3);
-				if (is_hovered)
-					dot_hovered.draw(DrawArgument(dot_pos));
-				else
-					dot_normal.draw(DrawArgument(dot_pos));
-
-				const std::string& label = (i < style_names.size())
-					? style_names[i] : std::to_string(style_ids[i]);
-
-				Text row_text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
-					label, 320);
-				row_text.draw(Point<int16_t>(text_x, text_y + static_cast<int16_t>(i) * line_h));
-			}
-		}
 
 	}
 
@@ -308,15 +427,42 @@ namespace ms
 
 		switch (type)
 		{
-			case TalkType::SENDSAY:
+			case TalkType::SENDOK:
 			{
-				// msgtype 0 — OK/Next/Prev
+				// msgtype 0 — text + [OK]. Close and OK both report end.
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
 						NpcTalkMorePacket(type, -1).dispatch();
 						break;
 					case Buttons::OK:
+						NpcTalkMorePacket(type, 1).dispatch();
+						break;
+				}
+				break;
+			}
+			case TalkType::SENDNEXT:
+			{
+				// msgtype 5 — text + [Next].
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, -1).dispatch();
+						break;
+					case Buttons::NEXT:
+						NpcTalkMorePacket(type, 1).dispatch();
+						break;
+				}
+				break;
+			}
+			case TalkType::SENDNEXTPREV:
+			{
+				// msgtype 6 — text + [Back] [Next].
+				switch (buttonid)
+				{
+					case Buttons::CLOSE:
+						NpcTalkMorePacket(type, -1).dispatch();
+						break;
 					case Buttons::NEXT:
 						NpcTalkMorePacket(type, 1).dispatch();
 						break;
@@ -324,26 +470,11 @@ namespace ms
 						NpcTalkMorePacket(type, 0).dispatch();
 						break;
 				}
-
-				break;
-			}
-			case TalkType::SENDNEXT:
-			{
-				// msgtype 5 — Next only; close cancels, Next advances.
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
-						break;
-					case Buttons::NEXT:
-						NpcTalkMorePacket(type, 1).dispatch();
-						break;
-				}
 				break;
 			}
 			case TalkType::SENDYESNO:
 			{
-				// msgtype 1
+				// msgtype 1 — text + [Yes] [No].
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -356,36 +487,36 @@ namespace ms
 						NpcTalkMorePacket(type, 1).dispatch();
 						break;
 				}
-
 				break;
 			}
 			case TalkType::SENDACCEPTDECLINE:
 			{
-				// msgtype 12 — quest accept/decline
+				// msgtype 7 — quest accept/decline (text + [Accept] [Decline]).
+				// We render this with BtYes / BtNo, but keep the quest-
+				// themed Q* button ids in the routing too so any NX
+				// build that still uses the themed sprites keeps working.
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
+					case Buttons::NO:
+					case Buttons::QNO:
 					case Buttons::QAFTER:
 					case Buttons::QCNO:
-						NpcTalkMorePacket(type, -1).dispatch();
-						break;
-					case Buttons::QNO:
+					case Buttons::QGIVEUP:
 						NpcTalkMorePacket(type, 0).dispatch();
 						break;
+					case Buttons::YES:
 					case Buttons::QYES:
 					case Buttons::QSTART:
 					case Buttons::QCYES:
 						NpcTalkMorePacket(type, 1).dispatch();
 						break;
-					case Buttons::QGIVEUP:
-						NpcTalkMorePacket(type, 0).dispatch();
-						break;
 				}
-
 				break;
 			}
 			case TalkType::SENDGETTEXT:
 			{
+				// msgtype 13 — text input.
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -399,7 +530,7 @@ namespace ms
 			}
 			case TalkType::SENDGETNUMBER:
 			{
-				// msgtype 3
+				// msgtype 12 — number input.
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -424,50 +555,13 @@ namespace ms
 						break;
 					}
 				}
-
 				break;
 			}
 			case TalkType::SENDSIMPLE:
 			{
-				// msgtype 4 — close only; selections are handled in send_cursor
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, 0).dispatch();
-						break;
-				}
-
-				break;
-			}
-			case TalkType::SENDSTYLE:
-			{
-				// msgtype 7 — style picker; selection handled in send_cursor,
-				// OK confirms the currently hovered/selected style.
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, 0).dispatch();
-						break;
-					case Buttons::OK:
-					{
-						int32_t idx = (style_hovered >= 0) ? style_hovered : 0;
-						NpcTalkStylePacket(idx).dispatch();
-						break;
-					}
-				}
-
-				break;
-			}
-			case TalkType::SENDDIMENSIONALMIRROR:
-			{
-				// msgtype 14 — PQ list; close only, selection dispatched in send_cursor
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
-						break;
-				}
-
+				// msgtype 4 — close only; selections handled in send_cursor.
+				if (buttonid == Buttons::CLOSE)
+					NpcTalkMorePacket(type, 0).dispatch();
 				break;
 			}
 			default:
@@ -495,44 +589,46 @@ namespace ms
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
-		// Handle SENDSTYLE row clicks (just marks the hovered style).
-		if (type == TalkType::SENDSTYLE && !style_ids.empty())
+		// Quest-progress banner hit-test (one clickable list_normal
+		// sprite per in-progress quest with this NPC). Hover swaps to
+		// list_hovered; click toggles that quest's expanded state in
+		// expanded_quest_ids so its requirements render below the
+		// banner.
+		quest_banner_hovered_qid = -1;
+		for (const auto& hit : quest_banner_hits)
 		{
-			int16_t y_adj = height - min_height;
-			int16_t text_x = position.x() + 130;
-			int16_t text_y = position.y() + 48 - y_adj;
-			int16_t text_w = 320;
-			int16_t line_h = 16;
-
-			style_hovered = -1;
-			for (size_t i = 0; i < style_ids.size(); i++)
+			if (hit.rect.contains(cursorpos))
 			{
-				int16_t opt_y = text_y + static_cast<int16_t>(i) * line_h;
-				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
-					cursorpos.y() >= opt_y && cursorpos.y() <= opt_y + line_h)
+				quest_banner_hovered_qid = hit.qid;
+				if (clicked)
 				{
-					style_hovered = static_cast<int32_t>(i);
-					if (clicked)
-					{
-						deactivate();
-						NpcTalkStylePacket(static_cast<int32_t>(i)).dispatch();
-						return Cursor::State::IDLE;
-					}
-					return Cursor::State::CANCLICK;
+					if (expanded_quest_ids.count(hit.qid))
+						expanded_quest_ids.erase(hit.qid);
+					else
+						expanded_quest_ids.insert(hit.qid);
+					return Cursor::State::CLICKING;
 				}
+				return Cursor::State::CANCLICK;
 			}
 		}
 
-		// Handle SENDSIMPLE / SENDDIMENSIONALMIRROR text option clicks.
-		// Both use embedded #L<i># codes in the text; only the reply packet differs.
-		if ((type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR) && !selections.empty())
+		// Handle SENDSIMPLE option clicks.
+		// Uses embedded #L<i># codes in the text; reply via NpcTalkMorePacket(index).
+		if (type == TalkType::SENDSIMPLE && !selections.empty())
 		{
-			// Text area starts at position + (166, 48 - y_adj) for non-slider
+			// Mirror the DRAW path's geometry exactly — the previous
+			// hit-test used text_x = +130 while the visible text
+			// renders at +166, leaving a dead 36-px strip and pushing
+			// every option's hot zone left of where the player sees
+			// it. Y-band is widened by a few pixels above and below
+			// to absorb word-wrap drift between prefix_text.height()
+			// and the formatted_text's actual layout.
 			int16_t y_adj = height - min_height;
-			int16_t text_x = position.x() + 130;
+			int16_t text_x = position.x() + 166;
 			int16_t text_y = position.y() + 48 - y_adj;
 			int16_t text_w = 320;
 			int16_t line_h = 16; // approximate line height for A12M font
+			int16_t band_pad = 4; // extra px above/below each option row
 
 			int32_t prev_hovered = hovered_selection;
 			hovered_selection = -1;
@@ -556,8 +652,8 @@ namespace ms
 				// (baseline - 14) to baseline — define the hit-test row
 				// around that range so clicking the visible text registers.
 				int16_t baseline = text_y + prefix_text.height();
-				int16_t row_top  = baseline - line_h;
-				int16_t row_bot  = baseline + 2;
+				int16_t row_top  = baseline - line_h - band_pad;
+				int16_t row_bot  = baseline + band_pad;
 
 				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
 					cursorpos.y() >= row_top && cursorpos.y() <= row_bot)
@@ -568,10 +664,7 @@ namespace ms
 					{
 						hovered_selection = -1;
 						deactivate();
-						if (type == TalkType::SENDDIMENSIONALMIRROR)
-							NpcTalkMirrorPacket(sel.index).dispatch();
-						else
-							NpcTalkMorePacket(sel.index).dispatch();
+						NpcTalkMorePacket(sel.index).dispatch();
 						return Cursor::State::IDLE;
 					}
 					else
@@ -618,15 +711,14 @@ namespace ms
 	{
 		switch (value)
 		{
-		case TalkType::SENDSAY:
+		case TalkType::SENDOK:
 		case TalkType::SENDYESNO:
-		case TalkType::SENDGETTEXT:
-		case TalkType::SENDGETNUMBER:
 		case TalkType::SENDSIMPLE:
 		case TalkType::SENDNEXT:
-		case TalkType::SENDSTYLE:
+		case TalkType::SENDNEXTPREV:
 		case TalkType::SENDACCEPTDECLINE:
-		case TalkType::SENDDIMENSIONALMIRROR:
+		case TalkType::SENDGETNUMBER:
+		case TalkType::SENDGETTEXT:
 			return true;
 		default:
 			return false;
@@ -641,6 +733,15 @@ namespace ms
 	{
 		std::string result;
 		result.reserve(tx.size());
+
+		// Item IDs we've passed through via `#v<id>#`, `#i<id>#`,
+		// `#t<id>#` or `#z<id>#` macros. After the main pass we run a
+		// cleanup that strips those exact id strings if they appear
+		// later in the text — many quest scripts hard-code the id as
+		// literal digits next to the name (e.g. "#v4031161# #t4031161#
+		// 4031161 / 1"), which surfaces as redundant numbers in the
+		// dialog (Rusty Screw 4031161 / 1).
+		std::vector<std::string> macro_ids;
 
 		for (size_t i = 0; i < tx.size(); i++)
 		{
@@ -742,7 +843,7 @@ namespace ms
 				}
 			}
 
-			// #t<id># or #z<id># — item name
+			// #t<id># or #z<id># — item name.
 			if (code == 't' || code == 'z')
 			{
 				size_t end = tx.find('#', i + 2);
@@ -751,6 +852,7 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
+						macro_ids.push_back(id_str);
 						try
 						{
 							int32_t itemid = std::stoi(id_str);
@@ -767,6 +869,26 @@ namespace ms
 				}
 			}
 
+			// Inline-icon macros (item / quest / skill / face). Pass
+			// the whole `#X<id>#` through unchanged so the Text /
+			// LayoutBuilder pipeline reserves a 32-px slot at the
+			// macro position. UINpcTalk::draw_inline_icons paints
+			// the bitmap from the right NX source per kind.
+			if (code == 'v' || code == 'i' || code == 'q'
+				|| code == 's' || code == 'f')
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos)
+				{
+					std::string id_str = tx.substr(i + 2, end - i - 2);
+					if (!id_str.empty() && (code == 'v' || code == 'i'))
+						macro_ids.push_back(id_str);
+					result.append(tx, i, end - i + 1);
+					i = end;
+					continue;
+				}
+			}
+
 			// #L, #l — selection markers, keep them for parse_simple_selections
 			if (code == 'L' || code == 'l')
 			{
@@ -774,8 +896,82 @@ namespace ms
 				continue;
 			}
 
-			// Unknown code — pass through
+			// Catch-all for any other `#X<id>#` macro the script might
+			// emit (e.g. `#q<id>#` quest icon, `#s<id>#` skill icon,
+			// `#f<id>#` face icon). We don't render their bitmaps yet,
+			// but stripping the macro is far better than leaking
+			// "ui/UIWindow.img/QuestIcon/8" path-style text into the
+			// dialog. Recognised by the shape: `#X<digits>#`.
+			if (std::isalpha(static_cast<unsigned char>(code)))
+			{
+				size_t end = tx.find('#', i + 2);
+				if (end != std::string::npos && end > i + 2)
+				{
+					bool all_digits = true;
+					for (size_t k = i + 2; k < end; k++)
+					{
+						if (!std::isdigit(static_cast<unsigned char>(tx[k])))
+						{
+							all_digits = false;
+							break;
+						}
+					}
+					if (all_digits)
+					{
+						i = end;
+						continue;
+					}
+				}
+			}
+
+			// Unknown code — pass through as-is.
 			result += '#';
+		}
+
+		// Strip standalone occurrences of any item id we already
+		// expanded via a macro. Avoids the "Rusty Screw 4031161 / 1"
+		// look — when the script literally writes the id next to its
+		// own name macro. We skip when the id is bounded by digits
+		// (so legitimate larger numbers stay) AND when it's directly
+		// inside a `#X<digits>#` inline-icon macro (e.g. `#v4031161#`),
+		// because eating those breaks the inline-icon layout.
+		for (const std::string& id : macro_ids)
+		{
+			if (id.size() < 4) continue; // skip short ids — too easily a real number
+			size_t pos = 0;
+			while ((pos = result.find(id, pos)) != std::string::npos)
+			{
+				bool left_ok = (pos == 0)
+					|| !std::isdigit(static_cast<unsigned char>(result[pos - 1]));
+				bool right_ok = (pos + id.size() >= result.size())
+					|| !std::isdigit(static_cast<unsigned char>(result[pos + id.size()]));
+
+				// Inside-macro guard: id sits immediately after `#X`
+				// (any single letter), so `result[pos-2]` would be `#`.
+				bool inside_macro = false;
+				if (pos >= 2
+					&& result[pos - 2] == '#'
+					&& std::isalpha(static_cast<unsigned char>(result[pos - 1])))
+				{
+					inside_macro = true;
+				}
+
+				if (left_ok && right_ok && !inside_macro)
+				{
+					size_t start = pos;
+					size_t end = pos + id.size();
+					if (start > 0 && result[start - 1] == ' ')
+						start--;
+					else if (end < result.size() && result[end] == ' ')
+						end++;
+					result.erase(start, end - start);
+					pos = start;
+				}
+				else
+				{
+					pos += id.size();
+				}
+			}
 		}
 
 		return result;
@@ -944,11 +1140,15 @@ namespace ms
 	{
 		type = is_valid_type(msgtype) ? static_cast<TalkType>(msgtype) : TalkType::NONE;
 
+		current_npcid = npcid;
+		expanded_quest_ids.clear();
+		quest_banner_hovered_qid = -1;
+		quest_banner_hits.clear();
 		timestep = 0;
 		draw_text = true;
 		formatted_text_pos = 0;
 
-		if (type == TalkType::SENDSIMPLE || type == TalkType::SENDDIMENSIONALMIRROR)
+		if (type == TalkType::SENDSIMPLE)
 		{
 			formatted_text = parse_simple_selections(format_text(tx, npcid));
 			draw_text = false; // Show all text immediately for selection menus
@@ -980,7 +1180,7 @@ namespace ms
 
 		int16_t text_height = text.height();
 
-		if (type != TalkType::SENDSIMPLE && type != TalkType::SENDDIMENSIONALMIRROR)
+		if (type != TalkType::SENDSIMPLE)
 			text.change_text("");
 
 		if (speakerbyte == 0)
@@ -1004,9 +1204,18 @@ namespace ms
 		height = min_height;
 		show_slider = false;
 
-		if (text_height > height)
+		// Pad the text area so its bottom edge clears the fill region's
+		// own bottom border. Without this, multi-line dialogues whose
+		// total height equals `height` exactly still bleed a few pixels
+		// below the panel because text_y (= position.y + 48 - y_adj)
+		// drifts as y_adj grows and the fill texture has internal padding
+		// that isn't part of `text_height`.
+		constexpr int16_t TEXT_BOTTOM_PAD = 16;
+		int16_t needed = text_height + TEXT_BOTTOM_PAD;
+
+		if (needed > height)
 		{
-			if (text_height > MAX_HEIGHT)
+			if (needed > MAX_HEIGHT)
 			{
 				height = MAX_HEIGHT;
 				show_slider = true;
@@ -1018,7 +1227,7 @@ namespace ms
 			}
 			else
 			{
-				height = text_height;
+				height = needed;
 			}
 		}
 
@@ -1035,38 +1244,24 @@ namespace ms
 
 		switch (type)
 		{
-			case TalkType::SENDSAY:
+			case TalkType::SENDOK:
 			{
-				// endBytes on the wire are [hasPrev][hasNext]; read_short is
-				// little-endian so prev is in the LOW byte and next in the HIGH byte.
-				bool has_prev = style & 0xFF;
-				bool has_next = (style >> 8) & 0xFF;
-
-				if (has_prev && has_next)
-				{
-					buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
-					buttons[Buttons::NEXT]->set_active(true);
-					buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
-					buttons[Buttons::PREV]->set_active(true);
-				}
-				else if (has_next)
-				{
-					buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
-					buttons[Buttons::NEXT]->set_active(true);
-				}
-				else
-				{
-					buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
-					buttons[Buttons::OK]->set_active(true);
-				}
+				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::OK]->set_active(true);
 				break;
 			}
 			case TalkType::SENDNEXT:
 			{
-				// Mode 5 — "Next only" flavour of SENDSAY. No Prev button;
-				// server doesn't expect backwards navigation here.
 				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
 				buttons[Buttons::NEXT]->set_active(true);
+				break;
+			}
+			case TalkType::SENDNEXTPREV:
+			{
+				buttons[Buttons::NEXT]->set_position(Point<int16_t>(471, y_cord));
+				buttons[Buttons::NEXT]->set_active(true);
+				buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
+				buttons[Buttons::PREV]->set_active(true);
 				break;
 			}
 			case TalkType::SENDYESNO:
@@ -1082,17 +1277,21 @@ namespace ms
 			}
 			case TalkType::SENDACCEPTDECLINE:
 			{
-				// Quest accept/decline — show quest-specific buttons
-				buttons[Buttons::QSTART]->set_position(Point<int16_t>(389, y_cord));
-				buttons[Buttons::QSTART]->set_active(true);
+				// Use BtYes / BtNo — the universal Yes/No sprites
+				// shipped in every UtilDlgEx node. The quest-themed
+				// BtQYes / BtQNo / BtQStart / BtQAfter variants
+				// don't always have valid normal/mouseover/pressed
+				// state subnodes, so they rendered as invisible 0×0
+				// hit zones and the player saw no buttons.
+				buttons[Buttons::YES]->set_position(Point<int16_t>(389, y_cord));
+				buttons[Buttons::YES]->set_active(true);
 
-				buttons[Buttons::QAFTER]->set_position(Point<int16_t>(389 + 65, y_cord));
-				buttons[Buttons::QAFTER]->set_active(true);
+				buttons[Buttons::NO]->set_position(Point<int16_t>(389 + 65, y_cord));
+				buttons[Buttons::NO]->set_active(true);
 				break;
 			}
 			case TalkType::SENDGETTEXT:
 			{
-				// Text input field below the NPC text
 				int16_t field_y = y_cord - 25;
 				input_field = Textfield(
 					Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK,
@@ -1107,7 +1306,6 @@ namespace ms
 			}
 			case TalkType::SENDGETNUMBER:
 			{
-				// Number input field (same widget as GETTEXT, prefilled with default)
 				int16_t field_y = y_cord - 25;
 				input_field = Textfield(
 					Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK,
@@ -1123,20 +1321,7 @@ namespace ms
 			}
 			case TalkType::SENDSIMPLE:
 			{
-				// Only close button — options are clicked in the text area
-				break;
-			}
-			case TalkType::SENDSTYLE:
-			{
-				// Style picker (hair/face/skin). Close button stays; style rows
-				// are clicked in the text area. OK confirms current selection.
-				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
-				buttons[Buttons::OK]->set_active(true);
-				break;
-			}
-			case TalkType::SENDDIMENSIONALMIRROR:
-			{
-				// PQ entrance list — close only; rows are clicked in the text area.
+				// Close-only; options are clicked in the text area.
 				break;
 			}
 			default:
@@ -1159,41 +1344,6 @@ namespace ms
 
 		if (type == TalkType::SENDGETNUMBER)
 			input_field.change_text(std::to_string(def));
-	}
-
-	void UINpcTalk::set_style_ids(std::vector<int32_t> ids)
-	{
-		style_ids = std::move(ids);
-		style_hovered = style_ids.empty() ? -1 : 0;
-
-		// Resolve each style id to a human-readable name so the list shows
-		// "Black Amour" instead of "30030". Categories by id prefix:
-		//   20000-29999 → Face, 30000-39999 → Hair, otherwise → Skin/raw id.
-#ifdef USE_NX
-		style_names.clear();
-		style_names.reserve(style_ids.size());
-
-		for (int32_t id : style_ids)
-		{
-			std::string idstr = std::to_string(id);
-			std::string nm;
-
-			if (id >= 30000 && id < 40000)
-				nm = (std::string)nl::nx::string["Eqp.img"]["Eqp"]["Hair"][idstr]["name"];
-			else if (id >= 20000 && id < 30000)
-				nm = (std::string)nl::nx::string["Eqp.img"]["Eqp"]["Face"][idstr]["name"];
-
-			if (nm.empty())
-				nm = idstr;
-
-			style_names.push_back(std::move(nm));
-		}
-#else
-		style_names.clear();
-		style_names.reserve(style_ids.size());
-		for (int32_t id : style_ids)
-			style_names.push_back(std::to_string(id));
-#endif
 	}
 
 }

@@ -265,6 +265,13 @@ namespace ms
 			std::vector<Text::Layout::Line> lines;
 			std::vector<Text::Layout::Word> words;
 			std::vector<int16_t> advances;
+			std::vector<Text::Layout::Image> images;
+			// Set after we consume a #v<id># / #i<id># macro. The next
+			// add() call will receive the closing `#` as a standalone
+			// token (because the splitter splits on `#`); this flag
+			// tells it to skip that single byte instead of trying to
+			// parse it as a fresh format code.
+			bool skip_lead_hash;
 			int16_t width;
 			int16_t endy;
 			int16_t line_adj;

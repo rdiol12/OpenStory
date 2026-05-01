@@ -75,6 +75,11 @@ namespace ms
 			NPC_TALK_MORE = 60,
 			NPC_SHOP_ACTION = 61,
 			STORAGE_ACTION = 62,
+			// Echoed sync of server-side NPC animation/movement.
+			// Server-authoritative engines (Cosmic / HeavenMS) ignore
+			// this packet, but v83 GMS clients send it on every inbound
+			// NPC_ACTION (0x104) to keep state in sync.
+			NPC_ACTION = 197,
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,

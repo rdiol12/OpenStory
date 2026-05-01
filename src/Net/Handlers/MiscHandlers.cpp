@@ -23,51 +23,57 @@
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../Configuration.h"
+#include "../Packets/NpcInteractionPackets.h"
+
+#include <vector>
 
 namespace ms
 {
 	void NpcActionHandler::handle(InPacket& recv) const
 	{
-		// v83 NPC_ACTION: int oid, then remaining bytes are action data
-		// The server periodically sends this to animate NPCs on the map
+		// v83 NPC_ACTION: int oid, then remaining bytes are action data.
+		// The server periodically sends this to animate NPCs on the map.
 		if (recv.length() < 4)
 			return;
 
 		int32_t oid = recv.read_int();
 
-		// Look up the NPC on the map
-		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
-		if (!npcs)
-			return;
+		// Capture every action byte the server sent — we mirror the
+		// payload byte-for-byte in the outbound NPC_ACTION echo so
+		// the wire-level handshake matches v83 GMS exactly.
+		std::vector<int8_t> action_bytes;
+		action_bytes.reserve(recv.length());
+		while (recv.available())
+			action_bytes.push_back(recv.read_byte());
 
-		Optional<MapObject> obj = npcs->get(oid);
-		if (!obj)
-			return;
-
-		Npc* npc = static_cast<Npc*>(obj.get());
-
-		if (recv.available())
+		// Apply the first action byte (if any) to the NPC's local
+		// stance. Subsequent bytes carry positional data we don't
+		// render but still echo back unchanged.
+		if (auto npcs = Stage::get().get_npcs().get_npcs())
 		{
-			// Read the action bytes
-			int8_t action = recv.read_byte();
-
-			// v83 NPC actions: 0 = stand, 1 = move/walk, 2 = talk, etc.
-			switch (action)
+			if (auto obj = npcs->get(oid))
 			{
-			case 0:
-				npc->set_stance("stand");
-				break;
-			case 1:
-				npc->set_stance("move");
-				break;
-			case 2:
-				npc->set_stance("say");
-				break;
-			default:
-				npc->set_stance("stand");
-				break;
+				auto* npc = static_cast<Npc*>(obj.get());
+				if (!action_bytes.empty())
+				{
+					switch (action_bytes[0])
+					{
+					case 0: npc->set_stance("stand"); break;
+					case 1: npc->set_stance("move");  break;
+					case 2: npc->set_stance("say");   break;
+					default: npc->set_stance("stand"); break;
+					}
+				}
 			}
 		}
+
+		// Echo of inbound NPC_ACTION bytes is intentionally NOT sent.
+		// Cosmic / HeavenMS ignore the outbound NPC_ACTION packet
+		// entirely, and dispatching one per server animation tick was
+		// flooding the outbound socket — the server saw a Connection
+		// reset shortly after each NPC was clicked. The wire-parity
+		// note in Packets/NpcInteractionPackets.h kept the packet
+		// class around for future use; we just don't emit it.
 	}
 
 	void YellowTipHandler::handle(InPacket& recv) const
@@ -78,8 +84,7 @@ namespace ms
 		std::string message = recv.read_string();
 
 		// Show yellow text notification at bottom of screen (like quest updates)
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+		chat::log(message, chat::LineType::YELLOW);
 	}
 
 	void BroadcastMsgHandler::handle(InPacket& recv) const
@@ -88,8 +93,7 @@ namespace ms
 		std::string message = recv.read_string();
 
 		// GM notices, event announcements
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(message, UIChatBar::LineType::YELLOW);
+		chat::log(message, chat::LineType::YELLOW);
 	}
 
 	void AdminResultHandler::handle(InPacket& recv) const
@@ -214,8 +218,7 @@ namespace ms
 		std::string prefix = (mode == 5) ? "[Spouse] " : "[Fiance] ";
 		std::string line = prefix + name + ": " + text;
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(line, UIChatBar::LineType::RED);
+		chat::log(line, chat::LineType::RED);
 	}
 
 	void BlockedMapHandler::handle(InPacket& recv) const
@@ -398,7 +401,6 @@ namespace ms
 		int8_t mode = recv.read_byte();
 
 		// Complex multi-mode packet — card data, errors, broadcasts
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[NewYearCard] Card update (mode=" + std::to_string(mode) + ")", UIChatBar::LineType::YELLOW);
+		chat::log("[NewYearCard] Card update (mode=" + std::to_string(mode) + ")", chat::LineType::YELLOW);
 	}
 }

@@ -41,35 +41,21 @@ namespace ms
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
-		// msgtype 14 (getDimensionalMirror) prefixes the text with a 4-byte
-		// zero int. Skip it so the subsequent read_string lands on the talk.
-		if (msgtype == 14 && recv.length() >= 4)
-			recv.skip_int();
-
 		std::string text = recv.read_string();
 
+		// `style` is unused by the new layout but kept on the
+		// change_text signature for interface stability.
 		int16_t style = 0;
 
-		// msgtype 0 — two endBytes telling the client which nav buttons to show.
-		if (msgtype == 0 && recv.length() > 0)
-			style = recv.read_short();
-
-		// Read trailing payload into locals so we can forward it after
-		// the fresh UINpcTalk is created.
+		// Trailing payload: msgtype 3 (sendGetNumber) carries default,
+		// min, max as three ints (12 bytes total).
 		int32_t num_def = 0, num_min = 0, num_max = 0;
-		std::vector<int32_t> style_ids;
 
 		if (msgtype == 3 && recv.length() >= 12)
 		{
 			num_def = recv.read_int();
 			num_min = recv.read_int();
 			num_max = recv.read_int();
-		}
-		else if (msgtype == 7 && recv.length() >= 4)
-		{
-			int32_t count = recv.read_int();
-			for (int32_t i = 0; i < count && recv.length() >= 4; i++)
-				style_ids.push_back(recv.read_int());
 		}
 
 		// Force-remove any stale NpcTalk element so emplace always creates a
@@ -85,8 +71,6 @@ namespace ms
 		{
 			if (msgtype == 3)
 				npctalk->set_number_bounds(num_def, num_min, num_max);
-			else if (msgtype == 7)
-				npctalk->set_style_ids(std::move(style_ids));
 
 			npctalk->change_text(npcid, msgtype, style, speaker, text);
 		}

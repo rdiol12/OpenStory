@@ -78,11 +78,24 @@ namespace ms
 	void NpcResponseTracker::clear_all()
 	{
 		pending_.clear();
+		last_click_ = Clock::time_point::min();
 
 		if (!unavailable_.empty())
 		{
 			unavailable_.clear();
 			++revision_;
 		}
+	}
+
+	bool NpcResponseTracker::can_click_now() const
+	{
+		if (last_click_ == Clock::time_point::min())
+			return true;
+		return (Clock::now() - last_click_) >= CLICK_COOLDOWN;
+	}
+
+	void NpcResponseTracker::mark_clicked_now()
+	{
+		last_click_ = Clock::now();
 	}
 }

@@ -1,3 +1,20 @@
+//////////////////////////////////////////////////////////////////////////////////
+//	This file is part of the continued Journey MMORPG client					//
+//	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
+//																				//
+//	This program is free software: you can redistribute it and/or modify		//
+//	it under the terms of the GNU Affero General Public License as published by	//
+//	the Free Software Foundation, either version 3 of the License, or			//
+//	(at your option) any later version.											//
+//																				//
+//	This program is distributed in the hope that it will be useful,				//
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of				//
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the				//
+//	GNU Affero General Public License for more details.							//
+//																				//
+//	You should have received a copy of the GNU Affero General Public License	//
+//	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
+//////////////////////////////////////////////////////////////////////////////////
 #include "UIPartyHelper.h"
 
 #include "../UI.h"
@@ -25,9 +42,9 @@ namespace ms
 		if (!alarm)
 			alarm = nl::nx::ui["UIWindow2.img"]["QuestAlarm"];
 
-		bg_min    = Texture(alarm["backgrndmin"]);
-		bg_center = Texture(alarm["backgrndcenter"]);
-		bg_bottom = Texture(alarm["backgrndbottom"]);
+		backgrnd_min    = Texture(alarm["backgrndmin"]);
+		backgrnd_center = Texture(alarm["backgrndcenter"]);
+		backgrnd_bottom = Texture(alarm["backgrndbottom"]);
 
 		title     = Text(Text::Font::A12B, Text::Alignment::LEFT,
 			Color::Name::WHITE, "Party", 0);
@@ -44,14 +61,14 @@ namespace ms
 		if (members.empty()) return;
 
 		// Header.
-		bg_min.draw(position);
+		backgrnd_min.draw(position);
 		title.draw(position + Point<int16_t>(10, 4));
 
 		// One row per member, drawn over a stretched center strip.
 		int16_t row_count = static_cast<int16_t>(members.size());
 		int16_t body_h    = row_count * ROW_H;
 
-		bg_center.draw(DrawArgument(
+		backgrnd_center.draw(DrawArgument(
 			position + Point<int16_t>(0, HEADER_H),
 			Point<int16_t>(PANEL_W, body_h)));
 
@@ -84,7 +101,7 @@ namespace ms
 		}
 
 		// Footer cap.
-		bg_bottom.draw(position + Point<int16_t>(0, HEADER_H + body_h));
+		backgrnd_bottom.draw(position + Point<int16_t>(0, HEADER_H + body_h));
 	}
 
 	UIElement::Type UIPartyHelper::get_type() const

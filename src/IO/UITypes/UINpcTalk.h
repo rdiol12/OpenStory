@@ -25,6 +25,7 @@
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 
+#include <set>
 #include <vector>
 
 namespace ms
@@ -32,19 +33,28 @@ namespace ms
 	class UINpcTalk : public UIElement
 	{
 	public:
+		// msgType layout per the actual server (Cosmic / HeavenMS,
+		// confirmed by reading the wire bytes the server emits):
+		//  0  sendOk(text)              — text + [OK]
+		//  1  sendYesNo(text)           — text + [Yes] [No]
+		//  2  sendGetText(...)          — text input field
+		//  3  sendGetNumber(...)        — number input slider
+		//  4  sendSimple(text)          — text with #L0#..#l selection links
+		//  5  sendNext(text)            — text + [Next]
+		//  6  sendNextPrev(text)        — text + [Back] [Next]
+		// 12  sendAcceptDecline(text)   — text + [Accept] [Decline]
 		enum TalkType : int8_t
 		{
 			NONE = -1,
-			SENDSAY = 0,		// 0 — OK/Next/Prev/NextPrev (determined by style bytes)
-			SENDYESNO = 1,		// 1 — Yes/No
-			SENDGETTEXT = 2,	// 2 — Text input
-			SENDGETNUMBER = 3,	// 3 — Number input
-			SENDSIMPLE = 4,		// 4 — Selection list (blue clickable text)
-			SENDNEXT = 5,		// 5 — "Next only" (no Prev) variant of SENDSAY
-			SENDSTYLE = 7,		// 7 — Style/cosmetic selection
-			SENDACCEPTDECLINE = 12,	// 12 (0x0C) — Accept/Decline
-			SENDDIMENSIONALMIRROR = 14, // 14 (0x0E) — PQ entrance list
-			LENGTH = 15
+			SENDOK = 0,
+			SENDYESNO = 1,
+			SENDGETTEXT = 2,
+			SENDGETNUMBER = 3,
+			SENDSIMPLE = 4,
+			SENDNEXT = 5,
+			SENDNEXTPREV = 6,
+			SENDACCEPTDECLINE = 12,
+			LENGTH = 13
 		};
 
 		static constexpr Type TYPE = UIElement::Type::NPCTALK;
@@ -66,7 +76,6 @@ namespace ms
 
 		// Extra payload setters — call after change_text based on msgtype.
 		void set_number_bounds(int32_t def, int32_t lo, int32_t hi);
-		void set_style_ids(std::vector<int32_t> ids);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -160,15 +169,30 @@ namespace ms
 
 		Textfield input_field;
 
-		// msgType 3 — sendGetNumber bounds
+		// msgType 12 — sendGetNumber bounds
 		int32_t num_default = 0;
 		int32_t num_min = 0;
 		int32_t num_max = 0;
 
-		// msgType 7 — getNPCTalkStyle
-		std::vector<int32_t> style_ids;
-		std::vector<std::string> style_names;
-		int32_t style_hovered = -1;
+		// NPC id for the active dialog. Used by the quest-progress
+		// banner so we can look up which in-progress quest this NPC
+		// is start/end for and render the requirements footer.
+		int32_t current_npcid = 0;
+
+		// Quest-progress banner state. When this NPC has one or more
+		// in-progress quests the dialog draws a clickable list_normal
+		// sprite per quest below the main text (5 px between each).
+		// Click a banner to flip just that quest's body from text to
+		// requirements; click again to flip back. Multiple banners
+		// can be expanded simultaneously.
+		struct QuestBannerHit
+		{
+			int16_t qid;
+			Rectangle<int16_t> rect;
+		};
+		mutable std::vector<QuestBannerHit> quest_banner_hits;
+		int16_t quest_banner_hovered_qid = -1;
+		std::set<int16_t> expanded_quest_ids;
 
 		std::function<void(bool)> onmoved;
 	};

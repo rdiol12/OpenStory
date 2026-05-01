@@ -76,6 +76,7 @@ namespace ms
 	UIQuestLog::UIQuestLog(const QuestLog& ql) :
 		UIDragElement<PosQUEST>(Point<int16_t>(280, 20)), questlog(ql), offset(0),
 		selected_entry(-1), hover_entry(-1), selected_from_recommended(false), show_detail(false),
+		detail_anim_t(0.0f),
 		detail_scroll(0), detail_content_height(0),
 		detail_progress(0.0f), show_icon_info(false), detail_npcid(0),
 		detail_area(0), detail_order(0), detail_auto_start(false),
@@ -870,6 +871,21 @@ namespace ms
 		show_detail = false;
 	}
 
+	void UIQuestLog::focus_completed_quest(int16_t qid)
+	{
+		load_quests();
+		change_tab(Buttons::TAB2);
+
+		for (size_t i = 0; i < completed_entries.size(); i++)
+		{
+			if (completed_entries[i].id == qid)
+			{
+				select_quest(static_cast<int16_t>(i));
+				return;
+			}
+		}
+	}
+
 	// Whether all item-count and mob-kill requirements on the end-check
 	// side of a started quest are satisfied. Mirrors the logic in
 	// UIQuestHelper::refresh_quest_info but skips the end-NPC talk
@@ -1133,6 +1149,18 @@ namespace ms
 		}
 
 		UIElement::update();
+
+		// Detail-panel slide animation. Tick toward 0/1 based on show_detail.
+		// Open is snappy (~140ms), close is gentler (~280ms) so the reverse
+		// motion reads as "tucking back in" instead of a hard snap.
+		const float open_step = 0.12f;
+		const float close_step = 0.06f;
+		float target = show_detail ? 1.0f : 0.0f;
+		if (detail_anim_t < target)
+			detail_anim_t = std::min(target, detail_anim_t + open_step);
+		else if (detail_anim_t > target)
+			detail_anim_t = std::max(target, detail_anim_t - close_step);
+
 		icon2_anim.update();
 		icon5_anim.update();
 		icon6_anim.update();
@@ -2132,9 +2160,22 @@ namespace ms
 		}
 
 		// === Detail panel (right of list) ===
-		if (show_detail && selected_entry >= 0)
+		// Keep drawing while the close animation runs out (detail_anim_t > 0).
+		if ((show_detail || detail_anim_t > 0.0f) && selected_entry >= 0)
 		{
-			Point<int16_t> detail_anchor = position + Point<int16_t>(dimension.x() - 3, 0);
+			// Smoothstep ease so the slide feels weighted at the ends.
+			float t = detail_anim_t;
+			float eased = t * t * (3.0f - 2.0f * t);
+
+			int16_t panel_w = detail_backgrnd.is_valid()
+				? detail_backgrnd.get_dimensions().x()
+				: 290;
+			// Panel emerges from behind the main panel: at t=0 it sits a full
+			// width to the left (hidden), at t=1 it lands at its final spot
+			// flush against the main panel's right edge.
+			int16_t slide_x = static_cast<int16_t>((eased - 1.0f) * panel_w);
+
+			Point<int16_t> detail_anchor = position + Point<int16_t>(dimension.x() - 3 + slide_x, 0);
 
 			// Draw detail panel background — NX bitmaps or solid fallback
 			bool has_bg = false;

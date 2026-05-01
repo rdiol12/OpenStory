@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Configuration.h"
 
+#include <algorithm>
 #include <fstream>
+#include <unordered_set>
 
 namespace ms
 {
@@ -160,19 +162,83 @@ namespace ms
 
 	void Configuration::save() const
 	{
-		// Open the settings file
 		std::ofstream config(FILENAME);
 
-		if (config.is_open())
+		if (!config.is_open())
+			return;
+
+		// Section -> ordered key list. Anything not listed falls into Window
+		// Positions (if it starts with "Pos") or Other (alphabetical).
+		static const std::vector<std::pair<const char*, std::vector<const char*>>> sections = {
+			{ "Connection",  { "ServerIP", "ServerPort", "SaveLogin", "Account", "Password",
+			                   "World", "Channel", "Character", "Region" } },
+			{ "Display",     { "Width", "Height", "Fullscreen", "VSync" } },
+			{ "Audio",       { "BGMVolume", "SFXVolume" } },
+			{ "Quality",     { "GraphicsQuality", "EffectsQuality", "ScreenShake" } },
+			{ "Input",       { "MouseSpeed", "Chatopen" } },
+			{ "Warnings",    { "HPWarning", "MPWarning" } },
+			{ "Permissions", { "AllowWhisper", "AllowChatInvite", "AllowPartyInvite",
+			                   "AllowGuildChat", "AllowAllianceChat", "AllowFamilyInvite",
+			                   "AllowFriendChat", "AllowTradeRequest", "AllowExpeditionInvite",
+			                   "AllowGuildInvite", "AllowAllianceInvite", "AllowFollow" } },
+			{ "Fonts",       { "FontPathNormal", "FontPathBold", "FontPathCJK", "FontPathEmoji" } },
+			{ "MiniMap",     { "MiniMapSimpleMode", "MiniMapType", "MiniMapDefaultHelpers" } },
+			{ "Misc",        { "ScreenshotFolder", "TrackedQuests" } },
+		};
+
+		// Defensive null-skip: TypeMap::get() can insert a null unique_ptr if a
+		// type is looked up before being registered in the constructor.
+		std::unordered_map<std::string, const Entry*> by_name;
+		for (auto& s : settings)
+			if (s.second)
+				by_name.emplace(s.second->name, s.second.get());
+
+		std::unordered_set<std::string> emitted;
+
+		for (auto& [title, keys] : sections)
 		{
-			// Save settings line by line. Defensive null-skip: TypeMap::get()
-			// uses operator[] which can insert a null unique_ptr if a type is
-			// looked up before being registered in the constructor.
-			for (auto& setting : settings)
+			config << "# " << title << std::endl;
+			for (auto* key : keys)
 			{
-				if (!setting.second) continue;
-				config << setting.second->to_string() << std::endl;
+				auto it = by_name.find(key);
+				if (it != by_name.end())
+				{
+					config << it->second->to_string() << std::endl;
+					emitted.insert(key);
+				}
 			}
+			config << std::endl;
+		}
+
+		std::vector<const Entry*> positions;
+		std::vector<const Entry*> other;
+		for (auto& s : settings)
+		{
+			if (!s.second || emitted.count(s.second->name))
+				continue;
+			if (s.second->name.rfind("Pos", 0) == 0)
+				positions.push_back(s.second.get());
+			else
+				other.push_back(s.second.get());
+		}
+
+		auto by_name_lt = [](const Entry* a, const Entry* b) { return a->name < b->name; };
+		std::sort(positions.begin(), positions.end(), by_name_lt);
+		std::sort(other.begin(), other.end(), by_name_lt);
+
+		if (!other.empty())
+		{
+			config << "# Other" << std::endl;
+			for (auto* e : other)
+				config << e->to_string() << std::endl;
+			config << std::endl;
+		}
+
+		if (!positions.empty())
+		{
+			config << "# Window Positions" << std::endl;
+			for (auto* e : positions)
+				config << e->to_string() << std::endl;
 		}
 	}
 

@@ -25,11 +25,11 @@
 #include "../../Character/BuddyMemoStore.h"
 #include "../../Net/Packets/BuddyPackets.h"
 
+#include <set>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
-
-#include <set>
 
 namespace ms
 {

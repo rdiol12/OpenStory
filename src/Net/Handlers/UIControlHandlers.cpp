@@ -110,8 +110,7 @@ namespace ms
 		// Beginner guide NPC — show helpful message when spawned
 		if (spawn)
 		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Guide] Maple Guide has appeared! Press the guide key for help.", UIChatBar::LineType::YELLOW);
+			chat::log("[Guide] Maple Guide has appeared! Press the guide key for help.", chat::LineType::YELLOW);
 		}
 	}
 
@@ -124,8 +123,7 @@ namespace ms
 			std::string text = recv.read_string();
 			recv.skip(8); // two ints: display timing (200, 4000)
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Guide] " + text, UIChatBar::LineType::YELLOW);
+			chat::log("[Guide] " + text, chat::LineType::YELLOW);
 		}
 		else if (mode == 1)
 		{

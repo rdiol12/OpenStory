@@ -83,8 +83,7 @@ namespace ms
 		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
 			carnival->set_summon_count(tab, number);
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + name + " summoned a monster!", UIChatBar::LineType::YELLOW);
+		chat::log("[Carnival] " + name + " summoned a monster!", chat::LineType::YELLOW);
 	}
 
 	void MonsterCarnivalMessageHandler::handle(InPacket& recv) const
@@ -101,8 +100,7 @@ namespace ms
 		default: msg = "Carnival message: " + std::to_string(message); break;
 		}
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + msg, UIChatBar::LineType::YELLOW);
+		chat::log("[Carnival] " + msg, chat::LineType::YELLOW);
 	}
 
 	void MonsterCarnivalDiedHandler::handle(InPacket& recv) const
@@ -111,8 +109,7 @@ namespace ms
 		std::string name = recv.read_string();
 		int8_t lost_cp = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Carnival] " + name + " was eliminated! (-" + std::to_string(lost_cp) + " CP)", UIChatBar::LineType::RED);
+		chat::log("[Carnival] " + name + " was eliminated! (-" + std::to_string(lost_cp) + " CP)", chat::LineType::RED);
 	}
 
 	void OXQuizHandler::handle(InPacket& recv) const
@@ -123,8 +120,7 @@ namespace ms
 
 		if (asking)
 		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[OX Quiz] Question " + std::to_string(question_set) + "-" + std::to_string(question_id) + ": Move to O or X!", UIChatBar::LineType::YELLOW);
+			chat::log("[OX Quiz] Question " + std::to_string(question_set) + "-" + std::to_string(question_id) + ": Move to O or X!", chat::LineType::YELLOW);
 		}
 	}
 
@@ -146,8 +142,7 @@ namespace ms
 			recv.read_short(); // ball1 position
 			recv.read_byte();  // -1
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Snowball] Team 1 HP: " + std::to_string(ball0_hp) + " | Team 2 HP: " + std::to_string(ball1_hp), UIChatBar::LineType::YELLOW);
+			chat::log("[Snowball] Team 1 HP: " + std::to_string(ball0_hp) + " | Team 2 HP: " + std::to_string(ball1_hp), chat::LineType::YELLOW);
 		}
 	}
 
@@ -156,8 +151,7 @@ namespace ms
 		int8_t what = recv.read_byte();
 		int32_t damage = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Snowball] Hit! Damage: " + std::to_string(damage), UIChatBar::LineType::YELLOW);
+		chat::log("[Snowball] Hit! Damage: " + std::to_string(damage), chat::LineType::YELLOW);
 	}
 
 	void SnowballMessageHandler::handle(InPacket& recv) const
@@ -165,8 +159,7 @@ namespace ms
 		int8_t team = recv.read_byte(); // 0=down, 1=up
 		int32_t message = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Snowball] Team " + std::to_string(team) + " event update!", UIChatBar::LineType::YELLOW);
+		chat::log("[Snowball] Team " + std::to_string(team) + " event update!", chat::LineType::YELLOW);
 	}
 
 	void CoconutHitHandler::handle(InPacket& recv) const
@@ -175,8 +168,7 @@ namespace ms
 		int16_t delay = recv.read_short();
 		int8_t type = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Coconut] Hit id=" + std::to_string(id) + " type=" + std::to_string(type), UIChatBar::LineType::YELLOW);
+		chat::log("[Coconut] Hit id=" + std::to_string(id) + " type=" + std::to_string(type), chat::LineType::YELLOW);
 	}
 
 	void CoconutScoreHandler::handle(InPacket& recv) const
@@ -184,8 +176,7 @@ namespace ms
 		int16_t team1 = recv.read_short();
 		int16_t team2 = recv.read_short();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Coconut] Score: Team 1 = " + std::to_string(team1) + " | Team 2 = " + std::to_string(team2), UIChatBar::LineType::YELLOW);
+		chat::log("[Coconut] Score: Team 1 = " + std::to_string(team1) + " | Team 2 = " + std::to_string(team2), chat::LineType::YELLOW);
 	}
 
 	void AriantScoreHandler::handle(InPacket& recv) const
@@ -205,23 +196,20 @@ namespace ms
 			scoreboard += name + ": " + std::to_string(score);
 		}
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(scoreboard, UIChatBar::LineType::YELLOW);
+		chat::log(scoreboard, chat::LineType::YELLOW);
 	}
 
 	void AriantShowResultHandler::handle(InPacket& recv) const
 	{
 		// Empty body — triggers result dialog
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Ariant] Match results!", UIChatBar::LineType::YELLOW);
+		chat::log("[Ariant] Match results!", chat::LineType::YELLOW);
 	}
 
 	void PyramidGaugeHandler::handle(InPacket& recv) const
 	{
 		int32_t gauge = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pyramid] Gauge: " + std::to_string(gauge), UIChatBar::LineType::YELLOW);
+		chat::log("[Pyramid] Gauge: " + std::to_string(gauge), chat::LineType::YELLOW);
 	}
 
 	void PyramidScoreHandler::handle(InPacket& recv) const
@@ -232,8 +220,7 @@ namespace ms
 		std::string ranks[] = { "S", "A", "B", "C", "D" };
 		std::string rank_str = (rank >= 0 && rank <= 4) ? ranks[rank] : "?";
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Pyramid] Rank " + rank_str + " - EXP: " + std::to_string(exp), UIChatBar::LineType::YELLOW);
+		chat::log("[Pyramid] Rank " + rank_str + " - EXP: " + std::to_string(exp), chat::LineType::YELLOW);
 	}
 
 	void TournamentHandler::handle(InPacket& recv) const
@@ -241,15 +228,13 @@ namespace ms
 		int8_t state = recv.read_byte();
 		int8_t sub_state = recv.read_byte();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] State update: " + std::to_string(state) + "/" + std::to_string(sub_state), UIChatBar::LineType::YELLOW);
+		chat::log("[Tournament] State update: " + std::to_string(state) + "/" + std::to_string(sub_state), chat::LineType::YELLOW);
 	}
 
 	void TournamentMatchTableHandler::handle(InPacket& recv) const
 	{
 		// Empty body — prompts match table dialog
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] Match table received.", UIChatBar::LineType::YELLOW);
+		chat::log("[Tournament] Match table received.", chat::LineType::YELLOW);
 	}
 
 	void TournamentSetPrizeHandler::handle(InPacket& recv) const
@@ -262,8 +247,7 @@ namespace ms
 			int32_t item1 = recv.read_int();
 			int32_t item2 = recv.read_int();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Tournament] Prize items set.", UIChatBar::LineType::YELLOW);
+			chat::log("[Tournament] Prize items set.", chat::LineType::YELLOW);
 		}
 	}
 
@@ -271,8 +255,7 @@ namespace ms
 	{
 		int8_t state = recv.read_byte(); // bitflags for round info
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Tournament] UEW state: " + std::to_string(state), UIChatBar::LineType::YELLOW);
+		chat::log("[Tournament] UEW state: " + std::to_string(state), chat::LineType::YELLOW);
 	}
 
 	void DojoWarpUpHandler::handle(InPacket& recv) const
@@ -280,8 +263,7 @@ namespace ms
 		recv.read_byte(); // 0
 		recv.read_byte(); // 6
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Dojo] Warping to next floor!", UIChatBar::LineType::YELLOW);
+		chat::log("[Dojo] Warping to next floor!", chat::LineType::YELLOW);
 	}
 
 	void SendTVHandler::handle(InPacket& recv) const
@@ -318,16 +300,14 @@ namespace ms
 		MapleTVBroadcast::get().start("", lines,
 			has_victim ? "partner" : "", remaining_ms);
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] Broadcast received.", UIChatBar::LineType::YELLOW);
+		chat::log("[MapleTV] Broadcast received.", chat::LineType::YELLOW);
 	}
 
 	void RemoveTVHandler::handle(InPacket& recv) const
 	{
 		MapleTVBroadcast::get().stop();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] Broadcast ended.", UIChatBar::LineType::YELLOW);
+		chat::log("[MapleTV] Broadcast ended.", chat::LineType::YELLOW);
 	}
 
 	void EnableTVHandler::handle(InPacket& recv) const
@@ -335,8 +315,7 @@ namespace ms
 		recv.read_int(); // 0
 		recv.read_byte(); // 0
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[MapleTV] MapleTV enabled.", UIChatBar::LineType::YELLOW);
+		chat::log("[MapleTV] MapleTV enabled.", chat::LineType::YELLOW);
 	}
 
 	void SetAvatarMegaphoneHandler::handle(InPacket& recv) const
@@ -383,8 +362,7 @@ namespace ms
 		int16_t x = recv.read_short();
 		int16_t fh = recv.read_short();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Kite] " + name + ": " + msg, UIChatBar::LineType::YELLOW);
+		chat::log("[Kite] " + name + ": " + msg, chat::LineType::YELLOW);
 	}
 
 	void RemoveKiteHandler::handle(InPacket& recv) const
@@ -392,8 +370,7 @@ namespace ms
 		int8_t anim = recv.read_byte();
 		int32_t obj_id = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Kite] A kite has been removed.", UIChatBar::LineType::YELLOW);
+		chat::log("[Kite] A kite has been removed.", chat::LineType::YELLOW);
 	}
 
 	void CannotSpawnKiteHandler::handle(InPacket& recv) const

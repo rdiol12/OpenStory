@@ -235,7 +235,6 @@ namespace ms
 		default: state_str = "Unknown (" + std::to_string(state) + ")"; break;
 		}
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Ship] Status: " + state_str, UIChatBar::LineType::YELLOW);
+		chat::log("[Ship] Status: " + state_str, chat::LineType::YELLOW);
 	}
 }

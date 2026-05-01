@@ -21,6 +21,7 @@
 
 #include "../../Net/NpcResponseTracker.h"
 #include "../../Net/Packets/NpcInteractionPackets.h"
+#include "../../IO/UI.h"
 
 namespace ms
 {
@@ -101,6 +102,23 @@ namespace ms
 			{
 				if (pressed)
 				{
+					// Cosmic / HeavenMS silently drop a TalkToNPC if it
+					// arrives within 500ms of the previous one (the
+					// BLOCK_NPC_RACE_CONDT cooldown). Mirror that
+					// client-side so rapid re-clicks don't wedge the
+					// server.
+					//
+					// We DON'T also gate on "is a UINpcTalk / UIShop
+					// open" — UI::get_element<T>() returns the element
+					// even after deactivate() (it just flips active to
+					// false but leaves the entry in the registry), so
+					// that check would block every click after the first
+					// dialog closed. The server's own conversation lock
+					// handles the genuine "still talking" case.
+					if (!NpcResponseTracker::get().can_click_now())
+						return Cursor::State::IDLE;
+
+					NpcResponseTracker::get().mark_clicked_now();
 					NpcResponseTracker::get().mark_pending(npc->get_npcid());
 					TalkToNPCPacket(npc->get_oid()).dispatch();
 

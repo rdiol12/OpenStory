@@ -200,6 +200,13 @@ namespace ms
 		// 9-slice frame TextTooltip uses for item hovers).
 		MapleFrame tooltip_frame;
 		Texture    tooltip_cover;
+		// Pre-allocated tooltip lines reused across frames so hovering
+		// doesn't churn 4-5 fresh Text objects on every draw call.
+		mutable Text tt_channel;
+		mutable Text tt_whisper_hint;
+		mutable Text tt_rclick_hint;
+		mutable Text tt_status;
+		mutable Text tt_memo;
 
 		// Per-group, per-side scroll offsets. Kept around so legacy
 		// rect plumbing still compiles; the live behaviour is now a

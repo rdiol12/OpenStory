@@ -43,11 +43,13 @@ namespace ms
 			write_byte(response);
 		}
 
+		// Response for msgType 2 (sendGetText): [msgtype=2][response=1][text]
 		NpcTalkMorePacket(const std::string& response) : NpcTalkMorePacket(2, 1)
 		{
 			write_string(response);
 		}
 
+		// Response for msgType 4 (sendSimple): [msgtype=4][response=1][index:int]
 		NpcTalkMorePacket(int32_t selection) : NpcTalkMorePacket(4, 1)
 		{
 			write_int(selection);
@@ -63,30 +65,6 @@ namespace ms
 			write_byte(3);
 			write_byte(1);
 			write_int(value);
-		}
-	};
-
-	// Response for msgType 7 (getNPCTalkStyle): [msgtype=7][response=1][index:int]
-	class NpcTalkStylePacket : public OutPacket
-	{
-	public:
-		NpcTalkStylePacket(int32_t index) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
-		{
-			write_byte(7);
-			write_byte(1);
-			write_int(index);
-		}
-	};
-
-	// Response for msgType 14 (getDimensionalMirror): [msgtype=14][response=1][selection:int]
-	class NpcTalkMirrorPacket : public OutPacket
-	{
-	public:
-		NpcTalkMirrorPacket(int32_t selection) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
-		{
-			write_byte(14);
-			write_byte(1);
-			write_int(selection);
 		}
 	};
 
@@ -121,6 +99,26 @@ namespace ms
 		NpcShopActionPacket(Mode mode) : OutPacket(OutPacket::Opcode::NPC_SHOP_ACTION)
 		{
 			write_byte(mode);
+		}
+	};
+
+	// Client → server NPC animation echo. v83 GMS sent this whenever
+	// an inbound NPC_ACTION (0x104) was processed, so the server could
+	// confirm it had received the state. Cosmic / HeavenMS ignore the
+	// packet outright, but emitting it keeps wire-level parity with
+	// the official client and avoids any latent server check that
+	// might watch for a missing echo. Body mirrors the inbound shape:
+	// int oid, then the raw action bytes copied verbatim.
+	// Opcode: NPC_ACTION(197 / 0xC5)
+	class NpcActionPacket : public OutPacket
+	{
+	public:
+		NpcActionPacket(int32_t oid, const int8_t* action_bytes, size_t length)
+			: OutPacket(OutPacket::Opcode::NPC_ACTION)
+		{
+			write_int(oid);
+			for (size_t i = 0; i < length; i++)
+				write_byte(action_bytes[i]);
 		}
 	};
 }

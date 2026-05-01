@@ -26,7 +26,7 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
-#include "../../IO/NotificationCenter.h"
+#include "../../IO/Notifications.h"
 
 #include "../Packets/GameplayPackets.h"
 #include "../Packets/SocialPackets.h"
@@ -107,10 +107,10 @@ namespace ms
 				}
 			);
 
-			// Mirror into the notification drawer so the user can
-			// re-resolve from BT_NOTICE on the status bar if the modal
-			// got dismissed without action.
-			NotificationCenter::get().push(
+			// Mirror into the toast/drawer so the user can re-resolve
+			// from BT_NOTICE on the status bar if the modal got
+			// dismissed without action.
+			Notifications::notify(
 				"Buddy Invite",
 				from_name + " wants to be your buddy.",
 				[from_cid](bool yes)
@@ -118,9 +118,6 @@ namespace ms
 					if (yes)
 						AcceptBuddyPacket(from_cid).dispatch();
 				});
-
-			if (auto statusbar = UI::get().get_element<UIStatusBar>())
-				statusbar->notify();
 
 			break;
 		}
@@ -182,8 +179,7 @@ namespace ms
 			{
 				if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 					messenger->show_status(Color::Name::RED, msg);
-				else if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(msg, UIChatBar::LineType::RED);
+				chat::log(msg, chat::LineType::RED);
 			}
 			break;
 		}
@@ -232,8 +228,7 @@ namespace ms
 			std::string senior_name = recv.read_string();
 			int32_t senior_cid = recv.read_int();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(senior_name + " has invited you to join their family.", UIChatBar::LineType::YELLOW);
+			chat::log(senior_name + " has invited you to join their family.", chat::LineType::YELLOW);
 
 			if (auto statusbar = UI::get().get_element<UIStatusBar>())
 				statusbar->notify();
@@ -349,7 +344,7 @@ namespace ms
 				}
 			);
 
-			NotificationCenter::get().push(
+			Notifications::notify(
 				"Party Invite",
 				display_name + " has invited you to their party.",
 				[partyid, from_name](bool yes)
@@ -359,9 +354,6 @@ namespace ms
 					else
 						DenyPartyInvitePacket(from_name).dispatch();
 				});
-
-			if (auto statusbar = UI::get().get_element<UIStatusBar>())
-				statusbar->notify();
 
 			break;
 		}
@@ -696,7 +688,7 @@ namespace ms
 				}
 			);
 
-			NotificationCenter::get().push(
+			Notifications::notify(
 				"Guild Invite",
 				inviter + " has invited you to their guild.",
 				[guild_id, my_cid, inviter](bool yes)
@@ -706,9 +698,6 @@ namespace ms
 					else
 						DenyGuildInvitePacket(inviter).dispatch();
 				});
-
-			if (auto statusbar = UI::get().get_element<UIStatusBar>())
-				statusbar->notify();
 			break;
 		}
 		case 0x1A: // Full guild info
@@ -977,7 +966,7 @@ namespace ms
 					}
 				);
 
-				NotificationCenter::get().push(
+				Notifications::notify(
 					"Alliance Invite",
 					inviter + " has invited your guild to join their alliance.",
 					[alliance_id](bool yes)
@@ -985,9 +974,6 @@ namespace ms
 						if (yes)
 							AllianceAcceptInvitePacket(alliance_id).dispatch();
 					});
-
-				if (auto statusbar = UI::get().get_element<UIStatusBar>())
-					statusbar->notify();
 			}
 			break;
 		}
@@ -1195,8 +1181,7 @@ namespace ms
 				}
 			}
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] A guild has been removed from the alliance.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] A guild has been removed from the alliance.", chat::LineType::YELLOW);
 
 			break;
 		}
@@ -1245,8 +1230,7 @@ namespace ms
 				}
 			}
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] A new guild has joined the alliance.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] A new guild has joined the alliance.", chat::LineType::YELLOW);
 
 			break;
 		}
@@ -1265,8 +1249,7 @@ namespace ms
 			for (int i = 0; i < 5; i++)
 				recv.read_string(); // rank titles
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Rank titles have been updated.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] Rank titles have been updated.", chat::LineType::YELLOW);
 
 			break;
 		}
@@ -1278,8 +1261,7 @@ namespace ms
 			if (auto alliance = UI::get().get_element<UIAlliance>())
 				alliance->set_notice(notice);
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Notice updated.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] Notice updated.", chat::LineType::YELLOW);
 
 			break;
 		}
@@ -1294,15 +1276,13 @@ namespace ms
 				alliance->set_notice("");
 			}
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] The alliance has been disbanded.", UIChatBar::LineType::RED);
+			chat::log("[Alliance] The alliance has been disbanded.", chat::LineType::RED);
 
 			break;
 		}
 		default:
 		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Operation (code: " + std::to_string(op) + ")", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] Operation (code: " + std::to_string(op) + ")", chat::LineType::YELLOW);
 			break;
 		}
 		}
@@ -1366,7 +1346,7 @@ namespace ms
 					}
 				});
 
-			NotificationCenter::get().push(
+			Notifications::notify(
 				"Messenger Invite",
 				from + " has invited you to a Messenger conversation.",
 				[from](bool yes)
@@ -1384,11 +1364,7 @@ namespace ms
 				}
 			);
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(from + " has invited you to a Messenger conversation.", UIChatBar::LineType::YELLOW);
-
-			if (auto statusbar = UI::get().get_element<UIStatusBar>())
-				statusbar->notify();
+			chat::log(from + " has invited you to a Messenger conversation.", chat::LineType::YELLOW);
 
 			break;
 		}
@@ -1396,8 +1372,7 @@ namespace ms
 		{
 			std::string text = recv.read_string();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(text, UIChatBar::LineType::RED);
+			chat::log(text, chat::LineType::RED);
 
 			break;
 		}
@@ -1415,8 +1390,7 @@ namespace ms
 					msger->add_chat("", text);
 			}
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Messenger] " + text, UIChatBar::LineType::BLUE);
+			chat::log("[Messenger] " + text, chat::LineType::BLUE);
 
 			break;
 		}
@@ -1433,8 +1407,7 @@ namespace ms
 
 		std::string prefix = (type == 2) ? "[Guild] " : "[Family] ";
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(prefix + name + " has reached level " + std::to_string(level) + "!", UIChatBar::LineType::YELLOW);
+		chat::log(prefix + name + " has reached level " + std::to_string(level) + "!", chat::LineType::YELLOW);
 	}
 
 	void NotifyJobChangeHandler::handle(InPacket& recv) const
@@ -1445,8 +1418,7 @@ namespace ms
 
 		std::string prefix = (type == 0) ? "[Guild] " : "[Family] ";
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(prefix + name + " has made a job advancement!", UIChatBar::LineType::YELLOW);
+		chat::log(prefix + name + " has made a job advancement!", chat::LineType::YELLOW);
 	}
 
 	void WeddingProgressHandler::handle(InPacket& recv) const
@@ -1467,8 +1439,7 @@ namespace ms
 		if (auto wedding = UI::get().get_element<UIWedding>())
 			wedding->set_countdown(0);
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Wedding] The ceremony has ended!", UIChatBar::LineType::YELLOW);
+		chat::log("[Wedding] The ceremony has ended!", chat::LineType::YELLOW);
 	}
 
 	void MarriageRequestHandler::handle(InPacket& recv) const
@@ -1477,16 +1448,14 @@ namespace ms
 
 		if (mode == 9) // Wishlist
 		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Marriage] Wishlist prompt received.", UIChatBar::LineType::YELLOW);
+			chat::log("[Marriage] Wishlist prompt received.", chat::LineType::YELLOW);
 		}
 		else // mode 0=engage, 1=cancel, 2=answer
 		{
 			std::string name = recv.read_string();
 			int32_t player_id = recv.read_int();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Marriage] " + name + " has sent you a proposal!", UIChatBar::LineType::YELLOW);
+			chat::log("[Marriage] " + name + " has sent you a proposal!", chat::LineType::YELLOW);
 		}
 	}
 
@@ -1503,8 +1472,7 @@ namespace ms
 		default: text = "Marriage update (code: " + std::to_string(msg) + ")"; break;
 		}
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Marriage] " + text, UIChatBar::LineType::YELLOW);
+		chat::log("[Marriage] " + text, chat::LineType::YELLOW);
 	}
 
 	void WeddingGiftResultHandler::handle(InPacket& recv) const
@@ -1525,8 +1493,7 @@ namespace ms
 		int32_t map_id = recv.read_int();
 		int32_t partner_id = recv.read_int();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Marriage] Your partner has moved to another map.", UIChatBar::LineType::YELLOW);
+		chat::log("[Marriage] Your partner has moved to another map.", chat::LineType::YELLOW);
 	}
 
 	void FamilyChartResultHandler::handle(InPacket& recv) const
@@ -1681,7 +1648,7 @@ namespace ms
 			}
 		);
 
-		NotificationCenter::get().push(
+		Notifications::notify(
 			"Family Join Request",
 			name + " wants to join your family.",
 			[player_id](bool yes)
@@ -1690,11 +1657,7 @@ namespace ms
 					FamilyAcceptPacket(player_id).dispatch();
 			});
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + name + " wants to join your family!", UIChatBar::LineType::YELLOW);
-
-		if (auto statusbar = UI::get().get_element<UIStatusBar>())
-			statusbar->notify();
+		chat::log("[Family] " + name + " wants to join your family!", chat::LineType::YELLOW);
 	}
 
 	void FamilyJoinRequestResultHandler::handle(InPacket& recv) const
@@ -1716,8 +1679,7 @@ namespace ms
 		std::string name = recv.read_string();
 		recv.read_int(); // 0
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + name + " has joined your family!", UIChatBar::LineType::YELLOW);
+		chat::log("[Family] " + name + " has joined your family!", chat::LineType::YELLOW);
 	}
 
 	void FamilyRepGainHandler::handle(InPacket& recv) const
@@ -1725,8 +1687,7 @@ namespace ms
 		int32_t gain = recv.read_int();
 		std::string from = recv.read_string();
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] +" + std::to_string(gain) + " rep from " + from, UIChatBar::LineType::YELLOW);
+		chat::log("[Family] +" + std::to_string(gain) + " rep from " + from, chat::LineType::YELLOW);
 	}
 
 	void FamilyLoginLogoutHandler::handle(InPacket& recv) const
@@ -1754,7 +1715,7 @@ namespace ms
 			}
 		);
 
-		NotificationCenter::get().push(
+		Notifications::notify(
 			"Family Summon",
 			from + " from the " + family_name + " family is summoning you.",
 			[family_name](bool yes)
@@ -1762,11 +1723,7 @@ namespace ms
 				FamilySummonResponsePacket(family_name, yes).dispatch();
 			});
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline("[Family] " + from + " is summoning you!", UIChatBar::LineType::YELLOW);
-
-		if (auto statusbar = UI::get().get_element<UIStatusBar>())
-			statusbar->notify();
+		chat::log("[Family] " + from + " is summoning you!", chat::LineType::YELLOW);
 	}
 
 	void FamilyPrivilegeListHandler::handle(InPacket& recv) const

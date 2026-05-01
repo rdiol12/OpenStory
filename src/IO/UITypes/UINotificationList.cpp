@@ -22,18 +22,13 @@
 #include "../UI.h"
 #include "../NotificationCenter.h"
 
-#ifdef USE_NX
-#include <nlnx/nx.hpp>
-#endif
-
 namespace ms
 {
 	namespace
 	{
-		// Per-row backdrop is the same FadeYesNo bitmap UIAlarmInvite
-		// uses, so each notification reads as a stacked copy of the
-		// existing alarm banner.
-		constexpr int16_t ROW_GAP = 4;
+		// Mirrors UIToastStack's anchor offset so toast and drawer
+		// occupy the same on-screen rectangle.
+		constexpr int16_t POCKET_X_NUDGE = 20;
 	}
 
 	UINotificationList::UINotificationList()
@@ -43,137 +38,73 @@ namespace ms
 		: UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0), true),
 		  anchor(anchor_bottom_right)
 	{
-		title         = Text(Text::Font::A12B, Text::Alignment::LEFT,   Color::Name::WHITE,    "Notifications", 0);
-		empty_label   = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY, "No new notifications.", 0);
-		row_title     = Text(Text::Font::A11B, Text::Alignment::LEFT,   Color::Name::WHITE,    "", 0);
-		row_body      = Text(Text::Font::A11M, Text::Alignment::LEFT,   Color::Name::WHITE,    "", 0);
-		accept_label  = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE,    "Accept", 0);
-		decline_label = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::WHITE,    "Decline", 0);
+		row.load();
+		dimension = row.dims;
 
-		computed_height = 0;
-		rebuild_layout();
+		empty_label = Text(Text::Font::A11M, Text::Alignment::CENTER,
+			Color::Name::DUSTYGRAY, "No new notifications.", 0);
+
+		buttons[Buttons::BT_ACCEPT]  = row.accept_button();
+		buttons[Buttons::BT_DECLINE] = row.decline_button();
+
+		layout();
 	}
 
-	void UINotificationList::rebuild_layout()
+	void UINotificationList::layout()
 	{
-		// Lazy-load the FadeYesNo backdrop so we can size by its real
-		// dimensions (varies per locale).
-		nl::node root = nl::nx::ui["UIWindow.img"]["FadeYesNo"];
-		Texture probe(root["backgrnd"]);
-		Point<int16_t> row_dims = probe.is_valid()
-			? probe.get_dimensions()
-			: Point<int16_t>(218, 66);
+		position = anchor - Point<int16_t>(row.dims.x() - POCKET_X_NUDGE, row.dims.y());
+		bool have_entry = !NotificationCenter::get().empty();
+		buttons[Buttons::BT_ACCEPT]->set_active(have_entry);
+		buttons[Buttons::BT_DECLINE]->set_active(have_entry);
+	}
 
-		const auto& entries = NotificationCenter::get().list();
-		int16_t rows = static_cast<int16_t>(entries.size());
-		int16_t body_h = (rows == 0)
-			? row_dims.y()       // empty-state slot is one row tall
-			: rows * row_dims.y() + (rows - 1) * ROW_GAP;
+	void UINotificationList::resolve_front(bool yes)
+	{
+		const auto& list = NotificationCenter::get().list();
+		if (list.empty())
+			return;
 
-		computed_height = body_h;
-		dimension = Point<int16_t>(row_dims.x(), computed_height);
-		// Anchor's bottom matches the BT_NOTICE button's top so the
-		// stack grows upward from the status bar; the x offset is
-		// nudged right so the popup sits closer above the bell button
-		// instead of hanging far to its left.
-		constexpr int16_t POCKET_X_NUDGE = 20;
-		position = anchor - Point<int16_t>(row_dims.x() - POCKET_X_NUDGE, computed_height);
+		int32_t front_id = list.front().id;
+		NotificationCenter::get().resolve(front_id, yes);
+
+		if (NotificationCenter::get().empty())
+		{
+			if (auto sb = UI::get().get_element<UIStatusBar>())
+				sb->clear_notification();
+			deactivate();
+		}
 	}
 
 	void UINotificationList::draw(float inter) const
 	{
-		const_cast<UINotificationList*>(this)->rebuild_layout();
-		hits.clear();
-
-		nl::node root = nl::nx::ui["UIWindow.img"]["FadeYesNo"];
-		Texture row_bg(root["backgrnd"]);
-		if (!row_bg.is_valid())
-			row_bg = Texture(root["backgrnd1"]);
-
-		Point<int16_t> row_dims = row_bg.is_valid()
-			? row_bg.get_dimensions()
-			: Point<int16_t>(218, 66);
+		const_cast<UINotificationList*>(this)->layout();
 
 		const auto& entries = NotificationCenter::get().list();
+
 		if (entries.empty())
 		{
-			row_bg.draw(DrawArgument(position));
-			empty_label.draw(position + Point<int16_t>(row_dims.x() / 2, row_dims.y() / 2 - 6));
-			return;
+			row.draw(position, "", "");
+			empty_label.draw(position + Point<int16_t>(row.dims.x() / 2,
+				row.dims.y() / 2 - 6));
 		}
-
-		int16_t y = 0;
-		int row_index = 0;
-		for (const auto& e : entries)
+		else
 		{
-			Point<int16_t> row_pos = position + Point<int16_t>(0, y);
-
-			// Same backdrop UIAlarmInvite uses — one banner per pending
-			// notification, stacked.
-			row_bg.draw(DrawArgument(row_pos));
-
-			// Optional icon — FadeYesNo/icon{N} maps to a small marker.
-			Texture icon(root["icon0"]);
-			int16_t icon_w = icon.is_valid() ? icon.get_dimensions().x() : 0;
-			if (icon.is_valid())
-				icon.draw(DrawArgument(row_pos + Point<int16_t>(6, 6)));
-
-			row_title.change_text(e.title);
-			row_title.draw(row_pos + Point<int16_t>(6 + icon_w + 6, 4));
-
-			row_body.change_text(e.body);
-			row_body.draw(row_pos + Point<int16_t>(6 + icon_w + 6, 22));
-
-			// Accept / Decline pills tucked into the bottom-right corner
-			// of each row (mirrors UIAlarmInvite's BtOK/BtCancel slot).
-			constexpr int16_t BTN_W = 50;
-			constexpr int16_t BTN_H = 18;
-			Point<int16_t> accept_tl  = row_pos + Point<int16_t>(row_dims.x() - 2 * BTN_W - 12, row_dims.y() - BTN_H - 6);
-			Point<int16_t> decline_tl = accept_tl + Point<int16_t>(BTN_W + 4, 0);
-
-			ColorBox accept_bg(BTN_W, BTN_H, Color::Name::JAPANESELAUREL, 0.92f);
-			accept_bg.draw(DrawArgument(accept_tl));
-			ColorBox decline_bg(BTN_W, BTN_H, Color::Name::DARKRED, 0.92f);
-			decline_bg.draw(DrawArgument(decline_tl));
-
-			accept_label.draw(accept_tl + Point<int16_t>(BTN_W / 2, 2));
-			decline_label.draw(decline_tl + Point<int16_t>(BTN_W / 2, 2));
-
-			RowHits rh;
-			rh.id = e.id;
-			rh.accept  = Rectangle<int16_t>(accept_tl,  accept_tl  + Point<int16_t>(BTN_W, BTN_H));
-			rh.decline = Rectangle<int16_t>(decline_tl, decline_tl + Point<int16_t>(BTN_W, BTN_H));
-			hits.push_back(rh);
-
-			y += row_dims.y() + ROW_GAP;
-			++row_index;
+			const auto& e = entries.front();
+			row.draw(position, e.title, e.body);
 		}
+
+		// Renders the Accept/Decline buttons.
+		UIElement::draw(inter);
 	}
 
 	Cursor::State UINotificationList::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		Cursor::State btn_state = UIElement::send_cursor(clicked, cursorpos);
+		if (btn_state != Cursor::State::IDLE)
+			return btn_state;
+
 		if (clicked)
 		{
-			for (const auto& h : hits)
-			{
-				if (h.accept.contains(cursorpos))
-				{
-					NotificationCenter::get().resolve(h.id, true);
-					if (NotificationCenter::get().empty())
-						if (auto sb = UI::get().get_element<UIStatusBar>())
-							sb->clear_notification();
-					return Cursor::State::CLICKING;
-				}
-				if (h.decline.contains(cursorpos))
-				{
-					NotificationCenter::get().resolve(h.id, false);
-					if (NotificationCenter::get().empty())
-						if (auto sb = UI::get().get_element<UIStatusBar>())
-							sb->clear_notification();
-					return Cursor::State::CLICKING;
-				}
-			}
-
 			Rectangle<int16_t> panel(position, position + dimension);
 			if (!panel.contains(cursorpos))
 			{
@@ -181,20 +112,29 @@ namespace ms
 				return Cursor::State::IDLE;
 			}
 		}
-		else
-		{
-			for (const auto& h : hits)
-				if (h.accept.contains(cursorpos) || h.decline.contains(cursorpos))
-					return Cursor::State::CANCLICK;
-		}
 
 		return Cursor::State::IDLE;
 	}
 
 	void UINotificationList::send_key(int32_t, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		if (!pressed) return;
+		if (escape)
 			deactivate();
+	}
+
+	Button::State UINotificationList::button_pressed(uint16_t id)
+	{
+		switch (id)
+		{
+		case Buttons::BT_ACCEPT:
+			resolve_front(true);
+			return Button::State::NORMAL;
+		case Buttons::BT_DECLINE:
+			resolve_front(false);
+			return Button::State::NORMAL;
+		}
+		return Button::State::DISABLED;
 	}
 
 	UIElement::Type UINotificationList::get_type() const

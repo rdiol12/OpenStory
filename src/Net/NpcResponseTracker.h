@@ -56,12 +56,29 @@ namespace ms
 		// Called when changing maps / logging out.
 		void clear_all();
 
+		// Cosmic-side rate limit: TalkToNPC packets sent within
+		// BLOCK_NPC_RACE_CONDT (default 500ms) of the previous one
+		// are silently dropped — no dialogue, no enable_actions.
+		// We mirror that on the client by suppressing rapid re-clicks.
+		// Returns true if enough time has elapsed since the last
+		// successful click for a fresh TalkToNPC to be sent.
+		bool can_click_now() const;
+
+		// Record the moment we just sent a TalkToNPC. Resets the
+		// cooldown clock used by can_click_now().
+		void mark_clicked_now();
+
 	private:
 		using Clock = std::chrono::steady_clock;
 		static constexpr auto TIMEOUT = std::chrono::milliseconds(3000);
+		// Mirror Cosmic's canClickNPC (500ms) with a tiny safety
+		// margin so server-side jitter doesn't push us inside the
+		// drop window.
+		static constexpr auto CLICK_COOLDOWN = std::chrono::milliseconds(600);
 
 		std::map<int32_t, Clock::time_point> pending_;
 		std::unordered_set<int32_t> unavailable_;
 		uint32_t revision_ = 0;
+		Clock::time_point last_click_ = Clock::time_point::min();
 	};
 }

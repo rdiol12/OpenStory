@@ -112,8 +112,18 @@ namespace ms
 		return text;
 	}
 
-	Text::Layout::Layout(const std::vector<Layout::Line>& l, const std::vector<int16_t>& a, int16_t w, int16_t h, int16_t ex, int16_t ey) : lines(l), advances(a), dimensions(w, h), endoffset(ex, ey) {}
-	Text::Layout::Layout() : Layout(std::vector<Layout::Line>(), std::vector<int16_t>(), 0, 0, 0, 0) {}
+	const std::vector<Text::Layout::Image>& Text::images() const
+	{
+		return layout.get_images();
+	}
+
+	const std::vector<Text::Layout::Image>& Text::Layout::get_images() const
+	{
+		return images;
+	}
+
+	Text::Layout::Layout(const std::vector<Layout::Line>& l, const std::vector<int16_t>& a, const std::vector<Layout::Image>& im, int16_t w, int16_t h, int16_t ex, int16_t ey) : lines(l), advances(a), images(im), dimensions(w, h), endoffset(ex, ey) {}
+	Text::Layout::Layout() : Layout(std::vector<Layout::Line>(), std::vector<int16_t>(), std::vector<Layout::Image>(), 0, 0, 0, 0) {}
 
 	int16_t Text::Layout::width() const
 	{

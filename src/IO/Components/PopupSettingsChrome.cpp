@@ -15,47 +15,23 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
+#include "PopupSettingsChrome.h"
 
-#include "../UIDragElement.h"
-#include "../Components/PopupSettingsChrome.h"
-
-#include "../../Graphics/Text.h"
-#include "../../Configuration.h"
-
-#include <cstdint>
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#include <nlnx/node.hpp>
+#endif
 
 namespace ms
 {
-	// Party settings popup — UIWindow2.img/UserList/PopupSettings
-	// (260x103). Two title sprites are baked into the dialog, one
-	// for "Make" (creating a party) and one for "Settings" (editing
-	// an existing one); we pick the right one at construction.
-	class UIPartySettings : public UIDragElement<PosPARTYSETTINGS>
+	void PopupSettingsChrome::load(const nl::node& src)
 	{
-	public:
-		static constexpr Type TYPE = UIElement::Type::PARTYSETTINGS;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		title_make     = Texture(src["titleMake"]);
+		title_settings = Texture(src["titleSettings"]);
+	}
 
-		UIPartySettings(bool make_mode);
-
-		void draw(float inter) const override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		enum Buttons : uint16_t
-		{
-			BT_OK,        // bound to NX BtSave; "OK" to match other popups
-			BT_CANCEL
-		};
-
-		bool make_mode;
-		PopupSettingsChrome chrome;
-	};
+	void PopupSettingsChrome::draw_title(Point<int16_t> pos, bool make_mode) const
+	{
+		(make_mode ? title_make : title_settings).draw(pos);
+	}
 }

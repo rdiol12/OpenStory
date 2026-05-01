@@ -17,45 +17,28 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
-#include "../Components/PopupSettingsChrome.h"
-
-#include "../../Graphics/Text.h"
-#include "../../Configuration.h"
-
-#include <cstdint>
+#include <functional>
+#include <string>
 
 namespace ms
 {
-	// Party settings popup — UIWindow2.img/UserList/PopupSettings
-	// (260x103). Two title sprites are baked into the dialog, one
-	// for "Make" (creating a party) and one for "Settings" (editing
-	// an existing one); we pick the right one at construction.
-	class UIPartySettings : public UIDragElement<PosPARTYSETTINGS>
+	// Single high-level entry point for all in-game notifications.
+	// Each call:
+	//   1. Spawns a transient toast above the status bar (~10s).
+	//   2. Pushes a persistent entry to NotificationCenter so the
+	//      status-bar drawer keeps it until the user resolves it.
+	//   3. Activates the bell badge on the status bar.
+	//
+	// `resolver(true)` runs on Accept (toast click OR drawer Accept).
+	// `resolver(false)` runs on drawer Decline. Pass an empty function
+	// for purely informational entries with no follow-up action.
+	namespace Notifications
 	{
-	public:
-		static constexpr Type TYPE = UIElement::Type::PARTYSETTINGS;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		void notify(std::string title, std::string body,
+			std::function<void(bool yes)> resolver);
 
-		UIPartySettings(bool make_mode);
-
-		void draw(float inter) const override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		enum Buttons : uint16_t
-		{
-			BT_OK,        // bound to NX BtSave; "OK" to match other popups
-			BT_CANCEL
-		};
-
-		bool make_mode;
-		PopupSettingsChrome chrome;
-	};
+		// Convenience: informational notification with no Accept action.
+		// Clicking the toast just dismisses it.
+		void info(std::string title, std::string body);
+	}
 }

@@ -129,12 +129,10 @@ namespace ms
 			deactivate();
 			break;
 		case Buttons::BT_INVITE:
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Use @allianceinvite <guild_name> to invite a guild.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] Use @allianceinvite <guild_name> to invite a guild.", chat::LineType::YELLOW);
 			break;
 		case Buttons::BT_LEAVE:
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Alliance] Use @allianceleave to leave the alliance.", UIChatBar::LineType::YELLOW);
+			chat::log("[Alliance] Use @allianceleave to leave the alliance.", chat::LineType::YELLOW);
 			break;
 		default:
 			break;

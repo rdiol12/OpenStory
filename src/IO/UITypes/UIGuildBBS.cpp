@@ -143,23 +143,20 @@ namespace ms
 			break;
 		case Buttons::BT_WRITE:
 			GuildBBSWritePacket(false, "New Post", "").dispatch();
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("Post submitted.", UIChatBar::LineType::YELLOW);
+			chat::log("Post submitted.", chat::LineType::YELLOW);
 			break;
 		case Buttons::BT_DELETE:
 			if (!posts.empty())
 			{
 				GuildBBSDeletePacket(posts[0].id).dispatch();
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Post deleted.", UIChatBar::LineType::YELLOW);
+				chat::log("Post deleted.", chat::LineType::YELLOW);
 			}
 			break;
 		case Buttons::BT_REPLY:
 			if (!posts.empty())
 			{
 				GuildBBSReplyPacket(posts[0].id, "").dispatch();
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Reply submitted.", UIChatBar::LineType::YELLOW);
+				chat::log("Reply submitted.", chat::LineType::YELLOW);
 			}
 			break;
 		default:

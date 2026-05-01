@@ -19,34 +19,38 @@
 
 #include "../UIElement.h"
 #include "../Components/NotificationRow.h"
-#include "../../Graphics/Text.h"
 
 #include <cstdint>
+#include <deque>
+#include <functional>
+#include <string>
 
 namespace ms
 {
-	// Drawer popup that opens above BT_NOTICE on the status bar. Shows
-	// the oldest pending NotificationCenter entry; resolving (Accept /
-	// Decline via the BtOK / BtCancel sprites) advances to the next
-	// entry. Auto-closes once the queue empties. Visually identical
-	// to UIToastStack — both share the NotificationRow primitive.
-	class UINotificationList : public UIElement
+	// Single floating "toast" docked above the status bar. Each entry
+	// fades in, holds for ~10s, fades out, then advances to the next
+	// queued entry (FIFO). Only one toast is on screen at a time —
+	// additional pushes while a toast is already up wait their turn.
+	// Accept/Decline use the BtOK / BtCancel sprites via NotificationRow,
+	// matching the bell-button drawer. The drawer (UINotificationList)
+	// keeps a parallel persistent copy of every entry until the user
+	// resolves it, so toasts that auto-expire never strand the request.
+	class UIToastStack : public UIElement
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::NOTIFICATIONLIST;
+		static constexpr Type TYPE = UIElement::Type::TOASTSTACK;
 		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		static constexpr bool TOGGLED = false;
 
-		UINotificationList();
-		// `anchor_bottom_right` is a screen-space point — the popup
-		// positions itself so its bottom-right corner sits there
-		// (i.e. just above the BT_NOTICE button on the status bar).
-		UINotificationList(Point<int16_t> anchor_bottom_right);
+		UIToastStack();
+
+		void push(std::string title, std::string body,
+			std::function<void(bool yes)> resolver);
 
 		void draw(float inter) const override;
+		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
@@ -60,12 +64,29 @@ namespace ms
 			BT_DECLINE
 		};
 
-		void layout();
+		struct Entry
+		{
+			std::string title_str;
+			std::string body_str;
+			std::function<void(bool yes)> resolver;
+			int32_t age = 0;
+		};
+
+		// Pop the head of the queue and invoke its resolver — used by
+		// explicit Accept/Decline button clicks.
 		void resolve_front(bool yes);
+		// Pop the head WITHOUT invoking the resolver — used by the
+		// 10-second fade-out path. The matching drawer entry stays in
+		// NotificationCenter so the user can still act on it.
+		void expire_front();
 
+		// Repositions the toast at the BT_NOTICE bell anchor.
+		void place();
+		// Toggle the resolution buttons based on whether the queue
+		// has a front entry.
+		void update_button_visibility();
+
+		std::deque<Entry> queue;
 		NotificationRow row;
-		Point<int16_t> anchor;
-
-		mutable Text empty_label;
 	};
 }

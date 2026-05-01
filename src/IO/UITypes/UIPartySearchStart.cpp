@@ -1,3 +1,20 @@
+//////////////////////////////////////////////////////////////////////////////////
+//	This file is part of the continued Journey MMORPG client					//
+//	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
+//																				//
+//	This program is free software: you can redistribute it and/or modify		//
+//	it under the terms of the GNU Affero General Public License as published by	//
+//	the Free Software Foundation, either version 3 of the License, or			//
+//	(at your option) any later version.											//
+//																				//
+//	This program is distributed in the hope that it will be useful,				//
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of				//
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the				//
+//	GNU Affero General Public License for more details.							//
+//																				//
+//	You should have received a copy of the GNU Affero General Public License	//
+//	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
+//////////////////////////////////////////////////////////////////////////////////
 #include "UIPartySearchStart.h"
 
 #include "../UI.h"
@@ -33,14 +50,14 @@ namespace ms
 	}
 
 	UIPartySearchStart::UIPartySearchStart()
-		: UIDragElement<PosPARTYSETTINGS>(Point<int16_t>(260, 22))
+		: UIDragElement<PosPARTYSETTINGS>(Point<int16_t>(PopupSettingsChrome::WIDTH, PopupSettingsChrome::DRAGAREA_H))
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["UserList"]["PopupSettings"];
 
 		sprites.emplace_back(src["backgrnd"]);
-		title_make = Texture(src["titleMake"]);
+		chrome.load(src);
 
-		buttons[BT_START]  = std::make_unique<MapleButton>(src["BtSave"]);
+		buttons[BT_OK]     = std::make_unique<MapleButton>(src["BtSave"]);
 		buttons[BT_CANCEL] = std::make_unique<MapleButton>(src["BtCancel"]);
 
 		// Pre-fill with the ±10 window around the local player's
@@ -74,15 +91,17 @@ namespace ms
 			Color::Name::DUSTYGRAY,
 			"Range max-min must be 30 or fewer levels.", 0);
 
-		dimension = Point<int16_t>(260, 103);
-		dragarea  = Point<int16_t>(260, 22);
+		dimension = Point<int16_t>(PopupSettingsChrome::WIDTH, PopupSettingsChrome::HEIGHT);
+		dragarea  = Point<int16_t>(PopupSettingsChrome::WIDTH, PopupSettingsChrome::DRAGAREA_H);
 	}
 
 	void UIPartySearchStart::draw(float inter) const
 	{
 		UIElement::draw(inter);
 
-		title_make.draw(position);
+		// Recruiting / "make" title strip — same chrome the Settings
+		// dialog uses, just locked to the make-mode swap.
+		chrome.draw_title(position, /*make_mode=*/true);
 
 		min_label.draw(position + Point<int16_t>(8, MIN_FIELD_Y));
 		max_label.draw(position + Point<int16_t>(120, MAX_FIELD_Y));
@@ -131,7 +150,7 @@ namespace ms
 	{
 		switch (buttonid)
 		{
-		case BT_START:  dispatch_start(); break;
+		case BT_OK:     dispatch_start(); break;
 		case BT_CANCEL: deactivate();     break;
 		}
 		return Button::State::NORMAL;

@@ -77,8 +77,7 @@ namespace ms
 		case 0x4A:
 		{
 			// Buy item success
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Cash Shop] Item purchased successfully!", UIChatBar::LineType::YELLOW);
+			chat::log("[Cash Shop] Item purchased successfully!", chat::LineType::YELLOW);
 			break;
 		}
 		case 0x4C:
@@ -97,14 +96,12 @@ namespace ms
 			case 7: msg = "You already have this item."; break;
 			default: msg = "Purchase failed (code: " + std::to_string(reason) + ")"; break;
 			}
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Cash Shop] " + msg, UIChatBar::LineType::RED);
+			chat::log("[Cash Shop] " + msg, chat::LineType::RED);
 			break;
 		}
 		case 0x59:
 		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Cash Shop] Coupon redeemed successfully!", UIChatBar::LineType::YELLOW);
+			chat::log("[Cash Shop] Coupon redeemed successfully!", chat::LineType::YELLOW);
 			break;
 		}
 		case 0x5C:
@@ -119,8 +116,7 @@ namespace ms
 			case 3: msg = "This coupon is for a different server."; break;
 			default: msg = "Coupon error (code: " + std::to_string(reason) + ")"; break;
 			}
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Cash Shop] " + msg, UIChatBar::LineType::RED);
+			chat::log("[Cash Shop] " + msg, chat::LineType::RED);
 			break;
 		}
 		default:
@@ -198,8 +194,7 @@ namespace ms
 			int32_t maple_points = recv.read_int();
 			int32_t cash_prepaid = recv.read_int();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Cash] NX: " + std::to_string(cash_nx) + " | MaplePoints: " + std::to_string(maple_points) + " | Prepaid: " + std::to_string(cash_prepaid), UIChatBar::LineType::YELLOW);
+			chat::log("[Cash] NX: " + std::to_string(cash_nx) + " | MaplePoints: " + std::to_string(maple_points) + " | Prepaid: " + std::to_string(cash_prepaid), chat::LineType::YELLOW);
 		}
 	}
 
@@ -267,8 +262,7 @@ namespace ms
 				world_list += world_name;
 			}
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(world_list, UIChatBar::LineType::YELLOW);
+			chat::log(world_list, chat::LineType::YELLOW);
 		}
 		else if (error != 0)
 		{
@@ -291,8 +285,7 @@ namespace ms
 			recv.read_long(); // box cash id
 			int32_t remaining = recv.read_int();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("[Gachapon] Opened! Remaining: " + std::to_string(remaining), UIChatBar::LineType::YELLOW);
+			chat::log("[Gachapon] Opened! Remaining: " + std::to_string(remaining), chat::LineType::YELLOW);
 			// CashItemInfo + reward data follows
 		}
 	}

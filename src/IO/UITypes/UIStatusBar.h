@@ -63,14 +63,10 @@ namespace ms
 		void notify();
 		void clear_notification();
 
-		// DEBUG: preview FloatNotice/Notice sprites from /float and /notice# commands.
-		void set_preview_float(int idx);
-		void set_preview_notice(int idx);
-		void clear_preview();
-		// Debug scrollers — advance the preview index by +1/-1, wrapping
-		// around the range for the current mode. Returns true if the
-		// preview is active (so the caller can suppress normal input).
-		bool preview_step(int delta);
+		// Screen-space top-left of the BT_NOTICE bell button. Used as
+		// the anchor for both the drawer popup and the floating toast
+		// so they line up over the bell.
+		Point<int16_t> get_notice_anchor() const;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -289,9 +285,6 @@ namespace ms
 		// Notice/notification state
 		bool has_notification;
 
-		// DEBUG preview state for sprite browser commands.
-		int preview_mode = 0;     // 0 off, 1 FloatNotice, 2 Notice
-		int preview_idx = 0;
 		Texture notice_sprite;
 		uint32_t notice_pulse_tick;
 
