@@ -51,16 +51,18 @@ Edit `Configuration.h` for defaults. A `Settings` file is generated after first 
 ## todo
 - fix login world selection char creation flow currently ui is broken
 - add notifications alers ui - ✅
-- buddy system — ~90% working; some options in the context menu are not implemented or not supported by Cosmic
+- buddy system — ~working; some options in the context menu are not implemented or not supported✅
 - party tab — still ongoing
 - family ui is currently broken and missing most fetures - ✅ 
 - nx shop ui is currently broken 
-- fix closing the game
+- fix closing the game✅
 - probably more stuff are missing/broken
 
 ## Changelog
 
 ### Latest
+- **support for server notifications party invite family invite quast complete will now show the correct invite sprite above the notification button
+- **pressing on the notification sprite will open the drawer and will show the last 10 notifications if user ignores them for more then 1 minute client eill auto reject
 - **statusbar menu and system buttons now display the correct nx when clicking 
 - **Family UI**: Rebuilt on `UIWindow2.img/Family` with motto/name, 
 - **Family Tree UI**: New `UIFamilyTree` drawing leader, grand-senior, senior, me, sibling, juniors, and grand-juniors from real `parent_id` chains with clickable plates. dropped yhe artows keys as they runied the ui click the plate insted p 
