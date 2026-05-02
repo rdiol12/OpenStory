@@ -24,6 +24,8 @@ A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](h
 - Storage, buddy list, skill macros, gamepad support
 - Fullscreen, UI scaling, drag-and-drop windows
 
+- on first run Open the client press on save login in login screen and close it find the settings file and change vsyc - false and full-screen true 
+
 ## Building
 
 ### Requirements
