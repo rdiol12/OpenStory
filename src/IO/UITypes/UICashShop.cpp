@@ -78,10 +78,13 @@ namespace ms
 		buttons[Buttons::BtHelp] = std::make_unique<MapleButton>(BaseFrame["BtHelp"]);
 		buttons[Buttons::BtCoupon] = std::make_unique<MapleButton>(BaseFrame["BtCoupon"]);
 
-		// Korean-only elements (CSTab/Tab menu banners, CSStatus/BtWish,
-		// CSStatus/BtMileage, CSPromotionBanner, CSChar avatar buttons,
-		// CSMVPBanner) are deliberately not instantiated — there are no
-		// equivalents in CashShopGL.img that match this layout 1:1.
+		// Korean-only elements (CSTab/Tab menu banners, CSStatus/BtMileage,
+		// CSPromotionBanner, CSChar avatar buttons, CSMVPBanner) are
+		// deliberately not instantiated — there are no equivalents in
+		// CashShopGL.img that match this layout 1:1. (CSStatus/BtWish and
+		// CSChar/BtInventory are the exception: they toggle the wishlist /
+		// cash inventory sub-panels and have no English counterpart, so the
+		// Korean buttons are instantiated further below.)
 
 		Player& player = Stage::get().get_player();
 		std::string pname = player.get_stats().get_name();
@@ -164,12 +167,28 @@ namespace ms
 		update_items();
 
 		// === Sub-panel backgrounds (English — CashShopGL/Popup) ===
-		// Popup/Buy/backgrnd, Popup/Cupon/backgrnd, Popup/Gift/backgrnd,
-		// Popup/Notice/backgrnd are the English popup chrome. Wishlist and
-		// Search have no dedicated Popup entry, so leave those empty.
-		gift_bg = Texture(Popup["Gift"]["backgrnd"]);
-		coupon_bg = Texture(Popup["Cupon"]["backgrnd"]);
-		purchase_bg = Texture(Popup["Buy"]["backgrnd"]);
+		// Popup/Gift/background and Popup/Cupon/background are the English
+		// popup chrome (the nodes are named "background", not "backgrnd").
+		// Popup/Buy has no single background bitmap (it is composed of
+		// Top/Middle/Bottom strips), so purchase_bg stays empty and its
+		// draw call remains guarded by is_valid().
+		gift_bg = Texture(Popup["Gift"]["background"]);
+		coupon_bg = Texture(Popup["Cupon"]["background"]);
+
+		// Wishlist ("CART INVENTORY") and cash inventory ("CASH INVENTORY")
+		// use the English right-side menu panels — 242px wide with a 6x2
+		// grid of 32x32 item slots at (8 + 36 * col, 28 + 35 * row).
+		nl::node RightMenu = CashShopGL["RightMenu"];
+		wishlist_bg = Texture(RightMenu["CartInven"]["background"]);
+		cs_inventory_bg = Texture(RightMenu["CashInven"]["background"]);
+
+		// Toggle buttons for the wishlist and cash inventory panels.
+		// CashShopGL has no English equivalents, so reuse the Korean
+		// CSStatus/BtWish (cart) and CSChar/BtInventory (storage) buttons,
+		// placed in the free stretch of the header bar left of BtCoupon.
+		buttons[Buttons::BtWish] = std::make_unique<MapleButton>(CashShop["CSStatus"]["BtWish"], Point<int16_t>(704, 7));
+		buttons[Buttons::BtInventory] = std::make_unique<MapleButton>(CashShop["CSChar"]["BtInventory"], Point<int16_t>(630, 2));
+
 		active_subpanel = SUBPANEL_NONE;
 
 		dimension = Texture(backgrnd).get_dimensions();
@@ -244,6 +263,45 @@ namespace ms
 			if (purchase_bg.is_valid())
 				purchase_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
 			break;
+		case SUBPANEL_WISHLIST:
+			if (wishlist_bg.is_valid())
+				wishlist_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
+
+			// Only the empty panel frame is drawn: the wishlist SNs are
+			// never parsed client-side (SetCashShopHandler skips them), so
+			// there is no wishlist data to render yet.
+			break;
+		case SUBPANEL_INVENTORY:
+		{
+			Point<int16_t> panel_pos = position + Point<int16_t>(200, 50);
+
+			if (cs_inventory_bg.is_valid())
+				cs_inventory_bg.draw(DrawArgument(panel_pos));
+
+			// Fill the panel's 6x2 slot grid with the player's cash items.
+			const Inventory& inventory = Stage::get().get_player().get_inventory();
+			uint8_t slotmax = inventory.get_slotmax(InventoryType::Id::CASH);
+			int16_t shown = 0;
+
+			for (int16_t slot = 1; slot <= slotmax && shown < 12; slot++)
+			{
+				int32_t item_id = inventory.get_item_id(InventoryType::Id::CASH, slot);
+
+				if (item_id == 0)
+					continue;
+
+				div_t div = std::div(shown, 6);
+				Point<int16_t> slot_pos = panel_pos + Point<int16_t>(8 + 36 * div.rem, 28 + 35 * div.quot);
+
+				// v83 item icons carry a (0, 32) origin, so draw at the
+				// slot's bottom edge to land the 32x32 icon inside it.
+				ItemData::get(item_id).get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(0, 32)));
+
+				shown++;
+			}
+
+			break;
+		}
 		default:
 			break;
 		}

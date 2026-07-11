@@ -21,6 +21,7 @@
 
 #include "../Components/MapleButton.h"
 #include "../UI.h"
+#include "UIAddBuddy.h"
 #include "UINotice.h"
 
 #include "../../Gameplay/Stage.h"
@@ -189,14 +190,11 @@ namespace ms
 			return Button::State::NORMAL;
 		case Buttons::BT_ADD:
 		{
-			// Add buddy using the last chat target or the selected character
-			// In v83, the Add button opens a name input — use chat /buddy <name> for now
-			// If a character is targeted (via clicking their name in-game), add them directly
-			int32_t target_cid = Stage::get().get_player().get_oid();
-
-			// Show instruction message
-			UI::get().emplace<UIOk>("Use the chat command to add a buddy:\n/buddy <character name>",
-				[](bool) {});
+			// Open the add-buddy popup next to this window. On OK it
+			// dispatches AddBuddyPacket(name, group) — the same packet
+			// the UserList's add button sends.
+			UI::get().emplace<UIAddBuddy>(
+				position + Point<int16_t>(dimension.x() + 4, 0));
 
 			return Button::State::NORMAL;
 		}
@@ -232,7 +230,7 @@ namespace ms
 			break;
 		}
 
-		return Button::State::DISABLED;
+		return Button::State::NORMAL;
 	}
 
 	void UIBuddyList::send_key(int32_t keycode, bool pressed, bool escape)

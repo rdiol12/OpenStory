@@ -43,6 +43,9 @@ namespace ms
 
 		// Add an attack to the attack queue
 		void push_attack(const AttackResult& attack);
+		// Show a standalone damage number over a mob (server DAMAGE_MONSTER
+		// packet: DoT, mist, Body Pressure and other attacker-less damage).
+		void show_mob_damage(int32_t oid, int32_t damage);
 		// Show a buff effect
 		void show_buff(int32_t cid, int32_t skillid, int8_t level);
 		// Show a buff effect

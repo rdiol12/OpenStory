@@ -295,9 +295,15 @@ namespace ms
 		nl::node statusbar_v83 = nl::nx::ui["StatusBar.img"];
 		nl::node v83_labeled = statusbar_v83["base"]["quickSlot"];
 		if (v83_labeled)
+		{
 			quickslot_bg = Texture(v83_labeled);
+			quickslot_bg_v83 = true;
+		}
 		else
+		{
 			quickslot_bg = Texture(qs["quickSlot"]);
+			quickslot_bg_v83 = false;
+		}
 
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
 		buttons[BT_QS_OPEN]->set_active(true);
@@ -421,14 +427,23 @@ namespace ms
 		if (show_quickslot)
 		{
 			if (quickslot_bg.is_valid())
-				quickslot_bg.draw(DrawArgument(position));
+			{
+				// The v83 base sprite has no origin, so it must be drawn at
+				// the panel position (above the bar, where the slots are).
+				// The StatusBar2 fallback self-positions from `position`.
+				// Drawing at `position` was hiding the base panel behind the
+				// status bar — only the slot icons showed.
+				Point<int16_t> bgpos = quickslot_bg_v83 ? quickslot_panel_pos() : position;
+				quickslot_bg.draw(DrawArgument(bgpos));
+			}
 
 			const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
+			const auto& quickslot_keys = UI::get().get_keyboard().get_quickslot_keys();
 			int16_t cell_w = 30;
 			int16_t cell_h = 30;
-			for (int16_t i = 0; i < static_cast<int16_t>(QUICKSLOT_KEYS.size()); ++i)
+			for (int16_t i = 0; i < static_cast<int16_t>(quickslot_keys.size()); ++i)
 			{
-				int32_t keycode = QUICKSLOT_KEYS[i];
+				int32_t keycode = quickslot_keys[i];
 				auto it = maplekeys.find(keycode);
 				if (it == maplekeys.end())
 					continue;
@@ -1244,7 +1259,7 @@ namespace ms
 		if (slot < 0 || slot >= 8)
 			return;
 
-		uint8_t key = QUICKSLOT_KEYS[slot];
+		uint8_t key = UI::get().get_keyboard().get_quickslot_keys()[slot];
 
 		// Persist locally so subsequent keypresses work immediately.
 		UI::get().get_keyboard().assign(key, static_cast<uint8_t>(type), action);
@@ -1284,7 +1299,7 @@ namespace ms
 			int16_t slot = quickslot_slot_at(cursorpos);
 			if (slot >= 0)
 			{
-				uint8_t key = QUICKSLOT_KEYS[slot];
+				uint8_t key = UI::get().get_keyboard().get_quickslot_keys()[slot];
 				const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
 				auto it = maplekeys.find(static_cast<int32_t>(key));
 				if (it != maplekeys.end())

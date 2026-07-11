@@ -210,6 +210,14 @@ namespace ms
 
 			write_point(startpos);
 
+			// Number of movement fragments. The server's parseMovement reads
+			// this byte FIRST; without it, it reads our command byte (0 for a
+			// normal move) as the count, hits 0, throws EmptyMovementException,
+			// and never updates the mob's server-side position — so the mob
+			// freezes on the server (and for everyone else / its drops) while
+			// our client walks it locally. MovePlayerPacket already writes it.
+			write_byte(1);
+
 			writemovement(movement);
 		}
 	};

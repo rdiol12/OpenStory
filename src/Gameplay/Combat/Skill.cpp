@@ -166,7 +166,7 @@ namespace ms
 	{
 		useeffect->apply(user);
 
-		sound->play_use();
+		sound->play_use(user.get_position());
 	}
 
 	void Skill::apply_actions(Char& user, Attack::Type type) const
@@ -253,7 +253,7 @@ namespace ms
 	{
 		hiteffect->apply(user, target);
 
-		sound->play_hit();
+		sound->play_hit(target.get_position());
 	}
 
 	Animation Skill::get_bullet(const Char& user, int32_t bulletid) const

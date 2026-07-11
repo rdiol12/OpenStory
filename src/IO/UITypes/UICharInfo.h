@@ -91,6 +91,10 @@ namespace ms
 
 		void update_stats(int32_t character_id, int16_t job_id, int8_t level, int16_t fame, std::string guild, std::string alliance);
 
+		// Live-refresh just the fame number (e.g. after a fame/defame is
+		// acknowledged by the server) without reopening the window.
+		void update_fame(int16_t fame);
+
 		void set_bot_inventory(BotInventoryData data);
 		int32_t get_char_id() const;
 

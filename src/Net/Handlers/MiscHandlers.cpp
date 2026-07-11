@@ -16,8 +16,10 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "MiscHandlers.h"
+#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Npc.h"
+#include "../../IO/KeyConfig.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
@@ -25,6 +27,7 @@
 #include "../../Configuration.h"
 #include "../Packets/NpcInteractionPackets.h"
 
+#include <array>
 #include <vector>
 
 namespace ms
@@ -162,19 +165,33 @@ namespace ms
 
 	void QuickSlotInitHandler::handle(InPacket& recv) const
 	{
-		if (recv.available())
-		{
-			bool init = recv.read_bool();
+		if (!recv.available())
+			return;
 
-			if (init)
-			{
-				for (int i = 0; i < 8; i++)
-				{
-					if (recv.available())
-						recv.read_int();
-				}
-			}
+		// bool = custom layout follows; false means the client should keep
+		// its default quickslot keys (Cosmic QuickslotBinding::encode).
+		bool init = recv.read_bool();
+
+		if (!init)
+			return;
+
+		// Eight maple keycodes, one per quickslot cell, sent as ints.
+		std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS> keys =
+			UI::get().get_keyboard().get_quickslot_keys();
+
+		for (size_t i = 0; i < keys.size(); i++)
+		{
+			if (!recv.available())
+				return;
+
+			int32_t key = recv.read_int();
+
+			if (key > 0 && key < KeyConfig::Key::LENGTH)
+				keys[i] = static_cast<uint8_t>(key);
 		}
+
+		// Store the layout the same way local key changes are kept.
+		UI::get().get_keyboard().set_quickslot_keys(keys);
 	}
 
 	void ClaimStatusChangedHandler::handle(InPacket& recv) const
@@ -297,19 +314,33 @@ namespace ms
 		}
 	}
 
+	// Resolve an item name for maker result messages, falling back to the
+	// raw id if the item is unknown to the NX data.
+	static std::string maker_item_name(int32_t itemid)
+	{
+		const ItemData& idata = ItemData::get(itemid);
+
+		return idata.is_valid() ? idata.get_name() : ("Item " + std::to_string(itemid));
+	}
+
 	void MakerResultHandler::handle(InPacket& recv) const
 	{
 		int32_t result = recv.read_int(); // 0 = success, 1 = fail
 		int32_t mode = recv.read_int();   // 1/2 = craft, 3 = crystal, 4 = desynth
 
+		auto messenger = UI::get().get_element<UIStatusMessenger>();
+
 		if (mode == 1 || mode == 2)
 		{
 			bool failed = recv.read_bool();
 
+			int32_t item_made = 0;
+			int32_t count = 0;
+
 			if (!failed)
 			{
-				int32_t item_made = recv.read_int();
-				int32_t count = recv.read_int();
+				item_made = recv.read_int();
+				count = recv.read_int();
 			}
 
 			int32_t num_consumed = recv.read_int();
@@ -332,28 +363,46 @@ namespace ms
 
 			recv.read_int(); // mesos cost
 
-			std::string msg = failed ? "Item creation failed." : "Item created successfully!";
+			std::string msg = failed
+				? "Item creation failed."
+				: "Created: " + maker_item_name(item_made) + " x" + std::to_string(count);
 
-			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			if (messenger)
 				messenger->show_status(failed ? Color::Name::RED : Color::Name::WHITE, msg);
 		}
 		else if (mode == 3) // Monster Crystal
 		{
-			recv.read_int(); // item gained
-			recv.read_int(); // item lost
+			int32_t item_gained = recv.read_int();
+			int32_t item_lost = recv.read_int();
+
+			if (messenger)
+				messenger->show_status(Color::Name::WHITE, "Created: " + maker_item_name(item_gained) + " (used " + maker_item_name(item_lost) + ")");
 		}
 		else if (mode == 4) // Desynth
 		{
-			recv.read_int(); // item id
+			int32_t item_id = recv.read_int(); // item disassembled
 			int32_t num_gained = recv.read_int();
+
+			std::string gained;
 
 			for (int32_t i = 0; i < num_gained; i++)
 			{
-				recv.read_int(); // item id
-				recv.read_int(); // quantity
+				int32_t gain_id = recv.read_int();
+				int32_t quantity = recv.read_int();
+
+				if (i > 0)
+					gained += ", ";
+
+				gained += maker_item_name(gain_id) + " x" + std::to_string(quantity);
 			}
 
 			recv.read_int(); // mesos
+
+			if (gained.empty())
+				gained = "nothing";
+
+			if (messenger)
+				messenger->show_status(Color::Name::WHITE, "Disassembled " + maker_item_name(item_id) + ": " + gained);
 		}
 	}
 

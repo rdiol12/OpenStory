@@ -599,8 +599,9 @@ namespace ms
 
 	void UIDeathNotice::draw(float alpha) const
 	{
+		// The UIWindow.img/Notice tombstone sprite already has its message
+		// baked in, so we don't draw our own text over it.
 		backdrop.draw(DrawArgument(position));
-		question.draw(position + Point<int16_t>(dimension.x() / 2, 48));
 		UIElement::draw(alpha);
 	}
 

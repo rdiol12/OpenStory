@@ -24,6 +24,7 @@
 #include "../Util/Randomizer.h"
 
 #include <chrono>
+#include <iostream>
 
 namespace ms
 {
@@ -34,6 +35,10 @@ namespace ms
 
 	void OutPacket::dispatch()
 	{
+		if (Configuration::get().get_show_packets())
+			std::cout << "Sent Packet: " << opcode
+				<< " (" << bytes.size() << " bytes)\n"; // '\n' not std::endl: never force-flush per packet
+
 		Session::get().write(bytes.data(), bytes.size());
 
 	}

@@ -17,16 +17,39 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapObjects.h"
 
+#include "../../Constants.h"
+
 namespace ms
 {
 	void MapObjects::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
+		// View-frustum culling. This method draws the dynamic entity
+		// collections (mobs, npcs, chars, drops, reactors) — map tiles/
+		// objects use a different path — so it is safe to skip anything
+		// well outside the visible screen. Previously every entity on the
+		// whole map was fully rendered each frame, which is the main reason
+		// the client bogged down with lots of mobs/NPCs. The margin is
+		// generous so tall sprites and effects aren't clipped at the edges.
+		const int16_t vwidth = Constants::Constants::get().get_viewwidth();
+		const int16_t vheight = Constants::Constants::get().get_viewheight();
+		constexpr double MARGIN = 320.0;
+
 		for (auto& oid : layers[layer])
 		{
 			auto mmo = get(oid);
 
-			if (mmo && mmo->is_active())
-				mmo->draw(viewx, viewy, alpha);
+			if (!mmo || !mmo->is_active())
+				continue;
+
+			Point<int16_t> pos = mmo->get_position();
+			double sx = pos.x() + viewx;
+			double sy = pos.y() + viewy;
+
+			if (sx < -MARGIN || sx > vwidth + MARGIN
+				|| sy < -MARGIN || sy > vheight + MARGIN)
+				continue;
+
+			mmo->draw(viewx, viewy, alpha);
 		}
 	}
 

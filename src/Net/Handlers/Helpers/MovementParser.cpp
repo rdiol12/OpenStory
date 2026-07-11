@@ -24,6 +24,11 @@ namespace ms
 		std::vector<Movement> movements;
 		uint8_t length = recv.read_byte();
 
+		// Byte layouts must match exactly what the server sends (see
+		// Cosmic's AbstractMovementPacketHandler.parseMovement). Reading
+		// the wrong number of bytes for ANY command desyncs every later
+		// fragment in the packet, leaving foreign players and mobs at
+		// garbage positions/stances.
 		for (uint8_t i = 0; i < length; ++i)
 		{
 			Movement fragment;
@@ -31,61 +36,81 @@ namespace ms
 
 			switch (fragment.command)
 			{
-			case 0:
+			case 0:  // normal move
 			case 5:
-			case 17:
+			case 17: // float
+				// Absolute — 13 bytes.
 				fragment.type = Movement::ABSOLUTE;
 				fragment.xpos = recv.read_short();
 				fragment.ypos = recv.read_short();
-				fragment.lastx = recv.read_short();
-				fragment.lasty = recv.read_short();
+				fragment.lastx = recv.read_short();  // x wobble
+				fragment.lasty = recv.read_short();  // y wobble
 				fragment.fh = recv.read_short();
 				fragment.newstate = recv.read_byte();
 				fragment.duration = recv.read_short();
 				break;
-			case 1:
-			case 2:
-			case 6:
+			case 1:  // jump
+			case 2:  // knockback
+			case 6:  // flash jump
 			case 12:
 			case 13:
-			case 16:
+			case 16: // float
+			case 18:
+			case 19: // springs on maps
+			case 20: // Aran combat step
+			case 22:
+				// Relative — 7 bytes.
 				fragment.type = Movement::RELATIVE;
 				fragment.xpos = recv.read_short();
 				fragment.ypos = recv.read_short();
 				fragment.newstate = recv.read_byte();
 				fragment.duration = recv.read_short();
 				break;
-			case 11:
-				fragment.type = Movement::CHAIR;
+			case 3:  // teleport disappear
+			case 4:  // teleport appear
+			case 7:  // assaulter
+			case 8:  // assassinate
+			case 9:  // rush
+			case 11: // chair
+				// Teleport-style — 9 bytes, absolute position, no duration.
+				fragment.type = Movement::ABSOLUTE;
 				fragment.xpos = recv.read_short();
 				fragment.ypos = recv.read_short();
-				recv.skip(2);
+				fragment.lastx = recv.read_short();  // x wobble
+				fragment.lasty = recv.read_short();  // y wobble
 				fragment.newstate = recv.read_byte();
-				fragment.duration = recv.read_short();
 				break;
 			case 15:
+				// Jump down — 15 bytes.
 				fragment.type = Movement::JUMPDOWN;
 				fragment.xpos = recv.read_short();
 				fragment.ypos = recv.read_short();
-				fragment.lastx = recv.read_short();
-				fragment.lasty = recv.read_short();
-				recv.skip(2);
+				fragment.lastx = recv.read_short();  // x wobble
+				fragment.lasty = recv.read_short();  // y wobble
 				fragment.fh = recv.read_short();
+				recv.skip(2);                        // origin foothold
 				fragment.newstate = recv.read_byte();
 				fragment.duration = recv.read_short();
 				break;
-			case 3:
-			case 4:
-			case 7:
-			case 8:
-			case 9:
-			case 14:
-				fragment.type = Movement::NONE;
-				break;
 			case 10:
+				// Change equip — 1 byte, no position.
 				fragment.type = Movement::NONE;
-				// Change equip
+				recv.skip(1);
 				break;
+			case 14:
+				// Jump-down variant — 9 bytes, no usable position.
+				fragment.type = Movement::NONE;
+				recv.skip(9);
+				break;
+			case 21:
+				// Aran-related — 3 bytes.
+				fragment.type = Movement::NONE;
+				recv.skip(3);
+				break;
+			default:
+				// Unknown command: its size is unknown, so continuing would
+				// desync the rest of the packet. Stop here with what we have.
+				return movements;
 			}
 
 			movements.push_back(fragment);

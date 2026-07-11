@@ -410,7 +410,7 @@ namespace ms
 
 			recv.skip(2);
 
-			Sound(Sound::Name::DROP).play();
+			Sound(Sound::Name::DROP).play(dropto);
 		}
 		else
 		{
@@ -438,12 +438,18 @@ namespace ms
 		{
 			int32_t cid = recv.read_int();
 
+			auto character = Stage::get().get_character(cid);
+
 			if (recv.length() > 0)
 				recv.read_byte(); // pet
-			else if (auto character = Stage::get().get_character(cid))
+			else if (character)
 				looter = character->get_phobj();
 
-			Sound(Sound::Name::PICKUP).play();
+			// Attenuate the pickup sound by the looting player's distance.
+			if (character)
+				Sound(Sound::Name::PICKUP).play(character->get_position());
+			else
+				Sound(Sound::Name::PICKUP).play();
 		}
 
 		Stage::get().get_drops().remove(oid, mode, looter.get());
@@ -770,11 +776,11 @@ namespace ms
 		recv.read_byte(); // 0
 		int32_t damage = recv.read_int();
 
+		// Cosmic routes attacker-less mob damage here (DoT, mist, Body
+		// Pressure, etc.). Show the number instead of dropping it; the
+		// HP bar is still updated separately via SHOW_MOB_HP.
 		if (damage > 0)
-		{
-			// Show damage number on the mob (from other players' attacks)
-			// The mob HP bar is updated separately via SHOW_MOB_HP
-		}
+			Stage::get().get_combat().show_mob_damage(oid, damage);
 	}
 
 	void CancelSkillEffectHandler::handle(InPacket& recv) const

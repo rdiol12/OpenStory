@@ -280,7 +280,28 @@ namespace ms
 
 	void Combat::push_attack(const AttackResult& attack)
 	{
-		attackresults.push(400, attack);
+		// Foreign attacks were delayed 400ms here, but the local player's
+		// own attack is applied immediately (see apply_move → extract_effects).
+		// On fast/one-shot kills the server's KILL_MONSTER removed the mob
+		// before the 400ms elapsed, so the foreign damage numbers never
+		// rendered and the mob just vanished. Apply promptly instead — the
+		// per-hit attack delay inside extract_effects still syncs each
+		// number to the attacker's swing.
+		attackresults.push(0, attack);
+	}
+
+	void Combat::show_mob_damage(int32_t oid, int32_t damage)
+	{
+		if (damage <= 0 || !mobs.contains(oid))
+			return;
+
+		// Float a single number over the mob's head and play its hit
+		// reaction, matching how attack damage is displayed.
+		int16_t head = mobs.get_mob_head_position(oid).y();
+		damagenumbers.emplace_back(DamageNumber::Type::NORMAL, damage, head);
+		damagenumbers.back().set_x(mobs.get_mob_head_position(oid).x());
+
+		mobs.apply_damage(oid, damage, false, {}, get_move(0));
 	}
 
 	void Combat::apply_attack(const AttackResult& attack)

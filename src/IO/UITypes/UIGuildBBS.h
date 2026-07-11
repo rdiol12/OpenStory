@@ -21,8 +21,13 @@
 
 #include "../../Graphics/Text.h"
 
+#include <vector>
+
 namespace ms
 {
+	// Guild bulletin board (GuildBBS.img/GuildBBS). Two views:
+	// the thread list, and an opened thread with its replies.
+	// Wire protocol matches Cosmic's BBSOperationHandler / GuildPackets.
 	class UIGuildBBS : public UIDragElement<PosGUILDBBS>
 	{
 	public:
@@ -41,8 +46,19 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		// Called from packet handlers
-		void add_post(int32_t id, const std::string& author, const std::string& title, int64_t timestamp, int32_t reply_count);
+		void start_post_list(int32_t thread_count);
+		void set_total_threads(int32_t thread_count);
+		void add_post(int32_t id, const std::string& author, const std::string& title,
+			int64_t timestamp, int32_t reply_count, bool is_notice);
 		void clear_posts();
+
+		void show_thread(int32_t id, const std::string& author, const std::string& title,
+			const std::string& content, int64_t timestamp);
+		void add_thread_reply(int32_t reply_id, const std::string& author,
+			const std::string& content, int64_t timestamp);
+
+		// Formats a Cosmic FILETIME-style long as YYYY-MM-DD.
+		static std::string format_date(int64_t timestamp);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -56,7 +72,6 @@ namespace ms
 			BT_REPLY
 		};
 
-		// Post list display
 		struct BBSPost
 		{
 			int32_t id;
@@ -64,9 +79,31 @@ namespace ms
 			std::string title;
 			std::string date;
 			int32_t reply_count;
+			bool is_notice;
 		};
 
+		struct BBSReply
+		{
+			int32_t id;
+			std::string author;
+			std::string content;
+			std::string date;
+		};
+
+		void request_list() const;
+		void open_write_dialog();
+		void open_reply_dialog();
+
 		std::vector<BBSPost> posts;
+
+		// Opened-thread state; viewing == true switches draw to thread view.
+		bool viewing = false;
+		int32_t view_id = 0;
+		std::string view_author;
+		std::string view_title;
+		std::string view_content;
+		std::string view_date;
+		std::vector<BBSReply> view_replies;
 
 		// Pagination
 		int16_t current_page;
@@ -78,6 +115,7 @@ namespace ms
 		mutable Text post_title_label;
 		mutable Text post_author_label;
 		mutable Text post_date_label;
+		mutable Text body_text;
 		mutable Text empty_text;
 
 		// Post list area

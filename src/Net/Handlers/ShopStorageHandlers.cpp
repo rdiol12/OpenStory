@@ -30,6 +30,7 @@
 #include "../../IO/UITypes/UIMinigame.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "Helpers/ItemParser.h"
+#include "Helpers/LoginParser.h"
 
 namespace ms
 {
@@ -368,53 +369,17 @@ namespace ms
 		{
 			uint8_t slot = recv.read_byte();
 
-			// Skip partner appearance data (addCharLook)
-			// This is complex; skip what we can
-			// For now, just read the partner name at the end
-			// We'll skip the look data by reading until we find the name
-
-			// In v83: addCharLook writes gender(byte), skin(byte), face(int),
-			// hair flag(byte), hair(int), then equipped items, then cash items,
-			// then end marker -1, then pets
-			// This is variable length, so we need to parse it
-
-			int8_t gender = recv.read_byte();
-			int8_t skin = recv.read_byte();
-			int32_t face = recv.read_int();
-
-			// mega flag
-			recv.skip_byte();
-
-			int32_t hair = recv.read_int();
-
-			// Equipped items (slot, itemid pairs until slot == -1)
-			while (recv.available())
-			{
-				int8_t equipped_slot = recv.read_byte();
-				if (equipped_slot == -1)
-					break;
-				recv.skip_int(); // item id
-			}
-
-			// Cash items (slot, itemid pairs until slot == -1)
-			while (recv.available())
-			{
-				int8_t cash_slot = recv.read_byte();
-				if (cash_slot == -1)
-					break;
-				recv.skip_int(); // item id
-			}
-
-			// Skip remaining look data (weapon sticker, pets)
-			recv.skip_int(); // weapon sticker
-
-			for (int i = 0; i < 3; i++)
-				recv.skip_int(); // pet ids
+			// addCharLook — identical layout to the login/char-select
+			// look block (gender, skin, face, mega flag, hair, equips,
+			// masked equips, weapon sticker, pets), so reuse the login
+			// parser and hand the result to the trade UI so it can draw
+			// the partner's real avatar.
+			LookEntry look = LoginParser::parse_look(recv);
 
 			std::string partner_name = recv.read_string();
 
 			if (auto trade = UI::get().get_element<UITrade>())
-				trade->set_partner(slot, partner_name);
+				trade->set_partner(slot, partner_name, look);
 
 			break;
 		}
@@ -436,68 +401,21 @@ namespace ms
 					// Partner data follows
 					recv.skip_byte(); // slot
 
-					// Skip partner addCharLook
-					recv.skip_byte(); // gender
-					recv.skip_byte(); // skin
-					recv.skip_int();  // face
-					recv.skip_byte(); // mega flag
-					recv.skip_int();  // hair
-
-					// Equipped items
-					while (recv.available())
-					{
-						int8_t eslot = recv.read_byte();
-						if (eslot == -1) break;
-						recv.skip_int();
-					}
-
-					// Cash items
-					while (recv.available())
-					{
-						int8_t cslot = recv.read_byte();
-						if (cslot == -1) break;
-						recv.skip_int();
-					}
-
-					recv.skip_int(); // weapon sticker
-					for (int i = 0; i < 3; i++)
-						recv.skip_int(); // pet ids
+					// Partner addCharLook — parse and keep for the avatar
+					LookEntry look = LoginParser::parse_look(recv);
 
 					std::string partner_name = recv.read_string();
 
 					if (auto trade = UI::get().get_element<UITrade>())
-						trade->set_partner(1, partner_name);
+						trade->set_partner(1, partner_name, look);
 				}
 
 				// Self data
 				uint8_t self_num = recv.read_byte();
 
-				// Skip self addCharLook
-				recv.skip_byte(); // gender
-				recv.skip_byte(); // skin
-				recv.skip_int();  // face
-				recv.skip_byte(); // mega flag
-				recv.skip_int();  // hair
-
-				// Equipped items
-				while (recv.available())
-				{
-					int8_t eslot = recv.read_byte();
-					if (eslot == -1) break;
-					recv.skip_int();
-				}
-
-				// Cash items
-				while (recv.available())
-				{
-					int8_t cslot = recv.read_byte();
-					if (cslot == -1) break;
-					recv.skip_int();
-				}
-
-				recv.skip_int(); // weapon sticker
-				for (int i = 0; i < 3; i++)
-					recv.skip_int(); // pet ids
+				// Self addCharLook — parse to advance the packet, but
+				// discard it: we already have our own look locally.
+				LoginParser::parse_look(recv);
 
 				recv.skip_string(); // self name
 

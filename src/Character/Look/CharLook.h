@@ -49,11 +49,18 @@ namespace ms
 		void attack(bool degenerate);
 		void attack(Stance::Id stance);
 		void set_stance(Stance::Id stance);
+		// Force a stance even if an action (e.g. an attack) is playing, by
+		// cancelling that action first. Used for death, which must override
+		// whatever the character was doing when HP hit 0.
+		void set_stance_forced(Stance::Id stance);
 		void set_expression(Expression::Id expression);
 		void set_action(const std::string& action);
 		void set_direction(bool mirrored);
 		void set_alerted(int64_t millis);
 		bool get_alerted() const;
+		// World position used as the audio anchor for this look's sounds
+		// (attack swings), so they attenuate by distance from the listener.
+		void set_sound_position(Point<int16_t> position);
 
 		bool is_twohanded(Stance::Id stance) const;
 		uint16_t get_attackdelay(size_t no, uint8_t first_frame) const;
@@ -85,6 +92,8 @@ namespace ms
 		TimedBool expcooldown;
 
 		bool flip;
+
+		Point<int16_t> soundposition;
 
 		const BodyAction* action;
 		std::string actionstr;

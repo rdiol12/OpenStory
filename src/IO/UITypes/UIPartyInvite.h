@@ -92,5 +92,12 @@ namespace ms
 		mutable std::vector<InviteRow> rows;
 		mutable int16_t list_scroll = 0;
 		mutable int16_t hovered_row  = -1;
+
+		// Column-header sort state. DEFAULT keeps the closest-level-first
+		// ordering; clicking a header sorts by that column, clicking it
+		// again flips the direction.
+		enum class SortColumn { DEFAULT, NAME, JOB, LEVEL };
+		SortColumn sort_column = SortColumn::DEFAULT;
+		bool sort_ascending = true;
 	};
 }

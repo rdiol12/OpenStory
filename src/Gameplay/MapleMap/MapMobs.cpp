@@ -30,6 +30,9 @@ namespace ms
 
 	void MapMobs::update(const Physics& physics)
 	{
+		// Apply spawns first. A spawn for a mob that still exists (killed
+		// but pending a deferred kill, or being refreshed on map entry) is
+		// a revive, not a fresh mob.
 		for (; !spawns.empty(); spawns.pop())
 		{
 			const MobSpawn& spawn = spawns.front();
@@ -38,10 +41,18 @@ namespace ms
 			{
 				int8_t mode = spawn.get_mode();
 
+				// If we don't already control this mob, the position in this
+				// spawn / control-grant is the server's authoritative one.
+				// Snap to it BEFORE taking control, so a stale local position
+				// doesn't make the mob appear to teleport when the server
+				// hands control over (which happens right after we attack it).
+				if (!mob->is_controlled())
+					mob->server_reposition(spawn.get_position(), spawn.get_stance());
+
 				if (mode > 0)
 					mob->set_control(mode);
 
-				mob->makeactive();
+				mob->revive();
 			}
 			else
 			{
@@ -49,18 +60,34 @@ namespace ms
 			}
 		}
 
+		// Now apply any kills that were NOT cancelled by a matching spawn
+		// this tick — these are genuine deaths, not map-transition refreshes.
+		for (auto& [oid, animation] : pending_kills)
+		{
+			if (Optional<Mob> mob = mobs.get(oid))
+				mob->kill(animation);
+		}
+		pending_kills.clear();
+
 		mobs.update(physics);
 	}
 
 	void MapMobs::spawn(MobSpawn&& spawn)
 	{
+		// A re-spawn cancels a kill queued for the same mob this tick: the
+		// server's map-transition refresh is kill-then-spawn, and we don't
+		// want the mob to actually die in between.
+		pending_kills.erase(spawn.get_oid());
+
 		spawns.emplace(std::move(spawn));
 	}
 
 	void MapMobs::remove(int32_t oid, int8_t animation)
 	{
-		if (Optional<Mob> mob = mobs.get(oid))
-			mob->kill(animation);
+		// Defer the kill to update() so a spawn arriving in the same batch
+		// can cancel it (map-transition refresh). A real death has no
+		// following spawn and is applied normally next tick.
+		pending_kills[oid] = animation;
 	}
 
 	void MapMobs::clear()

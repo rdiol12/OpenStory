@@ -323,22 +323,22 @@ namespace ms
 
 	// --- Guild Packets ---
 
-	// Guild operation base
+	// Guild operation base. Opcode and sub-op values verified against
+	// Cosmic's GuildOperationHandler (recv opcode 0x7E).
 	class GuildOperationPacket : public OutPacket
 	{
 	public:
 		enum Operation : int8_t
 		{
-			CREATE = 2,
-			INVITE = 5,
-			ACCEPT = 6,
-			LEAVE = 7,
-			EXPEL = 8,
-			CHANGE_RANK_TITLES = 9,
-			CHANGE_MEMBER_RANK = 10,
-			CHANGE_EMBLEM = 11,
-			CHANGE_NOTICE = 13,
-			REQUEST_BBS = 18
+			CREATE = 0x02,
+			INVITE = 0x05,
+			ACCEPT = 0x06,
+			LEAVE = 0x07,
+			EXPEL = 0x08,
+			CHANGE_RANK_TITLES = 0x0D,
+			CHANGE_MEMBER_RANK = 0x0E,
+			CHANGE_EMBLEM = 0x0F,
+			CHANGE_NOTICE = 0x10
 		};
 
 	protected:
@@ -381,11 +381,16 @@ namespace ms
 		}
 	};
 
-	// Leave guild
+	// Leave guild. Cosmic's handler (sub-op 0x07) reads the character id
+	// and name and rejects the request if they don't match the sender.
 	class GuildLeavePacket : public GuildOperationPacket
 	{
 	public:
-		GuildLeavePacket() : GuildOperationPacket(GuildOperationPacket::Operation::LEAVE) {}
+		GuildLeavePacket(int32_t cid, const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::LEAVE)
+		{
+			write_int(cid);
+			write_string(name);
+		}
 	};
 
 	// Expel member from guild
@@ -409,65 +414,90 @@ namespace ms
 		}
 	};
 
-	// Request guild BBS
-	class GuildBBSRequestPacket : public GuildOperationPacket
-	{
-	public:
-		GuildBBSRequestPacket() : GuildOperationPacket(GuildOperationPacket::Operation::REQUEST_BBS) {}
-	};
+	// --- Guild BBS Packets ---
+	// Cosmic serves the BBS on RecvOpcode BBS_OPERATION (0x9B) with a
+	// leading mode byte. Payloads verified against BBSOperationHandler:
+	// title max 25 chars, body max 600, reply max 25; icon 0-3 (or
+	// 0x64-0x6A which require owning the matching 529xxxx item).
 
-	// Write a new post to guild BBS
+	// Write a new post (or edit an existing one) — mode 0
 	class GuildBBSWritePacket : public OutPacket
 	{
 	public:
-		GuildBBSWritePacket(bool is_notice, const std::string& title, const std::string& content)
-			: OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		GuildBBSWritePacket(bool edit, int32_t thread_id, bool is_notice,
+			const std::string& title, const std::string& content, int32_t icon = 0)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
 		{
-			write_byte(18); // BBS operation
-			write_byte(0);  // new post (not edit)
+			write_byte(0);
+			write_byte(edit ? 1 : 0);
+			if (edit)
+				write_int(thread_id);
 			write_byte(is_notice ? 1 : 0);
 			write_string(title);
 			write_string(content);
+			write_int(icon);
 		}
 	};
 
-	// Delete a post from guild BBS
+	// Delete a thread — mode 1
 	class GuildBBSDeletePacket : public OutPacket
 	{
 	public:
-		GuildBBSDeletePacket(int32_t post_id)
-			: OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		GuildBBSDeletePacket(int32_t thread_id)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
 		{
-			write_byte(18); // BBS operation
-			write_byte(1);  // delete
-			write_int(post_id);
+			write_byte(1);
+			write_int(thread_id);
 		}
 	};
 
-	// Reply to a post on guild BBS
+	// Request the thread list — mode 2. Cosmic multiplies page by 10.
+	class GuildBBSListPacket : public OutPacket
+	{
+	public:
+		GuildBBSListPacket(int32_t page)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
+		{
+			write_byte(2);
+			write_int(page);
+		}
+	};
+
+	// Open a thread (returns content + replies) — mode 3
+	class GuildBBSViewPacket : public OutPacket
+	{
+	public:
+		GuildBBSViewPacket(int32_t thread_id)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
+		{
+			write_byte(3);
+			write_int(thread_id);
+		}
+	};
+
+	// Reply to a thread — mode 4
 	class GuildBBSReplyPacket : public OutPacket
 	{
 	public:
-		GuildBBSReplyPacket(int32_t post_id, const std::string& content)
-			: OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		GuildBBSReplyPacket(int32_t thread_id, const std::string& content)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
 		{
-			write_byte(18); // BBS operation
-			write_byte(2);  // reply
-			write_int(post_id);
+			write_byte(4);
+			write_int(thread_id);
 			write_string(content);
 		}
 	};
 
-	// List posts on guild BBS with pagination
-	class GuildBBSListPacket : public OutPacket
+	// Delete a reply — mode 5. Cosmic ignores the thread id field.
+	class GuildBBSDeleteReplyPacket : public OutPacket
 	{
 	public:
-		GuildBBSListPacket(int32_t start)
-			: OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		GuildBBSDeleteReplyPacket(int32_t thread_id, int32_t reply_id)
+			: OutPacket(OutPacket::Opcode::BBS_OPERATION)
 		{
-			write_byte(18); // BBS operation
-			write_byte(4);  // list posts
-			write_int(start);
+			write_byte(5);
+			write_int(thread_id);
+			write_int(reply_id);
 		}
 	};
 

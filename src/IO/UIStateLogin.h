@@ -21,6 +21,8 @@
 
 #include "Components/TextTooltip.h"
 
+#include <vector>
+
 namespace ms
 {
 	class UIStateLogin : public UIState
@@ -61,6 +63,13 @@ namespace ms
 
 		EnumMap<UIElement::Type, UIElement::UPtr, UIElement::Type::NUM_TYPES> elements;
 		UIElement::Type focused;
+
+		// Elements pulled out by remove() are parked here and destroyed at
+		// the start of the next update(). Deleting them immediately crashes
+		// when an element removes itself from inside its own button handler
+		// (e.g. UILoginNotice's ok handler) — the old code "solved" that by
+		// leaking via unique_ptr::release().
+		std::vector<UIElement::UPtr> graveyard;
 
 		TextTooltip tetooltip;
 		Optional<Tooltip> tooltip;

@@ -128,6 +128,10 @@ namespace ms
 
 	void UIStateGame::update()
 	{
+		// Safe point: no element code is on the stack here, so removed
+		// elements parked by remove() can finally be freed.
+		graveyard.clear();
+
 		bool update_screen = false;
 		int16_t new_width = Constants::Constants::get().get_viewwidth();
 		int16_t new_height = Constants::Constants::get().get_viewheight();
@@ -882,7 +886,12 @@ namespace ms
 		if (auto& element = elements[type])
 		{
 			element->deactivate();
-			element.reset();
+
+			// Park instead of deleting in place — remove() can be reached
+			// from inside the element's own handler (e.g. a dialog's ok
+			// callback), and freeing it here would be a use-after-free.
+			// update() clears the graveyard next tick.
+			graveyard.push_back(std::move(element));
 		}
 	}
 

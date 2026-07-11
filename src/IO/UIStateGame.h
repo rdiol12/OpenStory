@@ -27,6 +27,8 @@
 
 #include "../Character/CharStats.h"
 
+#include <vector>
+
 namespace ms
 {
 	class UIStateGame : public UIState
@@ -73,6 +75,11 @@ namespace ms
 		std::list<UIElement::Type> elementorder;
 		UIElement::Type focused;
 		UIElement* dragged;
+
+		// Elements pulled out by remove() are parked here and destroyed at
+		// the start of the next update(), so an element that removes itself
+		// from inside its own handler isn't freed mid-call.
+		std::vector<UIElement::UPtr> graveyard;
 
 		EquipTooltip eqtooltip;
 		ItemTooltip ittooltip;

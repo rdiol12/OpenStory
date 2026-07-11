@@ -124,6 +124,9 @@ namespace ms
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;
+		// Draw a small scaled copy of the mob's current sprite at a screen
+		// point (used to show the mob on the minimap instead of a marker).
+		void draw_minimap(Point<int16_t> position, float scale, float alpha) const;
 		// Update movement and animations
 		int8_t update(const Physics& physics) override;
 
@@ -135,6 +138,18 @@ namespace ms
 		// Kill the mob with the appropriate type:
 		// 0 - make inactive 1 - death animation 2 - fade out
 		void kill(int8_t killtype);
+		// Fully restore a mob that was killed but is being re-spawned in the
+		// same breath (the server's map-transition refresh sends kill+spawn
+		// for every mob). Clears the death state so it doesn't linger in a
+		// death pose.
+		void revive();
+		// Snap this mob to the authoritative position/stance the server gave
+		// in a spawn or control-grant packet. Used when we don't control the
+		// mob, so a stale local position can't show it teleporting when the
+		// server hands control over (e.g. right after we attack it).
+		void server_reposition(Point<int16_t> position, int8_t stancebyte);
+		// Whether this client currently controls (drives) this mob.
+		bool is_controlled() const;
 		// Display the hp percentage above the mob
 		// Use the playerlevel to determine color of NameTag
 		void show_hp(int8_t percentage, uint16_t playerlevel);
@@ -179,7 +194,7 @@ namespace ms
 		// Decide on the next state
 		void next_move();
 		// Send the current position and state to the server
-		void update_movement();
+		void update_movement(int8_t nibble = 0);
 
 		// Calculate the hit chance
 		float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
@@ -231,6 +246,11 @@ namespace ms
 		bool dying;
 		bool dead;
 		bool control;
+		// Set false whenever we gain control; the first control-update then
+		// immediately reports the mob's position to "claim" it with the
+		// server, the way a normal client does. Without this the server can
+		// kill and respawn a mob we took control of but never drove.
+		bool control_acked = false;
 		bool aggro;
 		Stance stance;
 		bool flip;

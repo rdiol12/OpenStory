@@ -128,4 +128,9 @@ namespace ms
 
 		return { 0, {} };
 	}
+
+	MapObjects* MapDrops::get_drops()
+	{
+		return &drops;
+	}
 }

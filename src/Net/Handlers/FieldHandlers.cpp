@@ -20,6 +20,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../Character/MapleStat.h"
 #ifdef USE_NX
@@ -97,6 +98,8 @@ namespace ms
 	void ForcedStatSetHandler::handle(InPacket& recv) const
 	{
 		// v83: int bitmask of forced stats, then for each set bit: short value
+		// (bits 0-9) or byte value (bits 10-11, SPEED/JUMP — see Cosmic's
+		// aranGodlyStats payload).
 		// Bitmask bits: 0=STR, 1=DEX, 2=INT, 3=LUK, 4=PAD, 5=PDD, 6=MAD, 7=MDD,
 		//               8=ACC, 9=EVA, 10=SPEED, 11=JUMP
 		if (recv.length() < 4)
@@ -105,38 +108,61 @@ namespace ms
 		int32_t mask = recv.read_int();
 		CharStats& stats = Stage::get().get_player().get_stats();
 
-		// Map of mask bit -> stat ID for the stats we can set
-		struct ForcedStat
+		for (int bit = 0; bit < 12 && recv.available(); bit++)
 		{
-			int bit;
-			MapleStat::Id stat;
-		};
+			if (!(mask & (1 << bit)))
+				continue;
 
-		ForcedStat stat_map[] =
-		{
-			{ 0, MapleStat::Id::STR },
-			{ 1, MapleStat::Id::DEX },
-			{ 2, MapleStat::Id::INT },
-			{ 3, MapleStat::Id::LUK },
-		};
+			// SPEED and JUMP are single unsigned bytes (e.g. 140), everything
+			// else is a short.
+			int16_t value = (bit >= 10)
+				? static_cast<uint8_t>(recv.read_byte())
+				: recv.read_short();
 
-		for (int bit = 0; bit < 12 && recv.length() >= 2; bit++)
-		{
-			if (mask & (1 << bit))
+			switch (bit)
 			{
-				int16_t value = recv.read_short();
-
-				// Apply to the known stat mappings
-				for (auto& sm : stat_map)
-				{
-					if (sm.bit == bit)
-					{
-						stats.set_stat(sm.stat, static_cast<uint16_t>(value));
-						break;
-					}
-				}
+			case 0: // STR
+				stats.set_stat(MapleStat::Id::STR, static_cast<uint16_t>(value));
+				break;
+			case 1: // DEX
+				stats.set_stat(MapleStat::Id::DEX, static_cast<uint16_t>(value));
+				break;
+			case 2: // INT
+				stats.set_stat(MapleStat::Id::INT, static_cast<uint16_t>(value));
+				break;
+			case 3: // LUK
+				stats.set_stat(MapleStat::Id::LUK, static_cast<uint16_t>(value));
+				break;
+			case 4: // PAD
+				stats.set_total(EquipStat::Id::WATK, value);
+				break;
+			case 5: // PDD
+				stats.set_total(EquipStat::Id::WDEF, value);
+				break;
+			case 6: // MAD
+				stats.set_total(EquipStat::Id::MAGIC, value);
+				break;
+			case 7: // MDD
+				stats.set_total(EquipStat::Id::MDEF, value);
+				break;
+			case 8: // ACC
+				stats.set_total(EquipStat::Id::ACC, value);
+				break;
+			case 9: // EVA
+				stats.set_total(EquipStat::Id::AVOID, value);
+				break;
+			case 10: // SPEED
+				stats.set_total(EquipStat::Id::SPEED, value);
+				break;
+			case 11: // JUMP
+				stats.set_total(EquipStat::Id::JUMP, value);
+				break;
 			}
 		}
+
+		// Refresh the stats window so the forced values show immediately.
+		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
+			statsinfo->update_all_stats();
 	}
 
 	void SetTractionHandler::handle(InPacket& recv) const

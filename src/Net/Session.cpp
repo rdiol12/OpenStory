@@ -102,6 +102,13 @@ namespace ms
 			catch (const PacketError&)
 			{
 			}
+			catch (const std::exception&)
+			{
+				// A handler hit an unexpected error (e.g. std::out_of_range
+				// from an unguarded container access). Swallow it so one bad
+				// packet degrades gracefully instead of terminating the
+				// whole client.
+			}
 
 			pos = 0;
 			length = 0;

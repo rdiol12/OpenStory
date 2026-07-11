@@ -24,6 +24,12 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Gameplay/MapleMap/Npc.h"
+#include "../../Gameplay/MapleMap/Mob.h"
+#include "../../Gameplay/MapleMap/Drop.h"
+#include "../../Character/Char.h"
+#include "../../Character/Player.h"
+#include "../../Character/Look/CharLook.h"
+#include "../../Graphics/DrawArgument.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -405,10 +411,15 @@ namespace ms
 		{
 		case BT_MIN:
 			type -= 1;
+			// Remember the chosen size so it survives a map change / respawn
+			// (update_map resets `type` to `user_type`). Without this, only
+			// the keyboard toggle persisted and the map shrank on every warp.
+			user_type = type;
 			toggle_buttons();
 			return type == Type::MIN ? Button::State::DISABLED : Button::State::NORMAL;
 		case BT_MAX:
 			type += 1;
+			user_type = type;
 			toggle_buttons();
 			return type == Type::MAX ? Button::State::DISABLED : Button::State::NORMAL;
 		case BT_SMALL:
@@ -690,36 +701,74 @@ namespace ms
 		if (!has_map)
 			return;
 
-		Animation marker_sprite;
-		Point<int16_t> sprite_offset;
 		Point<int16_t> origin(map_draw_origin_x, map_draw_origin_y);
+
+		// Draw shrunken copies of the real sprites on the minimap instead of
+		// plain marker dots. Size is tied to the minimap ZOOM (so sprites
+		// grow/shrink as the minimap is resized) at a fixed readable base,
+		// rather than to the per-map magnification — that varies so wildly
+		// between maps that a proportional size looked huge on some and
+		// invisible on others. The player is drawn a bit larger to stand out.
+		float base = (zoom_scale > 0.0f) ? zoom_scale : 1.0f;
+
+		const float MM_MOB_SCALE  = base * 0.20f;
+		const float MM_NPC_SCALE  = base * 0.24f;
+		const float MM_DROP_SCALE = base * 0.24f;
+		const float MM_CHAR_SCALE = base * 0.28f;
+
+		auto mm_point = [&](Point<int16_t> world_pos)
+		{
+			return scale_map_pos(world_pos) + origin + init_pos;
+		};
+
+		auto draw_look = [&](CharLook& look, Point<int16_t> p, float sc)
+		{
+			look.draw(DrawArgument(p, p, Point<int16_t>(0, 0),
+				sc, sc, 1.0f, 0.0f), alpha);
+		};
+
+		// These collections are homogeneous (only mobs / drops / npcs /
+		// chars), so a static_cast avoids the per-entity dynamic_cast cost.
+
+		/// Monsters
+		MapObjects* mobs = Stage::get().get_mobs().get_mobs();
+		for (auto it = mobs->begin(); it != mobs->end(); ++it)
+		{
+			auto* mob = static_cast<Mob*>(it->second.get());
+			if (mob && mob->is_active())
+				mob->draw_minimap(mm_point(mob->get_position()), MM_MOB_SCALE, alpha);
+		}
+
+		/// Drops
+		MapObjects* drops = Stage::get().get_drops().get_drops();
+		for (auto it = drops->begin(); it != drops->end(); ++it)
+		{
+			auto* drop = static_cast<Drop*>(it->second.get());
+			if (drop && drop->is_active())
+				drop->draw_minimap(mm_point(drop->get_position()), MM_DROP_SCALE, alpha);
+		}
 
 		/// NPCs
 		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
-		marker_sprite = Animation(marker["npc"]);
-		sprite_offset = marker_sprite.get_dimensions() / Point<int16_t>(2, 0);
-
-		for (auto npc = npcs->begin(); npc != npcs->end(); ++npc)
+		for (auto it = npcs->begin(); it != npcs->end(); ++it)
 		{
-			Point<int16_t> npc_pos = npc->second.get()->get_position();
-			marker_sprite.draw(scale_map_pos(npc_pos) - sprite_offset + origin + init_pos, alpha);
+			auto* npc = static_cast<Npc*>(it->second.get());
+			if (npc && npc->is_active())
+				npc->draw_minimap(mm_point(npc->get_position()), MM_NPC_SCALE, alpha);
 		}
 
 		/// Other characters
 		MapObjects* chars = Stage::get().get_chars().get_chars();
-		marker_sprite = Animation(marker["another"]);
-		sprite_offset = marker_sprite.get_dimensions() / Point<int16_t>(2, 0);
-
-		for (auto chr = chars->begin(); chr != chars->end(); ++chr)
+		for (auto it = chars->begin(); it != chars->end(); ++it)
 		{
-			Point<int16_t> chr_pos = chr->second.get()->get_position();
-			marker_sprite.draw(scale_map_pos(chr_pos) - sprite_offset + origin + init_pos, alpha);
+			auto* chr = static_cast<Char*>(it->second.get());
+			if (chr && chr->is_active())
+				draw_look(chr->get_look(), mm_point(chr->get_position()), MM_CHAR_SCALE);
 		}
 
 		/// Player
-		Point<int16_t> player_pos = Stage::get().get_player().get_position();
-		sprite_offset = player_marker.get_dimensions() / Point<int16_t>(2, 0);
-		player_marker.draw(scale_map_pos(player_pos) - sprite_offset + origin + init_pos, alpha);
+		Player& player = Stage::get().get_player();
+		draw_look(player.get_look(), mm_point(player.get_position()), MM_CHAR_SCALE);
 	}
 
 	Point<int16_t> UIMiniMap::get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const

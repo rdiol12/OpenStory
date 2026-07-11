@@ -26,6 +26,7 @@
 #include "../Combat/SpecialMove.h"
 
 #include <queue>
+#include <unordered_map>
 
 namespace ms
 {
@@ -78,5 +79,10 @@ namespace ms
 		MapObjects mobs;
 
 		std::queue<MobSpawn> spawns;
+		// Deferred mob kills. The server's map-transition refresh sends a
+		// kill immediately followed by a re-spawn for every mob; deferring
+		// the kill to update() lets a matching spawn cancel it, so mobs
+		// don't visibly die+respawn every time you enter a map.
+		std::unordered_map<int32_t, int8_t> pending_kills;
 	};
 }

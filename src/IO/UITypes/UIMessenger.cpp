@@ -21,6 +21,8 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Gameplay/Stage.h"
+
 #include "../../Net/Packets/SocialPackets.h"
 
 #ifdef USE_NX
@@ -44,10 +46,11 @@ namespace ms
 		if (backgrnd2.size() > 0)
 			sprites.emplace_back(backgrnd2);
 
+		// Chat input bar (184x22) at the bottom of the window
 		nl::node backgrnd3 = src["backgrnd3"];
 
 		if (backgrnd3.size() > 0)
-			sprites.emplace_back(backgrnd3);
+			sprites.emplace_back(backgrnd3, Point<int16_t>(14, 330));
 
 		// Name bars for player slots
 		nl::node namebar = src["NameBar"];
@@ -64,7 +67,24 @@ namespace ms
 			chat_balloons[i] = balloon[std::to_string(i)];
 
 		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
-		buttons[Buttons::BT_ENTER] = std::make_unique<MapleButton>(src["BtEnter"]);
+		buttons[Buttons::BT_ENTER] = std::make_unique<MapleButton>(src["BtEnter"], Point<int16_t>(205, 333));
+
+		// Chat input inside the bottom bar — Enter sends the message
+		chatfield = Textfield(
+			Text::A11M, Text::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(
+				Point<int16_t>(20, 333),
+				Point<int16_t>(194, 349)
+			),
+			70
+		);
+
+		chatfield.set_enter_callback(
+			[this](std::string)
+			{
+				send_chat();
+			}
+		);
 
 		// Initialize player slots
 		for (int i = 0; i < MAX_PLAYERS; i++)
@@ -115,11 +135,15 @@ namespace ms
 			chat_label.draw(position + Point<int16_t>(10, chat_y));
 			chat_y += 14;
 		}
+
+		chatfield.draw(position);
 	}
 
 	void UIMessenger::update()
 	{
 		UIElement::update();
+
+		chatfield.update(position);
 	}
 
 	void UIMessenger::add_player(int8_t slot, const std::string& name)
@@ -153,9 +177,39 @@ namespace ms
 	{
 		if (pressed && escape)
 		{
+			UI::get().remove_textfield();
+
 			MessengerLeavePacket().dispatch();
 			deactivate();
 		}
+	}
+
+	Cursor::State UIMessenger::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicked))
+			return new_state;
+
+		return UIDragElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIMessenger::send_chat()
+	{
+		std::string message = chatfield.get_text();
+
+		if (message.empty())
+			return;
+
+		// Cosmic relays the CHAT string verbatim to the other members,
+		// so the message is sent pre-formatted as "name : message" —
+		// the same format MessengerHandler parses on receive.
+		std::string name = Stage::get().get_player().get_name();
+		MessengerChatPacket(name + " : " + message).dispatch();
+
+		// The server does not echo the chat back to the sender,
+		// so append it to our own window locally.
+		add_chat(name, message);
+
+		chatfield.change_text("");
 	}
 
 	UIElement::Type UIMessenger::get_type() const
@@ -168,17 +222,29 @@ namespace ms
 		switch (buttonid)
 		{
 		case Buttons::BT_CLOSE:
+			UI::get().remove_textfield();
+
 			MessengerLeavePacket().dispatch();
 			deactivate();
 			break;
 		case Buttons::BT_ENTER:
-			UI::get().emplace<UIEnterText>(
-				"Enter the name of the player to invite:",
-				[](const std::string& name)
-				{
-					MessengerInvitePacket(name).dispatch();
-				}
-			);
+			// Send the typed chat message. With an empty input, fall
+			// back to the invite prompt so inviting stays possible.
+			if (!chatfield.empty())
+			{
+				send_chat();
+			}
+			else
+			{
+				UI::get().emplace<UIEnterText>(
+					"Enter the name of the player to invite:",
+					[](const std::string& name)
+					{
+						MessengerInvitePacket(name).dispatch();
+					}
+				);
+			}
+
 			break;
 		default:
 			break;

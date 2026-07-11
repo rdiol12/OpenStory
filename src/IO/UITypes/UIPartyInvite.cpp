@@ -222,28 +222,65 @@ namespace ms
 		}
 
 
-		// Sort: below-or-equal-my-level first (ascending), then above
-		// (ascending). Unknown-level rows (buddies, level=0) sort to
-		// the very bottom so the player can scan inviteable peers from
-		// closest match upward.
-		int16_t my_level = static_cast<int16_t>(
-			Stage::get().get_player().get_level());
-		std::sort(rows.begin(), rows.end(),
-			[my_level](const InviteRow& a, const InviteRow& b)
-			{
-				bool a_unknown = a.level <= 0;
-				bool b_unknown = b.level <= 0;
-				if (a_unknown != b_unknown)
-					return !a_unknown;        // knowns before unknowns
-				if (a_unknown && b_unknown)
-					return a.name < b.name;   // alpha within unknowns
+		if (sort_column == SortColumn::DEFAULT)
+		{
+			// Sort: below-or-equal-my-level first (ascending), then above
+			// (ascending). Unknown-level rows (buddies, level=0) sort to
+			// the very bottom so the player can scan inviteable peers from
+			// closest match upward.
+			int16_t my_level = static_cast<int16_t>(
+				Stage::get().get_player().get_level());
+			std::sort(rows.begin(), rows.end(),
+				[my_level](const InviteRow& a, const InviteRow& b)
+				{
+					bool a_unknown = a.level <= 0;
+					bool b_unknown = b.level <= 0;
+					if (a_unknown != b_unknown)
+						return !a_unknown;        // knowns before unknowns
+					if (a_unknown && b_unknown)
+						return a.name < b.name;   // alpha within unknowns
 
-				bool a_above = a.level > my_level;
-				bool b_above = b.level > my_level;
-				if (a_above != b_above)
-					return !a_above;          // below-or-equal first
-				return a.level < b.level;     // ascending within group
-			});
+					bool a_above = a.level > my_level;
+					bool b_above = b.level > my_level;
+					if (a_above != b_above)
+						return !a_above;          // below-or-equal first
+					return a.level < b.level;     // ascending within group
+				});
+		}
+		else
+		{
+			// Column-header sort. Rows missing the sorted value (buddy
+			// rows have no job/level) always sink to the bottom so the
+			// informative rows stay visible.
+			SortColumn col = sort_column;
+			bool asc = sort_ascending;
+			std::sort(rows.begin(), rows.end(),
+				[col, asc](const InviteRow& a, const InviteRow& b)
+				{
+					if (col == SortColumn::NAME)
+						return asc ? a.name < b.name : b.name < a.name;
+
+					if (col == SortColumn::JOB)
+					{
+						bool a_unknown = a.job.empty();
+						bool b_unknown = b.job.empty();
+						if (a_unknown != b_unknown)
+							return !a_unknown;
+						if (a.job != b.job)
+							return asc ? a.job < b.job : b.job < a.job;
+						return a.name < b.name;
+					}
+
+					// LEVEL
+					bool a_unknown = a.level <= 0;
+					bool b_unknown = b.level <= 0;
+					if (a_unknown != b_unknown)
+						return !a_unknown;
+					if (a.level != b.level)
+						return asc ? a.level < b.level : b.level < a.level;
+					return a.name < b.name;
+				});
+		}
 
 		// Refresh per-row hit-rects so click routing tracks the
 		// current scroll position.
@@ -346,10 +383,25 @@ namespace ms
 		case BT_COL_NAME:
 		case BT_COL_JOB:
 		case BT_COL_LEVEL:
-			// Sortable column headers — Cosmic doesn't supply ordering
-			// metadata for buddy rows, so the click is currently a
-			// no-op visual.
+		{
+			SortColumn clicked =
+				buttonid == BT_COL_NAME ? SortColumn::NAME :
+				buttonid == BT_COL_JOB  ? SortColumn::JOB  :
+				                          SortColumn::LEVEL;
+
+			// Same header again flips direction; a new header starts
+			// ascending. Rows re-sort on the next draw's rebuild_rows().
+			if (sort_column == clicked)
+				sort_ascending = !sort_ascending;
+			else
+			{
+				sort_column = clicked;
+				sort_ascending = true;
+			}
+
+			list_scroll = 0;
 			break;
+		}
 		}
 		return Button::State::NORMAL;
 	}

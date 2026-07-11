@@ -102,7 +102,31 @@ namespace ms
 
 	void OtherChar::send_movement(const std::vector<Movement>& newmoves)
 	{
-		movements.push(newmoves.back());
+		if (newmoves.empty())
+			return;
+
+		const Movement& target = newmoves.back();
+
+		// Recover from big jumps (teleport, flash jump, or a position that
+		// drifted out of sync) by snapping straight to the server position
+		// instead of sliding the character across the map — otherwise a
+		// foreign player lingers where they used to be and appears to
+		// attack empty space.
+		double dx = target.xpos - phobj.crnt_x();
+		double dy = target.ypos - phobj.crnt_y();
+
+		if ((dx * dx + dy * dy) > (200.0 * 200.0))
+		{
+			std::queue<Movement>().swap(movements);
+			lastmove = target;
+			phobj.set_x(target.xpos);
+			phobj.set_y(target.ypos);
+			phobj.hspeed = 0.0;
+			phobj.vspeed = 0.0;
+			return;
+		}
+
+		movements.push(target);
 	}
 
 	void OtherChar::update_skill(int32_t skillid, uint8_t skilllevel)

@@ -31,6 +31,20 @@
 
 namespace ms
 {
+	// Fallback costs/caps — overwritten by the server's actual config
+	// when the FAMILY_PRIVILEGE_LIST packet arrives at login.
+	int32_t UIFamily::ability_costs[UIFamily::NUM_ABILITIES] = { 500, 1000, 1500, 1500, 2500 };
+	int32_t UIFamily::ability_caps[UIFamily::NUM_ABILITIES] = { 3, 3, 1, 1, 1 };
+
+	void UIFamily::set_entitlement_info(int ordinal, int32_t rep_cost, int32_t use_limit)
+	{
+		if (ordinal >= 0 && ordinal < NUM_ABILITIES)
+		{
+			ability_costs[ordinal] = rep_cost;
+			ability_caps[ordinal] = use_limit;
+		}
+	}
+
 	UIFamily::UIFamily() :
 		UIDragElement<PosFAMILY>(Point<int16_t>(214, 27)),
 		selected_ability(0),
@@ -304,11 +318,8 @@ namespace ms
 
 	void UIFamily::refresh_ability_text()
 	{
-		// Costs in the 500–2500 range the user chose for this server.
-		static const int costs[NUM_ABILITIES] = { 500, 1000, 1500, 1500, 2500 };
-		// Per-day caps (Cosmic/v83 defaults — server only sends `used`).
-		static const int caps[NUM_ABILITIES]  = { 3, 3, 1, 1, 1 };
-
+		// Costs and per-day caps come from the server's privilege list
+		// (see set_entitlement_info); the arrays start with fallbacks.
 		static const char* targets[NUM_ABILITIES] = {
 			"Family Member",
 			"Family Member",
@@ -334,10 +345,10 @@ namespace ms
 		if (selected_ability >= 0 && selected_ability < NUM_ABILITIES)
 		{
 			ability_name_label.change_text(ability_names[selected_ability]);
-			ability_cost_label.change_text(std::to_string(costs[selected_ability]));
+			ability_cost_label.change_text(std::to_string(ability_costs[selected_ability]));
 			ability_uses_label.change_text(
 				std::to_string(ability_used[selected_ability])
-				+ "/" + std::to_string(caps[selected_ability]));
+				+ "/" + std::to_string(ability_caps[selected_ability]));
 			ability_target_label.change_text(std::string("[target] ") + targets[selected_ability]);
 			ability_duration_label.change_text(std::string("[time] ") + durations[selected_ability]);
 			ability_effect_label.change_text(std::string("[effect] ") + effects[selected_ability]);

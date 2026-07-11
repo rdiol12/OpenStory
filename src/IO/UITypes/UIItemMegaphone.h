@@ -21,6 +21,7 @@
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
 #include "../Components/Textfield.h"
+#include "../Components/Icon.h"
 
 #include <cstdint>
 #include <string>
@@ -47,6 +48,7 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -70,5 +72,11 @@ namespace ms
 
 		int16_t item_slot;
 		int32_t item_id;
+
+		// Attached inventory item for preview (drag-dropped from the
+		// inventory window). Tab 0 / slot 0 means "no attachment".
+		int8_t attach_tab = 0;
+		int16_t attach_slot = 0;
+		Texture attach_texture;
 	};
 }

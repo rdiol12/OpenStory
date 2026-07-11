@@ -166,7 +166,9 @@ namespace ms
 
 		player.recalc_stats(true);
 
-		PlayerUpdatePacket().dispatch();
+		// PlayerUpdatePacket (opcode 223) is not dispatched: Cosmic has no
+		// PLAYER_UPDATE recv opcode — 223 is PARTY_SEARCH_UPDATE there, so
+		// sending it unregistered the player from party search on login.
 
 		uint8_t portalid = player.get_stats().get_portal();
 		int32_t mapid = player.get_stats().get_mapid();

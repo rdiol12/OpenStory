@@ -20,6 +20,7 @@
 #include "KeyAction.h"
 #include "KeyType.h"
 
+#include <array>
 #include <map>
 
 namespace ms
@@ -48,8 +49,17 @@ namespace ms
 
 		Keyboard();
 
+		// Number of keys on the quickslot bar.
+		static constexpr size_t NUM_QUICKSLOT_KEYS = 8;
+
 		void assign(uint8_t key, uint8_t type, int32_t action);
 		void remove(uint8_t key);
+
+		// Store the quickslot bar's key layout (eight maple keycodes),
+		// e.g. from the server's QUICKSLOT_INIT packet.
+		void set_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys);
+		// Return the quickslot bar's key layout.
+		const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& get_quickslot_keys() const;
 
 		int32_t leftshiftcode() const;
 		int32_t rightshiftcode() const;
@@ -67,5 +77,6 @@ namespace ms
 		std::map<int32_t, Mapping> maplekeys;
 		std::map<int32_t, KeyAction::Id> textactions;
 		std::map<int32_t, bool> keystate;
+		std::array<uint8_t, NUM_QUICKSLOT_KEYS> quickslotkeys;
 	};
 }

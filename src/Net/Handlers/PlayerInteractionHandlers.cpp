@@ -124,6 +124,13 @@ namespace ms
 
 				if (messenger)
 					messenger->show_status(Color::Name::WHITE, msg);
+
+				// Live-update the open character info window's fame number.
+				// You can only fame from that window, so it is showing the
+				// character we just famed — refresh it in place instead of
+				// requiring a close/reopen.
+				if (auto charinfo = UI::get().get_element<UICharInfo>())
+					charinfo->update_fame(new_fame);
 			}
 			break;
 		}

@@ -31,13 +31,13 @@ namespace ms
 		hitsound = soundsrc["Hit"];
 	}
 
-	void SingleSkillSound::play_use() const
+	void SingleSkillSound::play_use(Point<int16_t> position) const
 	{
-		usesound.play();
+		usesound.play(position);
 	}
 
-	void SingleSkillSound::play_hit() const
+	void SingleSkillSound::play_hit(Point<int16_t> position) const
 	{
-		hitsound.play();
+		hitsound.play(position);
 	}
 }
