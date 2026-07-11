@@ -73,6 +73,9 @@ namespace ms
 		item_slot = slot;
 		item_id = itemid;
 		whisper_enabled = false;
+		attach_tab = 0;
+		attach_slot = 0;
+		attach_texture = Texture();
 		msg_field.change_text("");
 		msg_field.set_state(Textfield::State::FOCUSED);
 	}
@@ -87,6 +90,15 @@ namespace ms
 		bg.draw(DrawArgument(position + Point<int16_t>(16, 60)));
 
 		msg_field.draw(position);
+
+		// Item-attach drop slot: a 32x32 box below the message field.
+		// Drag an item from the inventory onto the window to attach it;
+		// click the box to detach.
+		ColorBox slot_bg(32, 32, Color::Name::WHITE, 0.60f);
+		slot_bg.draw(DrawArgument(position + Point<int16_t>(16, 90)));
+
+		if (attach_texture.is_valid())
+			attach_texture.draw(DrawArgument(position + Point<int16_t>(16, 122)));
 
 		// Whisper checkbox glyph (NX origin anchors it at the canonical
 		// slot inside the backdrop — drawing at `position` is enough).
@@ -122,7 +134,38 @@ namespace ms
 			return Cursor::State::CLICKING;
 		}
 
+		// Clicking the attach slot detaches the current item.
+		Rectangle<int16_t> attach_box(
+			Point<int16_t>(16, 90), Point<int16_t>(48, 122));
+		if (clicked && attach_box.contains(local) && attach_tab != 0)
+		{
+			attach_tab = 0;
+			attach_slot = 0;
+			attach_texture = Texture();
+			return Cursor::State::CLICKING;
+		}
+
 		return UIDragElement<PosITEMMEGAPHONE>::send_cursor(clicked, cursorpos);
+	}
+
+	bool UIItemMegaphone::send_icon(const Icon& icon, Point<int16_t> cursorpos)
+	{
+		// Accept item/equip icons dragged from the inventory anywhere on
+		// the window — they become the broadcast's attached preview item.
+		Icon::IconType type = const_cast<Icon&>(icon).get_type();
+		if (type != Icon::IconType::ITEM && type != Icon::IconType::EQUIP)
+			return true;
+
+		InventoryType::Id tab = icon.get_source_tab();
+		int16_t slot = icon.get_source_slot();
+		if (tab == InventoryType::Id::NONE || slot <= 0)
+			return true;
+
+		attach_tab = static_cast<int8_t>(tab);
+		attach_slot = slot;
+		attach_texture = icon.get_texture();
+
+		return true;
 	}
 
 	void UIItemMegaphone::send_key(int32_t keycode, bool pressed, bool escape)
@@ -159,10 +202,8 @@ namespace ms
 		std::string msg = msg_field.get_text();
 		if (msg.empty()) { deactivate(); return; }
 
-		// Item attachment picker is not wired yet — send with no attached
-		// item (src_tab = 0, src_slot = 0). TODO: add drag-drop slot from
-		// the inventory so players can preview any item.
-		UseMegaphonePacket(item_slot, item_id, msg, whisper_enabled, 0, 0).dispatch();
+		UseMegaphonePacket(item_slot, item_id, msg, whisper_enabled,
+			attach_tab, attach_slot).dispatch();
 		deactivate();
 	}
 }

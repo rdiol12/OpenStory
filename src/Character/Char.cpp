@@ -182,6 +182,11 @@ namespace ms
 
 		afterimage.update(look.get_frame(), stancespeed);
 
+		// Keep the look's audio anchor at the character's world position, so
+		// its attack-swing sound plays attenuated by distance (other players
+		// attacking across the map are quiet / silent).
+		look.set_sound_position(get_position());
+
 		return look.update(stancespeed);
 	}
 
@@ -400,7 +405,20 @@ namespace ms
 		state = st;
 
 		Stance::Id stance = Stance::by_state(state);
-		look.set_stance(stance);
+
+		// Death must override any action that was playing (e.g. an attack
+		// in progress when HP hit 0); otherwise the dead pose never shows.
+		if (st == State::DIED)
+		{
+			// Clear the attack flag so the death animation plays at normal
+			// speed (get_stancespeed returns attack speed while attacking).
+			attacking = false;
+			look.set_stance_forced(stance);
+		}
+		else
+		{
+			look.set_stance(stance);
+		}
 	}
 
 	void Char::add_pet(uint8_t index, int32_t iid, const std::string& name, int32_t uniqueid, Point<int16_t> pos, uint8_t stance, int32_t fhid)

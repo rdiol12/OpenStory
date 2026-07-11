@@ -105,7 +105,9 @@ namespace ms
 
 			/// Skill
 			USE_SKILL = 91,
-			SKILL_MACRO_MODIFIED = 92,
+			// Cosmic reads skill macros on RecvOpcode 0x6E (110); the old
+			// value 92 landed on CANCEL_BUFF there.
+			SKILL_MACRO_MODIFIED = 110,
 
 			/// Gameplay 2
 			PARTY_OPERATION = 124,
@@ -132,15 +134,19 @@ namespace ms
 			ENTER_MTS = 156,
 			MTS_OPERATION = 253,
 
-			/// Guild
-			GUILD_OPERATION = 138,
+			/// Guild — Cosmic reads guild operations on RecvOpcode 0x7E
+			/// (126); the old value 138 landed on WEDDING_ACTION there.
+			GUILD_OPERATION = 126,
+			// Guild BBS lives on its own recv opcode in Cosmic (0x9B).
+			BBS_OPERATION = 155,
 
 			/// Alliance
 			ALLIANCE_OPERATION = 143,
 			DENY_ALLIANCE_REQUEST = 144,
 
-			/// Messenger
-			MESSENGER = 126,
+			/// Messenger — Cosmic reads messenger ops on RecvOpcode 0x7A
+			/// (122); the old value 126 landed on GUILD_OPERATION there.
+			MESSENGER = 122,
 
 			/// Family — opcodes 0x91..0x99 (v83 Cosmic/HeavenMS).
 			OPEN_FAMILY_PEDIGREE = 145,
@@ -155,8 +161,8 @@ namespace ms
 			// Legacy alias kept for any leftover callers.
 			FAMILY_OPERATION = USE_FAMILY,
 
-			/// RPS Game
-			RPS_ACTION = 231,
+			/// RPS Game — Cosmic reads RPS on RecvOpcode 0x88 (136).
+			RPS_ACTION = 136,
 
 			/// Report
 			REPORT = 106,
@@ -165,14 +171,14 @@ namespace ms
 			/// 221/222 the original numbering used. The register op is
 			/// a server-side stub on Cosmic; the actual leader-driven
 			/// matchmaking entry point is PARTY_SEARCH_START.
-			PARTY_SEARCH_REGISTER = 224,    // 0xE0
-			PARTY_SEARCH_START    = 225,    // 0xE1
+			PARTY_SEARCH_REGISTER = 220,    // 0xDC per Cosmic RecvOpcode
+			PARTY_SEARCH_START    = 222,    // 0xDE per Cosmic RecvOpcode
 
 			/// Event
 			REQUEST_EVENT_INFO = 241, // 0xF1
 
-			/// Wedding
-			WEDDING_ACTION = 232,
+			/// Wedding — Cosmic reads wedding ops on RecvOpcode 0x8A (138).
+			WEDDING_ACTION = 138,
 
 			/// Bot Inventory (custom)
 			BOT_INV_ACTION = 0x168

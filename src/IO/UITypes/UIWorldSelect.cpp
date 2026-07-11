@@ -549,15 +549,19 @@ namespace ms
 		}
 		else if (id == BT_QUITGAME)
 		{
-			// Could open quit confirm UI
+			UI::get().quit();
 			return Button::State::NORMAL;
 		}
 		else if (id == BT_VIEWALL)
 		{
+			buttons[BT_VIEWALL]->set_active(false);
+			buttons[BT_VIEWCHOICE]->set_active(true);
 			return Button::State::NORMAL;
 		}
 		else if (id == BT_VIEWCHOICE)
 		{
+			buttons[BT_VIEWCHOICE]->set_active(false);
+			buttons[BT_VIEWALL]->set_active(true);
 			return Button::State::NORMAL;
 		}
 		else if (id >= BT_WORLD0 && id < BT_CHANNEL0)

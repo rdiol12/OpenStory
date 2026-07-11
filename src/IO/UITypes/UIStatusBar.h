@@ -211,18 +211,18 @@ namespace ms
 
 		// Quick slot
 		Texture quickslot_bg;
+		// True when quickslot_bg is the v83 StatusBar.img/base/quickSlot
+		// bitmap, which has origin (0,0) and must be drawn at the panel
+		// position. The StatusBar2 fallback has a baked (-143,143) origin
+		// and self-positions when drawn at `position`.
+		bool quickslot_bg_v83 = false;
 		bool show_quickslot;
 
 		// Quickslot drop support.
-		// The v83 panel shows 8 key bindings laid out in 2 rows of 4.
-		// Top row keys (L→R): LEFT_SHIFT, INSERT, HOME, PAGE_UP
-		// Bottom row keys (L→R): LEFT_CONTROL, DELETE, END, PAGE_DOWN
-		static constexpr std::array<uint8_t, 8> QUICKSLOT_KEYS{
-			KeyConfig::Key::LEFT_SHIFT, KeyConfig::Key::INSERT,
-			KeyConfig::Key::HOME,       KeyConfig::Key::PAGE_UP,
-			KeyConfig::Key::LEFT_CONTROL, KeyConfig::Key::DELETE,
-			KeyConfig::Key::END,        KeyConfig::Key::PAGE_DOWN
-		};
+		// The v83 panel shows 8 key bindings laid out in 2 rows of 4;
+		// the layout comes from Keyboard::get_quickslot_keys(), which is
+		// seeded with the default (SHIFT/INS/HOME/PGUP, CTRL/DEL/END/PGDN)
+		// and overwritten by the server's QUICKSLOT_INIT at login.
 		// Returns the quickslot slot index (0..7) under the cursor, or -1 if outside.
 		int16_t quickslot_slot_at(Point<int16_t> cursorpos) const;
 		// Returns the top-left screen position of the given slot (0..7).

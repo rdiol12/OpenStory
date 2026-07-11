@@ -95,6 +95,21 @@ namespace ms
 		textactions[GLFW_KEY_HOME] = KeyAction::Id::HOME;
 		textactions[GLFW_KEY_END] = KeyAction::Id::END;
 		textactions[GLFW_KEY_DELETE] = KeyAction::Id::DELETE;
+
+		// Default v83 quickslot key layout (maple keycodes), matching
+		// Cosmic's QuickslotBinding::DEFAULT_QUICKSLOTS:
+		// LShift, Insert, Home, PgUp / LCtrl, Delete, End, PgDn
+		quickslotkeys = { 42, 82, 71, 73, 29, 83, 79, 81 };
+	}
+
+	void Keyboard::set_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys)
+	{
+		quickslotkeys = keys;
+	}
+
+	const std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS>& Keyboard::get_quickslot_keys() const
+	{
+		return quickslotkeys;
 	}
 
 	int32_t Keyboard::leftshiftcode() const

@@ -49,6 +49,9 @@ namespace ms
 		using Loot = std::pair<int32_t, Point<int16_t>>;
 		Loot find_loot_at(Point<int16_t> playerpos);
 
+		// Access the drop objects (used by the minimap).
+		MapObjects* get_drops();
+
 	private:
 		MapObjects drops;
 

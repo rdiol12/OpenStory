@@ -22,6 +22,7 @@
 #include "IO/UI.h"
 #include "IO/Window.h"
 #include "Net/Session.h"
+#include "Util/CrashLog.h"
 #include "Util/HardwareInfo.h"
 #include "Util/ScreenResolution.h"
 
@@ -121,8 +122,20 @@ namespace ms
 
 			int64_t elapsed = Timer::get().stop();
 
+			// Clamp the accumulated time so a single long/stalled frame can't
+			// trigger a huge catch-up burst of update() steps. Without this,
+			// any hitch fast-forwards physics many steps at once and controlled
+			// mobs visibly "teleport" forward (and get reported to the server
+			// at the jumped-to position, desyncing every other client).
+			accumulator += elapsed;
+
+			const int64_t MAX_ACCUM = timestep * 5;
+
+			if (accumulator > MAX_ACCUM)
+				accumulator = MAX_ACCUM;
+
 			// Update game with constant timestep as many times as possible.
-			for (accumulator += elapsed; accumulator >= timestep; accumulator -= timestep)
+			for (; accumulator >= timestep; accumulator -= timestep)
 				update();
 
 			// Draw the game. Interpolate to account for remaining time.
@@ -187,6 +200,7 @@ namespace ms
 
 int main()
 {
+	ms::install_crash_logger();
 	ms::HardwareInfo();
 	ms::ScreenResolution();
 	ms::start();

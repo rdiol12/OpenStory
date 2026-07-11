@@ -70,7 +70,13 @@ namespace ms
 		}
 		else
 		{
-			animations.at(state - 1).draw(DrawArgument(absp - shift), 1.0);
+			// Guard: a server state of 0 (or beyond the reactor's frames)
+			// would make animations.at(state - 1) throw and crash.
+			auto it = animations.find(state - 1);
+			if (it != animations.end())
+				it->second.draw(DrawArgument(absp - shift), 1.0);
+			else
+				normal.draw(absp - shift, alpha);
 		}
 	}
 
@@ -79,7 +85,10 @@ namespace ms
 		physics.move_object(phobj);
 
 		if (!animation_ended)
-			animation_ended = animations.at(state - 1).update();
+		{
+			auto it = animations.find(state - 1);
+			animation_ended = (it != animations.end()) ? it->second.update() : true;
+		}
 
 		if (animation_ended && dead)
 			deactivate();

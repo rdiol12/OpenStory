@@ -47,6 +47,9 @@ namespace ms
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
+		// Draw a small scaled copy of the NPC's current sprite at a screen
+		// point (used to show the NPC on the minimap instead of a marker).
+		void draw_minimap(Point<int16_t> position, float scale, float alpha) const;
 		// Updates the current animation and physics
 		int8_t update(const Physics& physics) override;
 

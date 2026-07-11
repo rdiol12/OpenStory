@@ -29,4 +29,13 @@ namespace ms
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 		icon.draw({ angle.get(alpha), absp, opacity.get(alpha) }, alpha);
 	}
+
+	void MesoDrop::draw_minimap(Point<int16_t> position, float scale, float alpha) const
+	{
+		if (!active)
+			return;
+
+		icon.draw(DrawArgument(position, position, Point<int16_t>(0, 0),
+			scale, scale, opacity.get(alpha), 0.0f), alpha);
+	}
 }

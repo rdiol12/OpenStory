@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/Textfield.h"
+
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
 
@@ -37,6 +39,7 @@ namespace ms
 		void update() override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -49,6 +52,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		void send_chat();
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
@@ -79,5 +84,8 @@ namespace ms
 		std::vector<ChatLine> chat_lines;
 		mutable Text name_label;
 		mutable Text chat_label;
+
+		// Chat input at the bottom of the window
+		Textfield chatfield;
 	};
 }

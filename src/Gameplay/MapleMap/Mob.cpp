@@ -130,18 +130,39 @@ namespace ms
 
 		if (stancebyte < Stance::MOVE)
 			stancebyte = Stance::MOVE;
+		// Upper clamp too: a garbage/large stance byte off the wire would
+		// otherwise index past the known stances. set_stance(Stance) still
+		// falls back if this specific mob lacks the stance.
+		if (stancebyte > Stance::DIE)
+			stancebyte = Stance::STAND;
 
 		set_stance(static_cast<Stance>(stancebyte));
 	}
 
 	void Mob::set_stance(Stance newstance)
 	{
-		if (stance != newstance)
-		{
-			stance = newstance;
+		if (stance == newstance)
+			return;
 
-			animations.at(stance).reset();
+		// Not every v83 mob has every stance (many lack jump/hit/etc.).
+		// Entering a stance with no animation would make animations.at(stance)
+		// throw std::out_of_range and crash the client — increasingly likely
+		// as more varied mobs appear. Fall back to a stance the mob does have.
+		if (!animations.count(newstance))
+		{
+			if (animations.count(Stance::STAND))
+				newstance = Stance::STAND;
+			else if (!animations.empty())
+				newstance = animations.begin()->first;
+			else
+				return; // no animations at all — nothing safe to show
+
+			if (stance == newstance)
+				return;
 		}
+
+		stance = newstance;
+		animations.at(stance).reset();
 	}
 
 	int8_t Mob::update(const Physics& physics)
@@ -210,40 +231,50 @@ namespace ms
 				}
 			}
 
-			switch (stance)
+			// Only self-propel mobs WE control. For mobs another client (or
+			// the server) controls, the authoritative position arrives via
+			// send_movement, which snaps us exactly there. If we ALSO walked
+			// them locally they would dead-reckon past the real position and
+			// drift — leaving them rendered where they aren't. So non-
+			// controlled mobs just hold the last snapped position and play
+			// their walk animation in place until the next update.
+			if (control)
 			{
-			case Stance::MOVE:
-				if (canfly)
+				switch (stance)
 				{
-					phobj.hforce = flip ? flyspeed : -flyspeed;
-
-					switch (flydirection)
+				case Stance::MOVE:
+					if (canfly)
 					{
-					case FlyDirection::UPWARDS:
-						phobj.vforce = -flyspeed;
-						break;
-					case FlyDirection::DOWNWARDS:
-						phobj.vforce = flyspeed;
-						break;
+						phobj.hforce = flip ? flyspeed : -flyspeed;
+
+						switch (flydirection)
+						{
+						case FlyDirection::UPWARDS:
+							phobj.vforce = -flyspeed;
+							break;
+						case FlyDirection::DOWNWARDS:
+							phobj.vforce = flyspeed;
+							break;
+						}
 					}
-				}
-				else
-				{
-					phobj.hforce = flip ? speed : -speed;
-				}
+					else
+					{
+						phobj.hforce = flip ? speed : -speed;
+					}
 
-				break;
-			case Stance::HIT:
-				if (canmove)
-				{
-					double KBFORCE = phobj.onground ? 0.2 : 0.1;
-					phobj.hforce = flip ? -KBFORCE : KBFORCE;
-				}
+					break;
+				case Stance::HIT:
+					if (canmove)
+					{
+						double KBFORCE = phobj.onground ? 0.2 : 0.1;
+						phobj.hforce = flip ? -KBFORCE : KBFORCE;
+					}
 
-				break;
-			case Stance::JUMP:
-				phobj.vforce = -5.0;
-				break;
+					break;
+				case Stance::JUMP:
+					phobj.vforce = -5.0;
+					break;
+				}
 			}
 
 			physics.move_object(phobj);
@@ -251,6 +282,21 @@ namespace ms
 			if (control)
 			{
 				counter++;
+
+				// Claim the mob the moment we take control, then keep the
+				// server updated as it moves. This mirrors how a normal
+				// client drives its controlled mobs and stops the server
+				// from killing+respawning a mob we control but never report.
+				if (!control_acked)
+				{
+					update_movement(0);
+					control_acked = true;
+				}
+				else if (((phobj.hspeed != 0.0) || (phobj.vspeed != 0.0))
+					&& phobj.onground && (counter % 16) == 0)
+				{
+					update_movement(1);
+				}
 
 				bool next;
 
@@ -331,13 +377,46 @@ namespace ms
 		}
 	}
 
-	void Mob::update_movement()
+	void Mob::update_movement(int8_t nibble)
 	{
+		// Only the controlling client is allowed to report a mob's movement.
+		// calculate_damage() calls this after every hit, including on mobs we
+		// don't control — sending our (stale) idea of their position to the
+		// server, which then relays it to everyone as an authoritative move.
+		// That is exactly the "server suddenly says the mob is elsewhere"
+		// teleport. Non-controllers stay silent.
+		if (!control)
+			return;
+
+		// `nibble` (pNibbles) != 0 tells the server this move can NOT be
+		// followed by a mob skill. Frequent position-only reports pass 1 so
+		// they don't repeatedly prompt the server to roll a skill/teleport
+		// for the mob (which made skilled mobs blink around). The real
+		// move-change report passes 0 to keep normal skill behaviour.
 		MoveMobPacket(
-			oid, 1, 0, 0, 0, 0, 0, 0,
+			oid, 1, nibble, 0, 0, 0, 0, 0,
 			get_position(),
 			Movement(phobj, value_of(stance, flip))
 		).dispatch();
+	}
+
+	void Mob::draw_minimap(Point<int16_t> position, float scale, float alpha) const
+	{
+		if (dead || !active)
+			return;
+
+		auto it = animations.find(stance);
+		if (it == animations.end())
+			return;
+
+		bool f = flip && !noflip;
+
+		// Scale the sprite about `position` (the mob's feet on the minimap),
+		// mirroring the world draw's flip handling.
+		DrawArgument arg(position, position, Point<int16_t>(0, 0),
+			f ? -scale : scale, scale, 1.0f, 0.0f);
+
+		it->second.draw(arg, alpha);
 	}
 
 	void Mob::draw(double viewx, double viewy, float alpha) const
@@ -396,8 +475,15 @@ namespace ms
 
 	void Mob::set_control(int8_t mode)
 	{
+		bool had_control = control;
 		control = mode > 0;
 		aggro = mode == 2;
+
+		// On newly gaining control, arrange to immediately claim the mob
+		// (see Mob::update). A normal client drives a mob the instant it
+		// controls it; delaying let this server kill+respawn it.
+		if (control && !had_control)
+			control_acked = false;
 	}
 
 	void Mob::send_movement(Point<int16_t> start, std::vector<Movement>&& in_movements)
@@ -417,7 +503,16 @@ namespace ms
 
 		phobj.set_x(lastmove.xpos);
 		phobj.set_y(lastmove.ypos);
-		phobj.fhid = lastmove.fh;
+		if (lastmove.fh != 0)
+			phobj.fhid = lastmove.fh;
+
+		// Clear carried-over velocity when snapping to the server's
+		// authoritative position. Otherwise Mob::update keeps integrating
+		// the previous packet's speed and the mob drifts away from where
+		// the server actually placed it between updates — so a foreign
+		// player appears to attack empty space where the mob "should" be.
+		phobj.hspeed = 0.0;
+		phobj.vspeed = 0.0;
 	}
 
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
@@ -447,6 +542,37 @@ namespace ms
 			dying = true;
 			break;
 		}
+	}
+
+	void Mob::revive()
+	{
+		dying = false;
+		dead = false;
+		fading = false;
+		fadein = false;
+		opacity.set(1.0f);
+		control_acked = false;
+
+		if (stance == Stance::DIE)
+			set_stance(Stance::STAND);
+
+		makeactive();
+	}
+
+	void Mob::server_reposition(Point<int16_t> position, int8_t stancebyte)
+	{
+		set_position(position);
+		set_stance(static_cast<uint8_t>(stancebyte));
+
+		// Drop any carried velocity so local physics doesn't immediately
+		// integrate the mob away from the authoritative position.
+		phobj.hspeed = 0.0;
+		phobj.vspeed = 0.0;
+	}
+
+	bool Mob::is_controlled() const
+	{
+		return control;
 	}
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
@@ -598,7 +724,7 @@ namespace ms
 
 	void Mob::apply_damage(int32_t damage, bool toleft)
 	{
-		hitsound.play();
+		hitsound.play(get_position());
 
 		if (dying && stance != Stance::DIE)
 		{
@@ -629,7 +755,7 @@ namespace ms
 	void Mob::apply_death()
 	{
 		set_stance(Stance::DIE);
-		diesound.play();
+		diesound.play(get_position());
 		dying = true;
 	}
 

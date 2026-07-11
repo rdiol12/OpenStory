@@ -20,6 +20,7 @@
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
+#include "UIChatBar.h"
 
 #include "../../Gameplay/Stage.h"
 
@@ -178,12 +179,22 @@ namespace ms
 		case Buttons::BtPet:
 			return Button::State::NORMAL;
 		case Buttons::BtPopUp:
-			if (target_character)
-				GiveFamePacket(target_character->get_oid(), true).dispatch();
-			return Button::State::NORMAL;
 		case Buttons::BtPopDown:
-			if (target_character)
-				GiveFamePacket(target_character->get_oid(), false).dispatch();
+			// Cosmic silently drops fame packets from characters below
+			// level 15 (and self-fames) — tell the player instead of
+			// looking like a dead button.
+			if (Stage::get().get_player().get_level() < 15)
+			{
+				chat::log("You must be at least Level 15 to raise or drop someone's fame.", chat::LineType::RED);
+			}
+			else if (target_character)
+			{
+				GiveFamePacket(target_character->get_oid(), buttonid == Buttons::BtPopUp).dispatch();
+			}
+			else
+			{
+				chat::log("That character is no longer nearby.", chat::LineType::RED);
+			}
 			return Button::State::NORMAL;
 		case Buttons::BtBotEquip:
 			bot_sub_tab = 0;
@@ -288,6 +299,11 @@ namespace ms
 			else
 				buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
 		}
+	}
+
+	void UICharInfo::update_fame(int16_t f)
+	{
+		fame.change_text(std::to_string(f));
 	}
 
 	int32_t UICharInfo::get_char_id() const

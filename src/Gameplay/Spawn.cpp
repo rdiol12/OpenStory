@@ -54,6 +54,16 @@ namespace ms
 		return oid;
 	}
 
+	Point<int16_t> MobSpawn::get_position() const
+	{
+		return position;
+	}
+
+	int8_t MobSpawn::get_stance() const
+	{
+		return stance;
+	}
+
 	std::unique_ptr<MapObject> MobSpawn::instantiate() const
 	{
 		return std::make_unique<Mob>(oid, id, mode, stance, fh, newspawn, team, position);

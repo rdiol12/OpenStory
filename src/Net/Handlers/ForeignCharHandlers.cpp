@@ -18,6 +18,7 @@
 #include "ForeignCharHandlers.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../Character/Buff.h"
 #include "../../Character/OtherChar.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -77,68 +78,66 @@ namespace ms
 
 	void GiveForeignBuffHandler::handle(InPacket& recv) const
 	{
-		// v83: int cid, long buffmask, then for each set bit: short value
-		// Applies buff stat modifiers to another character on the map
-		if (recv.length() < 4)
+		// v83 (Cosmic PacketCreator::giveForeignBuff): int cid, long firstmask,
+		// long secondmask, then one short per set buffstat (written in
+		// ascending mask-bit order), then int 0 + short 0 padding.
+		// The mask bit values match Buffstat::first_codes / second_codes.
+		if (recv.length() < 20)
 			return;
 
 		int32_t cid = recv.read_int();
-
-		if (recv.length() < 8)
-			return;
-
-		int64_t buffmask = recv.read_long();
-
-		// Buff mask bits (v83):
-		// bit 0 = PAD, bit 1 = PDD, bit 2 = MAD, bit 3 = MDD
-		// bit 4 = ACC, bit 5 = EVA, bit 7 = SPEED, bit 8 = JUMP
-		// bit 42 = DARKSIGHT
-		uint8_t speed = 0;
-		bool darksight = (buffmask & 0x40000000000LL) != 0;
-
-		int bit = 0;
-		for (int64_t mask = buffmask; mask != 0 && recv.length() >= 2; mask >>= 1, bit++)
-		{
-			if (mask & 1)
-			{
-				int16_t value = recv.read_short();
-
-				// Speed buff (bit 7)
-				if (bit == 7)
-					speed = static_cast<uint8_t>(value);
-			}
-		}
+		uint64_t firstmask = static_cast<uint64_t>(recv.read_long());
+		uint64_t secondmask = static_cast<uint64_t>(recv.read_long());
 
 		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
-		if (ochar)
-		{
-			if (speed > 0)
-				ochar->update_speed(speed);
 
-			if (darksight)
-				ochar->set_hidden(true);
+		// First-mask buffs (Dash, Energy Charge, Speed Infusion, ...) have no
+		// foreign-character effect path — consume their values to stay aligned.
+		for (int bit = 0; bit < 64 && recv.length() >= 2; bit++)
+			if (firstmask & (1ULL << bit))
+				recv.read_short();
+
+		for (int bit = 0; bit < 64 && recv.length() >= 2; bit++)
+		{
+			uint64_t code = 1ULL << bit;
+
+			if (!(secondmask & code))
+				continue;
+
+			int16_t value = recv.read_short();
+			(void)value;
+
+			// Dark Sight / GM hide — render the character transparent.
+			if (code == Buffstat::second_codes.at(Buffstat::Id::DARKSIGHT))
+				if (ochar)
+					ochar->set_hidden(true);
+
+			// Remaining foreign buffs Cosmic broadcasts (MORPH, GHOST_MORPH,
+			// SHADOWPARTNER, SOULARROW, COMBO, AURA, WK_CHARGE) have no
+			// working visual path on OtherChar in this client — morphs and
+			// shadow partner copies are not rendered, and SPEED/JUMP only
+			// affect movement, which is already server-echoed for foreign
+			// characters. Skill cast animations arrive separately via
+			// SkillEffectHandler.
 		}
 	}
 
 	void CancelForeignBuffHandler::handle(InPacket& recv) const
 	{
-		// v83: int cid, long buffmask
-		// Resets buff stat modifiers on another character
-		if (recv.length() < 12)
+		// v83 (Cosmic PacketCreator::cancelForeignBuff): int cid,
+		// long firstmask, long secondmask
+		if (recv.length() < 20)
 			return;
 
 		int32_t cid = recv.read_int();
-		int64_t buffmask = recv.read_long();
+		recv.read_long(); // firstmask — no foreign effect paths (see give)
+		uint64_t secondmask = static_cast<uint64_t>(recv.read_long());
 
 		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
 		if (ochar)
 		{
-			// If speed buff was cancelled (bit 7), reset speed
-			if (buffmask & (1LL << 7))
-				ochar->update_speed(100); // default speed
-
-			// If DARKSIGHT was cancelled (bit 42), unhide
-			if (buffmask & 0x40000000000LL)
+			// If DARKSIGHT was cancelled, unhide
+			if (secondmask & Buffstat::second_codes.at(Buffstat::Id::DARKSIGHT))
 				ochar->set_hidden(false);
 		}
 	}

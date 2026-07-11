@@ -21,6 +21,8 @@
 
 #include <bass.h>
 
+#include <cmath>
+
 #ifdef USE_NX
 #include <nlnx/audio.hpp>
 #include <nlnx/nx.hpp>
@@ -67,6 +69,41 @@ namespace ms
 	{
 		if (id > 0)
 			play(id);
+	}
+
+	void Sound::play(Point<int16_t> world_position) const
+	{
+		if (id == 0)
+			return;
+
+		// Distance from the listener (local player). Within FULL_RANGE the
+		// sound is at full volume; it then fades linearly to silence at
+		// MAX_RANGE and is skipped entirely beyond it.
+		constexpr double FULL_RANGE = 400.0;
+		constexpr double MAX_RANGE = 1200.0;
+		// Horizontal offset that maps to hard-left / hard-right panning.
+		constexpr double PAN_RANGE = 800.0;
+
+		double dx = static_cast<double>(world_position.x() - listener_position.x());
+		double dy = static_cast<double>(world_position.y() - listener_position.y());
+		double distance = std::sqrt(dx * dx + dy * dy);
+
+		if (distance >= MAX_RANGE)
+			return; // too far to hear at all
+
+		float volume = 1.0f;
+
+		if (distance > FULL_RANGE)
+			volume = static_cast<float>((MAX_RANGE - distance) / (MAX_RANGE - FULL_RANGE));
+
+		float pan = static_cast<float>(dx / PAN_RANGE);
+
+		if (pan < -1.0f)
+			pan = -1.0f;
+		else if (pan > 1.0f)
+			pan = 1.0f;
+
+		play(id, volume, pan);
 	}
 
 	Error Sound::init()
@@ -136,6 +173,19 @@ namespace ms
 		BASS_ChannelPlay(channel, true);
 	}
 
+	void Sound::play(size_t id, float volume, float pan)
+	{
+		if (!samples.count(id))
+			return;
+
+		HCHANNEL channel = BASS_SampleGetChannel((HSAMPLE)samples.at(id), false);
+		// Per-channel volume multiplies with the global SFX volume, so the
+		// user's volume setting is still respected.
+		BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, volume);
+		BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, pan);
+		BASS_ChannelPlay(channel, true);
+	}
+
 	size_t Sound::add_sound(nl::node src)
 	{
 		nl::audio ad = src;
@@ -184,9 +234,15 @@ namespace ms
 		return strid;
 	}
 
+	void Sound::set_listener_position(Point<int16_t> position)
+	{
+		listener_position = position;
+	}
+
 	std::unordered_map<size_t, uint64_t> Sound::samples;
 	EnumMap<Sound::Name, size_t> Sound::soundids;
 	std::unordered_map<std::string, size_t> Sound::itemids;
+	Point<int16_t> Sound::listener_position;
 
 	Music::Music(std::string p)
 	{

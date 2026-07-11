@@ -55,6 +55,10 @@ namespace ms
 
 	void UIStateLogin::update()
 	{
+		// Safe point: no element code is on the stack here, so removed
+		// elements parked by remove() can finally be freed.
+		graveyard.clear();
+
 		for (auto iter : elements)
 		{
 			UIElement* element = iter.second.get();
@@ -183,7 +187,12 @@ namespace ms
 		if (auto& element = elements[type])
 		{
 			element->deactivate();
-			element.release();
+
+			// Park the element instead of deleting in place: remove() is
+			// often called from inside the element's own button handler,
+			// and destroying it here would free an object whose method is
+			// still executing. update() clears the graveyard next tick.
+			graveyard.push_back(std::move(element));
 		}
 	}
 

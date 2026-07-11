@@ -32,6 +32,10 @@ namespace ms
 
 		Rectangle<int16_t> bounds() const;
 
+		// Draw a small scaled copy of the drop at a minimap screen point.
+		// Default no-op; item/meso drops override with their icon.
+		virtual void draw_minimap(Point<int16_t> position, float scale, float alpha) const {}
+
 	protected:
 		Drop(int32_t oid, int32_t owner, Point<int16_t> start,
 			Point<int16_t> dest, int8_t type, int8_t mode, bool playerdrop);

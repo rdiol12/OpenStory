@@ -188,63 +188,72 @@ namespace ms
 		}
 	}
 
+	namespace
+	{
+		// Cosmic PacketCreator.getFamilyInfo — the payload starts directly
+		// with the reputation int; there is no mode byte:
+		//   int current_rep, int total_rep, int todays_rep,
+		//   short junior_count, short juniors_allowed (2), short unknown,
+		//   int leader_id, string family_name, string family_message,
+		//   int entitlement_count, then per entitlement:
+		//     int ordinal, int times_used
+		void parse_family_info(InPacket& recv)
+		{
+			int32_t current_rep = recv.read_int();
+			int32_t total_rep = recv.read_int();
+			int32_t todays_rep = recv.read_int();
+			int16_t junior_count = recv.read_short();
+			recv.read_short(); // juniors allowed
+			recv.read_short(); // unknown
+			int32_t leader_id = recv.read_int();
+			std::string family_name = recv.read_string();
+			std::string message = recv.read_string();
+
+			// Entitlement (ability) usage data — for each ability the
+			// server tells us how many times the player has used it today.
+			struct EntUse { int32_t ordinal; int32_t used; };
+			std::vector<EntUse> entitlements;
+
+			if (recv.available())
+			{
+				int32_t entitlement_count = recv.read_int();
+				for (int32_t i = 0; i < entitlement_count && recv.available(); i++)
+				{
+					int32_t ord = recv.read_int();
+					int32_t used = recv.read_int();
+					entitlements.push_back({ ord, used });
+				}
+			}
+
+			if (auto family = UI::get().get_element<UIFamily>())
+			{
+				family->set_family_info(family_name, current_rep, total_rep, todays_rep);
+				family->set_family_message(message);
+				for (auto& e : entitlements)
+					family->set_entitlement_usage(e.ordinal, e.used);
+			}
+
+			if (auto tree = UI::get().get_element<UIFamilyTree>())
+			{
+				tree->set_leader_id(leader_id);
+				tree->set_family_name(family_name);
+			}
+		}
+	}
+
 	void FamilyHandler::handle(InPacket& recv) const
 	{
+		// This opcode (0x5F) is Cosmic's FAMILY_INFO_RESULT. The previous
+		// mode-switch here misread the low byte of the reputation int as
+		// a mode and drained the packet, so family info never reached the
+		// UI. There is no mode-based family packet on this opcode: the
+		// pedigree chart arrives on FAMILY_CHART_RESULT (0x5E), invites on
+		// FAMILY_JOIN_REQUEST (0x61), and entitlement-use results as a
+		// re-sent info block right here.
 		if (!recv.available())
 			return;
 
-		int8_t mode = recv.read_byte();
-
-		switch (mode)
-		{
-		case 0x00: // Family chart — tree of members
-		{
-			// charId, name, job, level, reputation, totalJuniors per member
-			// Just consume the data
-			while (recv.available())
-				recv.read_byte();
-
-			break;
-		}
-		case 0x01: // Family info — senior, juniors, rep
-		{
-			while (recv.available())
-				recv.read_byte();
-
-			break;
-		}
-		case 0x02: // Use entitlement result
-		{
-			while (recv.available())
-				recv.read_byte();
-
-			break;
-		}
-		case 0x07: // Invite
-		{
-			if (!Setting<AllowFamilyInvite>::get().load())
-				break;
-
-			std::string senior_name = recv.read_string();
-			int32_t senior_cid = recv.read_int();
-
-			chat::log(senior_name + " has invited you to join their family.", chat::LineType::YELLOW);
-
-			if (auto statusbar = UI::get().get_element<UIStatusBar>())
-				statusbar->notify();
-
-			break;
-		}
-		case 0x0B: // Buff notification from family member
-		{
-			while (recv.available())
-				recv.read_byte();
-
-			break;
-		}
-		default:
-			break;
-		}
+		parse_family_info(recv);
 	}
 
 	namespace
@@ -538,17 +547,6 @@ namespace ms
 
 	namespace
 	{
-		// Rank title names (Jr. Master, etc.) — 5 rank slots
-		static const std::string default_ranks[] = { "Master", "Jr. Master", "Member", "Member", "Member" };
-
-		std::string get_rank_name(int32_t rank)
-		{
-			if (rank >= 1 && rank <= 5)
-				return default_ranks[rank - 1];
-
-			return "Member";
-		}
-
 		void parse_guild_info(InPacket& recv)
 		{
 			// v83 full guild info block (Cosmic MapleGuildResponse.guildInfo)
@@ -634,24 +632,15 @@ namespace ms
 			if (auto guild = UI::get().get_element<UIGuild>())
 			{
 				guild->clear_members();
-
-				// Calculate guild "level" from GP (approximate v83 formula)
-				int16_t guild_level = 1;
-				if (gp >= 15000) guild_level = 5;
-				else if (gp >= 5000) guild_level = 4;
-				else if (gp >= 2000) guild_level = 3;
-				else if (gp >= 500) guild_level = 2;
-
-				guild->set_guild_info(guild_name, notice, guild_level, static_cast<int16_t>(capacity));
+				guild->set_rank_titles(rank_titles);
+				guild->set_guild_info(guild_name, notice, UIGuild::level_for_gp(gp), static_cast<int16_t>(capacity));
 
 				for (const auto& m : member_data)
-				{
-					std::string rank_name = (m.rank >= 1 && m.rank <= 5) ? rank_titles[m.rank - 1] : "Member";
-					guild->add_member(m.name, rank_name, m.level, m.job, m.online != 0);
-				}
+					guild->add_member(m.cid, m.name, m.rank, m.level, m.job, m.online != 0);
 
-				// Update player's own guild label
+				// Update player's own guild label and emblem
 				Stage::get().get_player().set_guild(guild_name);
+				Stage::get().get_player().set_guild_mark(logo_bg, logo_bg_color, logo, logo_color);
 			}
 		}
 	}
@@ -724,16 +713,26 @@ namespace ms
 			}
 			break;
 		}
-		case 0x27: // New member joined
+		case 0x27: // New member joined (Cosmic GuildPackets.newGuildMember)
 		{
+			// int guild_id, int cid, padded(13) name, int job, int level,
+			// int rank, int online, int signature, int alliance_rank
 			int32_t guild_id = recv.read_int();
-			// Member info follows — re-parse full guild for simplicity
-			// In a full implementation, we'd just append the new member
-			if (recv.length() >= 4)
-				parse_guild_info(recv);
+			int32_t cid = recv.read_int();
+			std::string name = recv.read_padded_string(13);
+			int32_t job = recv.read_int();
+			int32_t level = recv.read_int();
+			int32_t rank = recv.read_int();
+			int32_t online = recv.read_int();
+			recv.read_int(); // signature
+			recv.read_int(); // alliance rank
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->add_member(cid, name, rank,
+					static_cast<int16_t>(level), static_cast<int16_t>(job), online != 0);
 
 			if (messenger)
-				messenger->show_status(Color::Name::WHITE, "A new member has joined the guild.");
+				messenger->show_status(Color::Name::WHITE, name + " has joined the guild.");
 			break;
 		}
 		case 0x2C: // Member left
@@ -759,6 +758,9 @@ namespace ms
 			}
 			else
 			{
+				if (auto guild = UI::get().get_element<UIGuild>())
+					guild->remove_member(cid);
+
 				if (messenger)
 					messenger->show_status(Color::Name::WHITE, name + " has left the guild.");
 			}
@@ -787,6 +789,9 @@ namespace ms
 			}
 			else
 			{
+				if (auto guild = UI::get().get_element<UIGuild>())
+					guild->remove_member(cid);
+
 				if (messenger)
 					messenger->show_status(Color::Name::RED, name + " has been expelled from the guild.");
 			}
@@ -813,7 +818,16 @@ namespace ms
 		case 0x3A: // Capacity changed
 		{
 			int32_t guild_id = recv.read_int();
-			int32_t new_capacity = recv.read_int();
+			// Cosmic's guildCapacityChange writes the capacity as a
+			// single byte, not an int.
+			int8_t new_capacity = recv.read_byte();
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->set_capacity(new_capacity);
+
+			if (messenger)
+				messenger->show_status(Color::Name::WHITE,
+					"The guild capacity has increased to " + std::to_string(new_capacity) + ".");
 			break;
 		}
 		case 0x3C: // Member level/job update
@@ -822,6 +836,10 @@ namespace ms
 			int32_t cid = recv.read_int();
 			int32_t level = recv.read_int();
 			int32_t job_id = recv.read_int();
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->update_member_stats(cid,
+					static_cast<int16_t>(level), static_cast<int16_t>(job_id));
 			break;
 		}
 		case 0x3D: // Member online/offline
@@ -829,13 +847,28 @@ namespace ms
 			int32_t guild_id = recv.read_int();
 			int32_t cid = recv.read_int();
 			bool online = recv.read_byte() != 0;
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+			{
+				std::string name = guild->get_member_name(cid);
+				guild->set_member_online(cid, online);
+
+				// The server also broadcasts our own status — skip the echo
+				if (!name.empty() && cid != Stage::get().get_player().get_oid())
+					chat::log("[Guild] " + name + (online ? " has logged in." : " has logged out."),
+						chat::LineType::YELLOW);
+			}
 			break;
 		}
 		case 0x3E: // Rank titles changed
 		{
 			int32_t guild_id = recv.read_int();
+			std::string titles[5];
 			for (int i = 0; i < 5; i++)
-				recv.read_string();
+				titles[i] = recv.read_string();
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->set_rank_titles(titles);
 			break;
 		}
 		case 0x40: // Member rank changed
@@ -843,15 +876,23 @@ namespace ms
 			int32_t guild_id = recv.read_int();
 			int32_t cid = recv.read_int();
 			int8_t new_rank = recv.read_byte();
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->set_member_rank(cid, new_rank);
 			break;
 		}
 		case 0x42: // Emblem changed
 		{
 			int32_t guild_id = recv.read_int();
-			recv.read_short(); // bg
-			recv.read_byte();  // bgColor
-			recv.read_short(); // logo
-			recv.read_byte();  // logoColor
+			int16_t bg = recv.read_short();
+			int8_t bgcolor = recv.read_byte();
+			int16_t logo = recv.read_short();
+			int8_t logocolor = recv.read_byte();
+
+			// The guild window has no emblem display yet — store the mark
+			// on the player so the name-label code can pick it up once
+			// emblem rendering is implemented.
+			Stage::get().get_player().set_guild_mark(bg, bgcolor, logo, logocolor);
 			break;
 		}
 		case 0x44: // Notice changed
@@ -860,7 +901,7 @@ namespace ms
 			std::string notice = recv.read_string();
 
 			if (auto guild = UI::get().get_element<UIGuild>())
-				guild->set_guild_info("", notice, 0, 0);
+				guild->set_notice(notice);
 
 			if (messenger)
 				messenger->show_status(Color::Name::WHITE, "The guild notice has been updated.");
@@ -870,6 +911,9 @@ namespace ms
 		{
 			int32_t guild_id = recv.read_int();
 			int32_t gp = recv.read_int();
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->set_gp(gp);
 			break;
 		}
 		// Error codes
@@ -902,6 +946,26 @@ namespace ms
 		}
 	}
 
+	namespace
+	{
+		// The BBS wire format carries poster character ids, not names.
+		// Resolve them against the guild roster; fall back to the id.
+		std::string bbs_poster_name(int32_t cid)
+		{
+			if (auto guild = UI::get().get_element<UIGuild>())
+			{
+				std::string name = guild->get_member_name(cid);
+
+				if (!name.empty())
+					return name;
+			}
+
+			return "#" + std::to_string(cid);
+		}
+	}
+
+	// Layouts verified against Cosmic's GuildPackets.BBSThreadList /
+	// showThread (SendOpcode GUILD_BBS_PACKET).
 	void GuildBBSHandler::handle(InPacket& recv) const
 	{
 		int8_t type = recv.read_byte();
@@ -912,27 +976,65 @@ namespace ms
 		auto bbs = UI::get().get_element<UIGuildBBS>();
 		if (!bbs) return;
 
-		if (type == 0x06) // Post list
+		auto read_thread = [&](bool is_notice)
 		{
-			bbs->clear_posts();
+			int32_t thread_id = recv.read_int();
+			int32_t poster_cid = recv.read_int();
+			std::string title = recv.read_string();
+			int64_t timestamp = recv.read_long();
+			recv.read_int(); // icon
+			int32_t reply_count = recv.read_int();
 
-			if (!recv.available()) return;
+			bbs->add_post(thread_id, bbs_poster_name(poster_cid), title,
+				timestamp, reply_count, is_notice);
+		};
 
-			int8_t count = recv.read_byte();
+		if (type == 0x06) // Thread list
+		{
+			// byte has_notice, [notice thread], int total, int visible,
+			// then `visible` thread entries. The empty-board packet is
+			// has_notice=0, total=0, visible=0.
+			bbs->start_post_list(0);
 
-			for (int8_t i = 0; i < count && recv.available(); i++)
-			{
-				int32_t post_id = recv.read_int();
-				std::string author = recv.read_string();
-				std::string title = recv.read_string();
-				int64_t timestamp = recv.read_long();
-				int32_t reply_count = recv.read_int();
+			bool has_notice = recv.read_byte() == 1;
 
-				bbs->add_post(post_id, author, title, timestamp, reply_count);
-			}
+			if (has_notice)
+				read_thread(true);
+
+			int32_t total = recv.read_int();
+			int32_t visible = recv.read_int();
+
+			for (int32_t i = 0; i < visible && recv.available(); i++)
+				read_thread(false);
+
+			bbs->set_total_threads(total);
+			bbs->makeactive();
 		}
-		else
+		else if (type == 0x07) // Opened thread with replies
 		{
+			int32_t thread_id = recv.read_int();
+			int32_t poster_cid = recv.read_int();
+			int64_t timestamp = recv.read_long();
+			std::string title = recv.read_string();
+			std::string content = recv.read_string();
+			recv.read_int(); // icon
+
+			bbs->show_thread(thread_id, bbs_poster_name(poster_cid),
+				title, content, timestamp);
+
+			int32_t reply_count = recv.read_int();
+
+			for (int32_t i = 0; i < reply_count && recv.available(); i++)
+			{
+				int32_t reply_id = recv.read_int();
+				int32_t reply_cid = recv.read_int();
+				int64_t reply_time = recv.read_long();
+				std::string reply_text = recv.read_string();
+
+				bbs->add_thread_reply(reply_id, bbs_poster_name(reply_cid),
+					reply_text, reply_time);
+			}
+
 			bbs->makeactive();
 		}
 	}
@@ -1558,45 +1660,9 @@ namespace ms
 
 	void FamilyInfoResultHandler::handle(InPacket& recv) const
 	{
-		int32_t current_rep = recv.read_int();
-		int32_t total_rep = recv.read_int();
-		int32_t todays_rep = recv.read_int();
-		int16_t junior_count = recv.read_short();
-		recv.read_short(); // juniors allowed
-		recv.read_short(); // unknown
-		int32_t leader_id = recv.read_int();
-		std::string family_name = recv.read_string();
-		std::string message = recv.read_string();
-
-		// Entitlement (ability) usage data — for each ability the
-		// server tells us how many times the player has used it today.
-		struct EntUse { int32_t ordinal; int32_t used; };
-		std::vector<EntUse> entitlements;
-
-		if (recv.available())
-		{
-			int32_t entitlement_count = recv.read_int();
-			for (int32_t i = 0; i < entitlement_count && recv.available(); i++)
-			{
-				int32_t ord = recv.read_int();
-				int32_t used = recv.read_int();
-				entitlements.push_back({ ord, used });
-			}
-		}
-
-		if (auto family = UI::get().get_element<UIFamily>())
-		{
-			family->set_family_info(family_name, current_rep, total_rep, todays_rep);
-			family->set_family_message(message);
-			for (auto& e : entitlements)
-				family->set_entitlement_usage(e.ordinal, e.used);
-		}
-
-		if (auto tree = UI::get().get_element<UIFamilyTree>())
-		{
-			tree->set_leader_id(leader_id);
-			tree->set_family_name(family_name);
-		}
+		// Same payload as FamilyHandler (Cosmic only sends family info on
+		// opcode 0x5F); kept for forks that register this separately.
+		parse_family_info(recv);
 	}
 
 	void FamilyResultHandler::handle(InPacket& recv) const
@@ -1728,7 +1794,10 @@ namespace ms
 
 	void FamilyPrivilegeListHandler::handle(InPacket& recv) const
 	{
-		// Family privilege list — read and consume all entries
+		// Cosmic PacketCreator.loadFamily — sent once at login:
+		//   int count, then per entitlement (FamilyEntitlement ordinal
+		//   order): byte type, int rep cost, int usage limit,
+		//   string name, string description
 		if (!recv.available())
 			return;
 
@@ -1736,11 +1805,17 @@ namespace ms
 
 		for (int32_t i = 0; i < count && recv.available(); i++)
 		{
-			recv.read_byte();   // type (1 or 2)
-			recv.read_int();    // reputation cost
-			recv.read_int();    // usage limit
-			recv.read_string(); // privilege name
-			recv.read_string(); // privilege description
+			recv.read_byte();                   // type (1 or 2)
+			int32_t rep_cost = recv.read_int();
+			int32_t use_limit = recv.read_int();
+			recv.read_string();                 // name — UIFamily keeps short labels that fit its layout
+			recv.read_string();                 // description
+
+			// The family window exposes the first five entitlements
+			// (matching FamilyUsePacket types 0-4); store the server's
+			// configured cost/limit for the ability panel. Higher
+			// ordinals are ignored by the setter.
+			UIFamily::set_entitlement_info(i, rep_cost, use_limit);
 		}
 	}
 

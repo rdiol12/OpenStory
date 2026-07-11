@@ -246,7 +246,7 @@ namespace ms
 		const char* RESETPIC = "https://www.nexon.com/account/en/login";
 		const char* CHARGENX = "https://billing.nexon.net/PurchaseNX";
 		const bool SHOW_FPS = false;
-		const bool SHOW_PACKETS = true;
+		const bool SHOW_PACKETS = false;
 		const bool AUTO_LOGIN = false;
 		const uint8_t auto_world = 0;
 		const uint8_t auto_channel = 0;
@@ -274,7 +274,7 @@ namespace ms
 	// IP Address which the client will connect to
 	struct ServerIP : public Configuration::StringEntry
 	{
-		ServerIP() : StringEntry("ServerIP", "100.115.197.11") {}
+		ServerIP() : StringEntry("ServerIP", "72.60.176.12") {}
 	};
 
 	// Port which the client will connect to
@@ -310,13 +310,13 @@ namespace ms
 	// The normal font which will be used
 	struct FontPathNormal : public Configuration::StringEntry
 	{
-		FontPathNormal() : StringEntry("FontPathNormal", "fonts/Arial/Arial.ttf") {}
+		FontPathNormal() : StringEntry("FontPathNormal", "fonts/Roboto/Roboto-Regular.ttf") {}
 	};
 
 	// The bold font which will be used
 	struct FontPathBold : public Configuration::StringEntry
 	{
-		FontPathBold() : StringEntry("FontPathBold", "fonts/Arial/Arial-Bold.ttf") {}
+		FontPathBold() : StringEntry("FontPathBold", "fonts/Roboto/Roboto-Bold.ttf") {}
 	};
 
 	// Optional color-emoji font for announcements/chat. Left empty to disable.

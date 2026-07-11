@@ -17,8 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIGuild.h"
 
+#include "UIGuildBBS.h"
+
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
+#include "../UI.h"
 
 #include "../../Net/Packets/SocialPackets.h"
 
@@ -28,8 +31,15 @@
 
 namespace ms
 {
-	UIGuild::UIGuild() : UIDragElement<PosGUILD>(Point<int16_t>(300, 20)), tab(0), scroll_offset(0)
+	UIGuild::UIGuild() : UIDragElement<PosGUILD>(Point<int16_t>(300, 20)), tab(0), capacity(0), scroll_offset(0)
 	{
+		// Default v83 rank titles — replaced by the titles the server
+		// sends with the full guild info block (sub-op 0x1A).
+		static const char* default_titles[5] = { "Master", "Jr. Master", "Member", "Member", "Member" };
+
+		for (int i = 0; i < 5; i++)
+			rank_titles[i] = default_titles[i];
+
 		nl::node src = nl::nx::ui["UIWindow2.img"]["UserList"];
 		nl::node main = src["Main"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
@@ -79,6 +89,7 @@ namespace ms
 		{
 			guild_notice.draw(position + Point<int16_t>(20, 65));
 			member_count_text.draw(position + Point<int16_t>(15, 98));
+			guild_level.draw(position + Point<int16_t>(dimension.x() - 60, 98));
 
 			int16_t visible_count = static_cast<int16_t>(members.size()) - scroll_offset;
 
@@ -98,7 +109,7 @@ namespace ms
 				member_name_label.change_text(member.name);
 				member_name_label.draw(position + Point<int16_t>(20, row_y + 2));
 
-				std::string info = "Lv." + std::to_string(member.level) + " " + member.rank;
+				std::string info = "Lv." + std::to_string(member.level) + " " + rank_title(member.rank);
 				info += member.online ? " [ON]" : " [OFF]";
 
 				member_info_label.change_text(info);
@@ -114,25 +125,137 @@ namespace ms
 		UIElement::update();
 	}
 
-	void UIGuild::set_guild_info(const std::string& name, const std::string& notice, int16_t level, int16_t capacity)
+	void UIGuild::set_guild_info(const std::string& name, const std::string& notice, int16_t level, int16_t cap)
 	{
 		guild_name.change_text(name);
 		guild_notice.change_text(notice);
 		guild_level.change_text("Lv. " + std::to_string(level));
-		guild_capacity.change_text(std::to_string(members.size()) + "/" + std::to_string(capacity));
+		capacity = cap;
+
+		refresh_member_count();
 	}
 
-	void UIGuild::add_member(const std::string& name, const std::string& rank, int16_t level, int16_t job, bool online)
+	void UIGuild::set_notice(const std::string& notice)
 	{
-		members.push_back({ name, rank, level, job, online });
-		member_count_text.change_text("Members: " + std::to_string(members.size()));
+		guild_notice.change_text(notice);
+	}
+
+	void UIGuild::set_capacity(int16_t cap)
+	{
+		capacity = cap;
+
+		refresh_member_count();
+	}
+
+	void UIGuild::set_gp(int32_t gp)
+	{
+		guild_level.change_text("Lv. " + std::to_string(level_for_gp(gp)));
+	}
+
+	int16_t UIGuild::level_for_gp(int32_t gp)
+	{
+		if (gp >= 15000)
+			return 5;
+		else if (gp >= 5000)
+			return 4;
+		else if (gp >= 2000)
+			return 3;
+		else if (gp >= 500)
+			return 2;
+
+		return 1;
+	}
+
+	void UIGuild::set_rank_titles(const std::string titles[5])
+	{
+		// Member rows resolve their rank string at draw time, so the
+		// list picks the new titles up automatically.
+		for (int i = 0; i < 5; i++)
+			rank_titles[i] = titles[i];
+	}
+
+	void UIGuild::add_member(int32_t cid, const std::string& name, int32_t rank, int16_t level, int16_t job, bool online)
+	{
+		members.push_back({ cid, name, rank, level, job, online });
+
+		refresh_member_count();
+	}
+
+	void UIGuild::remove_member(int32_t cid)
+	{
+		for (auto it = members.begin(); it != members.end(); ++it)
+		{
+			if (it->cid == cid)
+			{
+				members.erase(it);
+				break;
+			}
+		}
+
+		refresh_member_count();
+	}
+
+	void UIGuild::update_member_stats(int32_t cid, int16_t level, int16_t job)
+	{
+		if (MemberEntry* member = find_member(cid))
+		{
+			member->level = level;
+			member->job = job;
+		}
+	}
+
+	void UIGuild::set_member_online(int32_t cid, bool online)
+	{
+		if (MemberEntry* member = find_member(cid))
+			member->online = online;
+	}
+
+	void UIGuild::set_member_rank(int32_t cid, int32_t rank)
+	{
+		if (MemberEntry* member = find_member(cid))
+			member->rank = rank;
+	}
+
+	std::string UIGuild::get_member_name(int32_t cid) const
+	{
+		for (const auto& member : members)
+			if (member.cid == cid)
+				return member.name;
+
+		return "";
 	}
 
 	void UIGuild::clear_members()
 	{
 		members.clear();
-		member_count_text.change_text("Members: 0");
 		scroll_offset = 0;
+
+		refresh_member_count();
+	}
+
+	UIGuild::MemberEntry* UIGuild::find_member(int32_t cid)
+	{
+		for (auto& member : members)
+			if (member.cid == cid)
+				return &member;
+
+		return nullptr;
+	}
+
+	const std::string& UIGuild::rank_title(int32_t rank) const
+	{
+		return rank_titles[(rank >= 1 && rank <= 5) ? rank - 1 : 2];
+	}
+
+	void UIGuild::refresh_member_count()
+	{
+		std::string count = std::to_string(members.size());
+		guild_capacity.change_text(count + "/" + std::to_string(capacity));
+
+		if (capacity > 0)
+			member_count_text.change_text("Members: " + count + "/" + std::to_string(capacity));
+		else
+			member_count_text.change_text("Members: " + count);
 	}
 
 	void UIGuild::send_key(int32_t keycode, bool pressed, bool escape)
@@ -195,5 +318,21 @@ namespace ms
 			new_it->second->set_state(Button::State::PRESSED);
 
 		scroll_offset = 0;
+
+		// Tab 1 is the bulletin board in the v83 layout. The board lives
+		// in its own window; opening it requests the thread list from the
+		// server (BBS_OPERATION mode 2).
+		if (tab == 1)
+		{
+			if (auto bbs = UI::get().get_element<UIGuildBBS>())
+			{
+				bbs->makeactive();
+				GuildBBSListPacket(0).dispatch();
+			}
+			else
+			{
+				UI::get().emplace<UIGuildBBS>();
+			}
+		}
 	}
 }

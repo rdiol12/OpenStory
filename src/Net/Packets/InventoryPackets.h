@@ -133,8 +133,10 @@ namespace ms
 			write_byte(has_item ? 1 : 0);
 			if (has_item)
 			{
-				write_byte(src_tab);
-				write_short(src_slot);
+				// Cosmic's UseCashItemHandler case 6 reads the tab and
+				// slot as two full ints (readInt), not byte+short.
+				write_int(src_tab);
+				write_int(src_slot);
 			}
 		}
 

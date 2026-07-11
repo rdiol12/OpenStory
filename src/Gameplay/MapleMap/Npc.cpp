@@ -178,6 +178,18 @@ namespace ms
 		update_quest_mark();
 	}
 
+	void Npc::draw_minimap(Point<int16_t> position, float scale, float alpha) const
+	{
+		auto it = animations.find(stance);
+		if (it == animations.end())
+			return;
+
+		DrawArgument arg(position, position, Point<int16_t>(0, 0),
+			flip ? -scale : scale, scale, 1.0f, 0.0f);
+
+		it->second.draw(arg, alpha);
+	}
+
 	void Npc::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
@@ -193,11 +205,14 @@ namespace ms
 		}
 
 		// Draw quest mark above NPC
-		if (quest_mark_type != QuestMarkType::NONE)
+		if (quest_mark_type != QuestMarkType::NONE && !animations.empty())
 		{
-			// absp is at the NPC's feet; offset up to place mark above head
-			// Use the current animation's origin to find head position
-			auto& anim = animations.count(stance) ? animations.at(stance) : animations.begin()->second;
+			// absp is at the NPC's feet; offset up to place mark above head.
+			// Guard against an NPC with no stance animations at all —
+			// animations.begin() would otherwise be end() and crash.
+			auto it = animations.find(stance);
+			const Animation& anim = (it != animations.end())
+				? it->second : animations.begin()->second;
 			Point<int16_t> origin = anim.get_origin();
 			// origin.y() is how far above feet the sprite extends
 			Point<int16_t> mark_pos = absp + Point<int16_t>(22, -origin.y() - 10);

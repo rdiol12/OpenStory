@@ -21,6 +21,7 @@
 #include "../Components/Textfield.h"
 #include "../../Data/ItemData.h"
 #include "../../Character/Inventory/Inventory.h"
+#include "../../Character/Look/CharLook.h"
 
 #include <vector>
 
@@ -56,8 +57,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		// Called by handler to set up trade room
-		void set_partner(uint8_t slot, const std::string& name);
+		// Called by handler to set up trade room. The look parsed from
+		// the VISIT/ROOM packet is used to draw the partner's avatar.
+		void set_partner(uint8_t slot, const std::string& name, const LookEntry& look);
 		// Add item to a trade slot
 		void set_item(uint8_t player_num, uint8_t slot, int32_t itemid, int16_t count);
 		// Set meso for a player
@@ -83,6 +85,7 @@ namespace ms
 			BT_CANCEL,
 			BT_ENTER,    // chat-send button sitting by the input box
 			BT_REPORT,   // opens UIReport for the trade partner
+			BT_COIN,     // opens the "how many mesos" prompt
 			NUM_BUTTONS
 		};
 
@@ -107,6 +110,14 @@ namespace ms
 		int32_t partner_meso;
 
 		std::string partner_name;
+		// Partner's appearance built from the VISIT/ROOM packet's
+		// addCharLook block. Only drawn once the partner has joined.
+		CharLook partner_look;
+		bool has_partner_look = false;
+		// True once the other player has accepted and entered the room
+		// (VISIT, or ROOM with the partner block). Confirm is blocked
+		// until then, since there is no one to trade with yet.
+		bool partner_joined = false;
 		Text my_name_label;
 		Text partner_name_label;
 		Text my_meso_label;

@@ -19,6 +19,7 @@
 #include "UITrade.h"
 
 #include "UINotice.h"
+#include "UIChatBar.h"
 #include "UIItemInventory.h"
 #include "UIEquipInventory.h"
 #include "UIStatsInfo.h"
@@ -88,6 +89,9 @@ namespace ms
 				Point<int16_t>(70, 24)
 			);
 
+		// Greyed out until the other player accepts and joins the room.
+		buttons[BT_CONFIRM]->set_state(Button::State::DISABLED);
+
 		if (bt_cancel.size() > 0)
 			buttons[BT_CANCEL] = std::make_unique<MapleButton>(bt_cancel);
 		else
@@ -108,6 +112,18 @@ namespace ms
 		nl::node bt_report = src["BtClame"];
 		if (bt_report.size() > 0)
 			buttons[BT_REPORT] = std::make_unique<MapleButton>(bt_report);
+
+		// Meso button — BtCoin (NX origin puts it by the meso field)
+		// opens the "how many mesos" prompt. Falls back to an invisible
+		// AreaButton over my meso display so mesos can always be set.
+		nl::node bt_coin = src["BtCoin"];
+		if (bt_coin.size() > 0)
+			buttons[BT_COIN] = std::make_unique<MapleButton>(bt_coin);
+		else
+			buttons[BT_COIN] = std::make_unique<AreaButton>(
+				Point<int16_t>(148, 247),  // my meso display, see draw()
+				Point<int16_t>(120, 20)
+			);
 
 		// Labels
 		std::string player_name = Stage::get().get_player().get_stats().get_name();
@@ -156,8 +172,9 @@ namespace ms
 		{
 			if (msg.empty())
 				return;
+			// Don't echo locally — the server broadcasts the line back to
+			// us as "<CharName> : msg", so a local copy would duplicate it.
 			TradeChatPacket(msg).dispatch();
-			this->add_chat("You: " + msg);
 			chat_input.change_text("");
 		});
 
@@ -184,18 +201,17 @@ namespace ms
 		constexpr int16_t grid_y = 150;
 
 		// Character avatars (my side green grid, partner side red grid).
-		// Partner is drawn as a mirrored copy of the player's CharLook
-		// so you can see where the partner sprite will live — once the
-		// VISIT packet's CharLook is parsed this will be replaced with
-		// the real partner look.
+		// The partner avatar is the CharLook built from the VISIT/ROOM
+		// packet's addCharLook block — nothing is drawn on the partner
+		// side until they have actually joined.
 		const int16_t char_y = 115;
 		CharLook& my_look = Stage::get().get_player().get_look();
 		my_look.draw(position + Point<int16_t>(my_grid_x + 75, char_y),
 			false, Stance::Id::STAND1, Expression::Id::DEFAULT);
-		my_look.draw(position + Point<int16_t>(partner_grid_x + 45, char_y),
-			true, // flipped so the placeholder faces the other direction
-			Stance::Id::STAND1, Expression::Id::DEFAULT);
-		// TODO partner avatar — swap `my_look` for parsed partner look.
+		if (has_partner_look)
+			partner_look.draw(position + Point<int16_t>(partner_grid_x + 45, char_y),
+				true, // flipped so the partner faces the player
+				Stance::Id::STAND1, Expression::Id::DEFAULT);
 
 		// Names just below each avatar.
 		const int16_t name_y = char_y + 0;
@@ -348,6 +364,15 @@ namespace ms
 		switch (buttonid)
 		{
 		case BT_CONFIRM:
+			// Can't confirm until the other player has actually accepted
+			// and entered the trade room.
+			if (!partner_joined)
+			{
+				status_label.change_text("Waiting for the other player to accept...");
+				return Button::State::NORMAL;
+			}
+			if (my_confirmed)
+				return Button::State::NORMAL;
 			UI::get().emplace<UIYesNo>(
 				"Are you sure you want to trade?",
 				[this](bool yes) { if (yes) confirm_trade(); });
@@ -359,12 +384,12 @@ namespace ms
 			return Button::State::NORMAL;
 		case BT_ENTER:
 		{
-			// Same path as pressing Enter inside the chat input.
+			// Same path as pressing Enter inside the chat input. No local
+			// echo — the server broadcasts the line back to us.
 			std::string msg = chat_input.get_text();
 			if (!msg.empty())
 			{
 				TradeChatPacket(msg).dispatch();
-				add_chat("You: " + msg);
 				chat_input.change_text("");
 			}
 			return Button::State::NORMAL;
@@ -372,6 +397,34 @@ namespace ms
 		case BT_REPORT:
 			UI::get().emplace<UIReport>();
 			return Button::State::NORMAL;
+		case BT_COIN:
+		{
+			// The meso offer is locked once you've hit Confirm.
+			if (my_confirmed)
+				return Button::State::NORMAL;
+
+			// Cap the prompt at the mesos we actually carry. UIEnterNumber
+			// takes an int32_t max while the inventory stores an int64_t.
+			int64_t meso = Stage::get().get_player().get_inventory().get_meso();
+			if (meso > 2147483647LL)
+				meso = 2147483647LL;
+			int32_t max_meso = static_cast<int32_t>(meso);
+
+			if (max_meso < 1)
+				return Button::State::NORMAL;
+
+			auto on_enter = [](int32_t amount)
+			{
+				// The server echoes SET_MESO back to both players
+				// (handler case 16 → set_meso), so my_meso is updated
+				// from that echo rather than written locally here.
+				TradeSetMesoPacket(amount).dispatch();
+			};
+			UI::get().emplace<UIEnterNumber>(
+				"How many mesos would you like to trade?",
+				on_enter, max_meso, 1, -22);
+			return Button::State::NORMAL;
+		}
 		}
 
 		return Button::State::NORMAL;
@@ -389,8 +442,6 @@ namespace ms
 
 	void UITrade::doubleclick(Point<int16_t> cursorpos)
 	{
-		// Only my-side slots are removable — double-click a partner
-		// slot does nothing (can't touch their offer).
 		Point<int16_t> cursoroff = cursorpos - position;
 		bool is_my_side = false;
 		int8_t trade_slot = slot_by_position(cursoroff, is_my_side);
@@ -399,10 +450,13 @@ namespace ms
 		if (my_items[trade_slot].empty())
 			return;
 
-		// Wipe the slot locally and tell the server to do the same.
-		// v83 remove = TradeSetItemPacket with qty=0.
-		my_items[trade_slot] = TradeItem{};
-		TradeSetItemPacket(0, 0, 0, trade_slot + 1).dispatch();
+		// v83/Cosmic trades don't support taking an item back once it's
+		// placed — the server rejects any remove attempt. Wiping the slot
+		// locally used to leave the client showing the item as removed
+		// while the server still held it committed (a desync that could
+		// trade the item away anyway). So we don't remove; we tell the
+		// player how to actually reclaim it.
+		status_label.change_text("Items can't be taken back — press Cancel to reclaim them.");
 	}
 
 	void UITrade::send_scroll(double yoffset)
@@ -469,11 +523,19 @@ namespace ms
 		return TYPE;
 	}
 
-	void UITrade::set_partner(uint8_t slot, const std::string& name)
+	void UITrade::set_partner(uint8_t slot, const std::string& name, const LookEntry& look)
 	{
 		partner_name = name;
 		partner_name_label.change_text(name);
 		status_label.change_text("Trading with " + name);
+
+		partner_look = CharLook(look);
+		has_partner_look = true;
+		partner_joined = true;
+
+		// Partner is in the room — the Confirm button becomes usable.
+		if (!my_confirmed && buttons.count(BT_CONFIRM) && buttons[BT_CONFIRM])
+			buttons[BT_CONFIRM]->set_state(Button::State::NORMAL);
 	}
 
 	void UITrade::set_item(uint8_t player_num, uint8_t slot, int32_t itemid, int16_t count)
@@ -516,19 +578,44 @@ namespace ms
 		UI::get().remove(UIElement::Type::NOTICE);
 	}
 
-	void UITrade::trade_result(uint8_t /*result*/)
+	void UITrade::trade_result(uint8_t result)
 	{
 		// Drop the waiting modal; UITrade itself will deactivate shortly.
 		UI::get().remove(UIElement::Type::NOTICE);
+
+		// Report why the trade ended. Codes match Cosmic's TradeResult
+		// enum (server/Trade.java). The window closes right after, so a
+		// chat-log line is the durable place for this.
+		std::string msg;
+		chat::LineType color = chat::LineType::RED;
+
+		switch (result)
+		{
+		case 1:  msg = "The trade was cancelled — the other player did not respond."; break;
+		case 2:  msg = partner_name.empty()
+				? "The other player declined or cancelled the trade."
+				: partner_name + " declined or cancelled the trade."; break;
+		case 7:  msg = "Trade completed successfully."; color = chat::LineType::WHITE; break;
+		case 8:  msg = "The trade could not be completed."; break;
+		case 9:  msg = "Trade failed — that would exceed a one-of-a-kind item limit."; break;
+		case 12: msg = "The trade failed because a player changed maps."; break;
+		case 13: msg = "The trade failed due to a data error."; break;
+		default: msg = "The trade has ended."; break;
+		}
+
+		chat::log(msg, color);
 	}
 
 	void UITrade::add_chat(const std::string& message)
 	{
-		// Classic v83 trade chat: self lines in blue, partner lines in
-		// black. Routing here keys off the "You:" / "Partner:" prefix
-		// emitted by the server/handler.
+		// The server echoes every trade line back to both players as
+		// "<CharName> : <message>", so we do NOT locally echo — that would
+		// double the message. Colour our own lines blue by matching the
+		// leading name against the player's own character name.
 		Color::Name c = Color::Name::BLACK;
-		if (message.rfind("You:", 0) == 0)
+
+		const std::string& myname = Stage::get().get_player().get_name();
+		if (!myname.empty() && message.rfind(myname + " :", 0) == 0)
 			c = Color::Name::MEDIUMBLUE;
 
 		chat_lines.emplace_back(Text::Font::A11M, Text::Alignment::LEFT,

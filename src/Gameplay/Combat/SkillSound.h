@@ -27,16 +27,18 @@ namespace ms
 	public:
 		virtual ~SkillSound() {}
 
-		virtual void play_use() const = 0;
-		virtual void play_hit() const = 0;
+		// Positions are the world location of the caster / target, so the
+		// sound attenuates by distance from the local player.
+		virtual void play_use(Point<int16_t> position) const = 0;
+		virtual void play_hit(Point<int16_t> position) const = 0;
 	};
 
 	// No sound
 	class NoSkillSound : public SkillSound
 	{
 	public:
-		void play_use() const override {}
-		void play_hit() const override {}
+		void play_use(Point<int16_t>) const override {}
+		void play_hit(Point<int16_t>) const override {}
 	};
 
 	// Plays one use and one hit sound
@@ -45,8 +47,8 @@ namespace ms
 	public:
 		SingleSkillSound(std::string strid);
 
-		void play_use() const override;
-		void play_hit() const override;
+		void play_use(Point<int16_t> position) const override;
+		void play_hit(Point<int16_t> position) const override;
 
 	private:
 		Sound usesound;

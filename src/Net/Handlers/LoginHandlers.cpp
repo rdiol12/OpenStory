@@ -118,9 +118,18 @@ namespace ms
 		// 0 - Normal
 		// 1 - Highly populated
 		// 2 - Full
-		recv.read_short(); // status
+		int16_t status = recv.read_short();
 
-		// Status 1: warning message, Status 2: block entry
+		// Cosmic also sends this as the error reply to a charlist request
+		// for a bad/full world or channel. Silently ignoring it left the
+		// UILoginWait spinner up forever — surface it and unwedge the UI.
+		if (status != 0)
+		{
+			UI::get().remove(UIElement::Type::LOGINWAIT);
+
+			UI::get().emplace<UILoginNotice>(
+				UILoginNotice::Message::POPULATION_TOO_HIGH);
+		}
 	}
 
 	void ServerlistHandler::handle(InPacket& recv) const
@@ -162,9 +171,10 @@ namespace ms
 
 	void CharlistHandler::handle(InPacket& recv) const
 	{
-		auto loginwait = UI::get().get_element<UILoginWait>();
-
-		if (loginwait && loginwait->is_active())
+		// This packet only ever arrives as the answer to our own charlist
+		// request, so process it even if the UILoginWait spinner has been
+		// lost — the old guard silently dropped the character list and
+		// wedged the world-select screen.
 		{
 			uint8_t channel_id = recv.read_byte();
 

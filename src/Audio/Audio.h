@@ -21,6 +21,7 @@
 #include "../MapleStory.h"
 
 #include "../Template/EnumMap.h"
+#include "../Template/Point.h"
 
 #include <unordered_map>
 
@@ -75,16 +76,27 @@ namespace ms
 		Sound(nl::node src);
 		Sound();
 
+		// Play at full volume, centered (UI / non-world sounds).
 		void play() const;
+		// Play attenuated and panned by distance from the listener (the local
+		// player). Sounds from across the map fade out and go silent, so you
+		// no longer hear other players attacking / looting from far away.
+		void play(Point<int16_t> world_position) const;
 
 		static Error init();
 		static void close();
 		static bool set_sfxvolume(uint8_t volume);
+		// Update the listener (local player) position that positional playback
+		// attenuates against. Called once per frame.
+		static void set_listener_position(Point<int16_t> position);
 
 	private:
 		size_t id;
 
 		static void play(size_t id);
+		static void play(size_t id, float volume, float pan);
+
+		static Point<int16_t> listener_position;
 
 		static size_t add_sound(nl::node src);
 		static void add_sound(Name name, nl::node src);

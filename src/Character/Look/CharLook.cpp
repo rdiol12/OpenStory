@@ -197,6 +197,25 @@ namespace ms
 		if (action)
 			acmove = action->get_move();
 
+		// The action displacement (attack lunge, hit knockback, etc.) is in
+		// full world pixels. It becomes the sprite's draw anchor, so it must
+		// be scaled by the incoming draw scale — otherwise, when the look is
+		// drawn shrunk (e.g. on the minimap at ~0.28x), a mid-action character
+		// jumps by the full-size lunge and snaps back when the action ends.
+		// At world scale (1.0) this is a no-op.
+		float sx = args.get_xscale();
+		float sy = args.get_yscale();
+
+		if (sx < 0.0f)
+			sx = -sx;
+
+		if (sy < 0.0f)
+			sy = -sy;
+
+		acmove = Point<int16_t>(
+			static_cast<int16_t>(acmove.x() * sx),
+			static_cast<int16_t>(acmove.y() * sy));
+
 		DrawArgument relargs = { acmove, flip };
 
 		Stance::Id interstance = stance.get(alpha);
@@ -251,11 +270,22 @@ namespace ms
 				stelapsed = timestep - delta;
 
 				uint8_t nextframe = getnextframe(stance.get(), stframe.get());
-				float threshold = static_cast<float>(delta) / timestep;
-				stframe.next(nextframe, threshold);
 
-				if (stframe == 0)
+				// The death pose plays once and holds its final frame
+				// instead of looping the collapse over and over.
+				// nextframe == 0 means it would wrap to the start.
+				if (nextframe == 0 && stance.get() == Stance::Id::DEAD)
+				{
 					aniend = true;
+				}
+				else
+				{
+					float threshold = static_cast<float>(delta) / timestep;
+					stframe.next(nextframe, threshold);
+
+					if (stframe == 0)
+						aniend = true;
+				}
 			}
 			else
 			{
@@ -415,7 +445,7 @@ namespace ms
 			stelapsed = 0;
 		}
 
-		weapon.get_usesound(degenerate).play();
+		weapon.get_usesound(degenerate).play(soundposition);
 	}
 
 	void CharLook::attack(Stance::Id newstance)
@@ -447,6 +477,19 @@ namespace ms
 			stframe.set(0);
 			stelapsed = 0;
 		}
+	}
+
+	void CharLook::set_stance_forced(Stance::Id newstance)
+	{
+		// Cancel any in-progress action (attack, skill) so the requested
+		// stance actually applies. Without this, dying mid-attack leaves the
+		// action running and it resets to STAND when it ends — the death
+		// pose never shows.
+		action = nullptr;
+		actionstr = "";
+		actframe = 0;
+
+		set_stance(newstance);
 	}
 
 	Stance::Id CharLook::getattackstance(uint8_t attack, bool degenerate) const
@@ -571,6 +614,11 @@ namespace ms
 	bool CharLook::get_alerted() const
 	{
 		return (bool)alerted;
+	}
+
+	void CharLook::set_sound_position(Point<int16_t> position)
+	{
+		soundposition = position;
 	}
 
 	bool CharLook::is_twohanded(Stance::Id st) const

@@ -49,6 +49,10 @@ namespace ms
 
 		int8_t get_mode() const;
 		int32_t get_oid() const;
+		// The mob's authoritative position/stance as the server reported it in
+		// this spawn (or control-grant) packet.
+		Point<int16_t> get_position() const;
+		int8_t get_stance() const;
 		std::unique_ptr<MapObject> instantiate() const;
 
 	private:

@@ -43,6 +43,11 @@ namespace ms
 		// Called from packet handlers
 		void set_family_info(const std::string& leader, int32_t rep, int32_t total_rep, int32_t todays_rep = 0);
 		void set_entitlement_usage(int ordinal, int times_used);
+		// Server-configured rep cost / daily use limit per entitlement
+		// (FAMILY_PRIVILEGE_LIST). Static because the packet arrives at
+		// login, before this window is first opened. Ordinals beyond the
+		// five abilities shown here are ignored.
+		static void set_entitlement_info(int ordinal, int32_t rep_cost, int32_t use_limit);
 		void set_family_message(const std::string& message);
 		void set_senior(const std::string& name);
 		void add_junior(const std::string& name);
@@ -69,6 +74,8 @@ namespace ms
 		};
 
 		static constexpr int NUM_ABILITIES = 5;
+		static int32_t ability_costs[NUM_ABILITIES];
+		static int32_t ability_caps[NUM_ABILITIES];
 		std::vector<Texture> right_icons;
 		std::string ability_names[NUM_ABILITIES];
 		int ability_used[NUM_ABILITIES] = { 0, 0, 0, 0, 0 };
