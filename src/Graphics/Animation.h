@@ -59,6 +59,9 @@ namespace ms
 	{
 	public:
 		Animation(nl::node source);
+		// Build from an explicit ordered list of frame (bitmap) nodes. Used for
+		// effects whose frames are not direct children of a single node.
+		Animation(const std::vector<nl::node>& framenodes);
 		Animation();
 
 		bool update();

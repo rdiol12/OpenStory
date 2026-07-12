@@ -79,7 +79,7 @@ namespace ms
 
 			void set_ui_scale(float scale)
 			{
-				if (scale >= 1.0f && scale <= 3.0f)
+				if (scale >= 1.0f && scale <= 4.0f)
 					UI_SCALE = scale;
 			}
 

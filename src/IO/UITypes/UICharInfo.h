@@ -145,6 +145,7 @@ namespace ms
 			BtItem,
 			BtPopUp,
 			BtPopDown,
+			BtGuild,
 			BtBotEquip,
 			BtBotUse,
 			BtBotSetup,

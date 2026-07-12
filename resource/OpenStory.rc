@@ -1,0 +1,4 @@
+// Windows resources for OpenStory.
+// Naming the icon "GLFW_ICON" makes GLFW use it for the game window/taskbar,
+// and Explorer uses it as the executable's file icon.
+GLFW_ICON ICON "Icon.ico"

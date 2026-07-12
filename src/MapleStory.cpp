@@ -18,7 +18,9 @@
 #include <iostream>
 #include <thread>
 
+#include "Constants.h"
 #include "Gameplay/Stage.h"
+#include "Graphics/Text.h"
 #include "IO/UI.h"
 #include "IO/Window.h"
 #include "Net/Session.h"
@@ -86,11 +88,25 @@ namespace ms
 		Session::get().read();
 	}
 
+	// Current frames-per-second, recomputed a few times a second in loop().
+	int g_fps = 0;
+
 	void draw(float alpha)
 	{
 		Window::get().begin();
 		Stage::get().draw(alpha);
 		UI::get().draw(alpha);
+
+		// On-screen FPS counter (top-right, yellow).
+		if (Configuration::get().get_show_fps())
+		{
+			static Text fpslabel(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::YELLOW);
+			fpslabel.change_text("FPS " + std::to_string(g_fps));
+
+			int16_t sw = static_cast<int16_t>(Constants::Constants::get().get_viewwidth());
+			fpslabel.draw(DrawArgument(Point<int16_t>(static_cast<int16_t>(sw - 12), 6)));
+		}
+
 		Window::get().end();
 	}
 
@@ -108,13 +124,13 @@ namespace ms
 		int64_t timestep = Constants::TIMESTEP * 1000;
 		int64_t accumulator = timestep;
 
-		int64_t period = 0;
-		int32_t samples = 0;
+		// FPS counter accumulators.
+		int64_t fps_accum = 0;
+		int32_t fps_frames = 0;
 
-		bool show_fps = Configuration::get().get_show_fps();
-
-		// 120 FPS cap: ~8333 microseconds per frame
-		constexpr int64_t FRAME_CAP_US = 1000000 / 120;
+		// Frame-rate cap from settings (FPSCap). 0 = uncapped.
+		uint8_t fps_cap = Setting<FPSCap>::get().load();
+		int64_t FRAME_CAP_US = fps_cap > 0 ? 1000000 / fps_cap : 0;
 
 		while (running())
 		{
@@ -142,26 +158,26 @@ namespace ms
 			float alpha = static_cast<float>(accumulator) / timestep;
 			draw(alpha);
 
-			if (show_fps)
+			// Recompute the on-screen FPS ~4 times per second.
+			fps_accum += elapsed;
+			fps_frames++;
+
+			if (fps_accum >= 250000)
 			{
-				if (samples < 100)
-				{
-					period += elapsed;
-					samples++;
-				}
-				else if (period)
-				{
-					period = 0;
-					samples = 0;
-				}
+				g_fps = static_cast<int>(fps_frames * 1000000LL / fps_accum);
+				fps_frames = 0;
+				fps_accum = 0;
 			}
 
-			// Cap framerate to 120 FPS
-			auto frame_end = std::chrono::high_resolution_clock::now();
-			auto frame_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+			// Cap framerate to the configured FPS (skip entirely if uncapped).
+			if (FRAME_CAP_US > 0)
+			{
+				auto frame_end = std::chrono::high_resolution_clock::now();
+				auto frame_us = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
 
-			if (frame_us < FRAME_CAP_US)
-				std::this_thread::sleep_for(std::chrono::microseconds(FRAME_CAP_US - frame_us));
+				if (frame_us < FRAME_CAP_US)
+					std::this_thread::sleep_for(std::chrono::microseconds(FRAME_CAP_US - frame_us));
+			}
 		}
 
 		Sound::close();

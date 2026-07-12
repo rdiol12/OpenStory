@@ -267,7 +267,8 @@ namespace ms
 				check_drops();
 		}
 
-		if (player.is_invincible())
+		// A server-approved hidden GM takes no touch damage or knockback.
+		if (player.is_invincible() || player.is_hidden())
 			return;
 
 		if (int32_t oid_id = mobs.find_colliding(player.get_phobj()))

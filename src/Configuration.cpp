@@ -98,6 +98,8 @@ namespace ms
 		settings.emplace<GraphicsQuality>();
 		settings.emplace<EffectsQuality>();
 		settings.emplace<MouseSpeed>();
+		settings.emplace<FPSCap>();
+		settings.emplace<ShowFPS>();
 		settings.emplace<ScreenshotFolder>();
 		settings.emplace<HPWarning>();
 		settings.emplace<MPWarning>();
@@ -280,7 +282,7 @@ namespace ms
 
 	bool Configuration::get_show_fps() const
 	{
-		return SHOW_FPS;
+		return Setting<ShowFPS>::get().load();
 	}
 
 	bool Configuration::get_show_packets() const
