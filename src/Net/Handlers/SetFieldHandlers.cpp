@@ -61,8 +61,19 @@ namespace ms
 
 	void SetFieldHandler::handle(InPacket& recv) const
 	{
-		Constants::Constants::get().set_viewwidth(Setting<Width>::get().load());
-		Constants::Constants::get().set_viewheight(Setting<Height>::get().load());
+		int16_t res_w = Setting<Width>::get().load();
+		int16_t res_h = Setting<Height>::get().load();
+
+		// Scale the render so the logical view stays ~1280 wide at any
+		// resolution. Without this a large window (e.g. 4K) gives a huge
+		// logical view and every sprite looks tiny.
+		float ui_scale = res_w / 1280.0f;
+		if (ui_scale < 1.0f) ui_scale = 1.0f;
+		if (ui_scale > 4.0f) ui_scale = 4.0f;
+
+		Constants::Constants::get().set_ui_scale(ui_scale);
+		Constants::Constants::get().set_viewwidth(res_w);
+		Constants::Constants::get().set_viewheight(res_h);
 
 		int32_t channel = recv.read_int();
 		int8_t mode1 = recv.read_byte();

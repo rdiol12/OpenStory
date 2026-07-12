@@ -25,7 +25,7 @@
 
 namespace ms
 {
-	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NONE, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE))
+	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE))
 	{
 		// Default nametag color is plain white. Player/OtherChar call
 		// apply_nametag_style(job_id) after construction to load the real
@@ -40,6 +40,10 @@ namespace ms
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
 		effects.drawbelow(absp, alpha);
+
+		// Aura layers that sit behind the character.
+		item_aura.draw_back(DrawArgument(absp), alpha);
+		gm_effect.draw_back(DrawArgument(absp), alpha);
 
 		Color color;
 
@@ -76,9 +80,9 @@ namespace ms
 			if (pet.get_itemid())
 				pet.draw(viewx, viewy, alpha);
 
-		// Looping cash/etc item aura (set by SHOW_ITEM_EFFECT or SPAWN_CHAR).
-		if (item_effect_id != 0)
-			item_effect_anim.draw(DrawArgument(absp), alpha);
+		// Aura layers that sit in front of the character.
+		item_aura.draw_front(DrawArgument(absp), alpha);
+		gm_effect.draw_front(DrawArgument(absp), alpha);
 
 		// If ever changing code for namelabel confirm placements with map 10000
 		// v83 nametag is a 9-slice sprite from NameTag.img/<style>:
@@ -147,8 +151,8 @@ namespace ms
 		invincible.update();
 		ironbody.update();
 
-		if (item_effect_id != 0)
-			item_effect_anim.update();
+		item_aura.update();
+		gm_effect.update();
 
 
 		for (auto& pet : pets)
@@ -248,16 +252,80 @@ namespace ms
 
 		if (itemid == 0)
 		{
-			item_effect_anim = Animation();
+			item_aura.clear();
 			return;
 		}
 
 #ifdef USE_NX
-		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(itemid)]["0"];
-		if (src)
-			item_effect_anim = Animation(src);
-		else
+		item_aura.load(nl::nx::effect["ItemEff.img"][std::to_string(itemid)]);
+
+		if (!item_aura.is_active())
 			item_effect_id = 0;
+#endif
+	}
+
+	void Char::show_item_use_effect(int32_t itemid)
+	{
+#ifdef USE_NX
+		nl::node base = nl::nx::effect["ItemEff.img"][std::to_string(itemid)];
+		nl::node frames = (base["0"].data_type() == nl::node::type::bitmap) ? base : base["0"];
+
+		// Add to the effect layer, which plays it once and removes it when the
+		// animation ends — a one-shot use puff, not a looping aura.
+		if (frames && frames.size() > 0)
+			effects.add(Animation(frames));
+#endif
+	}
+
+	void Char::refresh_ring_effect()
+	{
+#ifdef USE_NX
+		const CharEquips& equips = look.get_equips();
+
+		// Effect rings drive the item aura.
+		static const EquipSlot::Id ringslots[] = {
+			EquipSlot::Id::RING1, EquipSlot::Id::RING2,
+			EquipSlot::Id::RING3, EquipSlot::Id::RING4
+		};
+
+		int32_t ringeffect = 0;
+
+		for (EquipSlot::Id slot : ringslots)
+		{
+			int32_t ring = equips.get_equip(slot);
+
+			if (ring > 0 && nl::nx::effect["ItemEff.img"][std::to_string(ring)])
+			{
+				ringeffect = ring;
+				break;
+			}
+		}
+
+		if (ringeffect != 0)
+		{
+			if (item_effect_id != ringeffect)
+				set_item_effect(ringeffect);
+		}
+		else if (item_effect_id != 0)
+		{
+			set_item_effect(0);
+		}
+
+		// A GM hat drives the GM set effect (SetEff.img). There is no set data
+		// in the client NX, so the hat -> set-effect link is mapped explicitly.
+		const char* seteff = nullptr;
+
+		switch (equips.get_equip(EquipSlot::Id::HAT))
+		{
+		case 1002940: seteff = "37"; break;   // GMS hat        -> GM Effect
+		case 1002959: seteff = "100"; break;  // Junior GM Cap  -> JR.GM effect
+		default: break;
+		}
+
+		if (seteff)
+			gm_effect.load(nl::nx::effect["SetEff.img"][seteff]["effect"]);
+		else
+			gm_effect.clear();
 #endif
 	}
 
@@ -434,27 +502,24 @@ namespace ms
 		return pets[index < 3 ? index : 0];
 	}
 
-	void Char::apply_nametag_style(int32_t job_id)
+	void Char::apply_nametag_style(bool is_gm)
 	{
 #ifdef USE_NX
+		// The GM set effect is driven by the equipped GM hat (see
+		// refresh_ring_effect), not by GM status. Only the name plate here.
+
+		// Like the original game: the decorative name plate is not for everyone.
+		// Regular players keep the plain default name (translucent background).
+		// Only GMs get a distinct plate.
+		if (!is_gm)
+			return;
+
+		// First existing style wins ("11" is the distinct GM plate if present,
+		// otherwise fall back to whatever the NX actually carries).
 		nl::node nt = nl::nx::ui["NameTag.img"];
-
-		// Candidate styles, first match wins. GM/SuperGM get the yellow
-		// style (11) so they're visually distinct; otherwise we prefer the
-		// job-specific style if the NX dump happens to carry one, then
-		// fall back through the generic "0","10","3","4","5" chain.
-		std::vector<std::string> candidates;
-
-		if (job_id == 900 || job_id == 910)
-			candidates.push_back("11");
-
-		if (job_id > 0)
-			candidates.push_back(std::to_string(job_id));
-
-		candidates.insert(candidates.end(), { "0", "10", "3", "4", "5" });
-
 		nl::node style;
-		for (const auto& k : candidates)
+
+		for (const char* k : { "11", "0", "1", "2", "3", "4", "5", "10" })
 		{
 			if (nt[k] && nt[k].size() > 0)
 			{
@@ -463,10 +528,15 @@ namespace ms
 			}
 		}
 
-		if (!style) return;
+		if (!style)
+			return;
+
+		// The plate provides its own background — drop the default one so they
+		// don't stack.
+		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NONE, namelabel.get_text());
 
 		// Load the 9-slice sprite pieces (w = left edge, c = tiled center,
-		// e = right edge). These are the actual in-game nametag background.
+		// e = right edge).
 		tag_w = Texture(style["w"]);
 		tag_c = Texture(style["c"]);
 		tag_e = Texture(style["e"]);
@@ -487,7 +557,7 @@ namespace ms
 			catch (...) {}
 		}
 #else
-		(void)job_id;
+		(void)is_gm;
 #endif
 	}
 

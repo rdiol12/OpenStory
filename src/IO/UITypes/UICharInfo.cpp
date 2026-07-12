@@ -26,6 +26,7 @@
 
 #include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Net/Packets/TradePackets.h"
+#include "../../Net/Packets/SocialPackets.h"
 #include "../../Net/Packets/BotInventoryPackets.h"
 
 #ifdef USE_NX
@@ -66,6 +67,7 @@ namespace ms
 		add_button(Buttons::BtItem, character["BtItem"]);
 		add_button(Buttons::BtPopUp, character["BtPopUp"]);
 		add_button(Buttons::BtPopDown, character["BtPopDown"]);
+		add_button(Buttons::BtGuild, character["BtGuild"]);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		job = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
@@ -163,6 +165,13 @@ namespace ms
 				TradeInvitePacket(target_character->get_oid()).dispatch();
 			}
 			deactivate();
+			return Button::State::NORMAL;
+		case Buttons::BtGuild:
+			if (target_character)
+			{
+				GuildInvitePacket(target_character->get_name()).dispatch();
+				chat::log("Sent a guild invite to " + target_character->get_name() + ". (You must be in a guild with invite rights.)", chat::LineType::YELLOW);
+			}
 			return Button::State::NORMAL;
 		case Buttons::BtItem:
 		{

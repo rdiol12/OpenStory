@@ -37,60 +37,24 @@ namespace ms
 		attackspeed = 6;
 		attacking = false;
 
-		apply_nametag_style(jb);
+		apply_nametag_style(jb == 900 || jb == 910);
+		refresh_ring_effect();
 	}
 
 	int8_t OtherChar::update(const Physics& physics)
 	{
-		// Consume one movement per frame (don't skip any)
-		if (!movements.empty())
-		{
-			lastmove = movements.front();
-			movements.pop();
-		}
-
 		if (!attacking)
-		{
-			uint8_t laststate = lastmove.newstate;
-			set_state(laststate);
-		}
+			set_state(lastmove.newstate);
 
-		double targetx = lastmove.xpos;
-		double targety = lastmove.ypos;
-		double dx = targetx - phobj.crnt_x();
-		double dy = targety - phobj.crnt_y();
+		// Damped follow toward the latest reported position. A gentle factor
+		// spreads motion across the gaps between (sparse) move packets, so the
+		// character glides instead of stepping once per packet.
+		double dx = lastmove.xpos - phobj.crnt_x();
+		double dy = lastmove.ypos - phobj.crnt_y();
 
-		// Move toward target position
-		// If we have queued movements, snap to consume them on time
-		// If queue is empty, interpolate smoothly to fill gaps between packets
-		if (!movements.empty())
-		{
-			// More packets waiting — snap to this one so we keep up
-			phobj.x = targetx;
-			phobj.y = targety;
-			phobj.hspeed = dx;
-			phobj.vspeed = dy;
-		}
-		else
-		{
-			// No more packets — interpolate toward target to fill frames
-			double dist = std::sqrt(dx * dx + dy * dy);
-			if (dist > 1.0)
-			{
-				// Move a fraction toward target each frame
-				phobj.x = phobj.crnt_x() + dx * 0.5;
-				phobj.y = phobj.crnt_y() + dy * 0.5;
-				phobj.hspeed = dx * 0.5;
-				phobj.vspeed = dy * 0.5;
-			}
-			else
-			{
-				phobj.x = targetx;
-				phobj.y = targety;
-				phobj.hspeed = 0.0;
-				phobj.vspeed = 0.0;
-			}
-		}
+		phobj.hspeed = dx * 0.18;
+		phobj.vspeed = dy * 0.18;
+		phobj.move();
 
 		bool aniend = Char::update(physics, get_stancespeed());
 
@@ -117,16 +81,13 @@ namespace ms
 
 		if ((dx * dx + dy * dy) > (200.0 * 200.0))
 		{
-			std::queue<Movement>().swap(movements);
-			lastmove = target;
 			phobj.set_x(target.xpos);
 			phobj.set_y(target.ypos);
 			phobj.hspeed = 0.0;
 			phobj.vspeed = 0.0;
-			return;
 		}
 
-		movements.push(target);
+		lastmove = target;
 	}
 
 	void OtherChar::update_skill(int32_t skillid, uint8_t skilllevel)
@@ -145,6 +106,9 @@ namespace ms
 
 		uint8_t laststate = lastmove.newstate;
 		set_state(laststate);
+
+		// A newly-equipped effect ring should start (or stop) its aura.
+		refresh_ring_effect();
 	}
 
 	int8_t OtherChar::get_integer_attackspeed() const

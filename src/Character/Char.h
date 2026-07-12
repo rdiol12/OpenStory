@@ -25,6 +25,7 @@
 #include "Look/PetLook.h"
 
 #include "../Graphics/EffectLayer.h"
+#include "../Graphics/CharacterAura.h"
 #include "../Graphics/Color.h"
 #include "../Graphics/Texture.h"
 
@@ -113,6 +114,14 @@ namespace ms
 		// Start/stop a persistent looping item-use aura (Effect.wz/ItemEff.img).
 		// Pass itemid=0 to clear.
 		void set_item_effect(int32_t itemid);
+		// The currently active looping item aura (0 if none).
+		int32_t get_item_effect_id() const { return item_effect_id; }
+		// Play an item's ItemEff animation once (consumable use puff), then
+		// let it expire. Unlike set_item_effect this does not loop.
+		void show_item_use_effect(int32_t itemid);
+		// Refresh equip-driven effects: effect-ring auras and the GM-hat set
+		// effect. Call whenever equipment changes.
+		void refresh_ring_effect();
 		// Display the iron body skill animation
 		void show_iron_body();
 		// Display damage over the characters head
@@ -134,10 +143,9 @@ namespace ms
 		void remove_pet(uint8_t index, bool hunger);
 		// Access one of the up-to-3 pet slots.
 		PetLook& get_pet(uint8_t index);
-		// Pick the nametag style (text ARGB color) from NameTag.img based
-		// on the character's job. Called by Player/OtherChar after the base
-		// Char constructor, once the job id is known.
-		void apply_nametag_style(int32_t job_id);
+		// Give GMs the distinct NameTag.img plate; regular players keep the
+		// plain default name. Called by Player/OtherChar after construction.
+		void apply_nametag_style(bool is_gm);
 
 		// Return if the character is facing left
 		bool getflip() const;
@@ -200,10 +208,13 @@ namespace ms
 		bool hidden = false;
 		std::list<DamageNumber> damagenumbers;
 
-		// Persistent item-use aura (e.g. cash buff glow). Loops as long as
+		// Persistent item aura (effect ring / cash effect). Active while
 		// item_effect_id != 0.
-		Animation item_effect_anim;
+		CharacterAura item_aura;
 		int32_t item_effect_id = 0;
+
+		// GM set effect (Effect.img/SetEff.img/37) shown on GM characters.
+		CharacterAura gm_effect;
 
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 	};

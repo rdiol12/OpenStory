@@ -50,10 +50,20 @@ namespace ms
 		int32_t buffmask1 = recv.read_int();
 		int16_t buffvalue = 0;
 
-		if (buffmask1 != 0)
-			buffvalue = morphed ? recv.read_short() : recv.read_byte();
+		// The server (writeForeignBuffs) writes a value between the two masks
+		// ONLY for MORPH (short) or COMBO (byte) — never for other high-mask
+		// buffs like Dark Sight / Soul Arrow / Shadow Partner. Reading it for
+		// any high-mask buff over-read the packet -> "stack underflow".
+		// COMBO = 0x20000000000000; its high 32 bits are 0x200000.
+		constexpr int32_t COMBO_HIGH = 0x200000;
+		bool combo = (static_cast<uint32_t>(buffmask1) & COMBO_HIGH) != 0;
 
-		recv.read_int(); // buffmask 2
+		if (morphed)
+			buffvalue = recv.read_short();
+		else if (combo)
+			buffvalue = recv.read_byte();
+
+		recv.read_int(); // buffmask 2 (low)
 
 		recv.skip(43);
 

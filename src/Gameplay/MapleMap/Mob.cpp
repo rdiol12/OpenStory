@@ -577,15 +577,16 @@ namespace ms
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
 	{
-		if (hppercent == 0)
-		{
-			int16_t delta = playerlevel - level;
+		// Colour the name by danger: how far the mob's level is above the
+		// player's. Red = much higher, yellow = higher, white = at/below.
+		int16_t leveldelta = level - playerlevel;
 
-			if (delta > 9)
-				namelabel.change_color(Color::Name::YELLOW);
-			else if (delta < -9)
-				namelabel.change_color(Color::Name::RED);
-		}
+		if (leveldelta >= 20)
+			namelabel.change_color(Color::Name::RED);
+		else if (leveldelta >= 5)
+			namelabel.change_color(Color::Name::YELLOW);
+		else
+			namelabel.change_color(Color::Name::WHITE);
 
 		if (percent > 100)
 			percent = 100;

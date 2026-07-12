@@ -20,6 +20,8 @@
 #include "PlayerStates.h"
 #include "SkillId.h"
 
+#include "../Configuration.h"
+
 #include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
@@ -77,7 +79,8 @@ namespace ms
 		set_state(Char::State::STAND);
 		set_direction(true);
 
-		apply_nametag_style(stats.get_stat(MapleStat::Id::JOB));
+		apply_nametag_style(Configuration::get().get_admin());
+		refresh_ring_effect();
 	}
 
 	Player::Player() : Char(0, {}, "") {}
@@ -145,6 +148,9 @@ namespace ms
 			look.add_equip(itemid);
 		else
 			look.remove_equip(EquipSlot::by_id(slot));
+
+		// An effect ring's aura loops while it's worn.
+		refresh_ring_effect();
 	}
 
 	void Player::use_item(int32_t itemid)
@@ -605,7 +611,9 @@ namespace ms
 
 	void Player::set_climb_cooldown()
 	{
-		climb_cooldown.set_for(1000);
+		// Just long enough to clear the ladder you jumped off, not so long it
+		// blocks grabbing a different rope/ladder mid-jump.
+		climb_cooldown.set_for(250);
 	}
 
 	bool Player::can_climb()

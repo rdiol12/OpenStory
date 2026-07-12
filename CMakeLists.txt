@@ -9,6 +9,11 @@ file(GLOB_RECURSE SOURCE_FILES
             "src/*/*.cpp"
             "src/*/*.h"
     )
+# Embed the Windows app/window icon (Explorer exe icon + GLFW window icon).
+if(WIN32)
+    list(APPEND SOURCE_FILES "${CMAKE_SOURCE_DIR}/resource/OpenStory.rc")
+endif(WIN32)
+
 add_executable(OpenStory ${SOURCE_FILES})
 
 set_target_properties(OpenStory PROPERTIES

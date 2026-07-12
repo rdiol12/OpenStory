@@ -101,6 +101,11 @@ namespace ms
 
 	void AdminResultHandler::handle(InPacket& recv) const
 	{
+		// The server only sends admin/GM command results to GMs, so receiving
+		// one confirms this account is a GM — give the character the GM name
+		// plate (the login admin flag is unreliable on this server).
+		Stage::get().get_player().apply_nametag_style(true);
+
 		if (!recv.available())
 			return;
 

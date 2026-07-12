@@ -166,6 +166,20 @@ namespace ms
 		reset();
 	}
 
+	Animation::Animation(const std::vector<nl::node>& framenodes)
+	{
+		for (auto& node : framenodes)
+			frames.push_back(node);
+
+		if (frames.empty())
+			frames.push_back(Frame());
+
+		animated = frames.size() > 1;
+		zigzag = false;
+
+		reset();
+	}
+
 	Animation::Animation()
 	{
 		animated = false;
@@ -188,6 +202,12 @@ namespace ms
 	void Animation::draw(const DrawArgument& args, float alpha) const
 	{
 		int16_t interframe = frame.get(alpha);
+
+		if (interframe < 0)
+			interframe = 0;
+		else if (interframe >= static_cast<int16_t>(frames.size()))
+			interframe = static_cast<int16_t>(frames.size()) - 1;
+
 		float interopc = opacity.get(alpha) / 255;
 		float interscale = xyscale.get(alpha) / 100;
 
@@ -326,6 +346,15 @@ namespace ms
 
 	const Frame& Animation::get_frame() const
 	{
-		return frames[frame.get()];
+		// Clamp the frame index — a stale/oversized index (e.g. from a bullet
+		// animation reused across attacks) must never index past the vector.
+		int16_t index = frame.get();
+
+		if (index < 0)
+			index = 0;
+		else if (index >= static_cast<int16_t>(frames.size()))
+			index = static_cast<int16_t>(frames.size()) - 1;
+
+		return frames[index];
 	}
 }

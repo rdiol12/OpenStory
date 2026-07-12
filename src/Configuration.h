@@ -759,6 +759,18 @@ namespace ms
 		MouseSpeed() : ByteEntry("MouseSpeed", "50") {}
 	};
 
+	// Frame-rate cap in FPS. 0 = uncapped.
+	struct FPSCap : public Configuration::ByteEntry
+	{
+		FPSCap() : ByteEntry("FPSCap", "120") {}
+	};
+
+	// Show the on-screen FPS counter (top-right, yellow).
+	struct ShowFPS : public Configuration::BoolEntry
+	{
+		ShowFPS() : BoolEntry("ShowFPS", "false") {}
+	};
+
 	// Directory where F12 screenshots are written (created if missing).
 	struct ScreenshotFolder : public Configuration::StringEntry
 	{
