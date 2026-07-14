@@ -106,7 +106,7 @@ authored, per-frame path.
 
 some example that was created purly by ai 
 
-note some minor visual bugs on the face will fix it next commit along with the hats
+note some minor visual bugs on  will fix it next commit
 
 ![](docs/images/anothere.png)
 
