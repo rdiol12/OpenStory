@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Clothing.h"
+#include "ProceduralWeapon.h"
 
 namespace ms
 {
@@ -40,6 +41,8 @@ namespace ms
 
 		// Draw an equip
 		void draw(EquipSlot::Id slot, Stance::Id stance, Clothing::Layer layer, uint8_t frame, const DrawArgument& args) const;
+		// Advance equip-driven animations (procedural weapon glow).
+		void update();
 		// Add an equip, if not in cache, the equip is created from the files.
 		void add_equip(int32_t itemid, const BodyDrawInfo& drawinfo);
 		// Remove an equip
@@ -66,6 +69,9 @@ namespace ms
 
 	private:
 		EnumMap<EquipSlot::Id, const Clothing*> clothes;
+		// Set when a weapon in the new single-image "procedural" format is equipped;
+		// takes over the WEAPON slot's draw. Invalid for authored weapons.
+		ProceduralWeapon procweapon;
 
 		static std::unordered_map<int32_t, Clothing> cloth_cache;
 	};

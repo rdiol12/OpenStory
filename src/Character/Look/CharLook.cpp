@@ -257,6 +257,7 @@ namespace ms
 
 		alerted.update();
 		expcooldown.update();
+		equips.update();
 
 		bool aniend = false;
 

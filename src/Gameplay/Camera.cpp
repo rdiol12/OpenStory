@@ -59,7 +59,12 @@ namespace ms
 		else if (next_x < hbounds.second() + VWIDTH)
 			next_x = hbounds.second() + VWIDTH;
 
-		if (next_y > vbounds.first() || vbounds.length() < VHEIGHT)
+		if (vbounds.length() < VHEIGHT)
+			// Map is shorter than the view: anchor its bottom to the screen
+			// bottom (ground stays under the status bar, extra sky shows at the
+			// top) instead of anchoring the top, which left void below the map.
+			next_y = vbounds.second() + VHEIGHT;
+		else if (next_y > vbounds.first())
 			next_y = vbounds.first();
 		else if (next_y < vbounds.second() + VHEIGHT)
 			next_y = vbounds.second() + VHEIGHT;

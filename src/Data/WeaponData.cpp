@@ -23,6 +23,33 @@
 
 namespace ms
 {
+	// Standard MapleStory afterimage (swing-trail) name for each weapon type.
+	// Used when a weapon's info/afterImage is empty (e.g. procedural weapons),
+	// so trails work with no NX change. An explicit info/afterImage still wins.
+	static std::string default_afterimage(Weapon::Type type)
+	{
+		switch (type)
+		{
+		case Weapon::Type::SWORD_1H:
+		case Weapon::Type::DAGGER:
+		case Weapon::Type::CLAW:     return "swordOL";
+		case Weapon::Type::SWORD_2H: return "swordTS";
+		case Weapon::Type::AXE_1H:
+		case Weapon::Type::AXE_2H:   return "axe";
+		case Weapon::Type::MACE_1H:
+		case Weapon::Type::MACE_2H:
+		case Weapon::Type::WAND:
+		case Weapon::Type::STAFF:    return "mace";
+		case Weapon::Type::SPEAR:    return "spear";
+		case Weapon::Type::POLEARM:  return "poleArm";
+		case Weapon::Type::BOW:      return "bow";
+		case Weapon::Type::CROSSBOW: return "crossBow";
+		case Weapon::Type::KNUCKLE:  return "knuckle";
+		case Weapon::Type::GUN:      return "gun";
+		default:                     return "swordOL";
+		}
+	}
+
 	WeaponData::WeaponData(int32_t equipid) : equipdata(EquipData::get(equipid))
 	{
 		int32_t prefix = equipid / 10000;
@@ -50,6 +77,9 @@ namespace ms
 		}
 
 		afterimage = (std::string)src["afterImage"];
+
+		if (afterimage.empty())
+			afterimage = default_afterimage(type);
 	}
 
 	bool WeaponData::is_valid() const
