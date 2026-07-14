@@ -106,9 +106,16 @@ authored, per-frame path.
 
 some example that was created purly by ai 
 ![](docs/images/anothere.png)
+
+
 ![](crossbow.png)
+
+
+
 ![](docs/images/onemore.png)
 with glow effect
+
+
 ![](docs/images/swordflame.png)
 
 ## Building
