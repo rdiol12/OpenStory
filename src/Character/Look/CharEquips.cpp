@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharEquips.h"
 
+#include <nlnx/nx.hpp>
+#include <fstream> // TEMP diag
+
 namespace ms
 {
 	CharEquips::CharEquips()
@@ -27,8 +30,20 @@ namespace ms
 
 	void CharEquips::draw(EquipSlot::Id slot, Stance::Id stance, Clothing::Layer layer, uint8_t frame, const DrawArgument& args) const
 	{
+		// Procedural weapons render themselves (grip-on-hand + motion profile).
+		if (slot == EquipSlot::Id::WEAPON && procweapon.is_valid())
+		{
+			procweapon.draw(stance, layer, frame, args);
+			return;
+		}
+
 		if (const Clothing* cloth = clothes[slot])
 			cloth->draw(stance, layer, frame, args);
+	}
+
+	void CharEquips::update()
+	{
+		procweapon.update();
 	}
 
 	void CharEquips::add_equip(int32_t itemid, const BodyDrawInfo& drawinfo)
@@ -51,11 +66,27 @@ namespace ms
 
 		EquipSlot::Id slot = cloth.get_eqslot();
 		clothes[slot] = &cloth;
+
+		// Detect the new procedural weapon format: a weapon img with a
+		// default/weapon bitmap and no authored stance groups (no stand1).
+		if (slot == EquipSlot::Id::WEAPON)
+		{
+			nl::node src = nl::nx::character["Weapon"]["0" + std::to_string(itemid) + ".img"];
+
+			if (src["stand1"].size() == 0 &&
+				src["default"]["weapon"].data_type() == nl::node::type::bitmap)
+				procweapon = ProceduralWeapon(src, itemid, drawinfo);
+			else
+				procweapon = ProceduralWeapon(); // authored — clear any prior procedural
+		}
 	}
 
 	void CharEquips::remove_equip(EquipSlot::Id slot)
 	{
 		clothes[slot] = nullptr;
+
+		if (slot == EquipSlot::Id::WEAPON)
+			procweapon = ProceduralWeapon();
 	}
 
 	bool CharEquips::is_visible(EquipSlot::Id slot) const
