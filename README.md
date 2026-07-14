@@ -104,6 +104,13 @@ natural next step (a single image anchored to the head's `brow`) — **work in p
 arms swing, legs walk — so a single picture can't represent it; armor stays on the traditional
 authored, per-frame path.
 
+some example that was created purly by ai 
+![](docs/images/anothere.png)
+![](crossbow.png)
+![](docs/images/onemore.png)
+with glow effect
+![](docs/images/swordflame.png)
+
 ## Building
 
 ### Requirements
