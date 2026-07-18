@@ -469,6 +469,48 @@ namespace ms
 
 		uint8_t attacktype = weapon.get_attack();
 
+		// Incomplete custom clones sometimes ship without info/attack; derive
+		// the attack class from the weapon type instead of freezing in STAND1
+		if (attacktype == 0)
+		{
+			switch (weapon.get_type())
+			{
+			case Weapon::Type::SWORD_1H:
+			case Weapon::Type::AXE_1H:
+			case Weapon::Type::MACE_1H:
+			case Weapon::Type::DAGGER:
+				attacktype = 1;
+				break;
+			case Weapon::Type::SPEAR:
+			case Weapon::Type::POLEARM:
+				attacktype = 2;
+				break;
+			case Weapon::Type::BOW:
+				attacktype = 3;
+				break;
+			case Weapon::Type::CROSSBOW:
+				attacktype = 4;
+				break;
+			case Weapon::Type::SWORD_2H:
+			case Weapon::Type::AXE_2H:
+			case Weapon::Type::MACE_2H:
+				attacktype = 5;
+				break;
+			case Weapon::Type::WAND:
+			case Weapon::Type::STAFF:
+				attacktype = 6;
+				break;
+			case Weapon::Type::KNUCKLE:
+				attacktype = 7;
+				break;
+			case Weapon::Type::GUN:
+				attacktype = 9;
+				break;
+			default:
+				break;
+			}
+		}
+
 		if (attacktype == 9 && !degenerate)
 		{
 			stance.set(Stance::Id::SHOT);

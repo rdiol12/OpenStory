@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>

@@ -25,6 +25,7 @@
 #include "../../MapleStory.h"
 
 #include <cstdlib>
+#include <fstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
