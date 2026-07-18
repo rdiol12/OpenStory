@@ -19,7 +19,6 @@ A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](h
 AI-made armor and hats rendered by the client — see [AI-Generated Equipment](#ai-generated-equipment-armor--hats) below.
 
 ![AI armor](docs/images/armour.png)
-![AI knight helm](docs/images/hat.png)
 ![AI wizard hat](docs/images/hat1.png)
 ![AI item icons](docs/images/hat-icons.png)
 
