@@ -75,6 +75,10 @@ namespace ms
 		// Initialize drawinfo
 		static void init();
 
+		// Shared body skeleton data (per-frame anchors) — used by aura pivots
+		// to track the head bob
+		static const BodyDrawInfo& get_drawinfo();
+
 	private:
 		void updatetwohanded();
 		void draw(const DrawArgument& args, Stance::Id interstance, Expression::Id interexp, uint8_t interframe, uint8_t interfcframe) const;

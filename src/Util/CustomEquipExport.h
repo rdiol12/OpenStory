@@ -17,67 +17,20 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../../Template/EnumMap.h"
-
-#include <string>
-
 namespace ms
 {
-	namespace Stance
+	// Template exporter for the AI-generated equip pipeline.
+	//
+	// If Custom/export.txt (next to the exe) exists, each line holds an equip item
+	// id. For every id, all part bitmaps of its .img are dumped to
+	// Custom/Export/<id>/<stance>.<frame>.<part>.png together with a frames.txt
+	// listing dimensions, origins and anchor maps. Those PNGs are the img2img
+	// templates: generate art over them (same canvas size!) and drop the results
+	// into Custom/Equip/<id>/ under the SAME file names — the client then renders
+	// them instead of the NX bitmaps, with vanilla-perfect alignment.
+	namespace CustomEquipExport
 	{
-		enum Id : uint8_t
-		{
-			NONE,
-			ALERT,
-			DEAD,
-			FLY,
-			HEAL,
-			JUMP,
-			LADDER,
-			PRONE,
-			PRONESTAB,
-			ROPE,
-			SHOT,
-			SHOOT1,
-			SHOOT2,
-			SHOOTF,
-			SIT,
-			STABO1,
-			STABO2,
-			STABOF,
-			STABT1,
-			STABT2,
-			STABTF,
-			STAND1,
-			STAND2,
-			SWINGO1,
-			SWINGO2,
-			SWINGO3,
-			SWINGOF,
-			SWINGP1,
-			SWINGP2,
-			SWINGPF,
-			SWINGT1,
-			SWINGT2,
-			SWINGT3,
-			SWINGTF,
-			WALK1,
-			WALK2,
-			LENGTH
-		};
-
-		Id by_state(int8_t state);
-		Id by_id(uint8_t id);
-		Id by_string(const std::string& name);
-
-		bool is_climbing(Id value);
-		// True for the swing/stab/shoot attack stances. Used to gate the
-		// weapon afterimage (swing trail) so it only shows during an actual
-		// attack and never lingers over the character at idle.
-		bool is_attack(Id value);
-		Id baseof(Id value);
-		Id secondof(Id value);
-
-		extern const EnumMap<Id, std::string> names;
-	};
+		// Run once at startup, after the NX files are loaded.
+		void run();
+	}
 }

@@ -32,6 +32,8 @@ namespace ms
 		void set_mob(int32_t mobid, const std::string& name, int8_t boss_type);
 		bool is_active() const;
 		void clear();
+		// Width of the gauge backdrop, for centering on screen.
+		int16_t width() const;
 
 	private:
 		Texture backgrnd;

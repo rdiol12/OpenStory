@@ -48,6 +48,7 @@ namespace ms
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
 		notattack = info["notAttack"].get_bool();
+		boss = info["boss"].get_bool();
 		canjump = src["jump"].size() > 0;
 		canfly = src["fly"].size() > 0;
 		canmove = src["move"].size() > 0 || canfly;
@@ -763,6 +764,16 @@ namespace ms
 	bool Mob::is_alive() const
 	{
 		return active && !dying;
+	}
+
+	bool Mob::is_boss() const
+	{
+		return boss;
+	}
+
+	const std::string& Mob::get_name() const
+	{
+		return name;
 	}
 
 	bool Mob::is_in_range(const Rectangle<int16_t>& range) const

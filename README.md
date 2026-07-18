@@ -15,6 +15,14 @@ A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](h
 ### Quest UI & NPC Quest Indicators
 ![Quest UI](docs/images/quest-ui.png)
 
+### AI-Generated Equipment
+AI-made armor and hats rendered by the client — see [AI-Generated Equipment](#ai-generated-equipment-armor--hats) below.
+
+![AI armor](docs/images/armour.png)
+![AI knight helm](docs/images/hat.png)
+![AI wizard hat](docs/images/hat1.png)
+![AI item icons](docs/images/hat-icons.png)
+
 ## Features
 
 - Full v83 client connecting to Cosmic servers
@@ -35,8 +43,9 @@ Some features are client-side additions not supported by a stock Cosmic server:
 | HP/MP Warning | Working | Client-only |
 | Graphics/Effects Quality | Working | Client-only |
 | Procedural Weapons | Working | AI-friendly one-image weapons — see below |
-| Procedural Hats | WIP | Same idea for head-worn items |
-| Procedural Armor | Not planned | Body clothing deforms per frame — stays authored |
+| AI Armor (materials + silhouettes) | Working | `aiSkin` / `aiShell` — see below |
+| AI Hats | Working | Donor-canvas repaint pipeline — see below |
+| Equip Auras | Working | Data-driven glow effects with additive blending |
 
 ## Procedural Weapons (AI-friendly item creation)
 
@@ -96,13 +105,69 @@ weapon keeps its full authored stance set and renders on the original path, unch
 Procedural and authored weapons can live side-by-side in the same `Character.nx` — each is
 detected per item — so adding procedural weapons never touches the existing item set.
 
-### Hats & armor
+## AI-Generated Equipment (Armor & Hats)
 
-The one-image approach only works for **rigid** equipment. **Hats** ride the head and are a
-natural next step (a single image anchored to the head's `brow`) — **work in progress**.
-**Body armor** (top/bottom/overall/gloves/shoes) **deforms with the body** — the torso bends,
-arms swing, legs walk — so a single picture can't represent it; armor stays on the traditional
-authored, per-frame path.
+The client renders AI-generated equipment from data embedded in the NX files — no loose
+files, no per-frame hand art. The core idea everywhere: **geometry stays hand-made
+(cloned from a vanilla "donor" item), AI supplies only surface and shape** — which is why
+nothing flickers or misaligns.
+
+### Armor — `info/aiSkin` (materials)
+
+An armor clone carries ONE flat, seamless, opaque **material swatch** at `info/aiSkin`.
+At load, the client retextures every donor frame (~180 of them) from it:
+
+- each pixel maps into body-space (pinned to the part's anchor — `navel` for clothes,
+  sleeves to their own center, prone rotates 90°) and samples the material with wrap-around,
+- the donor pixel's **luminance** shades the result, so every pose inherits its hand-drawn
+  folds, shadows and outline; the donor alpha masks it, so alignment can't break,
+- inventory icons are retextured automatically to match.
+
+Data knobs (all optional, no client rebuild): `aiSkinScale`, `aiSkinShadeMid`,
+`aiSkinShadeStrength`, `aiSkinGloss` (matte↔glossy), `aiSkinBands` (cel shading),
+`aiSkinTrim` (silhouette-edge color), `aiSkinDecal`+`aiSkinDecalPos` (body-pinned emblem),
+`aiSkinArm` (separate sleeve material).
+
+### Armor — `info/aiShell` (custom silhouettes)
+
+Shell views replace the donor body part with **authored silhouette images** — the armor's
+shape is no longer bound to any existing item. Views: `upright` (required), `prone`,
+`back`, `sit`, `attack`, `jump` (all optional), each pinned to the body's **neck** per
+frame (measured to be stable in idle and to track real torso motion). A view can be a set
+of numbered frames for animation (billowing capes). Missing views get automatic
+stand-ins — squashed upright when airborne, rotated upright when prone — so the custom
+look never reverts mid-animation. With a material present, shell views are retextured
+too: one drawn shape × any material. `uprightBehind` draws behind the body (open coats,
+wings). Weapons can use `aiShell/held` — one image, auto-rotated per frame by measuring
+the donor weapon's blade angle from its own pixels.
+
+### Hats — donor-canvas repaint
+
+Hats use the simplest and most reliable pipeline: pick a **donor cap whose silhouette
+matches the design** (helm, pointy hat, circlet, hood…), have the AI **repaint the
+donor's bitmaps in place** (img2img over each sprite, then clamp to the donor's alpha),
+and keep every origin/map/vslot untouched. Seating, size and hair interplay are inherited
+from a hat Nexon already fitted — placement bugs are structurally impossible. Hair
+coverage is driven by the standard `vslot` codes (the client parses them properly; helms
+and masks use full-cover codes to hide hair).
+
+### Auras — `info/effect`
+
+Any equip may declare a looping aura: an inline frame animation (back/front layers) with
+`effectPivot` (center/head/feet), `effectBlend=1` for **additive glow** (real light
+accumulation, rendered via segmented draw batches), `effectTint=1` to tint a shared
+white template with the item's material accent color, `effectScale`/`effectOpacity`/
+`effectTintColor`, `effectShow` conditions, `effectFlip`, and `effectDrag` — auras trail
+the character's movement and settle when standing.
+
+### Review tooling
+
+`wz/Custom/preview.txt` (one item id per line) makes the client dump, at startup:
+synthesized frames for every stance, shell views, aura frames, and **on-head composites**
+for hats — the hat rendered over the real head+hair at the exact in-game offset. New
+items are verified from these images before they're ever published. `wz/Custom/export.txt`
+dumps donor frames as repaint templates, and mannequin head templates are exported to
+`wz/Custom/HatTemplate/`.
 
 some example that was created purly by ai 
 

@@ -17,7 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Char.h"
 
+#include "Look/AiSkin.h"
+
 #include "../Data/WeaponData.h"
+#include "../Data/EquipData.h"
+
+#include "../Graphics/GraphicsGL.h"
+
+#include <algorithm>
+#include <cmath>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -25,6 +33,23 @@
 
 namespace ms
 {
+	// Aura pivot offset from absp (= character feet). Seeds validated by an
+	// offline render across stand/walk/jump; the neck barely moves so these are
+	// single constants. On prone a lying body can't be described by a vertical
+	// offset, so anchor to the base instead of floating a marker above it.
+	static Point<int16_t> aura_pivot_offset(int16_t pivot, bool prone)
+	{
+		if (prone)
+			return { 0, 0 };
+
+		switch (pivot)
+		{
+		case 1:  return { 0, -44 }; // head (neck -31 + ~13 head radius)
+		case 2:  return { 0, 0 };   // feet
+		default: return { 0, -20 }; // center (navel)
+		}
+	}
+
 	Char::Char(int32_t o, const CharLook& lk, const std::string& name) : MapObject(o), look(lk), look_preview(lk), namelabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)), guildlabel(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE))
 	{
 		// Default nametag color is plain white. Player/OtherChar call
@@ -41,9 +66,59 @@ namespace ms
 
 		effects.drawbelow(absp, alpha);
 
-		// Aura layers that sit behind the character.
-		item_aura.draw_back(DrawArgument(absp), alpha);
-		gm_effect.draw_back(DrawArgument(absp), alpha);
+		// Aura layers that sit behind the character. A flat (unsplit) aura — e.g. a
+		// ring or glow — draws its whole self here so it frames the body instead of
+		// covering it; a split aura draws only its 0-layer here (1-layer below).
+		item_aura.draw_below(DrawArgument(absp), alpha);
+		gm_effect.draw_below(DrawArgument(absp), alpha);
+
+		bool aura_prone = look.get_stance() == Stance::Id::PRONE;
+
+		// Shared by the below/above aura passes: stance gating, and draw args
+		// with pivot + motion drag + scale + facing flip + tint
+		auto aura_visible = [&](const AuraInstance& a)
+		{
+			switch (a.show)
+			{
+			case 1:  return state != State::LADDER && state != State::ROPE;
+			case 2:  return state == State::STAND || state == State::SIT;
+			default: return true;
+			}
+		};
+
+		auto aura_args = [&](const AuraInstance& a)
+		{
+			Point<int16_t> pos = absp + aura_pivot_offset(a.pivot, aura_prone) + Point<int16_t>(
+				static_cast<int16_t>(std::round(aura_drag_x * a.drag)),
+				static_cast<int16_t>(std::round(aura_drag_y * a.drag)));
+
+			// Head pivot rides the per-frame head bob (delta from the stance's
+			// first frame, so the calibrated base offset stays valid)
+			if (a.pivot == 1 && !aura_prone)
+			{
+				Stance::Id st = look.get_stance();
+				pos += CharLook::get_drawinfo().get_neck_position(st, look.get_frame())
+					- CharLook::get_drawinfo().get_neck_position(st, 0);
+			}
+
+			float xscale = (a.flip && !facing_right) ? -a.scale : a.scale;
+
+			return DrawArgument(pos, pos, Point<int16_t>(0, 0), xscale, a.scale, a.tint, 0.0f);
+		};
+
+		for (const auto& a : equip_auras)
+		{
+			if (!aura_visible(a))
+				continue;
+
+			if (a.blend == 1)
+				GraphicsGL::get().setblend(true);
+
+			a.aura.draw_below(aura_args(a), alpha);
+
+			if (a.blend == 1)
+				GraphicsGL::get().setblend(false);
+		}
 
 		Color color;
 
@@ -65,7 +140,12 @@ namespace ms
 
 		look.draw(DrawArgument(absp, color), alpha);
 
-		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
+		// Only show the swing trail during an actual attack stance. Otherwise a
+		// trail whose animation outlasts a short attack keeps drawing over the
+		// character at idle (a stray stance frame can satisfy the frame gate),
+		// which read as a stray glow on the face.
+		if (Stance::is_attack(look.get_stance()))
+			afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
 		if (ironbody)
 		{
@@ -80,9 +160,24 @@ namespace ms
 			if (pet.get_itemid())
 				pet.draw(viewx, viewy, alpha);
 
-		// Aura layers that sit in front of the character.
-		item_aura.draw_front(DrawArgument(absp), alpha);
-		gm_effect.draw_front(DrawArgument(absp), alpha);
+		// Aura layers that sit in front of the character — only a split aura's
+		// explicit 1-layer; a flat aura already drew fully behind (draw_below).
+		item_aura.draw_above(DrawArgument(absp), alpha);
+		gm_effect.draw_above(DrawArgument(absp), alpha);
+
+		for (const auto& a : equip_auras)
+		{
+			if (!aura_visible(a))
+				continue;
+
+			if (a.blend == 1)
+				GraphicsGL::get().setblend(true);
+
+			a.aura.draw_above(aura_args(a), alpha);
+
+			if (a.blend == 1)
+				GraphicsGL::get().setblend(false);
+		}
 
 		// If ever changing code for namelabel confirm placements with map 10000
 		// v83 nametag is a 9-slice sprite from NameTag.img/<style>:
@@ -153,6 +248,16 @@ namespace ms
 
 		item_aura.update();
 		gm_effect.update();
+
+		for (auto& a : equip_auras)
+			a.aura.update();
+
+		// Motion drag: auras trail against the velocity and ease back when
+		// stopping — flames stream behind a runner, settle on a stander
+		float drag_target_x = std::clamp(static_cast<float>(-phobj.hspeed) * 2.0f, -8.0f, 8.0f);
+		float drag_target_y = std::clamp(static_cast<float>(-phobj.vspeed) * 1.2f, -6.0f, 6.0f);
+		aura_drag_x += (drag_target_x - aura_drag_x) * 0.12f;
+		aura_drag_y += (drag_target_y - aura_drag_y) * 0.12f;
 
 
 		for (auto& pet : pets)
@@ -326,6 +431,104 @@ namespace ms
 			gm_effect.load(nl::nx::effect["SetEff.img"][seteff]["effect"]);
 		else
 			gm_effect.clear();
+
+		// Data-driven auras: any equipped item may declare info/effect. This is
+		// additive to the GM-hat/ring effects above (which are the always-shown
+		// "reserved band"); these declared auras are the capped equip band.
+		equip_auras.clear();
+
+		for (auto slot : EquipSlot::values)
+		{
+			int32_t id = equips.get_equip(slot);
+			if (id <= 0)
+				continue;
+
+			const std::string& category = EquipData::get(id).get_itemdata().get_category();
+			nl::node info = nl::nx::character[category]["0" + std::to_string(id) + ".img"]["info"];
+			nl::node eff = info["effect"];
+			if (!eff)
+				continue;
+
+			// String -> resolve by name (bare = CharEff.img, "Folder/name" = escape
+			// hatch to a vanilla bucket). Container -> use the subtree inline.
+			nl::node effnode;
+			if (eff.data_type() == nl::node::type::string)
+			{
+				std::string name = (std::string)eff;
+				size_t slash = name.find('/');
+				effnode = (slash != std::string::npos)
+					? nl::nx::effect[name.substr(0, slash) + ".img"][name.substr(slash + 1)]
+					: nl::nx::effect["CharEff.img"][name];
+			}
+			else
+			{
+				effnode = eff;
+			}
+
+			if (!effnode)
+				continue;
+
+			AuraInstance inst;
+			inst.aura.load(effnode);
+			if (!inst.aura.is_active())
+				continue;
+
+			inst.pivot = static_cast<int16_t>(info["effectPivot"]);
+			inst.blend = static_cast<int16_t>(info["effectBlend"]);
+			inst.prio = static_cast<int16_t>(info["effectPrio"]);
+			inst.show = static_cast<int16_t>(info["effectShow"]);
+			inst.flip = static_cast<int32_t>(info["effectFlip"]) != 0;
+
+			if (double scale = info["effectScale"]; scale > 0.0)
+				inst.scale = static_cast<float>(scale);
+
+			if (info["effectDrag"].data_type() == nl::node::type::integer ||
+				info["effectDrag"].data_type() == nl::node::type::real)
+				inst.drag = static_cast<float>(static_cast<double>(info["effectDrag"]));
+
+			float opacity = 1.0f;
+
+			if (double o = info["effectOpacity"]; o > 0.0 && o <= 1.0)
+				opacity = static_cast<float>(o);
+
+			// Tint: explicit color wins; else effectTint=1 samples the aiSkin
+			// material accent so one shared white/gray template effect matches
+			// every armor theme
+			if (info["effectTintColor"].data_type() == nl::node::type::integer)
+			{
+				int64_t rgb = info["effectTintColor"];
+				inst.tint = Color(
+					((rgb >> 16) & 0xFF) / 255.0f,
+					((rgb >> 8) & 0xFF) / 255.0f,
+					(rgb & 0xFF) / 255.0f,
+					opacity);
+			}
+			else if (static_cast<int32_t>(info["effectTint"]) != 0)
+			{
+				float r, g, b;
+
+				if (AiSkin::accent_color(id, info, r, g, b))
+					inst.tint = Color(r, g, b, opacity);
+				else
+					inst.tint = Color(1.0f, 1.0f, 1.0f, opacity);
+			}
+			else
+			{
+				inst.tint = Color(1.0f, 1.0f, 1.0f, opacity);
+			}
+
+			equip_auras.push_back(std::move(inst));
+		}
+
+		// Cap the declared equip auras (GM/ring effects are separate and always
+		// shown). Keep the highest-priority ones; ties keep insertion order.
+		constexpr size_t AURA_CAP = 3;
+		if (equip_auras.size() > AURA_CAP)
+		{
+			std::stable_sort(equip_auras.begin(), equip_auras.end(),
+				[](const AuraInstance& a, const AuraInstance& b) { return a.prio > b.prio; });
+			equip_auras.resize(AURA_CAP);
+		}
 #endif
 	}
 

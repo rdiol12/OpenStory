@@ -711,10 +711,10 @@ namespace ms
 		// invisible on others. The player is drawn a bit larger to stand out.
 		float base = (zoom_scale > 0.0f) ? zoom_scale : 1.0f;
 
-		const float MM_MOB_SCALE  = base * 0.20f;
-		const float MM_NPC_SCALE  = base * 0.24f;
-		const float MM_DROP_SCALE = base * 0.24f;
-		const float MM_CHAR_SCALE = base * 0.28f;
+		const float MM_MOB_SCALE  = base * 0.13f;
+		const float MM_NPC_SCALE  = base * 0.16f;
+		const float MM_DROP_SCALE = base * 0.16f;
+		const float MM_CHAR_SCALE = base * 0.18f;
 
 		auto mm_point = [&](Point<int16_t> world_pos)
 		{

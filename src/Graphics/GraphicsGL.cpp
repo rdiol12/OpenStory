@@ -722,10 +722,23 @@ namespace ms
 		if (offiter != offsets.end())
 			return offiter->second;
 
+		return upload(id, bmp.width(), bmp.height(), bmp.data());
+	}
+
+	const GraphicsGL::Offset& GraphicsGL::getoffset(size_t id, GLshort width, GLshort height, const void* data)
+	{
+		auto offiter = offsets.find(id);
+
+		if (offiter != offsets.end())
+			return offiter->second;
+
+		return upload(id, width, height, data);
+	}
+
+	const GraphicsGL::Offset& GraphicsGL::upload(size_t id, GLshort width, GLshort height, const void* data)
+	{
 		GLshort x = 0;
 		GLshort y = 0;
-		GLshort width = bmp.width();
-		GLshort height = bmp.height();
 
 		if (width <= 0 || height <= 0)
 			return nulloffset;
@@ -824,7 +837,7 @@ namespace ms
 			}
 		}
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, bmp.data());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
 
 		return offsets.emplace(
 			std::piecewise_construct,
@@ -845,6 +858,25 @@ namespace ms
 			return;
 
 		Offset offset = getoffset(bmp);
+
+		offset.top += vertical.first();
+		offset.bottom -= vertical.second();
+
+		quads.emplace_back(rect.left(), rect.right(), rect.top() + vertical.first(), rect.bottom() - vertical.second(), offset, color, angle);
+	}
+
+	void GraphicsGL::drawraw(size_t id, int16_t width, int16_t height, const void* data, const Rectangle<int16_t>& rect, const Range<int16_t>& vertical, const Color& color, float angle)
+	{
+		if (locked)
+			return;
+
+		if (color.invisible())
+			return;
+
+		if (!rect.overlaps(SCREEN))
+			return;
+
+		Offset offset = getoffset(id, width, height, data);
 
 		offset.top += vertical.first();
 		offset.bottom -= vertical.second();
@@ -931,6 +963,7 @@ namespace ms
 			case 'q': return Text::Layout::ImageKind::QUEST;
 			case 's': return Text::Layout::ImageKind::SKILL;
 			case 'f': return Text::Layout::ImageKind::FACE;
+			case 'e': return Text::Layout::ImageKind::EMOTE;
 			default:  return Text::Layout::ImageKind::ITEM;
 			}
 		};
@@ -938,9 +971,12 @@ namespace ms
 			&& text[first] == '#'
 			&& (text[first + 1] == 'v' || text[first + 1] == 'i'
 				|| text[first + 1] == 'q' || text[first + 1] == 's'
-				|| text[first + 1] == 'f'))
+				|| text[first + 1] == 'f' || text[first + 1] == 'e'))
 		{
-			constexpr int16_t ICON_W = 32;
+			// Inline icon box. Kept close to the font line height so the icon
+			// stays on its own line (a bigger box pushed the icon up into the
+			// previous line) and reads as a small inline glyph, not a full icon.
+			constexpr int16_t ICON_W = 14;
 
 			int32_t item_id = 0;
 			try
@@ -1329,6 +1365,25 @@ namespace ms
 		locked = false;
 	}
 
+	void GraphicsGL::setblend(bool additive)
+	{
+		if (additive == additive_active)
+			return;
+
+		if (additive)
+		{
+			additive_active = true;
+			additive_from = quads.size();
+		}
+		else
+		{
+			additive_active = false;
+
+			if (quads.size() > additive_from)
+				additive_ranges.emplace_back(additive_from, quads.size());
+		}
+	}
+
 	void GraphicsGL::flush(float opacity)
 	{
 		bool coverscene = opacity != 1.0f;
@@ -1385,7 +1440,37 @@ namespace ms
 
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_SHORT, indices.data());
 #else
-		glDrawArrays(GL_QUADS, 0, fsize);
+		// Segment the draw around additive ranges (glow effects); the common
+		// no-additive frame stays a single call
+		if (additive_ranges.empty() && !additive_active)
+		{
+			glDrawArrays(GL_QUADS, 0, fsize);
+		}
+		else
+		{
+			auto ranges = additive_ranges;
+
+			// Defensive: close a still-open range at the frame end
+			if (additive_active && quads.size() > additive_from)
+				ranges.emplace_back(additive_from, quads.size());
+
+			size_t cursor = 0;
+
+			for (const auto& range : ranges)
+			{
+				if (range.first > cursor)
+					glDrawArrays(GL_QUADS, GLint(cursor * Quad::LENGTH), GLsizei((range.first - cursor) * Quad::LENGTH));
+
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+				glDrawArrays(GL_QUADS, GLint(range.first * Quad::LENGTH), GLsizei((range.second - range.first) * Quad::LENGTH));
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+				cursor = range.second;
+			}
+
+			if (quads.size() > cursor)
+				glDrawArrays(GL_QUADS, GLint(cursor * Quad::LENGTH), GLsizei((quads.size() - cursor) * Quad::LENGTH));
+		}
 #endif
 
 		glDisableVertexAttribArray(attribute_coord);
@@ -1399,6 +1484,11 @@ namespace ms
 	void GraphicsGL::clearscene()
 	{
 		if (!locked)
+		{
 			quads.clear();
+			additive_ranges.clear();
+			additive_active = false;
+			additive_from = 0;
+		}
 	}
 }

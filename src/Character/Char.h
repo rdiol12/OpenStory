@@ -216,6 +216,33 @@ namespace ms
 		// GM set effect (Effect.img/SetEff.img/37) shown on GM characters.
 		CharacterAura gm_effect;
 
+		// Data-driven auras: any equipped item that declares info/effect adds one
+		// here (name -> CharEff.img, "Folder/name" escape, or inline subtree).
+		// ADDITIVE to item_aura/gm_effect above (which stay untouched for network
+		// item effects and the GM hat, so those can't regress). Rebuilt on equip
+		// change, capped to AURA_CAP, drawn at the per-item pivot offset from absp.
+		struct AuraInstance
+		{
+			CharacterAura aura;
+			int16_t pivot = 0;   // 0 center | 1 head | 2 feet
+			int16_t blend = 0;   // 0 normal | 1 additive (rendered via setblend)
+			int16_t prio = 0;    // higher wins the cap
+			int16_t show = 0;    // 0 always | 1 hide climbing | 2 idle only
+			float scale = 1.0f;  // effectScale: template drawn at this size
+			float drag = 1.0f;   // effectDrag: motion-drag multiplier (0 = pinned)
+			bool flip = false;   // effectFlip: mirror with the character's facing
+			// Tint color * effectOpacity alpha. effectTintColor sets it
+			// explicitly; effectTint=1 samples the aiSkin material accent, so
+			// one shared white/gray template matches every armor theme.
+			Color tint = Color(1.0f, 1.0f, 1.0f, 1.0f);
+		};
+		std::vector<AuraInstance> equip_auras;
+
+		// Eased offset opposing the character's velocity — auras trail when
+		// moving and settle when standing (see update)
+		float aura_drag_x = 0.0f;
+		float aura_drag_y = 0.0f;
+
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 	};
 }

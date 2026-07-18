@@ -228,6 +228,11 @@ namespace ms
 
 	void UIItemInventory::update_slot(int16_t slot)
 	{
+		// This slot's icon may currently be the UI's dragged icon (rebuild
+		// arriving mid-drag) — forget that reference before destroying it
+		if (auto icon_iter = icons.find(slot); icon_iter != icons.end() && icon_iter->second)
+			UI::get().purge_icon(icon_iter->second.get());
+
 		if (int32_t item_id = inventory.get_item_id(tab, slot))
 		{
 			int16_t count;
@@ -257,6 +262,10 @@ namespace ms
 
 	void UIItemInventory::load_icons()
 	{
+		for (auto& icon_pair : icons)
+			if (icon_pair.second)
+				UI::get().purge_icon(icon_pair.second.get());
+
 		icons.clear();
 
 		uint8_t numslots = inventory.get_slotmax(tab);
@@ -744,6 +753,14 @@ namespace ms
 			clear_new();
 			clear_tooltip();
 		}
+	}
+
+	void UIItemInventory::send_scroll(double yoffset)
+	{
+		// Mouse wheel drives the same slider that the scrollbar does, so the
+		// visible slot range shifts a row per notch (same as storage/shop panels).
+		if (!full_enabled && slider.isenabled())
+			slider.send_scroll(yoffset);
 	}
 
 	void UIItemInventory::remove_cursor()

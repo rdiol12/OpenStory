@@ -22,6 +22,8 @@
 
 namespace ms
 {
+	class Inventory;
+
 	// Class that stores information on the quest log of an individual character
 	class QuestLog
 	{
@@ -32,6 +34,11 @@ namespace ms
 		void forfeit(int16_t);
 		bool is_started(int16_t);
 		int16_t get_last_started();
+
+		// Whether all end-side (Check.img/<qid>/1) mob-kill and item requirements
+		// of a started quest are satisfied — i.e. it can now be turned in. Returns
+		// false if the quest isn't started or has no material requirements.
+		bool is_completable(int16_t qid, const Inventory& inv) const;
 
 		const std::map<int16_t, std::string>& get_started() const;
 		const std::map<int16_t, int64_t>& get_completed() const;

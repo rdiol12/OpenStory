@@ -58,7 +58,9 @@ namespace ms
 		case Weapon::Type::CROSSBOW:return 55.0f;   // angled forward
 		case Weapon::Type::CLAW:    return 50.0f;   // forward, low
 		case Weapon::Type::KNUCKLE: return 62.0f;   // forward
-		case Weapon::Type::GUN:     return 82.0f;   // pointed forward
+		case Weapon::Type::GUN:     return -82.0f;  // pointed forward (negative =
+		                                            // toward the facing direction, not
+		                                            // resting back like a melee weapon)
 		default:                    return 24.0f;
 		}
 	}
@@ -110,6 +112,12 @@ namespace ms
 			return { 0.0f, L, true, (type == Weapon::Type::GUN) ? 0.0f : 0.0f };
 		case Stance::Id::PRONE:
 			return { 92.0f, L, false, 0.0f };
+		case Stance::Id::LADDER:
+		case Stance::Id::ROPE:
+			// Climbing: the character is seen from behind, so slot the weapon
+			// onto the BACKWEAPON layer and anchor it to the body (slung across
+			// the back) instead of the hand.
+			return { 28.0f, Clothing::Layer::BACKWEAPON, false, 0.0f, true };
 		default: // STAND1/2, WALK1/2, ALERT, JUMP — held at rest
 			return { rest_angle(type), L, false, 0.0f };
 		}
@@ -128,7 +136,11 @@ namespace ms
 		// A held grip anchors to the arm's hand point (arm_position) — the same
 		// anchor authored weapons use for their "hand" map point. hand_position
 		// (HAND_BELOW_WEAPON/handMove) is only populated on some attack frames.
-		Point<int16_t> hand = drawinfo->get_arm_position(stance, frame);
+		// When slung on the back (climbing), anchor to the body/navel instead so
+		// the weapon sits centered on the character's back.
+		Point<int16_t> hand = pose.back
+			? drawinfo->get_body_position(stance, frame)
+			: drawinfo->get_arm_position(stance, frame);
 
 		constexpr float DEG = 0.017453293f;
 		float th;
@@ -156,7 +168,7 @@ namespace ms
 		// Per-type hold adjustment (e.g. hold a pike lower for a two-handed look) —
 		// only at rest; during attacks the grip stays at the true pivot so the
 		// swing/thrust rotates cleanly.
-		Point<int16_t> g = pose.track_arm ? grip : grip + grip_offset(type);
+		Point<int16_t> g = (pose.track_arm || pose.back) ? grip : grip + grip_offset(type);
 		float gx = g.x() - hw; // grip relative to sprite centre
 		float gy = g.y() - hh;
 
@@ -171,12 +183,36 @@ namespace ms
 		float px = flip ? (hw - hand.x() - (gx * c + gy * s))
 		                : (hand.x() - hw - (gx * c - gy * s));
 
-		Point<int16_t> shift(static_cast<int16_t>(std::lround(px)), static_cast<int16_t>(std::lround(py)));
+		// A gun is chiral (distinct top/bottom: sight up, grip down). Pointing it
+		// forward needs the angle negation above, which REFLECTS the sprite — a
+		// symmetric blade doesn't care, but the gun lands upside-down. Re-mirror
+		// the gun sprite about its own Y axis to restore chirality: the barrel
+		// direction is unchanged (it depends only on the draw angle), only the
+		// sight side swaps. The mirror moves the grip, so add the compensating
+		// shift that pins it back onto the hand.
+		bool gun = (type == Weapon::Type::GUN);
+		if (gun)
+		{
+			float fsign = flip ? -1.0f : 1.0f;
+			px += 2.0f * fsign * (hw + gx * c);
+			py += 2.0f * fsign * (gx * s);
+		}
+
+		// The placement above is in full sprite pixels. When the whole look is
+		// drawn scaled (e.g. shrunk to ~0.28x on the minimap), the weapon texture
+		// scales with `args`, but this positional shift must scale too — otherwise
+		// the weapon lands a full-size offset away from the tiny character and
+		// smears across the minimap. At world scale |scale| == 1, so this is a
+		// no-op there.
+		float sx = std::fabs(args.get_xscale());
+		float sy = std::fabs(args.get_yscale());
+		Point<int16_t> shift(static_cast<int16_t>(std::lround(px * sx)), static_cast<int16_t>(std::lround(py * sy)));
 
 		float draw_angle = flip ? -th : th;
 
-		// Compose onto the character args (keeps its flip + flip-centre), add rotation.
-		DrawArgument wargs = (args + shift) + DrawArgument(draw_angle, Point<int16_t>(0, 0), false, 1.0f);
+		// Compose onto the character args (keeps its flip + flip-centre), add
+		// rotation. For a gun the extra flip=true mirrors the sprite (chirality fix).
+		DrawArgument wargs = (args + shift) + DrawArgument(draw_angle, Point<int16_t>(0, 0), gun, 1.0f);
 
 		// The glow is authored in the same canvas, so the identical transform makes
 		// it wrap the blade — behind, then the weapon, then in front.

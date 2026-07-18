@@ -17,6 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
 
+#include <stb_image_write.h>
+#include <nlnx/bitmap.hpp>
+#include <vector>
+#include <cstdint>
+
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
@@ -257,6 +262,41 @@ namespace ms
 		basic_texture = Texture(questBtns["basic"]);
 		prob_texture = Texture(questBtns["prob"]);
 		reward_texture = Texture(questBtns["reward"]);
+
+		// TEMP: dump candidate detail sprites so we can identify the stray box.
+		{
+			auto dump = [](nl::node n, const char* fname)
+			{
+				if (!n || n.data_type() != nl::node::type::bitmap) return;
+				nl::bitmap b = n;
+				int w = b.width(), h = b.height();
+				if (w <= 0 || h <= 0 || !b.data()) return;
+				std::vector<uint8_t> rgba((size_t)w * h * 4);
+				const uint8_t* src = static_cast<const uint8_t*>(b.data());
+				for (size_t i = 0; i < (size_t)w * h; ++i)
+				{
+					rgba[i*4+0] = src[i*4+2];
+					rgba[i*4+1] = src[i*4+1];
+					rgba[i*4+2] = src[i*4+0];
+					rgba[i*4+3] = src[i*4+3];
+				}
+				stbi_write_png(fname, w, h, 4, rgba.data(), w*4);
+			};
+			dump(questBtns["basic"], "qdump_basic.png");
+			dump(questBtns["reward"], "qdump_reward.png");
+			dump(questBtns["prob"], "qdump_prob.png");
+			dump(questBtns["summary"], "qdump_summary.png");
+			dump(questBtns["select"], "qdump_select.png");
+			dump(list["searchArea"], "qdump_searchArea.png");
+			dump(quest_info_node["backgrnd"], "qdump_detailbg.png");
+			nl::node ii = quest["icon_info"];
+			dump(ii["backgrnd"], "qdump_ii_bg.png");
+			dump(ii["backgrnd2"], "qdump_ii_bg2.png");
+			dump(ii["Sheet"], "qdump_ii_sheet.png");
+			dump(ii["Sheet"]["0"], "qdump_ii_sheet0.png");
+			dump(ii["Sheet"]["1"], "qdump_ii_sheet1.png");
+			dump(ii["Sheet"]["2"], "qdump_ii_sheet2.png");
+		}
 		summary_texture = Texture(questBtns["summary"]);
 		obtain_select_texture = Texture(questBtns["select"]);
 
@@ -280,7 +320,10 @@ namespace ms
 		auto search_pos_adj = Point<int16_t>(29, 0);
 		auto search_dim_adj = Point<int16_t>(-80, 0);
 
-		auto search_pos = position + search_area_origin + search_pos_adj;
+		// Window-RELATIVE rect (drawn at `position`), so the field follows the
+		// window when dragged. It used to bake in `position` and draw at (0,0),
+		// which left the field stranded in the detail panel after any drag.
+		auto search_pos = search_area_origin + search_pos_adj;
 		auto search_dim = search_pos + search_area_dim + search_dim_adj;
 
 		search = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BOULDER, Rectangle<int16_t>(search_pos, search_dim), 19);
@@ -447,15 +490,22 @@ namespace ms
 
 			nl::node qnode = quest_info[std::to_string(qid)];
 
-			if (qnode)
-				name = strip_quest_codes(qnode["name"].get_string());
+			// A started/completed quest with NO QuestInfo entry is not a real
+			// player quest — servers (HeavenMS/Cosmic) use undefined quest ids as
+			// "info" records to store character flags/data. The stock client never
+			// lists these; showing them as "Quest <id>" just clutters the log with
+			// numbers the player can't forfeit. Hide them.
+			if (!qnode || !qnode["name"])
+				continue;
+
+			name = strip_quest_codes(qnode["name"].get_string());
 
 			// Skip quests whose NX name is CJK (untranslated KMS/TMS/CMS data).
 			if (has_cjk(name))
 				continue;
 
 			if (name.empty())
-				name = "Quest " + std::to_string(qid);
+				continue;
 
 			// Search filter
 			if (!search_lower.empty())
@@ -490,15 +540,22 @@ namespace ms
 
 			nl::node qnode = quest_info[std::to_string(qid)];
 
-			if (qnode)
-				name = strip_quest_codes(qnode["name"].get_string());
+			// A started/completed quest with NO QuestInfo entry is not a real
+			// player quest — servers (HeavenMS/Cosmic) use undefined quest ids as
+			// "info" records to store character flags/data. The stock client never
+			// lists these; showing them as "Quest <id>" just clutters the log with
+			// numbers the player can't forfeit. Hide them.
+			if (!qnode || !qnode["name"])
+				continue;
+
+			name = strip_quest_codes(qnode["name"].get_string());
 
 			// Skip quests whose NX name is CJK (untranslated KMS/TMS/CMS data).
 			if (has_cjk(name))
 				continue;
 
 			if (name.empty())
-				name = "Quest " + std::to_string(qid);
+				continue;
 
 			// Search filter
 			if (!search_lower.empty())
@@ -1921,7 +1978,7 @@ namespace ms
 		if (tab != Buttons::TAB2)
 		{
 			search_area.draw(position);
-			search.draw(Point<int16_t>(0, 0));
+			search.draw(position);
 
 			if (search.get_state() == Textfield::State::NORMAL && search.empty())
 				placeholder.draw(position + Point<int16_t>(39, 51));
@@ -2655,7 +2712,8 @@ namespace ms
 		// can overlap LIST_Y and steal clicks from the first quest row.
 		if (cursorpos.y() < position.y() + LIST_Y)
 		{
-			if (Cursor::State new_state = search.send_cursor(cursorpos, clicking))
+			// Rect is window-relative, so hit-test with a window-relative cursor.
+			if (Cursor::State new_state = search.send_cursor(cursorpos - position, clicking))
 				return new_state;
 		}
 
@@ -3217,23 +3275,30 @@ namespace ms
 				set_btn_state(Buttons::TAB3, Button::State::NORMAL);
 			else
 				set_btn_state(Buttons::TAB0 + oldtab, Button::State::NORMAL);
-
-			// Level/location filter buttons only on available tab
-			set_btn_active(Buttons::ALL_LEVEL, tab == Buttons::TAB0);
-			set_btn_active(Buttons::MY_LEVEL, tab == Buttons::TAB0);
-			set_btn_active(Buttons::BT_ALLLOCN, tab == Buttons::TAB0);
-			set_btn_active(Buttons::BT_MYLOCATION, tab == Buttons::TAB0);
-
-
-			// Search on available and in-progress tabs
-			bool search_active = (tab == Buttons::TAB0 || tab == Buttons::TAB1);
-			set_btn_active(Buttons::BT_SEARCH, search_active);
-
-			if (search_active)
-				search.set_state(Textfield::State::NORMAL);
-			else
-				search.set_state(Textfield::State::DISABLED);
 		}
+
+		// Filter/search button activation — run EVERY time, including the initial
+		// open where oldtab == tab, so the fix below is never skipped.
+		//
+		// The ALL_* and MY_* buttons of each pair share a screen position, so if
+		// both are active a single click fires BOTH (base send_cursor hits every
+		// button under the cursor): ALL sets the filter off, MY toggles it on ->
+		// it always ends up enabled and can never be turned off. MY_* alone is a
+		// clean on/off toggle, so keep only that one active and drop the
+		// overlapping ALL_* button.
+		set_btn_active(Buttons::ALL_LEVEL, false);
+		set_btn_active(Buttons::MY_LEVEL, tab == Buttons::TAB0);
+		set_btn_active(Buttons::BT_ALLLOCN, false);
+		set_btn_active(Buttons::BT_MYLOCATION, tab == Buttons::TAB0);
+
+		// Search on available and in-progress tabs
+		bool search_active = (tab == Buttons::TAB0 || tab == Buttons::TAB1);
+		set_btn_active(Buttons::BT_SEARCH, search_active);
+
+		if (search_active)
+			search.set_state(Textfield::State::NORMAL);
+		else
+			search.set_state(Textfield::State::DISABLED);
 
 		// Set current tab state
 		if (tab == Buttons::TAB3)

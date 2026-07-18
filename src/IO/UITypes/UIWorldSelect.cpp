@@ -171,12 +171,12 @@ namespace ms
 		// v83: Channel panel background
 		channels_background = world_select["chBackgrn"];
 
-		// Scroll/springboard — always visible
-		// scroll/1/3 = closed (513x152), scroll/0/1 = open (513x416)
-		if (world_select["scroll"]["1"]["3"])
-			scroll_closed = Texture(world_select["scroll"]["1"]["3"]);
-		if (world_select["scroll"]["0"]["1"])
-			scroll_open = Texture(world_select["scroll"]["0"]["1"]);
+		// Scroll/springboard roller — two ANIMATIONS: scroll/0 is the closed roller
+		// (played while no world is picked) and scroll/1 is the open roller (played
+		// once a world is selected). Loading them as Animations means that if the NX
+		// carries multiple unroll frames they play; a single-frame state just holds.
+		scroll_closed = Animation(world_select["scroll"]["0"]);
+		scroll_open = Animation(world_select["scroll"]["1"]);
 
 		// Scroll position — just below the signboard
 		scroll_pos = Point<int16_t>(143, 100);
@@ -199,7 +199,6 @@ namespace ms
 
 		// Set up region (loads world panel bg + world buttons)
 		set_region(region);
-
 	}
 
 	void UIWorldSelect::draw(float alpha) const
@@ -211,9 +210,8 @@ namespace ms
 		// Scroll/springboard — always visible
 		if (world_selected)
 		{
-			// Open springboard
-			if (scroll_open.is_valid())
-				scroll_open.draw(drawpos + scroll_pos);
+			// Open roller animation
+			scroll_open.draw(DrawArgument(drawpos + scroll_pos), alpha);
 
 			// World name/decoration at top-left of scroll
 			if (worldid < world_textures.size())
@@ -221,9 +219,8 @@ namespace ms
 		}
 		else
 		{
-			// Closed springboard
-			if (scroll_closed.is_valid())
-				scroll_closed.draw(drawpos + scroll_pos);
+			// Closed roller animation
+			scroll_closed.draw(DrawArgument(drawpos + scroll_pos), alpha);
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -264,6 +261,8 @@ namespace ms
 	{
 		UIElement::update();
 
+		scroll_closed.update();
+		scroll_open.update();
 		channel_selected.update();
 	}
 

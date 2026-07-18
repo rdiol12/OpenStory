@@ -86,6 +86,10 @@ namespace ms
 		std::string parse_simple_selections(const std::string& tx);
 
 		static constexpr int16_t MAX_HEIGHT = 248;
+		// Pixels the body text scrolls per slider row (one text line). The old code
+		// stepped 400px/row — far bigger than the ~230px viewport — so scrolling
+		// skipped straight past the middle of the text.
+		static constexpr int16_t SCROLL_STEP = 16;
 
 		enum Buttons
 		{

@@ -65,6 +65,38 @@ namespace ms
 		return value == LADDER || value == ROPE;
 	}
 
+	bool Stance::is_attack(Id value)
+	{
+		switch (value)
+		{
+		case PRONESTAB:
+		case SHOT:
+		case SHOOT1:
+		case SHOOT2:
+		case SHOOTF:
+		case STABO1:
+		case STABO2:
+		case STABOF:
+		case STABT1:
+		case STABT2:
+		case STABTF:
+		case SWINGO1:
+		case SWINGO2:
+		case SWINGO3:
+		case SWINGOF:
+		case SWINGP1:
+		case SWINGP2:
+		case SWINGPF:
+		case SWINGT1:
+		case SWINGT2:
+		case SWINGT3:
+		case SWINGTF:
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	Stance::Id Stance::baseof(Id value)
 	{
 		switch (value)

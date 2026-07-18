@@ -90,6 +90,8 @@ namespace ms
 
 	private:
 		EnumMap<Stance::Id, EnumMap<Layer, std::unordered_multimap<uint8_t, Texture>, Layer::NUM_LAYERS>> stances;
+		// Kept so the climbing fallback can reposition to the per-frame head.
+		const BodyDrawInfo* bodydrawinfo = nullptr;
 		int32_t itemid;
 		EquipSlot::Id eqslot;
 		Stance::Id walk;

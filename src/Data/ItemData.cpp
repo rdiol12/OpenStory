@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "ItemData.h"
 
+#include "../Character/Look/AiSkin.h"
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -71,6 +73,28 @@ namespace ms
 		{
 			icons[false] = src["icon"];
 			icons[true] = src["iconRaw"];
+
+			// AI equips get their inventory icons synthesized (for equips, src
+			// IS the .img's info node):
+			// - shell items: icon rendered from the actual aiShell shape
+			//   (retextured when a material exists, raw otherwise), so the
+			//   inventory shows the real silhouette instead of the donor's
+			// - material-only items: donor icons retextured with the material
+			if (prefix == 1)
+			{
+				if (Texture shellicon = AiSkin::icon_from_shell(itemid, src); shellicon.is_valid())
+				{
+					icons[false] = shellicon;
+					icons[true] = shellicon;
+				}
+				else if (AiSkin::available(itemid, src))
+				{
+					if (Texture themed = AiSkin::retexture_icon(itemid, src["icon"], "small"); themed.is_valid())
+						icons[false] = themed;
+					if (Texture themed = AiSkin::retexture_icon(itemid, src["iconRaw"], "raw"); themed.is_valid())
+						icons[true] = themed;
+				}
+			}
 			price = src["price"];
 			untradable = src["tradeBlock"].get_bool();
 			unique = src["only"].get_bool();

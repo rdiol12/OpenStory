@@ -22,6 +22,7 @@
 #include "../Components/Charset.h"
 #include "../Components/Gauge.h"
 #include "../Components/Icon.h"
+#include "../Components/MobGage.h"
 #include "../KeyConfig.h"
 #include "../KeyType.h"
 
@@ -55,6 +56,10 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
+
+		// Show/refresh the boss HP gauge with a boss's name + HP percent (0..100).
+		// Auto-hides shortly after the last update (or on 0%).
+		void update_boss_hp(const std::string& name, int8_t percent);
 
 		void toggle_qs();
 		void toggle_menu();
@@ -135,6 +140,11 @@ namespace ms
 		};
 
 		const CharStats& stats;
+
+		// Boss HP gauge (top-centre) — shown while a boss reports its HP.
+		MobGage boss_gage;
+		float boss_hp_percent = 0.0f;
+		int32_t boss_hp_ticks = 0; // ms remaining before the gauge auto-hides
 
 		// Main gauges
 		Gauge expbar;
@@ -232,8 +242,10 @@ namespace ms
 		// Applies a mapping to a quickslot key and dispatches the server packet.
 		void assign_quickslot(int16_t slot, KeyType::Id type, int32_t action);
 
-		// Text labels drawn above each cell showing the bound key name.
-		Text qs_key_labels[8];
+		// Reusable label drawn on each quickslot cube showing its bound key name
+		// (change_text per slot). Keeps the key indicator correct after rebinding.
+		// mutable: draw() is const but we re-text it per slot.
+		mutable Text qs_key_label;
 
 		// Drawn icons for bound quickslot entries (keyed by maple keycode).
 		mutable std::map<int32_t, Texture> qs_icon_cache;

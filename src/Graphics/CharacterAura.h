@@ -26,10 +26,15 @@ namespace ms
 		bool is_active() const { return active; }
 
 		void update();
-		// Behind the character.
+		// Behind the character (the 0-layer, or nothing if the effect is flat).
 		void draw_back(const DrawArgument& args, float alpha) const;
-		// In front of the character.
+		// In front of the character (the whole effect if flat — used to wrap a hat
+		// or weapon glow around its sprite).
 		void draw_front(const DrawArgument& args, float alpha) const;
+		// Char-aura layering: everything that belongs behind the body (the 0-layer,
+		// or the ENTIRE effect when flat) / only a split effect's explicit front.
+		void draw_below(const DrawArgument& args, float alpha) const;
+		void draw_above(const DrawArgument& args, float alpha) const;
 
 	private:
 		Animation back;

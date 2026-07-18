@@ -166,12 +166,53 @@ namespace ms
 			}
 			else if (status == 1)
 			{
+				const Inventory& inv = Stage::get().get_player().get_inventory();
+
+				// Completability BEFORE applying this progress update.
+				bool was_completable = quests.is_completable(qid, inv);
+
 				std::string qdata = recv.read_string();
 				// Skip 5 trailing bytes (Cosmic sends 5 zero bytes after progress)
 				if (recv.available() && recv.length() >= 5)
 					recv.skip(5);
 				quests.add_started(qid, qdata);
 				show_status(Color::Name::WHITE, "Quest updated.");
+
+				// Progress "tick" sound (kill/collect counter went up).
+				Sound(Sound::Name::QUESTCOUNT).play();
+
+				// If this update just satisfied all requirements, alert the player
+				// that the quest is ready to turn in (sound + toast) — the server
+				// never sends a dedicated "completable" packet, so we derive it.
+				if (!was_completable && quests.is_completable(qid, inv))
+				{
+					Sound(Sound::Name::QUESTALERT).play();
+
+					std::string qname;
+					nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(qid)];
+					if (info)
+						qname = info["name"].get_string();
+					if (qname.empty())
+						qname = "Quest #" + std::to_string(qid);
+
+					Notifications::notify(
+						"Quest Ready",
+						qname + " is ready to complete!",
+						[qid](bool yes)
+						{
+							if (!yes)
+								return;
+							auto log = UI::get().get_element<UIQuestLog>();
+							if (!log)
+							{
+								UI::get().emplace<UIQuestLog>(
+									Stage::get().get_player().get_quests());
+								log = UI::get().get_element<UIQuestLog>();
+							}
+							if (log)
+								log->load_quests();
+						});
+				}
 			}
 			else if (status == 2)
 			{
@@ -256,8 +297,20 @@ namespace ms
 			else
 				show_status(Color::Name::WHITE, "You have gained fame. (" + sign + std::to_string(gain) + ")");
 		}
+		else if (mode == 5)
+		{
+			// Meso gain shown in chat (Cosmic getShowMesoGain, in-chat variant):
+			// int gain, short padding.
+			int32_t gain = recv.read_int();
+			recv.read_short();
+
+			int32_t amt = (gain < 0) ? -gain : gain;
+			std::string sign = (gain < 0) ? "-" : "+";
+			show_status(Color::Name::WHITE, "You have gained mesos. (" + sign + std::to_string(amt) + ")");
+		}
 		else
 		{
+			// Surface unknown info modes so we can spot anything still unhandled.
 			show_status(Color::Name::RED, "Mode: " + std::to_string(mode) + " is not handled.");
 		}
 	}

@@ -139,6 +139,8 @@ namespace ms
 		add_sound(Sound::Name::LEVELUP, gamesrc["LevelUp"]);
 		add_sound(Sound::Name::HURTDAMAGE, gamesrc["Damage"]);
 		add_sound(Sound::Name::QUESTCOMPLETE, gamesrc["QuestClear"]);
+		add_sound(Sound::Name::QUESTALERT, gamesrc["QuestAlert"]);
+		add_sound(Sound::Name::QUESTCOUNT, gamesrc["questCount"]);
 		add_sound(Sound::Name::TOMBSTONE, gamesrc["Tombstone"]);
 
 		nl::node itemsrc = nl::nx::sound["Item.img"];

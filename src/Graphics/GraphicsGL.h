@@ -59,6 +59,17 @@ namespace ms
 		void addbitmap(const nl::bitmap& bmp);
 		// Draw the bitmap with the given parameters
 		void draw(const nl::bitmap& bmp, const Rectangle<int16_t>& rect, const Range<int16_t>& vertical, const Color& color, float angle);
+		// Draw a raw BGRA pixel buffer (custom art loaded from disk, not from NX).
+		// The id must be unique per image and stable for its lifetime; the pixel
+		// pointer must stay valid so the image can be re-uploaded after the atlas
+		// is cleared.
+		void drawraw(size_t id, int16_t width, int16_t height, const void* data, const Rectangle<int16_t>& rect, const Range<int16_t>& vertical, const Color& color, float angle);
+
+		// Additive blending for glow/light effects: draws submitted between
+		// setblend(true) and setblend(false) accumulate light (src alpha, dst
+		// ONE). Rendered as segmented draw calls at flush, so use sparingly
+		// (auras), not for bulk sprites.
+		void setblend(bool additive);
 
 		// Create a layout for the text with the parameters specified
 		Text::Layout createlayout(const std::string& text, Text::Font font, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj);
@@ -110,6 +121,10 @@ namespace ms
 
 		// Add a bitmap to the available resources
 		const Offset& getoffset(const nl::bitmap& bmp);
+		// Atlas slot for a raw pixel buffer, keyed by caller-provided id
+		const Offset& getoffset(size_t id, GLshort width, GLshort height, const void* data);
+		// Allocate atlas space and upload BGRA pixels (shared by both paths)
+		const Offset& upload(size_t id, GLshort width, GLshort height, const void* data);
 
 		struct Leftover
 		{
@@ -302,6 +317,11 @@ namespace ms
 
 		std::unordered_map<size_t, Offset> offsets;
 		Offset nulloffset;
+
+		// Quad index ranges to render additively (see setblend)
+		std::vector<std::pair<size_t, size_t>> additive_ranges;
+		bool additive_active = false;
+		size_t additive_from = 0;
 
 		QuadTree<size_t, Leftover> leftovers;
 		size_t rlid;

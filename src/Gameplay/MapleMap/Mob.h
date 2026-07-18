@@ -173,6 +173,10 @@ namespace ms
 		bool is_in_range(const Rectangle<int16_t>& range) const;
 		// Check if this mob is still alive
 		bool is_alive() const;
+		// Whether this mob is a boss (info/boss) — drives the boss HP gauge.
+		bool is_boss() const;
+		// The mob's display name.
+		const std::string& get_name() const;
 		// Return the head position
 		Point<int16_t> get_head_position() const;
 
@@ -229,6 +233,7 @@ namespace ms
 		bool canmove;
 		bool canjump;
 		bool canfly;
+		bool boss;
 
 		EffectLayer effects;
 		Text namelabel;

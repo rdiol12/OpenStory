@@ -93,8 +93,8 @@ namespace ms
 		Texture channels_background;
 		Texture worlds_background;
 		Texture channel_gauge;
-		Texture scroll_closed;
-		Texture scroll_open;
+		Animation scroll_closed;
+		Animation scroll_open;
 		std::vector<Texture> world_textures;
 
 		// Channel selection highlight

@@ -44,6 +44,10 @@ namespace ms
 		virtual void send_close() = 0;
 
 		virtual void drag_icon(Icon* icon) = 0;
+		// An icon owner is about to destroy/replace this icon: drop any drag
+		// reference to it (inventory rebuilds mid-drag left a dangling pointer
+		// that crashed on the next drop)
+		virtual void purge_icon(const Icon* icon) {}
 		virtual void clear_tooltip(Tooltip::Parent parent) = 0;
 		virtual void show_equip(Tooltip::Parent parent, int16_t slot) = 0;
 		virtual void show_item(Tooltip::Parent parent, int32_t itemid) = 0;

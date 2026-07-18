@@ -779,10 +779,11 @@ namespace ms
 		{
 			if (sid / 10000 != static_cast<int32_t>(subid))
 				return;
-			// NX flags mount/item-tied skills (Balrog, spaceship,
-			// custom riding) with invisible = 1. Suppress those even
-			// though they appear under a class's skill list.
-			if (SkillData::get(sid).is_invisible())
+			// NX flags mount/item-tied skills (Balrog, spaceship, custom
+			// riding) and many GM/utility skills with invisible = 1. Hide those
+			// only while UNLEARNED — a learned invisible skill (e.g. a GM's Hide
+			// or a granted skill) should still show, matching the vanilla client.
+			if (SkillData::get(sid).is_invisible() && skillbook.get_level(sid) == 0)
 				return;
 			if (!seen.insert(sid).second)
 				return;

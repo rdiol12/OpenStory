@@ -18,14 +18,24 @@
 #include "Combat.h"
 
 #include "../../Character/SkillId.h"
+#include "../../Data/SkillData.h"
 #include "../../IO/Messages.h"
+#include "../../IO/KeyAction.h"
+
+#include "../../MapleStory.h"
+
+#include <cstdlib>
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 #include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
 
 namespace ms
 {
-	Combat::Combat(Player& in_player, MapChars& in_chars, MapMobs& in_mobs, MapReactors& in_reactors) : player(in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors),
+	Combat::Combat(Player& in_player, MapChars& in_chars, MapMobs& in_mobs, MapReactors& in_reactors, const Physics& in_physics) : player(in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), physics(in_physics),
 		attackresults([&](const AttackResult& attack) { apply_attack(attack); }),
 		bulleteffects([&](const BulletEffect& effect) { apply_bullet_effect(effect); }),
 		damageeffects([&](const DamageEffect& effect) { apply_damage_effect(effect); }) {}
@@ -41,6 +51,9 @@ namespace ms
 
 	void Combat::update()
 	{
+		if (teleport_cooldown > 0)
+			teleport_cooldown--;
+
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
@@ -170,6 +183,9 @@ namespace ms
 			move.apply_useeffects(player);
 			move.apply_actions(player, Attack::Type::MAGIC);
 
+			// Non-attack movement skills (Teleport / Flash Jump) blink the player.
+			apply_use_movement(move);
+
 			int32_t moveid = move.get_id();
 			int32_t level = player.get_skills().get_level(moveid);
 			UseSkillPacket(moveid, level).dispatch();
@@ -227,10 +243,99 @@ namespace ms
 		case SkillId::Id::TELEPORT_FP:
 		case SkillId::Id::IL_TELEPORT:
 		case SkillId::Id::PRIEST_TELEPORT:
+		case SkillId::Id::GM_TELEPORT:
+		case SkillId::Id::SUPERGM_TELEPORT:
+			apply_teleport(move);
+			break;
 		case SkillId::Id::FLASH_JUMP:
+			// TODO: Flash Jump is a mid-air dash, not a ground-snapping blink —
+			// needs its own handling; left as a no-op for now.
 		default:
 			break;
 		}
+	}
+
+	void Combat::apply_teleport(const SpecialMove& move)
+	{
+		// Client-side rate limit (~350ms) — the base skill carries no data
+		// cooldown, so without this you could blink every frame.
+		if (teleport_cooldown > 0)
+			return;
+
+		// Distance comes from the skill's level data (hrange * 100), matching the
+		// classic ~130px blink; fall back if the data is missing.
+		constexpr int16_t DEFAULT_RANGE = 130;
+		int32_t skillid = move.get_id();
+		int32_t level = player.get_skilllevel(skillid);
+		int16_t range = static_cast<int16_t>(SkillData::get(skillid).get_stats(level).hrange * 100.0f);
+		if (range <= 0)
+			range = DEFAULT_RANGE;
+
+		Point<int16_t> cur = player.get_position();
+
+		bool up = player.is_key_down(KeyAction::Id::UP);
+		bool down = player.is_key_down(KeyAction::Id::DOWN);
+		bool left = player.is_key_down(KeyAction::Id::LEFT);
+		bool right = player.is_key_down(KeyAction::Id::RIGHT);
+
+		int16_t border = physics.get_fht().get_borders().second();
+		Point<int16_t> target = cur;
+
+		if (up || down)
+		{
+			// Vertical blink: snap onto the foothold `range` px above (or below,
+			// +3 to clear the current contact) the player, if one exists there.
+			int16_t probe_y = up
+				? static_cast<int16_t>(cur.y() - range)
+				: static_cast<int16_t>(cur.y() + 3 + range);
+
+			int16_t ground = physics.get_y_below(Point<int16_t>(cur.x(), probe_y)).y();
+
+			if (ground < border)
+				target = Point<int16_t>(cur.x(), ground);
+		}
+		else
+		{
+			// Horizontal blink: step toward the destination in 8px increments,
+			// stopping at a map wall or a >35px ground-height jump (a cliff/wall),
+			// so the player can't blink straight through terrain.
+			int16_t dir = left ? -1 : (right ? 1 : (player.is_facing_right() ? 1 : -1));
+			Range<int16_t> walls = physics.get_fht().get_walls();
+			int16_t base_ground = physics.get_y_below(Point<int16_t>(cur.x(), static_cast<int16_t>(cur.y() - 6))).y();
+
+			int16_t bx = cur.x();
+			int16_t by = base_ground;
+
+			for (int16_t step = 8; step <= range; step += 8)
+			{
+				int16_t nx = static_cast<int16_t>(cur.x() + dir * step);
+
+				if (nx <= walls.first() || nx >= walls.second())
+					break;
+
+				int16_t g = physics.get_y_below(Point<int16_t>(nx, static_cast<int16_t>(cur.y() - 6))).y();
+
+				if (g >= border || std::abs(g - base_ground) > 35)
+					break;
+
+				bx = nx;
+				by = g;
+			}
+
+			target = Point<int16_t>(bx, by);
+		}
+
+		if (target == cur)
+			return;
+
+		player.teleport(target.x(), target.y());
+
+		// The teleport skills carry no own use-effect, so play the standard
+		// BasicEff teleport puff on the player at the destination.
+		static Animation tp_effect(nl::nx::effect["BasicEff.img"]["Teleport"]);
+		player.show_attack_effect(tp_effect, 0);
+
+		teleport_cooldown = 44; // ~350ms
 	}
 
 	void Combat::apply_result_movement(const SpecialMove& move, const AttackResult& result)

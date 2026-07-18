@@ -82,7 +82,8 @@ namespace ms
 				ITEM = 0,    // #v<id># or #i<id># — Item.wz
 				QUEST = 1,   // #q<id># — UI.wz/UIWindow.img/QuestIcon
 				SKILL = 2,   // #s<id># — Skill.wz/<job>.img/skill/<id>/icon
-				FACE = 3     // #f<id># — Character.wz/Face/<id>.img
+				FACE = 3,    // #f<id># — Character.wz/Face/<id>.img
+				EMOTE = 4    // #e<id># — UI.wz/Emote.img/<id> (emote/expression icons)
 			};
 			struct Image
 			{
