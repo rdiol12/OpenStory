@@ -41,10 +41,10 @@ Some features are client-side additions not supported by a stock Cosmic server:
 | Event System | WIP | Custom `EVENT_INFO` / `REQUEST_EVENT_INFO` packets; needs a server-side handler |
 | HP/MP Warning | Working | Client-only |
 | Graphics/Effects Quality | Working | Client-only |
-| Procedural Weapons | Working | AI-friendly one-image weapons — see below |
-| AI Armor (materials + silhouettes) | Working | `aiSkin` / `aiShell` — see below |
-| AI Hats | Working | Donor-canvas repaint pipeline — see below |
-| Equip Auras | Working | Data-driven glow effects with additive blending |
+| Procedural Weapons | WIP | AI-friendly one-image weapons — see below |
+| AI Armor (materials + silhouettes) | WIP | `aiSkin` / `aiShell` — see below |
+| AI Hats | WIP | Donor-canvas repaint pipeline — see below |
+| Equip Auras | WIP | Data-driven glow effects with additive blending |
 
 ## Procedural Weapons (AI-friendly item creation)
 
