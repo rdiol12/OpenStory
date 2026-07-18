@@ -72,6 +72,10 @@ no extra data, and optional per-weapon blade **glow** effects ride the same tran
 
 Net result: one picture per weapon, no per-stance frame art, no per-weapon hand-tuning.
 
+Procedural weapons also take **materials**: an `info/aiSkin` swatch retextures the
+canonical bitmap (shaded by its own luminance) — one blade shape × any material, riding
+the same motion profiles.
+
 ### Building the WZ/NX files
 
 Author each weapon as one image with anchors, then convert WZ → NX and drop it in `wz/`:
@@ -137,18 +141,22 @@ of numbered frames for animation (billowing capes). Missing views get automatic
 stand-ins — squashed upright when airborne, rotated upright when prone — so the custom
 look never reverts mid-animation. With a material present, shell views are retextured
 too: one drawn shape × any material. `uprightBehind` draws behind the body (open coats,
-wings). Weapons can use `aiShell/held` — one image, auto-rotated per frame by measuring
-the donor weapon's blade angle from its own pixels.
+wings). Shells cover body armor and capes; weapons use the procedural system below, and
+hats use the mannequin pipeline.
 
-### Hats — donor-canvas repaint
+### Hats — the mannequin pipeline
 
-Hats use the simplest and most reliable pipeline: pick a **donor cap whose silhouette
-matches the design** (helm, pointy hat, circlet, hood…), have the AI **repaint the
-donor's bitmaps in place** (img2img over each sprite, then clamp to the donor's alpha),
-and keep every origin/map/vslot untouched. Seating, size and hair interplay are inherited
-from a hat Nexon already fitted — placement bugs are structurally impossible. Hair
-coverage is driven by the standard `vslot` codes (the client parses them properly; helms
-and masks use full-cover codes to hide hair).
+Hats get **full silhouette freedom** with placement baked into the generation. The client
+exports **mannequin templates** (`wz/Custom/HatTemplate/` — the actual in-game head+hair,
+8× scale, with a known brow pixel). The AI **paints the hat directly onto the mannequin**
+("add the hat, change nothing else"), then a diff against the template isolates the hat
+pixels, and the hat's origin is *computed* from the known brow position — never guessed.
+The result is embedded as ordinary cap data (bitmap + computed origin, `map/brow` at
+zero), so the client renders it on the vanilla path with nothing to misplace. Front and
+climbing-back views each have a mannequin. Hair coverage is driven by the standard
+`vslot` codes (the client parses cover codes properly; full-cover codes hide hair for
+helms and masks). Donor-canvas repainting (img2img over an existing cap's bitmaps,
+geometry untouched) remains a valid shortcut for donor-shaped restyles.
 
 ### Auras — `info/effect`
 

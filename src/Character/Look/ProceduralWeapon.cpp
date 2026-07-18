@@ -3,6 +3,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "ProceduralWeapon.h"
 
+#include "AiSkin.h"
+
 #include "../../Data/WeaponData.h"
 
 #include <cmath>
@@ -14,6 +16,18 @@ namespace ms
 		nl::node wnode = weaponnode["default"]["weapon"];
 
 		texture = Texture(wnode);
+
+		// One canonical shape x any material: an info/aiSkin swatch retextures
+		// the canonical bitmap (shaded by its own luminance), riding the same
+		// motion profiles — the weapon equivalent of materials-on-shells.
+		if (AiSkin::available(itemid, weaponnode["info"]))
+		{
+			std::string key = "aiweapon/" + std::to_string(itemid) + "/canonical";
+			Texture themed = AiSkin::retexture_shell(itemid, wnode, key, false);
+
+			if (themed.is_valid())
+				texture = themed;
+		}
 		grip = wnode["map"]["grip"];
 		tip = wnode["map"]["tip"];
 		dim = Point<int16_t>(texture.width(), texture.height());

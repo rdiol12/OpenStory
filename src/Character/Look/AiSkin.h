@@ -74,14 +74,6 @@ namespace ms
 		// canvas), so shell items show their real shape in the inventory
 		Texture icon_from_shell(int32_t itemid, nl::node info);
 
-		// Weapon shells: rotate the authored aiShell/held view (blade pointing
-		// UP, origin node = grip point) to match the donor weapon frame's blade
-		// angle, measured from the donor's own pixels (principal axis of its
-		// alpha, signed away from the hand anchor). Material applies when
-		// present. Returns invalid when the frame can't be measured — caller
-		// falls back to donor art.
-		Texture weapon_from_held(int32_t itemid, nl::node info, nl::node heldnode, nl::node donorpart, const std::string& key);
-
 		// The material's accent color (saturation-weighted, normalized to a
 		// bright tint) — used to tint shared aura effects to match the armor
 		// (info/effectTint=1). Returns false when the item has no material.

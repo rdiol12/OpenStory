@@ -212,50 +212,15 @@ namespace ms
 					//   body art compensates, a rigid image can't, so shells
 					//   floated in idle; the neck is rock-stable and tracks real
 					//   torso motion). View origin = collar point.
-					// - head slots (hat/earrings/eye acc): ALL parts, pinned to
-					//   the per-frame face position (the head moves rigidly, so
-					//   this is exact). View origin = brow contact point.
 					// - capes: ALL parts, neck-pinned like body armor (capes
 					//   hang from the shoulders and barely animate in v83).
-					// Gloves/shoes/sleeves stay donor art: their frames encode
-					// per-frame hand/foot poses a rigid image can't match.
-					const bool headslot_shell =
-						eqslot == EquipSlot::Id::HAT ||
-						eqslot == EquipSlot::Id::EARACC ||
-						eqslot == EquipSlot::Id::EYEACC;
+					// Hats DON'T use shells (the mannequin paint-on-head pipeline
+					// produces plain cap data); weapons use the procedural
+					// one-image system; gloves/shoes/sleeves stay donor art —
+					// their frames encode per-frame poses a rigid image can't match.
 					const bool cape_shell = eqslot == EquipSlot::Id::CAPE;
 
-					// Weapon shells: aiShell/held (blade drawn pointing UP,
-					// origin = grip). The client measures each donor frame's
-					// blade angle from its own pixels and rotates the held
-					// view to match — one image, correct through every swing.
-					// The donor's other weapon fragments are suppressed so
-					// they can't double-draw with the shell.
-					if (has_shell && eqslot == EquipSlot::Id::WEAPON &&
-						shell["held"].data_type() == nl::node::type::bitmap)
-					{
-						if (part == "weapon")
-						{
-							std::string wkey = "aiweapon/" + std::to_string(itemid) + "/" + stancename + "." + std::to_string(frame);
-							Texture wtex = AiSkin::weapon_from_held(itemid, info, shell["held"], partnode, wkey);
-
-							if (wtex.is_valid())
-							{
-								// Grip lands on the same hand anchor the donor
-								// frame used (shift + parentpos = hand position)
-								auto weapon_iter = stances[stance][z].emplace(frame, std::move(wtex));
-								weapon_iter->second.shift(shift + parentpos);
-								continue;
-							}
-							// Unmeasurable frame → donor art below
-						}
-						else
-						{
-							continue;
-						}
-					}
-
-					if (has_shell && (part == "mail" || headslot_shell || cape_shell))
+					if (has_shell && (part == "mail" || cape_shell))
 					{
 						// View families: prone, back (climbing), sit, attack
 						// (swings/stabs/shoots), else upright
@@ -267,7 +232,7 @@ namespace ms
 						const char* family = "upright";
 						nl::node view = shell["upright"];
 
-						if (!headslot_shell && (stance == Stance::Id::PRONE || stance == Stance::Id::PRONESTAB))
+						if (stance == Stance::Id::PRONE || stance == Stance::Id::PRONESTAB)
 						{
 							// No authored prone view -> upright rotated to
 							// lying (continuity over donor reversion)
@@ -288,32 +253,24 @@ namespace ms
 								view = shell["back"];
 								family = "back";
 							}
-							else if (headslot_shell)
-							{
-								// Hats: donor caps have REAL rear sprites, so
-								// fall through to the donor back art (material-
-								// retextured) — better than showing the hat's
-								// front on a back-facing head
-								view = nl::node();
-							}
 							else
 							{
-								// Body armor: upright stand-in (continuity
-								// over donor reversion)
+								// Upright stand-in (continuity over donor
+								// reversion)
 								family = "upright";
 							}
 						}
-						else if (!headslot_shell && stance == Stance::Id::SIT && shell["sit"])
+						else if (stance == Stance::Id::SIT && shell["sit"])
 						{
 							view = shell["sit"];
 							family = "sit";
 						}
-						else if (!headslot_shell && is_attack && shell["attack"])
+						else if (is_attack && shell["attack"])
 						{
 							view = shell["attack"];
 							family = "attack";
 						}
-						else if (!headslot_shell && stance == Stance::Id::JUMP)
+						else if (stance == Stance::Id::JUMP)
 						{
 							// Airborne legs tuck up — a rigid upright hem clips
 							// through them. Prefer the authored jump view; else
@@ -357,25 +314,7 @@ namespace ms
 						{
 							if (!shell_used)
 							{
-								Point<int16_t> pin = headslot_shell ?
-									drawinfo.getfacepos(stance, frame) :
-									drawinfo.get_neck_position(stance, frame);
-
-								// Hats use the AUTHORED origin (the brow
-								// contact point in the view) — the authored
-								// anchors proved mostly right; per-hat fit is
-								// nudged in data via info/aiShellSeat (px,
-								// bigger = rides higher, negative = lower).
-								if (eqslot == EquipSlot::Id::HAT &&
-									info["aiShellSeat"].data_type() == nl::node::type::integer)
-									pin.shift_y(static_cast<int16_t>(-static_cast<int64_t>(info["aiShellSeat"])));
-
-								// Head-slot shells draw on the main CAP layer —
-								// the one every vslot cover branch renders.
-								// Hair coverage under the hat is the vslot's
-								// job (CpH1H5AyAs hides hair for helms/masks).
-								if (headslot_shell)
-									z = Clothing::Layer::CAP;
+								Point<int16_t> pin = drawinfo.get_neck_position(stance, frame);
 
 								// With a material present the shell is
 								// retextured through the aiSkin engine (shaded
@@ -426,9 +365,7 @@ namespace ms
 
 								if (behindbmp.data_type() == nl::node::type::bitmap)
 								{
-									Clothing::Layer behind_z = headslot_shell ?
-										Clothing::Layer::CAP_BELOW_BODY :
-										Clothing::Layer::CAPE;
+									Clothing::Layer behind_z = Clothing::Layer::CAPE;
 
 									Texture behindtex;
 
