@@ -50,6 +50,33 @@ namespace ms
 		}
 	}
 
+	// Same idea as default_afterimage: incomplete custom clones often ship
+	// without info/sfx — fall back to the standard attack sound for the type
+	// instead of swinging silently. An explicit info/sfx still wins.
+	static std::string default_sfx(Weapon::Type type)
+	{
+		switch (type)
+		{
+		case Weapon::Type::SWORD_1H:
+		case Weapon::Type::SWORD_2H:  return "swordL";
+		case Weapon::Type::DAGGER:    return "swordS";
+		case Weapon::Type::AXE_1H:
+		case Weapon::Type::AXE_2H:
+		case Weapon::Type::MACE_1H:
+		case Weapon::Type::MACE_2H:
+		case Weapon::Type::WAND:
+		case Weapon::Type::STAFF:     return "mace";
+		case Weapon::Type::SPEAR:     return "spear";
+		case Weapon::Type::POLEARM:   return "poleArm";
+		case Weapon::Type::BOW:       return "bow";
+		case Weapon::Type::CROSSBOW:  return "cBow";
+		case Weapon::Type::CLAW:      return "tGlove";
+		case Weapon::Type::KNUCKLE:   return "knuckle";
+		case Weapon::Type::GUN:       return "gun";
+		default:                      return "swordL";
+		}
+	}
+
 	WeaponData::WeaponData(int32_t equipid) : equipdata(EquipData::get(equipid))
 	{
 		int32_t prefix = equipid / 10000;
@@ -61,7 +88,17 @@ namespace ms
 		attackspeed = static_cast<uint8_t>(src["attackSpeed"]);
 		attack = static_cast<uint8_t>(src["attack"]);
 
-		nl::node soundsrc = nl::nx::sound["Weapon.img"][src["sfx"]];
+		// Missing attackSpeed on stub clones reads as 0, which would divide by
+		// zero in get_attackdelay — use the normal(6)-ish default instead
+		if (attackspeed == 0)
+			attackspeed = 6;
+
+		std::string sfx = (std::string)src["sfx"];
+
+		if (sfx.empty())
+			sfx = default_sfx(type);
+
+		nl::node soundsrc = nl::nx::sound["Weapon.img"][sfx];
 
 		bool twosounds = soundsrc["Attack2"].data_type() == nl::node::type::audio;
 
