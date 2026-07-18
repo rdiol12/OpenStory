@@ -475,6 +475,26 @@ namespace ms
 		}
 	}
 
+	void Player::teleport(int16_t x, int16_t y)
+	{
+		set_position(x, y);
+
+		// Kill momentum/forces so the next physics step re-evaluates the landing
+		// from a standstill (prevents the pre-blink velocity carrying through),
+		// and clear the foothold id so physics re-resolves the platform we landed
+		// on rather than trusting the pre-blink one.
+		phobj.hspeed = 0.0;
+		phobj.vspeed = 0.0;
+		phobj.hforce = 0.0;
+		phobj.vforce = 0.0;
+		phobj.fhid = 0;
+	}
+
+	bool Player::is_facing_right() const
+	{
+		return facing_right;
+	}
+
 	bool Player::is_invincible() const
 	{
 		if (state == Char::State::DIED)

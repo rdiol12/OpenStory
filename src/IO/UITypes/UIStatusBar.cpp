@@ -74,6 +74,61 @@
 
 namespace ms
 {
+	// === Quickslot layout constants (used by draw() and the slot helpers) ===
+	// Panel: quickSlot bitmap is 145x93 with origin (-143, 143), so drawing at
+	// `position` places the panel top-left at (position.x + 143, position.y - 143).
+	static constexpr int16_t QS_PANEL_OFFSET_X = 143;
+	static constexpr int16_t QS_PANEL_OFFSET_Y = -143;
+	// Extra lift applied to the whole opened quickslot (panel + icons + labels).
+	// 0 = original position (the panel itself is fine where it is).
+	static constexpr int16_t QS_LIFT = 0;
+	// Upward shift for the quickslot arrow button in the OPEN state (BtClose).
+	static constexpr int16_t QS_OPEN_BTN_LIFT = 15;
+	// Vertical nudge (negative = up) for the cube icon and the key-name label.
+	static constexpr int16_t QS_ICON_NUDGE_Y  = -8;
+	static constexpr int16_t QS_LABEL_NUDGE_Y = -14;
+	// Cube grid, measured from the StatusBar2 panel: cubes start at x=8,41,74,107
+	// (step 33, ~28 wide) and y=16,49 (step 33, ~28 tall).
+	static constexpr int16_t QS_CELL_OFFSET_X = 8;
+	static constexpr int16_t QS_CELL_OFFSET_Y = 16;
+	static constexpr int16_t QS_CELL_W   = 28;
+	static constexpr int16_t QS_CELL_H   = 28;
+	static constexpr int16_t QS_COL_STEP = 33;
+	static constexpr int16_t QS_ROW_STEP = 33;
+
+	// Short display name for a maple/DIK quickslot keycode (drawn on each cube).
+	static std::string qs_keyname(uint8_t code)
+	{
+		switch (code)
+		{
+		// letters
+		case 16: return "Q"; case 17: return "W"; case 18: return "E"; case 19: return "R";
+		case 20: return "T"; case 21: return "Y"; case 22: return "U"; case 23: return "I";
+		case 24: return "O"; case 25: return "P";
+		case 30: return "A"; case 31: return "S"; case 32: return "D"; case 33: return "F";
+		case 34: return "G"; case 35: return "H"; case 36: return "J"; case 37: return "K";
+		case 38: return "L";
+		case 44: return "Z"; case 45: return "X"; case 46: return "C"; case 47: return "V";
+		case 48: return "B"; case 49: return "N"; case 50: return "M";
+		// number row
+		case 2: return "1"; case 3: return "2"; case 4: return "3"; case 5: return "4";
+		case 6: return "5"; case 7: return "6"; case 8: return "7"; case 9: return "8";
+		case 10: return "9"; case 11: return "0";
+		// function keys
+		case 59: return "F1"; case 60: return "F2"; case 61: return "F3"; case 62: return "F4";
+		case 63: return "F5"; case 64: return "F6"; case 65: return "F7"; case 66: return "F8";
+		case 67: return "F9"; case 68: return "F10"; case 87: return "F11"; case 88: return "F12";
+		// modifiers / navigation (the default quickslot set)
+		case 42: case 54: return "Sh";
+		case 29: case 157: return "Ct";
+		case 56: return "Al";
+		case 82: return "Ins"; case 71: return "Hm"; case 73: return "PU";
+		case 83: return "Del"; case 79: return "End"; case 81: return "PD";
+		case 57: return "Sp"; case 15: return "Tab"; case 14: return "BS";
+		default: return std::to_string(static_cast<int>(code));
+		}
+	}
+
 	UIStatusBar::UIStatusBar(const CharStats& st) : stats(st)
 	{
 		int16_t VWIDTH = Constants::Constants::get().get_viewwidth();
@@ -184,6 +239,8 @@ namespace ms
 		// === Labels ===
 		joblabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW);
 		namelabel = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE);
+		// Bold white key label drawn in each quickslot cube's corner.
+		qs_key_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE);
 
 		// === Gauge animations ===
 		ani_hp_gauge = Animation(mainbar["aniHPGauge"]);
@@ -307,7 +364,8 @@ namespace ms
 
 		buttons[BT_QS_OPEN]  = std::make_unique<MapleButton>(qs["BtOpen"]);
 		buttons[BT_QS_OPEN]->set_active(true);
-		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"]);
+		// Open state: nudge the "close quickslot" arrow up from its sprite spot.
+		buttons[BT_QS_CLOSE] = std::make_unique<MapleButton>(qs["BtClose"], Point<int16_t>(0, -QS_OPEN_BTN_LIFT));
 		buttons[BT_QS_CLOSE]->set_active(false);
 
 		// === Menu sub-panel ===
@@ -417,9 +475,33 @@ namespace ms
 		}
 	}
 
+	void UIStatusBar::update_boss_hp(const std::string& name, int8_t percent)
+	{
+		// 0% (or below) means the boss died / the tag cleared — hide the gauge.
+		if (percent <= 0)
+		{
+			boss_hp_ticks = 0;
+			boss_gage.clear();
+			return;
+		}
+
+		boss_gage.set_mob(0, name, 0);
+		boss_hp_percent = std::clamp(static_cast<float>(percent) / 100.0f, 0.0f, 1.0f);
+		boss_hp_ticks = 250; // ~4s of fixed-step updates; refreshed on every report
+	}
+
 	void UIStatusBar::draw(float alpha) const
 	{
 		int16_t vwidth = Constants::Constants::get().get_viewwidth();
+
+		// Boss HP gauge, centred near the top of the screen while a boss is
+		// reporting its HP (auto-hides via boss_hp_ticks in update()).
+		if (boss_hp_ticks > 0 && boss_gage.is_active())
+		{
+			Point<int16_t> boss_pos(
+				static_cast<int16_t>((vwidth - boss_gage.width()) / 2), 18);
+			boss_gage.draw(boss_pos, boss_hp_percent);
+		}
 
 		// Quickslot panel — drawn FIRST so the status bar renders on
 		// top of it. The panel sits above the main bar on screen, but
@@ -433,33 +515,55 @@ namespace ms
 				// The StatusBar2 fallback self-positions from `position`.
 				// Drawing at `position` was hiding the base panel behind the
 				// status bar — only the slot icons showed.
-				Point<int16_t> bgpos = quickslot_bg_v83 ? quickslot_panel_pos() : position;
+				// v83 panel draws at the (already lifted) panel pos; the StatusBar2
+				// fallback self-positions from `position` via its origin, so lift it
+				// the same amount here to keep it aligned with the slot cells.
+				Point<int16_t> bgpos = quickslot_bg_v83
+					? quickslot_panel_pos()
+					: position + Point<int16_t>(0, -QS_LIFT);
 				quickslot_bg.draw(DrawArgument(bgpos));
 			}
 
 			const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
 			const auto& quickslot_keys = UI::get().get_keyboard().get_quickslot_keys();
-			int16_t cell_w = 30;
-			int16_t cell_h = 30;
+			constexpr int16_t CELL = 28; // visible cube size (see QS_CELL_W)
 			for (int16_t i = 0; i < static_cast<int16_t>(quickslot_keys.size()); ++i)
 			{
 				int32_t keycode = quickslot_keys[i];
+				Point<int16_t> tl = quickslot_slot_pos(i);
+
 				auto it = maplekeys.find(keycode);
-				if (it == maplekeys.end())
-					continue;
+				bool bound = it != maplekeys.end()
+					&& it->second.type != KeyType::Id::NONE && it->second.action != 0;
 
-				const Keyboard::Mapping& m = it->second;
-				if (m.type == KeyType::Id::NONE || m.action == 0)
-					continue;
-
-				Texture icon = get_quickslot_icon(m.type, m.action);
-				if (icon.is_valid())
+				if (bound)
 				{
-					Point<int16_t> tl = quickslot_slot_pos(i);
-					Point<int16_t> center = tl + Point<int16_t>((cell_w - 32) / 2,
-					                                             (cell_h - 32) / 2);
-					icon.draw(DrawArgument(center));
+					Texture icon = get_quickslot_icon(it->second.type, it->second.action);
+					if (icon.is_valid())
+					{
+						// Fit the (32px) icon into the ~28px cube and centre it — its
+						// origin is already normalised to top-left by get_quickslot_icon.
+						Point<int16_t> dims = icon.get_dimensions();
+						float scale = 1.0f;
+						int16_t maxdim = std::max(dims.x(), dims.y());
+						if (maxdim > CELL)
+							scale = static_cast<float>(CELL) / static_cast<float>(maxdim);
+
+						int16_t dw = static_cast<int16_t>(dims.x() * scale);
+						int16_t dh = static_cast<int16_t>(dims.y() * scale);
+						Point<int16_t> pos(
+							static_cast<int16_t>(tl.x() + (CELL - dw) / 2),
+							static_cast<int16_t>(tl.y() + (CELL - dh) / 2 + QS_ICON_NUDGE_Y));
+						icon.draw(DrawArgument(pos, scale, scale, 1.0f));
+					}
 				}
+
+				// Key label for EVERY cube (even empty ones), so the player always
+				// knows which key fires each slot. Drawn from the real binding, so it
+				// stays correct after rebinding and on the blank panel. Bottom-left
+				// corner keeps it clear of the centred icon.
+				qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
+				qs_key_label.draw(tl + Point<int16_t>(1, CELL - 13 + QS_LABEL_NUDGE_Y));
 			}
 		}
 
@@ -574,8 +678,8 @@ namespace ms
 
 		// Draw stat numbers
 		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
-		int16_t hp = stats.get_stat(MapleStat::Id::HP);
-		int16_t mp = stats.get_stat(MapleStat::Id::MP);
+		int32_t hp = stats.get_stat(MapleStat::Id::HP); // uint16_t -> int32; avoid int16 overflow > 32767
+		int32_t mp = stats.get_stat(MapleStat::Id::MP);
 		int32_t maxhp = stats.get_total(EquipStat::Id::HP);
 		int32_t maxmp = stats.get_total(EquipStat::Id::MP);
 		int64_t exp = stats.get_exp();
@@ -733,6 +837,13 @@ namespace ms
 		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH), 84);
 
 		UIElement::update();
+
+		// Age out the boss HP gauge if the boss stopped reporting (dead / left).
+		if (boss_hp_ticks > 0)
+		{
+			if (--boss_hp_ticks <= 0)
+				boss_gage.clear();
+		}
 
 		// Age notification entries; auto-decline anything older than
 		// NotificationCenter::TTL_TICKS (~2 minutes). When the queue
@@ -1141,18 +1252,24 @@ namespace ms
 
 	float UIStatusBar::gethppercent() const
 	{
-		int16_t hp = stats.get_stat(MapleStat::Id::HP);
+		// get_stat returns uint16_t; store in int32_t so HP > 32767 doesn't
+		// overflow to a negative int16_t (which made the bar go invisible).
+		int32_t hp = stats.get_stat(MapleStat::Id::HP);
 		int32_t maxhp = stats.get_total(EquipStat::Id::HP);
 
-		return static_cast<float>(hp) / maxhp;
+		if (maxhp <= 0)
+			return 0.0f;
+		return std::clamp(static_cast<float>(hp) / static_cast<float>(maxhp), 0.0f, 1.0f);
 	}
 
 	float UIStatusBar::getmppercent() const
 	{
-		int16_t mp = stats.get_stat(MapleStat::Id::MP);
+		int32_t mp = stats.get_stat(MapleStat::Id::MP);
 		int32_t maxmp = stats.get_total(EquipStat::Id::MP);
 
-		return static_cast<float>(mp) / maxmp;
+		if (maxmp <= 0)
+			return 0.0f;
+		return std::clamp(static_cast<float>(mp) / static_cast<float>(maxmp), 0.0f, 1.0f);
 	}
 
 	void UIStatusBar::notify()
@@ -1183,24 +1300,9 @@ namespace ms
 
 	// === Quickslot drop / render ===
 
-	// Layout constants for the v83 quickslot panel.
-	// Per NX dump: quickSlot bitmap is 145x93 with origin (-143, 143),
-	// so drawing at `position=(512, VHEIGHT)` places the panel top-left at
-	// `(position.x + 143, position.y - 143)`.
-	static constexpr int16_t QS_PANEL_OFFSET_X = 143;
-	static constexpr int16_t QS_PANEL_OFFSET_Y = -143;
-	// First slot top-left offset inside the panel, step between slots.
-	// Tweak these to align with the visible cube squares.
-	static constexpr int16_t QS_CELL_OFFSET_X = 8;
-	static constexpr int16_t QS_CELL_OFFSET_Y = 15;
-	static constexpr int16_t QS_CELL_W   = 30;
-	static constexpr int16_t QS_CELL_H   = 30;
-	static constexpr int16_t QS_COL_STEP = 34;
-	static constexpr int16_t QS_ROW_STEP = 34;
-
 	Point<int16_t> UIStatusBar::quickslot_panel_pos() const
 	{
-		return position + Point<int16_t>(QS_PANEL_OFFSET_X, QS_PANEL_OFFSET_Y);
+		return position + Point<int16_t>(QS_PANEL_OFFSET_X, QS_PANEL_OFFSET_Y - QS_LIFT);
 	}
 
 	Point<int16_t> UIStatusBar::quickslot_slot_pos(int16_t slot) const

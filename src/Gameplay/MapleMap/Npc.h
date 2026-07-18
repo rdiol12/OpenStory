@@ -22,6 +22,7 @@
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Util/Randomizer.h"
+#include "../../IO/Components/ChatBalloon.h"
 
 namespace ms
 {
@@ -92,6 +93,14 @@ namespace ms
 		Randomizer random;
 		Text namelabel;
 		Text funclabel;
+
+		// Ambient speech: cycles the NPC's resolved info/speak lines in a balloon
+		// above its head. Empty for NPCs without info/speak (they stay silent).
+		ChatBalloon speech_balloon;
+		std::vector<std::string> speak_lines;
+		size_t speak_index = 0;
+		int32_t speak_timer = 0;
+		bool speak_showing = false;
 
 		// Quest mark above NPC
 		QuestMarkType quest_mark_type;

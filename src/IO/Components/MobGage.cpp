@@ -72,4 +72,9 @@ namespace ms
 		active = false;
 		current_mob = 0;
 	}
+
+	int16_t MobGage::width() const
+	{
+		return backgrnd.width();
+	}
 }

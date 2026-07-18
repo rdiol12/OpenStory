@@ -150,6 +150,10 @@ namespace ms
 			// Priest
 			PRIEST_TELEPORT = 2301001,
 
+			// GM / Super GM teleport (admin job 900 / 910)
+			GM_TELEPORT = 9001002,
+			SUPERGM_TELEPORT = 9101002,
+
 			// Hermit
 			AVENGER = 4111005,
 			FLASH_JUMP = 4111006,

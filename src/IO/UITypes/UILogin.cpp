@@ -67,6 +67,8 @@ namespace ms
 		sprites.emplace_back(back["11"], UIScale::bg_args());
 		sprites.emplace_back(logo, Point<int16_t>(409, 144));
 		sprites.emplace_back(signboard, signboard_pos);
+		// The light rays are 6 SEPARATE animated elements (effect/0..5, each its
+		// own animation), layered at the same spot to build the full sunbeam.
 		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50));
 		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50));
 		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50));
@@ -286,6 +288,18 @@ namespace ms
 		{
 			case Buttons::BT_LOGIN:
 			{
+				login();
+
+				return Button::State::NORMAL;
+			}
+			case Buttons::BT_GUEST_LOGIN:
+			{
+				// No dedicated guest protocol on this server, so log in with a
+				// fixed guest account. Create a "guest" account on Cosmic (pw
+				// "guest") for this to succeed; otherwise the server replies
+				// "not registered".
+				account.change_text("guest");
+				password.change_text("guest");
 				login();
 
 				return Button::State::NORMAL;

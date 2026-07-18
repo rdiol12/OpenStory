@@ -19,6 +19,10 @@
 
 #include "DrawArgument.h"
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #ifdef USE_NX
 #include <nlnx/bitmap.hpp>
 #endif
@@ -32,6 +36,14 @@ namespace ms
 		Texture() {};
 		Texture(nl::node source);
 		~Texture() {};
+
+		// Load a PNG from disk (AI-generated / custom art). Returns an invalid
+		// Texture if the file is missing or unreadable. Pixels are cached by path
+		// so the same file always maps to one atlas entry.
+		static Texture from_file(const std::string& path, Point<int16_t> origin);
+		// Wrap a raw BGRA buffer (synthesized art). The key identifies the image:
+		// the first call for a key stores the pixels, later calls reuse them.
+		static Texture from_pixels(const std::string& key, int16_t width, int16_t height, std::vector<uint8_t> bgra, Point<int16_t> origin);
 
 		void draw(const DrawArgument& args) const;
 		void draw(const DrawArgument& args, const Range<int16_t>& vertical) const;
@@ -47,5 +59,10 @@ namespace ms
 		nl::bitmap bitmap;
 		Point<int16_t> origin;
 		Point<int16_t> dimensions;
+
+		// Raw-pixel path for custom art: id keys the atlas slot, the shared BGRA
+		// buffer stays alive so the atlas can re-upload after a clear.
+		size_t rawid = 0;
+		std::shared_ptr<std::vector<uint8_t>> rawpixels;
 	};
 }

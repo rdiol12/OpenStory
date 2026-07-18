@@ -19,12 +19,71 @@
 
 #include "GraphicsGL.h"
 
+#include <unordered_map>
+
+#include <stb_image.h>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
+	namespace
+	{
+		struct RawImage
+		{
+			size_t id = 0;
+			int16_t width = 0;
+			int16_t height = 0;
+			std::shared_ptr<std::vector<uint8_t>> pixels;
+		};
+
+		// Synthetic ids from a high range so they never collide with NX bitmap ids
+		size_t next_raw_id = size_t(1) << 48;
+
+		// Path → loaded image. Keeps atlas ids stable across reloads and keeps the
+		// pixel buffers alive for atlas re-uploads. Only successful loads are
+		// cached, so a file dropped in later is picked up on the next load attempt.
+		std::unordered_map<std::string, RawImage>& raw_registry()
+		{
+			static std::unordered_map<std::string, RawImage> registry;
+
+			return registry;
+		}
+
+		const RawImage* load_raw(const std::string& path)
+		{
+			auto& registry = raw_registry();
+			auto iter = registry.find(path);
+
+			if (iter != registry.end())
+				return &iter->second;
+
+			int width = 0;
+			int height = 0;
+			int channels = 0;
+			stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+
+			if (!data)
+				return nullptr;
+
+			// stb gives RGBA, the atlas uploads BGRA — swap R and B
+			auto pixels = std::make_shared<std::vector<uint8_t>>(data, data + width * height * 4);
+			stbi_image_free(data);
+
+			for (size_t i = 0; i < pixels->size(); i += 4)
+				std::swap((*pixels)[i], (*pixels)[i + 2]);
+
+			RawImage image;
+			image.id = next_raw_id++;
+			image.width = static_cast<int16_t>(width);
+			image.height = static_cast<int16_t>(height);
+			image.pixels = std::move(pixels);
+
+			return &registry.emplace(path, std::move(image)).first->second;
+		}
+	}
 	Texture::Texture(nl::node src)
 	{
 		if (src.data_type() == nl::node::type::bitmap)
@@ -67,8 +126,68 @@ namespace ms
 		draw(args, Range<int16_t>(0, 0));
 	}
 
+	Texture Texture::from_file(const std::string& path, Point<int16_t> origin)
+	{
+		Texture texture;
+
+		if (const RawImage* image = load_raw(path))
+		{
+			texture.rawid = image->id;
+			texture.rawpixels = image->pixels;
+			texture.dimensions = Point<int16_t>(image->width, image->height);
+			texture.origin = origin;
+		}
+
+		return texture;
+	}
+
+	Texture Texture::from_pixels(const std::string& key, int16_t width, int16_t height, std::vector<uint8_t> bgra, Point<int16_t> origin)
+	{
+		Texture texture;
+
+		if (width <= 0 || height <= 0 || bgra.size() != size_t(width) * height * 4)
+			return texture;
+
+		auto& registry = raw_registry();
+		auto iter = registry.find(key);
+
+		if (iter == registry.end())
+		{
+			RawImage image;
+			image.id = next_raw_id++;
+			image.width = width;
+			image.height = height;
+			image.pixels = std::make_shared<std::vector<uint8_t>>(std::move(bgra));
+
+			iter = registry.emplace(key, std::move(image)).first;
+		}
+
+		texture.rawid = iter->second.id;
+		texture.rawpixels = iter->second.pixels;
+		texture.dimensions = Point<int16_t>(iter->second.width, iter->second.height);
+		texture.origin = origin;
+
+		return texture;
+	}
+
 	void Texture::draw(const DrawArgument& args, const Range<int16_t>& vertical) const
 	{
+		if (rawid > 0)
+		{
+			GraphicsGL::get().drawraw(
+				rawid,
+				dimensions.x(),
+				dimensions.y(),
+				rawpixels->data(),
+				args.get_rectangle(origin, dimensions),
+				vertical,
+				args.get_color(),
+				args.get_angle()
+			);
+
+			return;
+		}
+
 		if (!is_valid())
 			return;
 
@@ -88,7 +207,7 @@ namespace ms
 
 	bool Texture::is_valid() const
 	{
-		return bitmap.id() > 0;
+		return bitmap.id() > 0 || rawid > 0;
 	}
 
 	int16_t Texture::width() const

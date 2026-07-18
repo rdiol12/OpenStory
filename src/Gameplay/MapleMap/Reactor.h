@@ -57,7 +57,10 @@ namespace ms
 		std::map<int8_t, Animation> animations;
 		bool animation_ended;
 
-		bool active;
+		// NOTE: `active` lives in MapObject (initialised true, cleared on
+		// deactivate()). Re-declaring it here shadowed the base with an
+		// uninitialised copy, so is_in_range() read garbage and reactors were
+		// randomly un-hittable.
 		bool hittable;
 		bool dead;
 

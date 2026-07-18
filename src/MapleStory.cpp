@@ -25,6 +25,7 @@
 #include "IO/Window.h"
 #include "Net/Session.h"
 #include "Util/CrashLog.h"
+#include "Util/CustomEquipExport.h"
 #include "Util/HardwareInfo.h"
 #include "Util/ScreenResolution.h"
 
@@ -52,6 +53,9 @@ namespace ms
 		if (Error error = WzFiles::init())
 			return error;
 #endif
+
+		// AI-equip pipeline: dump img2img templates if Custom/export.txt asks
+		CustomEquipExport::run();
 
 		std::cout << "[Init] Creating window..." << std::endl;
 

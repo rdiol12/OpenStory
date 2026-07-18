@@ -17,8 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharEquips.h"
 
+#include "../../Data/EquipData.h"
+
 #include <nlnx/nx.hpp>
-#include <fstream> // TEMP diag
 
 namespace ms
 {
@@ -30,10 +31,16 @@ namespace ms
 
 	void CharEquips::draw(EquipSlot::Id slot, Stance::Id stance, Clothing::Layer layer, uint8_t frame, const DrawArgument& args) const
 	{
-		// Procedural weapons render themselves (grip-on-hand + motion profile).
+		// Procedural weapons/hats render themselves (anchored + posed).
 		if (slot == EquipSlot::Id::WEAPON && procweapon.is_valid())
 		{
 			procweapon.draw(stance, layer, frame, args);
+			return;
+		}
+
+		if (slot == EquipSlot::Id::HAT && prochat.is_valid())
+		{
+			prochat.draw(stance, layer, frame, args);
 			return;
 		}
 
@@ -44,6 +51,7 @@ namespace ms
 	void CharEquips::update()
 	{
 		procweapon.update();
+		prochat.update();
 	}
 
 	void CharEquips::add_equip(int32_t itemid, const BodyDrawInfo& drawinfo)
@@ -79,6 +87,21 @@ namespace ms
 			else
 				procweapon = ProceduralWeapon(); // authored — clear any prior procedural
 		}
+		else if (slot == EquipSlot::Id::HAT)
+		{
+			nl::node src = nl::nx::character["Cap"]["0" + std::to_string(itemid) + ".img"];
+
+			if (src["stand1"].size() == 0 &&
+				src["default"]["cap"].data_type() == nl::node::type::bitmap)
+				prochat = ProceduralHat(src, drawinfo);
+			else
+				prochat = ProceduralHat(); // authored — clear any prior procedural
+
+			// Head hiding (info/replaceHead) is retired — no hat ever hides the
+			// head/hair/face. Hair coverage stays data-driven via vslot
+			// (CpH1H5 = half cover, CpH1H5AyAs = full cover hides the hair),
+			// which is how helms/masks avoid hair poking through them.
+		}
 	}
 
 	void CharEquips::remove_equip(EquipSlot::Id slot)
@@ -87,6 +110,10 @@ namespace ms
 
 		if (slot == EquipSlot::Id::WEAPON)
 			procweapon = ProceduralWeapon();
+		else if (slot == EquipSlot::Id::HAT)
+		{
+			prochat = ProceduralHat();
+		}
 	}
 
 	bool CharEquips::is_visible(EquipSlot::Id slot) const
@@ -127,20 +154,32 @@ namespace ms
 	{
 		if (const Clothing* cap = clothes[EquipSlot::Id::HAT])
 		{
+			// Parse the vslot cover codes instead of matching exact strings —
+			// unknown combinations (e.g. "CpH1H2H3H5HfHsAfAyAsAeHbH4H6" on AI
+			// helms) previously fell to NONE, whose draw branch renders no hat
+			// at all. A/face codes = full cover (hair hidden), H1 = half cover,
+			// H5 alone = headband; any equipped hat must always draw.
 			const std::string& vslot = cap->get_vslot();
-			if (vslot == "CpH1H5")
-				return CharEquips::CapType::HALFCOVER;
-			else if (vslot == "CpH1H5AyAs")
+
+			if (vslot.find("As") != std::string::npos || vslot.find("Ay") != std::string::npos)
 				return CharEquips::CapType::FULLCOVER;
-			else if (vslot == "CpH5")
+			if (vslot.find("H1") != std::string::npos)
+				return CharEquips::CapType::HALFCOVER;
+			if (vslot.find("H5") != std::string::npos)
 				return CharEquips::CapType::HEADBAND;
-			else
-				return CharEquips::CapType::NONE;
+
+			return CharEquips::CapType::HALFCOVER;
 		}
 		else
 		{
 			return CharEquips::CapType::NONE;
 		}
+	}
+
+	bool CharEquips::covers_whole_head() const
+	{
+		// Head hiding retired: no hat suppresses the head/hair/face anymore
+		return false;
 	}
 
 	Stance::Id CharEquips::adjust_stance(Stance::Id stance) const

@@ -67,6 +67,8 @@ namespace ms
 			LEVELUP,
 			HURTDAMAGE,
 			QUESTCOMPLETE,
+			QUESTALERT,     // quest became ready to turn in
+			QUESTCOUNT,     // quest progress counter ticked (kill/collect)
 			TOMBSTONE,
 			LENGTH
 		};

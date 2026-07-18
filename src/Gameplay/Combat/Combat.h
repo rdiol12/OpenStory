@@ -22,6 +22,7 @@
 #include "../MapleMap/MapChars.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapReactors.h"
+#include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
 #include "../../Template/TimedQueue.h"
@@ -31,7 +32,7 @@ namespace ms
 	class Combat
 	{
 	public:
-		Combat(Player& player, MapChars& chars, MapMobs& mobs, MapReactors& reactors);
+		Combat(Player& player, MapChars& chars, MapMobs& mobs, MapReactors& reactors, const Physics& physics);
 
 		// Draw bullets, damage numbers etc.
 		void draw(double viewx, double viewy, float alpha) const;
@@ -75,6 +76,9 @@ namespace ms
 		void apply_use_movement(const SpecialMove& move);
 		void apply_result_movement(const SpecialMove& move, const AttackResult& result);
 		void apply_rush(const AttackResult& result);
+		// Blink the player a fixed distance in the held-direction (Magician
+		// Teleport / Flash Jump), snapping onto the foothold at the destination.
+		void apply_teleport(const SpecialMove& move);
 		void apply_bullet_effect(const BulletEffect& effect);
 		void apply_damage_effect(const DamageEffect& effect);
 		void extract_effects(const Char& user, const SpecialMove& move, const AttackResult& result);
@@ -85,6 +89,7 @@ namespace ms
 		MapChars& chars;
 		MapMobs& mobs;
 		MapReactors& reactors;
+		const Physics& physics;
 
 		std::unordered_map<int32_t, Skill> skills;
 		RegularAttack regularattack;
@@ -95,5 +100,9 @@ namespace ms
 
 		std::list<BulletEffect> bullets;
 		std::list<DamageNumber> damagenumbers;
+
+		// Client-side rate limit on Teleport (ticks). The base skill has no data
+		// cooldown, so without this the player could blink every frame.
+		int16_t teleport_cooldown = 0;
 	};
 }

@@ -73,26 +73,42 @@ namespace ms
 			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::TOP, interframe, args);
 			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::MAIL, interframe, args);
 			equips.draw(EquipSlot::Id::CAPE, interstance, Clothing::Layer::CAPE, interframe, args);
+			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::CAPE, interframe, args);
 			hair->draw(interstance, Hair::Layer::OVERCAPE, interframe, args);
-			body->draw(interstance, Body::Layer::HEAD, interframe, args);
-			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
 
-			switch (equips.getcaptype())
+			// A full-head helmet replaces the head on a rope/ladder too — without
+			// this gate the back of the head reappears while climbing.
+			bool climbwholehead = equips.covers_whole_head();
+
+			if (!climbwholehead)
 			{
-				case CharEquips::CapType::NONE:
-					hair->draw(interstance, Hair::Layer::BACK, interframe, args);
-					break;
-				case CharEquips::CapType::HEADBAND:
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					hair->draw(interstance, Hair::Layer::BACK, interframe, args);
-					break;
-				case CharEquips::CapType::HALFCOVER:
-					hair->draw(interstance, Hair::Layer::BELOWCAP, interframe, args);
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					break;
-				case CharEquips::CapType::FULLCOVER:
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					break;
+				body->draw(interstance, Body::Layer::HEAD, interframe, args);
+				equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
+			}
+
+			if (climbwholehead)
+			{
+				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+			}
+			else
+			{
+				switch (equips.getcaptype())
+				{
+					case CharEquips::CapType::NONE:
+						hair->draw(interstance, Hair::Layer::BACK, interframe, args);
+						break;
+					case CharEquips::CapType::HEADBAND:
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						hair->draw(interstance, Hair::Layer::BACK, interframe, args);
+						break;
+					case CharEquips::CapType::HALFCOVER:
+						hair->draw(interstance, Hair::Layer::BELOWCAP, interframe, args);
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						break;
+					case CharEquips::CapType::FULLCOVER:
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						break;
+				}
 			}
 
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::BACKSHIELD, interframe, args);
@@ -102,6 +118,9 @@ namespace ms
 		{
 			hair->draw(interstance, Hair::Layer::BELOWBODY, interframe, args);
 			equips.draw(EquipSlot::Id::CAPE, interstance, Clothing::Layer::CAPE, interframe, args);
+			// aiShell "<family>Behind" pieces of body armor land on the CAPE
+			// layer so they draw behind the body (open coats, wings)
+			equips.draw(EquipSlot::Id::TOP, interstance, Clothing::Layer::CAPE, interframe, args);
 			hair->draw(interstance, Hair::Layer::OVERCAPE, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_BELOW_BODY, interframe, args);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::WEAPON_BELOW_BODY, interframe, args);
@@ -124,33 +143,49 @@ namespace ms
 
 			body->draw(interstance, Body::Layer::ARM_BELOW_HEAD_OVER_MAIL, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_OVER_HAIR, interframe, args);
-			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
-			body->draw(interstance, Body::Layer::HEAD, interframe, args);
-			hair->draw(interstance, Hair::Layer::SHADE, interframe, args);
-			hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
-			face->draw(interexpression, interexpframe, faceargs);
-			equips.draw(EquipSlot::Id::FACE, interstance, Clothing::Layer::FACEACC, 0, faceargs);
-			equips.draw(EquipSlot::Id::EYEACC, interstance, Clothing::Layer::EYEACC, interframe, args);
+			// A full-head helmet (info/replaceHead) suppresses the head, hair, face
+			// and ear/eye/face accessories entirely and draws ONLY the hat. Removing
+			// it clears the flag and the head draws again next frame.
+			bool wholehead = equips.covers_whole_head();
+
+			if (!wholehead)
+			{
+				equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
+				body->draw(interstance, Body::Layer::HEAD, interframe, args);
+				hair->draw(interstance, Hair::Layer::SHADE, interframe, args);
+				hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
+				face->draw(interexpression, interexpframe, faceargs);
+				equips.draw(EquipSlot::Id::FACE, interstance, Clothing::Layer::FACEACC, 0, faceargs);
+				equips.draw(EquipSlot::Id::EYEACC, interstance, Clothing::Layer::EYEACC, interframe, args);
+			}
+
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD, interframe, args);
 
-			switch (equips.getcaptype())
+			if (wholehead)
 			{
-				case CharEquips::CapType::NONE:
-					hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
-					break;
-				case CharEquips::CapType::HEADBAND:
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
-					hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP_OVER_HAIR, interframe, args);
-					break;
-				case CharEquips::CapType::HALFCOVER:
-					hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					break;
-				case CharEquips::CapType::FULLCOVER:
-					equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-					break;
+				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+			}
+			else
+			{
+				switch (equips.getcaptype())
+				{
+					case CharEquips::CapType::NONE:
+						hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
+						break;
+					case CharEquips::CapType::HEADBAND:
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
+						hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP_OVER_HAIR, interframe, args);
+						break;
+					case CharEquips::CapType::HALFCOVER:
+						hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						break;
+					case CharEquips::CapType::FULLCOVER:
+						equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
+						break;
+				}
 			}
 
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::WEAPON_BELOW_ARM, interframe, args);
@@ -687,6 +722,11 @@ namespace ms
 	void CharLook::init()
 	{
 		drawinfo.init();
+	}
+
+	const BodyDrawInfo& CharLook::get_drawinfo()
+	{
+		return drawinfo;
 	}
 
 	BodyDrawInfo CharLook::drawinfo;

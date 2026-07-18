@@ -18,6 +18,9 @@
 #include "MapMobs.h"
 #include "Mob.h"
 
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIStatusBar.h"
+
 #include <algorithm>
 #include <map>
 
@@ -106,7 +109,14 @@ namespace ms
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
+		{
 			mob->show_hp(percent, playerlevel);
+
+			// Boss mobs additionally drive the on-screen boss HP gauge.
+			if (mob->is_boss())
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->update_boss_hp(mob->get_name(), percent);
+		}
 	}
 
 	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement>&& movements)

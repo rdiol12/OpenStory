@@ -75,6 +75,14 @@ namespace ms
 		// Execute a rush movement
 		void rush(double targetx);
 
+		// Blink to an absolute map position (Teleport / Flash Jump). Clears
+		// momentum so physics re-settles the landing on the next update.
+		void teleport(int16_t x, int16_t y);
+
+		// Whether the character currently faces right (used to pick a default
+		// teleport direction when no arrow key is held).
+		bool is_facing_right() const;
+
 		// Check whether the player is invincible
 		bool is_invincible() const override;
 		// Check whether the player is hidden (GM dark sight)

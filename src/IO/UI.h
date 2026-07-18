@@ -65,6 +65,8 @@ namespace ms
 		void focus_textfield(Textfield* textfield);
 		void remove_textfield();
 		void drag_icon(Icon* icon);
+		// Forget a dragged-icon reference before its owner destroys it
+		void purge_icon(const Icon* icon);
 
 		void add_keymapping(uint8_t no, uint8_t type, int32_t action);
 

@@ -159,4 +159,27 @@ namespace ms
 		if (active)
 			front.draw(args, alpha);
 	}
+
+	void CharacterAura::draw_below(const DrawArgument& args, float alpha) const
+	{
+		if (!active)
+			return;
+
+		// A split effect draws its 0-layer behind and its 1-layer in front (see
+		// draw_above). A flat effect (a ring/glow authored without a 0/1 split)
+		// belongs ENTIRELY behind the character so it frames the body instead of
+		// covering it — draw the whole thing here.
+		if (has_back)
+			back.draw(args, alpha);
+		else
+			front.draw(args, alpha);
+	}
+
+	void CharacterAura::draw_above(const DrawArgument& args, float alpha) const
+	{
+		// Only an explicit split effect has a front layer to lay over the body; a
+		// flat effect already drew fully behind in draw_below.
+		if (active && has_back)
+			front.draw(args, alpha);
+	}
 }

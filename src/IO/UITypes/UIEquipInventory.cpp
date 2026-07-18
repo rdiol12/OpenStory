@@ -190,6 +190,12 @@ namespace ms
 
 	void UIEquipInventory::update_slot(EquipSlot::Id slot)
 	{
+		// Forget a dangling drag reference before replacing/destroying the
+		// icon (also lets the empty-slot branch actually free it — release()
+		// leaked the icon to dodge exactly this dangling problem)
+		if (icons[slot])
+			UI::get().purge_icon(icons[slot].get());
+
 		if (int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, slot))
 		{
 			const Texture& texture = ItemData::get(item_id).get_icon(false);
@@ -202,7 +208,7 @@ namespace ms
 		}
 		else if (icons[slot])
 		{
-			icons[slot].release();
+			icons[slot].reset();
 		}
 
 		clear_tooltip();
@@ -210,6 +216,10 @@ namespace ms
 
 	void UIEquipInventory::load_icons()
 	{
+		for (auto iter : EquipSlot::values)
+			if (icons[iter])
+				UI::get().purge_icon(icons[iter].get());
+
 		icons.clear();
 
 		for (auto iter : EquipSlot::values)

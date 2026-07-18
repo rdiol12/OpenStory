@@ -31,6 +31,7 @@
 
 #include <cctype>
 #include <cmath>
+#include <algorithm>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -93,12 +94,19 @@ namespace ms
 
 		onmoved = [&](bool upwards)
 		{
-			int16_t shift = upwards ? -unitrows : unitrows;
-			bool above = offset + shift >= 0;
-			bool below = offset + shift <= rowmax - unitrows;
+			// The Slider drives one row per notch; offset mirrors its row (each row
+			// == SCROLL_STEP px of text). Clamp to the scrollable range.
+			int16_t maxoff = rowmax - unitrows;
 
-			if (above && below)
-				offset += shift;
+			if (upwards)
+			{
+				if (offset > 0)
+					offset--;
+			}
+			else if (offset < maxoff)
+			{
+				offset++;
+			}
 		};
 
 		UI::get().remove_textfield();
@@ -129,7 +137,10 @@ namespace ms
 		// records each macro's pixel position and kind; we resolve
 		// the bitmap from the appropriate NX source and stamp it on
 		// top of the reserved 32-px slot.
-		auto draw_inline_icons = [&](Point<int16_t> text_origin)
+		// clip is the visible panel body (absolute screen Y). Icons whose slot
+		// falls outside it (scrolled out, or past the bottom border) are skipped
+		// so they never spill out of the chat window.
+		auto draw_inline_icons = [&](Point<int16_t> text_origin, Range<int16_t> clip)
 		{
 			for (const auto& img : text.images())
 			{
@@ -139,7 +150,9 @@ namespace ms
 				switch (img.kind)
 				{
 				case Text::Layout::ImageKind::ITEM:
-					tex = ItemData::get(img.item_id).get_icon(true);
+					// The small inventory icon (~32px), NOT iconRaw (full-size art),
+					// which is far bigger than the reserved slot.
+					tex = ItemData::get(img.item_id).get_icon(false);
 					break;
 				case Text::Layout::ImageKind::QUEST:
 				{
@@ -170,32 +183,99 @@ namespace ms
 						tex = Texture(fnode);
 					break;
 				}
+				case Text::Layout::ImageKind::EMOTE:
+				{
+					nl::node enode = nl::nx::ui["Emote.img"][std::to_string(img.item_id)];
+					if (enode)
+						tex = Texture(enode);
+					break;
+				}
 				}
 
 				if (!tex.is_valid()) continue;
 
 				Point<int16_t> icon_dims = tex.get_dimensions();
+				if (icon_dims.x() <= 0 || icon_dims.y() <= 0) continue;
+
+				// Icons arrive in many sizes (item icons, faces, skill icons can be
+				// larger than the 32-px slot the layout reserves). Scale to fit that
+				// slot, preserving aspect, so an icon never spills over the text.
+				float scale = 1.0f;
+				int16_t maxdim = std::max(icon_dims.x(), icon_dims.y());
+				if (maxdim > img.size)
+					scale = static_cast<float>(img.size) / static_cast<float>(maxdim);
+
+				int16_t dw = static_cast<int16_t>(icon_dims.x() * scale);
+				int16_t dh = static_cast<int16_t>(icon_dims.y() * scale);
+
 				Point<int16_t> slot_pos = text_origin + img.pos;
-				Point<int16_t> centered(
-					slot_pos.x() + (img.size - icon_dims.x()) / 2,
-					slot_pos.y() + (img.size - icon_dims.y()) / 2);
-				tex.draw(DrawArgument(centered));
+				Point<int16_t> tl(
+					slot_pos.x() + (img.size - dw) / 2,
+					slot_pos.y() + (img.size - dh) / 2);
+
+				// Skip icons that don't fully fit inside the visible panel body so
+				// a scrolled-out or bottom-edge icon can't draw over the frame.
+				if (tl.y() < clip.first() || tl.y() + dh > clip.second())
+					continue;
+
+				// draw() pins the texture ORIGIN at pos and scales about it, so add
+				// the scaled origin to land the bitmap's top-left exactly at tl.
+				Point<int16_t> origin = tex.get_origin();
+				Point<int16_t> pos(
+					static_cast<int16_t>(tl.x() + origin.x() * scale),
+					static_cast<int16_t>(tl.y() + origin.y() * scale));
+				tex.draw(DrawArgument(pos, scale, scale, 1.0f));
 			}
 		};
 
 		if (show_slider)
 		{
 			int16_t text_min_height = position.y() + top.height() - 1;
-			Point<int16_t> text_origin = position + Point<int16_t>(162, 19 - offset * 400);
+			int16_t clip_bot = text_min_height + height - 18;
+			Point<int16_t> text_origin = position + Point<int16_t>(162, 19 - offset * SCROLL_STEP);
+
+			// Hover band for the option under the cursor (send_cursor sets
+			// hovered_selection with the same scrolled geometry). The non-slider
+			// path draws this in its selection loop; the slider path skipped it,
+			// which is why many-option menus showed no hover feedback. Clip it to
+			// the visible band so a scrolled-out row doesn't paint over the frame.
+			if (type == TalkType::SENDSIMPLE && hovered_selection >= 0
+				&& hovered_selection < static_cast<int32_t>(selections.size()))
+			{
+				const auto& sel = selections[hovered_selection];
+				std::string pref_escaped;
+				pref_escaped.reserve(sel.prefix.size() + 8);
+				for (char c : sel.prefix)
+				{
+					if (c == '\n') pref_escaped += "\\n";
+					else pref_escaped += c;
+				}
+				Text prefix_text(Text::Font::A12M, Text::Alignment::LEFT,
+					Color::Name::DARKGREY, Text::Background::NONE, pref_escaped, 320, true);
+
+				int16_t base_y = position.y() + 19 - offset * SCROLL_STEP;
+				int16_t row_y = base_y + prefix_text.height() - 16;
+
+				if (row_y + 16 > text_min_height && row_y < clip_bot)
+				{
+					ColorBox band(360, 16, Color::Name::LIGHTBLUE, 0.30f);
+					band.draw(DrawArgument(Point<int16_t>(position.x() + 162 - 36, row_y)));
+				}
+			}
+
 			text.draw(text_origin, Range<int16_t>(text_min_height, text_min_height + height - 18));
-			draw_inline_icons(text_origin);
+			draw_inline_icons(text_origin, Range<int16_t>(text_min_height, text_min_height + height - 18));
 			slider.draw(position);
 		}
 		else
 		{
-			int16_t y_adj = height - min_height;
+			// Text sits at a FIXED offset below the header. It used to be
+			// position.y() + 48 - (height - min_height), which drifted UP as the
+			// window grew to fit longer text — pushing the text out the top of the
+			// frame. A constant top keeps it inside; the window is already sized
+			// to the text (needed = text_height + pad), so it fills downward.
 			int16_t text_x = position.x() + 166;
-			int16_t text_y = position.y() + 48 - y_adj;
+			int16_t text_y = position.y() + 48;
 			int16_t line_h = 16;
 
 			// Draw selection list backgrounds and dots for SENDSIMPLE
@@ -268,11 +348,13 @@ namespace ms
 				}
 			}
 
-			Point<int16_t> text_origin = position + Point<int16_t>(166, 48 - y_adj);
+			Point<int16_t> text_origin = position + Point<int16_t>(166, 48);
 
-			// Always draw the NPC text first.
-			text.draw(text_origin);
-			draw_inline_icons(text_origin);
+			// Always draw the NPC text first, clipped to the panel body so it can
+			// never bleed above the header or below the bottom border even if the
+			// measured text height drifts from the actual layout.
+			text.draw(text_origin, Range<int16_t>(position.y() + top.height(), position.y() + top.height() + height));
+			draw_inline_icons(text_origin, Range<int16_t>(position.y() + top.height(), position.y() + top.height() + height));
 
 			quest_banner_hits.clear();
 
@@ -623,12 +705,23 @@ namespace ms
 			// it. Y-band is widened by a few pixels above and below
 			// to absorb word-wrap drift between prefix_text.height()
 			// and the formatted_text's actual layout.
-			int16_t y_adj = height - min_height;
-			int16_t text_x = position.x() + 166;
-			int16_t text_y = position.y() + 48 - y_adj;
+			// Match the DRAW geometry for whichever path is active. With many
+			// options the list scrolls (show_slider): the text renders at
+			// +(162, 19 - offset*400) and is clipped, so the hit-test MUST apply
+			// the same base + scroll offset, or clicks land on the wrong option
+			// (or nothing). The non-slider path renders at a fixed +(166, 48).
+			int16_t text_x = position.x() + (show_slider ? 162 : 166);
+			int16_t text_y = show_slider
+				? (position.y() + 19 - offset * SCROLL_STEP)
+				: (position.y() + 48);
 			int16_t text_w = 320;
 			int16_t line_h = 16; // approximate line height for A12M font
 			int16_t band_pad = 4; // extra px above/below each option row
+
+			// Visible clip band (slider mode) — options scrolled out of view
+			// must not be clickable/hoverable.
+			int16_t clip_top = position.y() + top.height() - 1;
+			int16_t clip_bot = clip_top + height - 18;
 
 			int32_t prev_hovered = hovered_selection;
 			hovered_selection = -1;
@@ -654,6 +747,10 @@ namespace ms
 				int16_t baseline = text_y + prefix_text.height();
 				int16_t row_top  = baseline - line_h - band_pad;
 				int16_t row_bot  = baseline + band_pad;
+
+				// Skip options scrolled out of the visible band when sliding.
+				if (show_slider && (row_bot < clip_top || row_top > clip_bot))
+					continue;
 
 				if (cursorpos.x() >= text_x && cursorpos.x() <= text_x + text_w &&
 					cursorpos.y() >= row_top && cursorpos.y() <= row_bot)
@@ -1211,7 +1308,14 @@ namespace ms
 		// drifts as y_adj grows and the fill texture has internal padding
 		// that isn't part of `text_height`.
 		constexpr int16_t TEXT_BOTTOM_PAD = 16;
-		int16_t needed = text_height + TEXT_BOTTOM_PAD;
+		// The body text is drawn at a fixed y = 48 from the window top, while the
+		// panel body starts at top.height(). The window height must cover that gap
+		// too, or the last line clips against the bottom border (as seen when a
+		// quest's item list ran one line past the frame).
+		int16_t text_top_offset = 48 - top.height();
+		if (text_top_offset < 0)
+			text_top_offset = 0;
+		int16_t needed = text_top_offset + text_height + TEXT_BOTTOM_PAD;
 
 		if (needed > height)
 		{
@@ -1219,8 +1323,20 @@ namespace ms
 			{
 				height = MAX_HEIGHT;
 				show_slider = true;
-				rowmax = text_height / 400 + 1;
-				unitrows = 1;
+				offset = 0;
+
+				// Line-based scrolling: a slider row == one text line
+				// (SCROLL_STEP px). unitrows = visible lines (proportional thumb),
+				// rowmax = total content lines; the slider then has
+				// (rowmax - unitrows) scroll positions, each moving the text
+				// SCROLL_STEP px, so every line is reachable.
+				int16_t visible = height - 18;
+				unitrows = visible / SCROLL_STEP;
+				if (unitrows < 1) unitrows = 1;
+
+				rowmax = (text_height + SCROLL_STEP - 1) / SCROLL_STEP + 1;
+				if (rowmax <= unitrows)
+					rowmax = unitrows + 1;
 
 				int16_t slider_y = top.height() - 7;
 				slider = Slider(Slider::Type::DEFAULT_SILVER, Range<int16_t>(slider_y, slider_y + height - 20), top.width() - 26, unitrows, rowmax, onmoved);

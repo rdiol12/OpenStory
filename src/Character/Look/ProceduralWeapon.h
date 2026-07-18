@@ -49,6 +49,8 @@ namespace ms
 			Clothing::Layer layer;    // which weapon z-layer to emit on
 			bool track_arm;           // true = derive angle from the live forearm vector
 			float arm_offset;         // degrees added to the forearm angle when tracking
+			bool back = false;        // true = slung on the back (climbing), anchored to
+			                          // the body instead of the hand
 		};
 
 		Pose pose_for(Stance::Id stance, uint8_t frame) const;

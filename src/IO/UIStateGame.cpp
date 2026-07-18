@@ -178,7 +178,11 @@ namespace ms
 
 	void UIStateGame::remove_icon()
 	{
-		draggedicon->reset();
+		// The drop itself may have rebuilt the owner's icons (purge_icon then
+		// already cleared the reference)
+		if (draggedicon)
+			draggedicon->reset();
+
 		draggedicon = {};
 	}
 
@@ -717,6 +721,14 @@ namespace ms
 		draggedicon = drgic;
 	}
 
+	void UIStateGame::purge_icon(const Icon* icon)
+	{
+		// The icon object is about to die — just forget the pointer, do NOT
+		// touch the object
+		if (draggedicon.get() == icon)
+			draggedicon = {};
+	}
+
 	void UIStateGame::clear_tooltip(Tooltip::Parent parent)
 	{
 		if (parent == tooltipparent)
@@ -880,6 +892,13 @@ namespace ms
 
 		if (type == tooltipparent)
 			clear_tooltip(tooltipparent);
+
+		// If the element being removed owns the icon currently being dragged,
+		// cancel the drag now. Otherwise draggedicon keeps pointing into the
+		// element after it is parked in the graveyard and freed next update(),
+		// and the following dragdraw() reads freed memory (access violation).
+		if (draggedicon && icon_map[draggedicon.get()->get_type()] == type)
+			remove_icon();
 
 		elementorder.remove(type);
 

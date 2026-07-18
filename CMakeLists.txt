@@ -21,6 +21,13 @@ set_target_properties(OpenStory PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/wz
 )
 
+# Emit a PDB for optimized Release builds so crash logs (CrashLog.cpp) resolve to
+# real function names + line numbers instead of raw addresses.
+if(MSVC)
+    target_compile_options(OpenStory PRIVATE $<$<CONFIG:Release>:/Zi>)
+    target_link_options(OpenStory PRIVATE $<$<CONFIG:Release>:/DEBUG>)
+endif()
+
 # ADD_CUSTOM_COMMAND(TARGET OpenStory POST_BUILD
 #                 COMMAND copy \"${CMAKE_SOURCE_DIR}\vendor\bass24\x64\bass.dll\"  \"${RUNTIME_OUTPUT_DIRECTORY_DEBUG}/\"
 #                 COMMENT "copying dlls …"

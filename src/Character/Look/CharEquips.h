@@ -19,6 +19,7 @@
 
 #include "Clothing.h"
 #include "ProceduralWeapon.h"
+#include "ProceduralHat.h"
 
 namespace ms
 {
@@ -60,6 +61,10 @@ namespace ms
 		bool is_twohanded() const;
 		// Return the cap type (vslot)
 		CapType getcaptype() const;
+		// True when the equipped hat replaces the ENTIRE head (helmet-style): the
+		// head/hair/face are suppressed and only the hat is drawn. Driven by the
+		// hat's info/replaceHead data flag (set by generated full-head hats).
+		bool covers_whole_head() const;
 		// Return a stance which has been adjusted to the equipped weapon type
 		Stance::Id adjust_stance(Stance::Id stance) const;
 		// Return the item id of the equip at the specified slot
@@ -69,10 +74,10 @@ namespace ms
 
 	private:
 		EnumMap<EquipSlot::Id, const Clothing*> clothes;
-		// Set when a weapon in the new single-image "procedural" format is equipped;
-		// takes over the WEAPON slot's draw. Invalid for authored weapons.
+		// Set when a weapon/hat in the single-image "procedural" format is equipped;
+		// takes over that slot's draw. Invalid for authored items.
 		ProceduralWeapon procweapon;
-
+		ProceduralHat prochat;
 		static std::unordered_map<int32_t, Clothing> cloth_cache;
 	};
 }

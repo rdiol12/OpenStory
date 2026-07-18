@@ -36,22 +36,32 @@ namespace ms
 		dead = false;
 		hittable = false;
 
-		// A reactor is considered hittable if its current state defines
-		// any `event` block — that's the WZ flag indicating "this state
-		// reacts to player input". The previous code only recognised
-		// `event/0/type == 0` (attack-hit), missing reactors that
-		// trigger via skills, multi-step quests, or walk-over but are
-		// still attackable. The server validates the actual hit, so
-		// erring on the permissive side is safe.
-		nl::node spawn_state = src[std::to_string(state)];
-		if (!spawn_state)
-			spawn_state = src[0];
-		for (auto sub : spawn_state)
-			if (sub.name() == "event")
-			{
-				hittable = true;
+		// A reactor is hittable if ANY of its states defines an `event` block —
+		// the WZ flag for "reacts to player input". The old code only checked the
+		// SPAWN state, so a reactor the server spawned in a state whose node has
+		// no event (yet the reactor is still interactive) read as un-hittable and
+		// Combat skipped it. Scanning every state is a strict superset — it can
+		// only make more reactors hittable, never fewer — and the server validates
+		// the real hit anyway, so being permissive is safe.
+		for (auto st : src)
+		{
+			bool is_number = !st.name().empty();
+			for (char c : st.name())
+				if (c < '0' || c > '9') { is_number = false; break; }
+			if (!is_number)
+				continue; // skip `info` and other non-state nodes
+
+			for (auto sub : st)
+				if (sub.name() == "event")
+				{
+					hittable = true;
+					break;
+				}
+
+			if (hittable)
 				break;
-			}
+		}
+
 
 		nl::node sndsrc = nl::nx::sound["Reactor.img"][strid];
 		hitsound = sndsrc["hit"];

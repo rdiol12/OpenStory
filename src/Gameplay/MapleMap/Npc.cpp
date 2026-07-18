@@ -22,6 +22,7 @@
 #include "../../Character/QuestLog.h"
 #include "../../Graphics/Text.h"
 #include "../../Net/NpcResponseTracker.h"
+#include "../../Constants.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -176,6 +177,17 @@ namespace ms
 
 		// Determine quest mark for this NPC
 		update_quest_mark();
+
+		// Ambient speech: the constructor loop above already resolved each speak
+		// key (info/speak -> String/Npc.img/<id>/<key>) into `lines`. Flatten the
+		// non-empty results into a cycle list. Stagger the first balloon per NPC
+		// (seed by id) so a map full of NPCs doesn't all pop at once.
+		for (const auto& kv : lines)
+			for (const auto& ln : kv.second)
+				if (!ln.empty())
+					speak_lines.push_back(ln);
+
+		speak_timer = 500 + (id % 4000);
 	}
 
 	void Npc::draw_minimap(Point<int16_t> position, float scale, float alpha) const
@@ -217,6 +229,17 @@ namespace ms
 			// origin.y() is how far above feet the sprite extends
 			Point<int16_t> mark_pos = absp + Point<int16_t>(22, -origin.y() - 10);
 			quest_mark_anim.draw(DrawArgument(mark_pos), alpha);
+		}
+
+		// Ambient speech balloon above the head (self-hides once expired). Anchor
+		// just above the sprite's top so the balloon's tail points at the NPC.
+		if (speak_showing && !animations.empty())
+		{
+			auto ait = animations.find(stance);
+			const Animation& anim = (ait != animations.end())
+				? ait->second : animations.begin()->second;
+			Point<int16_t> origin = anim.get_origin();
+			speech_balloon.draw(absp + Point<int16_t>(0, -origin.y() - 8));
 		}
 
 		// MapleTV NPCs display the current world-wide broadcast on their
@@ -330,6 +353,32 @@ namespace ms
 
 		if (quest_mark_type != QuestMarkType::NONE)
 			quest_mark_anim.update();
+
+		// Ambient speech cycle: show a line ~4-6s, hide ~2-4s, advance and wrap.
+		// We drive show/hide from speak_timer and toggle the balloon directly
+		// (change_text shows, expire hides) rather than the balloon's own 4s timer,
+		// so we control the durations. Per-NPC variation keeps them out of sync.
+		if (!speak_lines.empty())
+		{
+			speak_timer -= Constants::TIMESTEP;
+
+			if (speak_timer <= 0)
+			{
+				if (speak_showing)
+				{
+					speech_balloon.expire();
+					speak_showing = false;
+					speak_timer = 2000 + static_cast<int32_t>(npcid % 2000); // hide 2-4s
+				}
+				else
+				{
+					speech_balloon.change_text(speak_lines[speak_index]);
+					speak_index = (speak_index + 1) % speak_lines.size();
+					speak_showing = true;
+					speak_timer = 4000 + static_cast<int32_t>(npcid % 2000); // show 4-6s
+				}
+			}
+		}
 
 		return phobj.fhlayer;
 	}
