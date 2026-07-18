@@ -491,6 +491,419 @@ namespace ms
 			}
 		}
 
+			// ---- Full-character on-body composites ----
+			// The item rendered on the complete mannequin character (body +
+			// head + hair) in key poses, using the same anchor math and shell
+			// family/lean logic the game uses — armor/capes/hats are judged
+			// from these images before anything is published.
+
+			std::vector<HairPiece> load_back_hair();
+
+			struct Sprite
+			{
+				std::vector<uint8_t> px;
+				int16_t w = 0, h = 0;
+				Point<int16_t> tl;   // top-left in navel-space
+			};
+
+			Point<int16_t> map_point(nl::node part, const char* name)
+			{
+				return part["map"][name] ? Point<int16_t>(part["map"][name]) : Point<int16_t>(0, 0);
+			}
+
+			bool raw_pixels(nl::node bmpnode, std::vector<uint8_t>& out, int16_t& w, int16_t& h)
+			{
+				if (bmpnode.data_type() != nl::node::type::bitmap)
+					return false;
+
+				nl::bitmap bmp = bmpnode;
+				w = bmp.width();
+				h = bmp.height();
+
+				if (w <= 0 || h <= 0)
+					return false;
+
+				const uint8_t* data = static_cast<const uint8_t*>(bmp.data());
+				out.assign(data, data + size_t(w) * h * 4);
+
+				return true;
+			}
+
+			// Rotate a sprite around a pivot (given in sprite-local coords) —
+			// the same nearest-sample rotation the client's lean/prone paths use
+			void rotate_sprite(Sprite& s, Point<int16_t> pivot, float rot)
+			{
+				float c = std::cos(rot);
+				float sn = std::sin(rot);
+
+				float min_x = 0.0f, max_x = 0.0f, min_y = 0.0f, max_y = 0.0f;
+
+				for (int corner = 0; corner < 4; ++corner)
+				{
+					float cx = (corner & 1) ? float(s.w) : 0.0f;
+					float cy = (corner & 2) ? float(s.h) : 0.0f;
+					float rx = c * (cx - pivot.x()) - sn * (cy - pivot.y());
+					float ry = sn * (cx - pivot.x()) + c * (cy - pivot.y());
+
+					min_x = std::min(min_x, rx);
+					max_x = std::max(max_x, rx);
+					min_y = std::min(min_y, ry);
+					max_y = std::max(max_y, ry);
+				}
+
+				int16_t out_w = int16_t(std::ceil(max_x - min_x)) + 1;
+				int16_t out_h = int16_t(std::ceil(max_y - min_y)) + 1;
+
+				if (out_w <= 0 || out_h <= 0 || out_w > 512 || out_h > 512)
+					return;
+
+				Point<int16_t> out_pivot(int16_t(-min_x), int16_t(-min_y));
+				std::vector<uint8_t> out(size_t(out_w) * out_h * 4, 0);
+
+				for (int16_t y = 0; y < out_h; ++y)
+				{
+					for (int16_t x = 0; x < out_w; ++x)
+					{
+						float rx = float(x - out_pivot.x());
+						float ry = float(y - out_pivot.y());
+						int src_x = int(std::floor(c * rx + sn * ry + pivot.x()));
+						int src_y = int(std::floor(-sn * rx + c * ry + pivot.y()));
+
+						if (src_x < 0 || src_y < 0 || src_x >= s.w || src_y >= s.h)
+							continue;
+
+						std::copy_n(&s.px[(size_t(src_y) * s.w + src_x) * 4], 4, &out[(size_t(y) * out_w + x) * 4]);
+					}
+				}
+
+				// Keep the pivot's navel-space position fixed
+				s.tl = s.tl + pivot - out_pivot;
+				s.px = std::move(out);
+				s.w = out_w;
+				s.h = out_h;
+			}
+
+			void composite_onbody(int32_t itemid)
+			{
+				std::string strid = "0" + std::to_string(itemid);
+				std::string category = EquipData::get(itemid).get_itemdata().get_category();
+
+				if (category != "Longcoat" && category != "Coat" && category != "Cape" && category != "Cap")
+					return;
+
+				nl::node src = nl::nx::character[category][strid + ".img"];
+
+				if (!src)
+					return;
+
+				nl::node info = src["info"];
+				std::string outdir = "Custom/Preview/" + std::to_string(itemid);
+				std::filesystem::create_directories(outdir);
+				int written = 0;
+
+				struct PoseDef { const char* st; uint8_t fr; };
+				const PoseDef poses[] = {
+					{ "stand1", 0 }, { "walk1", 1 }, { "swingT1", 1 },
+					{ "prone", 0 }, { "jump", 0 }, { "ladder", 0 }
+				};
+
+				bool is_cape = category == "Cape";
+				bool is_coat = category == "Longcoat" || category == "Coat";
+				bool is_cap = category == "Cap";
+				bool has_material = AiSkin::available(itemid, info);
+				nl::node shell = info["aiShell"];
+				bool has_shell = shell["upright"].data_type() == nl::node::type::bitmap;
+
+				// Spine baseline for the attack lean (same math as the client)
+				nl::node base_body = nl::nx::character["00002000.img"]["stand1"]["0"]["body"];
+				Point<int16_t> base_navel = map_point(base_body, "navel");
+				Point<int16_t> base_neck = map_point(base_body, "neck");
+				float base_spine = std::atan2(
+					float(base_neck.x() - base_navel.x()),
+					float(base_navel.y() - base_neck.y()));
+
+				for (const auto& pose : poses)
+				{
+					nl::node bodyfr = nl::nx::character["00002000.img"][pose.st][pose.fr];
+					nl::node bodypart = bodyfr["body"];
+
+					if (bodypart.data_type() != nl::node::type::bitmap || !bodypart["map"]["navel"])
+						continue;
+
+					Point<int16_t> m_navel = map_point(bodypart, "navel");
+					Point<int16_t> m_neck = map_point(bodypart, "neck");
+					Point<int16_t> neck_world = m_neck - m_navel;
+
+					std::string stname = pose.st;
+					bool is_swing = stname.rfind("swing", 0) == 0 || stname.rfind("stab", 0) == 0;
+					bool is_prone_pose = stname.rfind("prone", 0) == 0;
+					bool is_climb = stname == "ladder" || stname == "rope";
+					bool is_jump = stname == "jump";
+
+					std::vector<Sprite> layers;
+
+					auto add_navel_part = [&](nl::node part, bool use_material)
+					{
+						Sprite s;
+						std::vector<uint8_t> px;
+						int16_t w = 0, h = 0;
+						bool got = false;
+
+						if (use_material && has_material)
+							got = AiSkin::part_pixels(itemid, info, stname, part.name(), part, px, w, h);
+
+						if (!got)
+							got = raw_pixels(part, px, w, h);
+
+						if (!got || !part["map"]["navel"])
+							return;
+
+						Point<int16_t> o = part["origin"];
+						s.px = std::move(px);
+						s.w = w;
+						s.h = h;
+						s.tl = Point<int16_t>(0, 0) - o - map_point(part, "navel");
+						layers.push_back(std::move(s));
+					};
+
+					// Shell view for this pose (family + stand-ins + lean),
+					// mirroring the client's selection
+					auto make_shell_sprite = [&](Sprite& out_sprite) -> bool
+					{
+						nl::node view = shell["upright"];
+						bool rotate_prone = false;
+						bool squash_jump = false;
+
+						if (is_prone_pose)
+						{
+							if (shell["prone"])
+								view = shell["prone"];
+							else
+								rotate_prone = true;
+						}
+						else if (is_climb && shell["back"])
+							view = shell["back"];
+						else if (is_swing && shell["attack"])
+							view = shell["attack"];
+						else if (is_jump)
+						{
+							if (shell["jump"])
+								view = shell["jump"];
+							else
+								squash_jump = true;
+						}
+
+						if (view && view.data_type() != nl::node::type::bitmap)
+							view = view["0"];
+
+						if (view.data_type() != nl::node::type::bitmap)
+							return false;
+
+						std::vector<uint8_t> px;
+						int16_t w = 0, h = 0;
+
+						if (!AiSkin::shell_pixels(itemid, info, view, false, px, w, h))
+							return false;
+
+						Sprite s;
+						Point<int16_t> origin = view["origin"];
+						s.px = std::move(px);
+						s.w = w;
+						s.h = h;
+						s.tl = neck_world - origin;
+
+						if (squash_jump)
+						{
+							int16_t new_h = std::max<int16_t>(1, int16_t(h * 0.82f));
+							std::vector<uint8_t> sq(size_t(w) * new_h * 4);
+
+							for (int16_t y = 0; y < new_h; ++y)
+								std::copy_n(&s.px[size_t(std::min<int>(h - 1, int(y / 0.82f))) * w * 4], size_t(w) * 4, &sq[size_t(y) * w * 4]);
+
+							s.px = std::move(sq);
+							s.h = new_h;
+						}
+
+						if (rotate_prone)
+							rotate_sprite(s, origin, -1.5707963f);
+
+						if (is_swing)
+						{
+							float spine = std::atan2(
+								float(m_neck.x() - m_navel.x()),
+								float(m_navel.y() - m_neck.y()));
+							float lean = std::clamp(spine - base_spine, -0.9f, 0.9f);
+							int deg = int(std::lround(lean * 180.0f / 3.14159265f / 5.0f)) * 5;
+
+							if (std::abs(deg) >= 10)
+								rotate_sprite(s, origin, float(deg) * 3.14159265f / 180.0f);
+						}
+
+						out_sprite = std::move(s);
+
+						return true;
+					};
+
+					// 1. Cape item (or its shell) — behind everything
+					if (is_cape)
+					{
+						Sprite s;
+
+						if (has_shell && make_shell_sprite(s))
+							layers.push_back(std::move(s));
+						else
+							for (nl::node part : src[stname][pose.fr])
+								if (part.data_type() == nl::node::type::bitmap)
+									add_navel_part(part, true);
+					}
+
+					// 2. Body
+					{
+						Sprite s;
+						std::vector<uint8_t> px;
+						int16_t w = 0, h = 0;
+
+						if (raw_pixels(bodypart, px, w, h))
+						{
+							Point<int16_t> o = bodypart["origin"];
+							s.px = std::move(px);
+							s.w = w;
+							s.h = h;
+							s.tl = Point<int16_t>(0, 0) - o - m_navel;
+							layers.push_back(std::move(s));
+						}
+					}
+
+					// 3. Coat item: shell or retextured donor mail
+					if (is_coat)
+					{
+						Sprite s;
+
+						if (has_shell && make_shell_sprite(s))
+							layers.push_back(std::move(s));
+						else
+							for (nl::node part : src[stname][pose.fr])
+								if (part.data_type() == nl::node::type::bitmap && part.name() == "mail")
+									add_navel_part(part, true);
+					}
+
+					// 4. Remaining body parts (arm, hands) over the coat
+					for (nl::node part : bodyfr)
+						if (part.data_type() == nl::node::type::bitmap && part.name() != "body")
+							add_navel_part(part, false);
+
+					// 5. Coat sleeves
+					if (is_coat)
+						for (nl::node part : src[stname][pose.fr])
+							if (part.data_type() == nl::node::type::bitmap && part.name() == "mailArm")
+								add_navel_part(part, true);
+
+					// 6. Head
+					nl::node headpart = nl::nx::character["00012000.img"][stname][pose.fr]["head"];
+					Point<int16_t> brow_world;
+					bool have_head = false;
+
+					if (headpart.data_type() == nl::node::type::bitmap && headpart["map"]["neck"])
+					{
+						Sprite s;
+						std::vector<uint8_t> px;
+						int16_t w = 0, h = 0;
+
+						if (raw_pixels(headpart, px, w, h))
+						{
+							Point<int16_t> o = headpart["origin"];
+							Point<int16_t> hneck = map_point(headpart, "neck");
+							s.px = std::move(px);
+							s.w = w;
+							s.h = h;
+							s.tl = neck_world - o - hneck;
+							brow_world = neck_world - hneck + map_point(headpart, "brow");
+							have_head = true;
+							layers.push_back(std::move(s));
+						}
+					}
+
+					// 7. Hair
+					if (have_head)
+					{
+						std::vector<HairPiece> hair = is_climb ? load_back_hair() : load_hair();
+						std::string vslot = (std::string)info["vslot"];
+						bool fullcover = is_cap &&
+							(vslot.find("As") != std::string::npos || vslot.find("Ay") != std::string::npos);
+
+						if (!fullcover)
+							for (const auto& piece : hair)
+							{
+								Sprite s;
+								s.px = piece.bgra;
+								s.w = piece.width;
+								s.h = piece.height;
+								s.tl = brow_world + piece.tl_rel_brow;
+								layers.push_back(std::move(s));
+							}
+					}
+
+					// 8. Hat item
+					if (is_cap && have_head)
+						for (nl::node part : src[stname][pose.fr])
+							if (part.data_type() == nl::node::type::bitmap)
+							{
+								Sprite s;
+								std::vector<uint8_t> px;
+								int16_t w = 0, h = 0;
+
+								if (!raw_pixels(part, px, w, h))
+									continue;
+
+								Point<int16_t> o = part["origin"];
+								s.px = std::move(px);
+								s.w = w;
+								s.h = h;
+								s.tl = brow_world - o - map_point(part, "brow");
+								layers.push_back(std::move(s));
+							}
+
+					if (layers.empty())
+						continue;
+
+					// Compose
+					int left = 9999, top = 9999, right = -9999, bottom = -9999;
+
+					for (const auto& s : layers)
+					{
+						left = std::min<int>(left, s.tl.x() - 2);
+						top = std::min<int>(top, s.tl.y() - 2);
+						right = std::max<int>(right, s.tl.x() + s.w + 2);
+						bottom = std::max<int>(bottom, s.tl.y() + s.h + 2);
+					}
+
+					int cw = right - left;
+					int ch = bottom - top;
+
+					if (cw <= 0 || ch <= 0 || cw > 512 || ch > 512)
+						continue;
+
+					std::vector<uint8_t> canvas(size_t(cw) * ch * 4, 0);
+
+					for (const auto& s : layers)
+						blit(canvas, cw, ch, s.px, s.w, s.h, s.tl.x() - left, s.tl.y() - top);
+
+					// 3x upscale for readability
+					int ow = cw * 3, oh = ch * 3;
+					std::vector<uint8_t> big(size_t(ow) * oh * 4);
+
+					for (int y = 0; y < oh; ++y)
+						for (int x = 0; x < ow; ++x)
+							std::copy_n(&canvas[(size_t(y / 3) * cw + x / 3) * 4], 4, &big[(size_t(y) * ow + x) * 4]);
+
+					if (write_pixels(outdir + "/onbody." + stname + ".png", big, int16_t(ow), int16_t(oh)))
+						written++;
+				}
+
+				if (written > 0)
+					std::cout << "[CustomEquip] On-body: " << written << " pose composites for item " << itemid << " -> " << outdir << std::endl;
+			}
+
 			// Mannequin templates for the paint-on-head hat pipeline: the AI
 			// paints a hat ONTO these; the diff against the template isolates
 			// the hat pixels, and the known brow position yields an exact
@@ -587,7 +1000,10 @@ namespace ms
 				int32_t itemid;
 
 				while (preview >> itemid)
+				{
 					preview_equip(itemid);
+					composite_onbody(itemid);
+				}
 			}
 
 			// Always refresh the hat mannequin templates (cheap, and the

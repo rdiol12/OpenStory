@@ -94,6 +94,19 @@ namespace ms
 					if (Texture themed = AiSkin::retexture_icon(itemid, src["iconRaw"], "raw"); themed.is_valid())
 						icons[true] = themed;
 				}
+
+				// Procedural weapons have no donor icon to retexture — build
+				// one from the canonical blade image (material applied)
+				if (!icons[false].is_valid())
+				{
+					nl::node canonical = nl::nx::character[category][strid + ".img"]["default"]["weapon"];
+
+					if (Texture wicon = AiSkin::icon_from_art(itemid, src, canonical, "weapon"); wicon.is_valid())
+					{
+						icons[false] = wicon;
+						icons[true] = wicon;
+					}
+				}
 			}
 			price = src["price"];
 			untradable = src["tradeBlock"].get_bool();

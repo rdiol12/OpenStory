@@ -22,6 +22,7 @@
 #include "../../Data/WeaponData.h"
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
 #ifdef USE_NX
@@ -316,6 +317,34 @@ namespace ms
 							{
 								Point<int16_t> pin = drawinfo.get_neck_position(stance, frame);
 
+								// During attacks the torso leans into the
+								// strike — rotate the shell to the body's
+								// per-frame spine angle (neck vs navel,
+								// relative to the standing baseline) so it
+								// follows the lunge instead of staying rigid.
+								// Quantized to 5-degree steps for atlas reuse.
+								int16_t lean_deg = 0;
+
+								if (is_attack)
+								{
+									auto spine_angle = [&](Stance::Id st, uint8_t fr)
+									{
+										Point<int16_t> neck = drawinfo.get_neck_position(st, fr);
+										Point<int16_t> navel = drawinfo.get_body_position(st, fr);
+
+										return std::atan2(
+											float(neck.x() - navel.x()),
+											float(navel.y() - neck.y()));
+									};
+
+									float lean = spine_angle(stance, frame) - spine_angle(Stance::Id::STAND1, 0);
+									lean = std::clamp(lean, -0.9f, 0.9f);
+									lean_deg = int16_t(std::lround(lean * 180.0f / 3.14159265f / 5.0f)) * 5;
+
+									if (std::abs(lean_deg) < 10)
+										lean_deg = 0;
+								}
+
 								// With a material present the shell is
 								// retextured through the aiSkin engine (shaded
 								// by its own luminance, trim/decal included) —
@@ -324,7 +353,13 @@ namespace ms
 								Texture shelltex;
 								std::string skey = "aishell/" + std::to_string(itemid) + "/" + family + "/" + std::to_string(subframe);
 
-								if (family == std::string("jumpsq"))
+								if (lean_deg != 0)
+								{
+									shelltex = AiSkin::lean_shell(itemid, info, viewbmp,
+										skey + "/r" + std::to_string(lean_deg),
+										float(lean_deg) * 3.14159265f / 180.0f);
+								}
+								else if (family == std::string("jumpsq"))
 								{
 									// Squashed upright (airborne stand-in);
 									// handles material and raw alike

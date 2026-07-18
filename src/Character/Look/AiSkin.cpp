@@ -511,21 +511,77 @@ namespace ms
 			return build(iter->second, iconnode, key, true, Point<int16_t>(), false, false, iconnode["origin"]);
 		}
 
-		Texture icon_from_shell(int32_t itemid, nl::node info)
+		Texture lean_shell(int32_t itemid, nl::node info, nl::node viewnode, const std::string& key, float rot)
 		{
-			nl::node view = info["aiShell"]["upright"];
-
-			if (view && view.data_type() != nl::node::type::bitmap)
-				view = view["0"];
-
-			if (view.data_type() != nl::node::type::bitmap)
+			if (viewnode.data_type() != nl::node::type::bitmap)
 				return Texture();
 
-			// Shell pixels (retextured when a material exists, raw otherwise)
 			std::vector<uint8_t> px;
 			int16_t w = 0, h = 0;
 
-			if (!shell_pixels(itemid, info, view, false, px, w, h))
+			if (!shell_pixels(itemid, info, viewnode, false, px, w, h))
+				return Texture();
+
+			Point<int16_t> origin = viewnode["origin"];
+
+			// Rotate around the collar origin (nearest sampling), expanding the
+			// canvas to the rotated bounding box
+			float c = std::cos(rot);
+			float s = std::sin(rot);
+
+			float min_x = 0.0f, max_x = 0.0f, min_y = 0.0f, max_y = 0.0f;
+
+			for (int corner = 0; corner < 4; ++corner)
+			{
+				float cx = (corner & 1) ? float(w) : 0.0f;
+				float cy = (corner & 2) ? float(h) : 0.0f;
+				float rx = c * (cx - origin.x()) - s * (cy - origin.y());
+				float ry = s * (cx - origin.x()) + c * (cy - origin.y());
+
+				min_x = std::min(min_x, rx);
+				max_x = std::max(max_x, rx);
+				min_y = std::min(min_y, ry);
+				max_y = std::max(max_y, ry);
+			}
+
+			int16_t out_w = int16_t(std::ceil(max_x - min_x)) + 1;
+			int16_t out_h = int16_t(std::ceil(max_y - min_y)) + 1;
+
+			if (out_w <= 0 || out_h <= 0 || out_w > 256 || out_h > 256)
+				return Texture();
+
+			Point<int16_t> out_origin(int16_t(-min_x), int16_t(-min_y));
+			std::vector<uint8_t> out(size_t(out_w) * out_h * 4, 0);
+
+			for (int16_t y = 0; y < out_h; ++y)
+			{
+				for (int16_t x = 0; x < out_w; ++x)
+				{
+					float rx = float(x - out_origin.x());
+					float ry = float(y - out_origin.y());
+					int src_x = int(std::floor(c * rx + s * ry + origin.x()));
+					int src_y = int(std::floor(-s * rx + c * ry + origin.y()));
+
+					if (src_x < 0 || src_y < 0 || src_x >= w || src_y >= h)
+						continue;
+
+					std::copy_n(&px[(size_t(src_y) * w + src_x) * 4], 4, &out[(size_t(y) * out_w + x) * 4]);
+				}
+			}
+
+			return Texture::from_pixels(key, out_w, out_h, std::move(out), out_origin);
+		}
+
+		Texture icon_from_art(int32_t itemid, nl::node info, nl::node artnode, const std::string& variant)
+		{
+			if (artnode.data_type() != nl::node::type::bitmap)
+				return Texture();
+
+			// Art pixels (retextured when a material exists, raw otherwise)
+			std::vector<uint8_t> px;
+			int16_t w = 0, h = 0;
+
+			if (!shell_pixels(itemid, info, artnode, false, px, w, h))
 				return Texture();
 
 			// Fit into the standard 32x32 icon canvas (nearest, centered,
@@ -560,11 +616,25 @@ namespace ms
 				}
 			}
 
-			// Reuse the donor icon's origin so the icon draws like any other
-			Point<int16_t> origin = info["icon"]["origin"];
-			std::string key = "aiskin/" + std::to_string(itemid) + "/icon.shell";
+			// Reuse the donor icon's origin so the icon draws like any other;
+			// items with no authored icon at all (procedural weapons) use the
+			// standard v83 icon origin (bottom-left)
+			Point<int16_t> origin = info["icon"]
+				? Point<int16_t>(info["icon"]["origin"])
+				: Point<int16_t>(0, ICON);
+			std::string key = "aiskin/" + std::to_string(itemid) + "/icon." + variant;
 
 			return Texture::from_pixels(key, ICON, ICON, std::move(icon), origin);
+		}
+
+		Texture icon_from_shell(int32_t itemid, nl::node info)
+		{
+			nl::node view = info["aiShell"]["upright"];
+
+			if (view && view.data_type() != nl::node::type::bitmap)
+				view = view["0"];
+
+			return icon_from_art(itemid, info, view, "shell");
 		}
 
 		bool accent_color(int32_t itemid, nl::node info, float& r, float& g, float& b)

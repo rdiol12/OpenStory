@@ -8,6 +8,11 @@
 #include "../../Data/WeaponData.h"
 
 #include <cmath>
+#include <map>
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -92,6 +97,98 @@ namespace ms
 		}
 	}
 
+	// Vanilla-measured blade angle for frames whose arm anchor is fused into
+	// the body sprite: sample the TYPE's base vanilla weapon (id prefix*10000
+	// + 2000, e.g. 1402000 for 2H swords) at the same stance/frame and measure
+	// its blade axis from its opaque pixels (principal axis, signed away from
+	// its map anchor). Cached per (type, stance, frame). Returns false when the
+	// reference has no usable art for that frame.
+	static bool reference_angle(Weapon::Type type, Stance::Id stance, uint8_t frame, float& out_rad)
+	{
+		static std::map<int64_t, float> cache;
+
+		int64_t key = (int64_t(type) << 16) | (int64_t(stance) << 8) | frame;
+		auto iter = cache.find(key);
+
+		if (iter != cache.end())
+		{
+			out_rad = iter->second;
+
+			return out_rad > -100.0f;
+		}
+
+		float result = -999.0f;
+		int32_t refid = int32_t(type) * 10000 + 2000;
+		nl::node part = nl::nx::character["Weapon"]["0" + std::to_string(refid) + ".img"][Stance::names[stance]][frame]["weapon"];
+
+		if (part.data_type() == nl::node::type::bitmap)
+		{
+			nl::bitmap bmp = part;
+			int w = bmp.width();
+			int h = bmp.height();
+
+			if (w > 0 && h > 0)
+			{
+				const uint8_t* px = static_cast<const uint8_t*>(bmp.data());
+
+				double sx = 0.0, sy = 0.0;
+				int count = 0;
+
+				for (int y = 0; y < h; ++y)
+					for (int x = 0; x < w; ++x)
+						if (px[(size_t(y) * w + x) * 4 + 3] >= 64)
+						{
+							sx += x;
+							sy += y;
+							count++;
+						}
+
+				if (count >= 10)
+				{
+					double cx = sx / count, cy = sy / count;
+					double sxx = 0.0, syy = 0.0, sxy = 0.0;
+
+					for (int y = 0; y < h; ++y)
+						for (int x = 0; x < w; ++x)
+							if (px[(size_t(y) * w + x) * 4 + 3] >= 64)
+							{
+								sxx += (x - cx) * (x - cx);
+								syy += (y - cy) * (y - cy);
+								sxy += (x - cx) * (y - cy);
+							}
+
+					float axis = 0.5f * std::atan2(float(2.0 * sxy), float(sxx - syy));
+					float ax = std::cos(axis);
+					float ay = std::sin(axis);
+
+					// Blade points away from the anchor (grip-ish) point
+					Point<int16_t> origin = part["origin"];
+					Point<int16_t> anchor;
+
+					for (nl::node mapnode : part["map"])
+						if (mapnode.data_type() == nl::node::type::vector)
+							anchor = mapnode;
+
+					float to_blade_x = float(cx) - float(origin.x() + anchor.x());
+					float to_blade_y = float(cy) - float(origin.y() + anchor.y());
+
+					if (ax * to_blade_x + ay * to_blade_y < 0.0f)
+					{
+						ax = -ax;
+						ay = -ay;
+					}
+
+					result = std::atan2(ax, -ay);
+				}
+			}
+		}
+
+		cache[key] = result;
+		out_rad = result;
+
+		return result > -100.0f;
+	}
+
 	ProceduralWeapon::Pose ProceduralWeapon::pose_for(Stance::Id stance, uint8_t frame) const
 	{
 		const Clothing::Layer L = Clothing::Layer::WEAPON_OVER_HAND;
@@ -148,13 +245,36 @@ namespace ms
 			return; // emit only on this pose's z-layer
 
 		// A held grip anchors to the arm's hand point (arm_position) — the same
-		// anchor authored weapons use for their "hand" map point. hand_position
-		// (HAND_BELOW_WEAPON/handMove) is only populated on some attack frames.
-		// When slung on the back (climbing), anchor to the body/navel instead so
-		// the weapon sits centered on the character's back.
+		// anchor authored weapons use for their "hand" map point. When slung on
+		// the back (climbing), anchor to the body/navel instead so the weapon
+		// sits centered on the character's back.
+		Point<int16_t> body = drawinfo->get_body_position(stance, frame);
 		Point<int16_t> hand = pose.back
-			? drawinfo->get_body_position(stance, frame)
+			? body
 			: drawinfo->get_arm_position(stance, frame);
+
+		// Some attack frames have NO separate arm part (the arm is fused into
+		// the body sprite), which degenerates arm_position to the navel — the
+		// weapon then lost its anchor and snapped to a vertical/idle pose
+		// mid-swing. Fall back to the handMove anchor when it exists.
+		bool anchorless = !pose.back &&
+			hand.x() == body.x() && hand.y() == body.y();
+
+		if (anchorless)
+		{
+			Point<int16_t> handmove = drawinfo->get_hand_position(stance, frame);
+
+			if (handmove.x() != 0 || handmove.y() != 0)
+			{
+				hand = handmove;
+				anchorless = false;
+			}
+			else
+			{
+				// Last resort: approximate a held position beside the torso
+				hand = body + Point<int16_t>(6, -4);
+			}
+		}
 
 		constexpr float DEG = 0.017453293f;
 		float th;
@@ -164,11 +284,42 @@ namespace ms
 			// Forearm vector = ARM["hand"] - ARM["navel"] = arm_position - body_position.
 			// Angle that makes the blade (canonical: up) point along it:
 			//   blade dir at theta is (sin, -cos), so theta = atan2(dx, -dy).
-			Point<int16_t> body = drawinfo->get_body_position(stance, frame);
 			float dx = static_cast<float>(hand.x() - body.x());
 			float dy = static_cast<float>(hand.y() - body.y());
-			th = (dx == 0.0f && dy == 0.0f) ? pose.angle * DEG
-			                                : std::atan2(dx, -dy) + pose.arm_offset * DEG;
+
+			if (anchorless || (dx == 0.0f && dy == 0.0f))
+			{
+				// No usable anchor this frame: use the angle MEASURED from the
+				// type's vanilla base weapon at this exact stance/frame — the
+				// real arc Nexon drew. Canned constants only if even the
+				// reference has no art here.
+				float measured;
+
+				if (reference_angle(type, stance, frame, measured))
+				{
+					th = measured;
+				}
+				else
+				{
+					bool stab = stance == Stance::Id::STABO1 || stance == Stance::Id::STABO2 ||
+						stance == Stance::Id::STABOF || stance == Stance::Id::STABT1 ||
+						stance == Stance::Id::STABT2 || stance == Stance::Id::STABTF ||
+						stance == Stance::Id::PRONESTAB;
+
+					float arc;
+
+					if (stab)
+						arc = frame == 0 ? 75.0f : 95.0f;
+					else
+						arc = frame == 0 ? -50.0f : frame == 1 ? 60.0f : 120.0f;
+
+					th = arc * DEG;
+				}
+			}
+			else
+			{
+				th = std::atan2(dx, -dy) + pose.arm_offset * DEG;
+			}
 		}
 		else
 		{

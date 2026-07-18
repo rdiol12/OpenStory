@@ -70,9 +70,19 @@ namespace ms
 		// when no aiShell/prone view is authored
 		Texture prone_shell(int32_t itemid, nl::node info, nl::node viewnode, const std::string& key);
 
+		// A shell view rotated by `rot` radians around its collar origin — used
+		// to lean the shell with the body's per-frame spine angle during
+		// attacks, so it follows the lunge instead of staying bolt-upright
+		Texture lean_shell(int32_t itemid, nl::node info, nl::node viewnode, const std::string& key, float rot);
+
 		// Icon rendered from the aiShell upright view (scaled to fit the icon
 		// canvas), so shell items show their real shape in the inventory
 		Texture icon_from_shell(int32_t itemid, nl::node info);
+
+		// Icon rendered from any art bitmap (e.g. a procedural weapon's
+		// canonical blade image) — retextured by the material when present,
+		// fitted to the 32x32 icon canvas
+		Texture icon_from_art(int32_t itemid, nl::node info, nl::node artnode, const std::string& variant);
 
 		// The material's accent color (saturation-weighted, normalized to a
 		// bright tint) — used to tint shared aura effects to match the armor
