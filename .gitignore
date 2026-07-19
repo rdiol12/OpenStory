@@ -32,3 +32,6 @@ Settings
 /launcher/node_modules
 /launcher/dist
 crash_debug.txt
+
+# local deploy scripts (never publish - contain server/ssh details)
+*.sh
