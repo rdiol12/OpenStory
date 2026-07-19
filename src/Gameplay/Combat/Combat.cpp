@@ -55,6 +55,9 @@ namespace ms
 		if (teleport_cooldown > 0)
 			teleport_cooldown--;
 
+		if (local_cast_timeout > 0)
+			local_cast_timeout--;
+
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
@@ -111,6 +114,9 @@ namespace ms
 
 	void Combat::apply_move(const SpecialMove& move)
 	{
+		local_cast_id = move.get_id();
+		local_cast_timeout = 90; // ~720ms echo window
+
 		if (move.is_attack())
 		{
 			Attack attack = player.prepare_attack(move.is_skill());
@@ -553,6 +559,11 @@ namespace ms
 
 	void Combat::show_player_buff(int32_t skillid)
 	{
+		// Our own cast already played its use effect locally — this packet is
+		// just the server echoing it back
+		if (skillid == local_cast_id && local_cast_timeout > 0)
+			return;
+
 		get_move(skillid).apply_useeffects(player);
 	}
 

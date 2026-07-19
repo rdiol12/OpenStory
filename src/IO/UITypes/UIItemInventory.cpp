@@ -124,13 +124,15 @@ namespace ms
 		slotrange[InventoryType::Id::ETC] = { 1, 24 };
 		slotrange[InventoryType::Id::CASH] = { 1, 24 };
 
+		scroll_rows = 6;
+
 		slider = Slider(
-			Slider::Type::DEFAULT_SILVER, Range<int16_t>(50, 245), 152, 6, 1 + inventory.get_slotmax(tab) / COLUMNS,
+			Slider::Type::DEFAULT_SILVER, Range<int16_t>(50, 245), 152, 6, 6,
 			[&](bool upwards)
 			{
 				int16_t shift = upwards ? -COLUMNS : COLUMNS;
 				bool above = slotrange[tab].first + shift > 0;
-				bool below = slotrange[tab].second + shift < inventory.get_slotmax(tab) + 1 + COLUMNS;
+				bool below = slotrange[tab].second + shift <= scroll_rows * COLUMNS;
 
 				if (above && below)
 				{
@@ -143,6 +145,7 @@ namespace ms
 		set_full(false);
 		clear_new();
 		load_icons();
+		update_slider();
 	}
 
 	void UIItemInventory::draw(float alpha) const
@@ -275,6 +278,35 @@ namespace ms
 				update_slot(i);
 	}
 
+	int16_t UIItemInventory::used_rows() const
+	{
+		int16_t last = 0;
+
+		for (int16_t i = 1; i <= inventory.get_slotmax(tab); i++)
+			if (inventory.get_item_id(tab, i))
+				last = i;
+
+		return (last + COLUMNS - 1) / COLUMNS;
+	}
+
+	void UIItemInventory::update_slider()
+	{
+		int16_t rows = used_rows();
+		scroll_rows = rows > 6 ? rows : 6;
+
+		// The current scroll offset may sit past the shrunken range
+		int16_t maxfirst = 1 + (scroll_rows - 6) * COLUMNS;
+
+		while (slotrange[tab].first > maxfirst)
+		{
+			slotrange[tab].first -= COLUMNS;
+			slotrange[tab].second -= COLUMNS;
+		}
+
+		slider.setrows(slotrange[tab].first / COLUMNS, 6, scroll_rows);
+		slider.setenabled(scroll_rows > 6);
+	}
+
 	Button::State UIItemInventory::button_pressed(uint16_t buttonid)
 	{
 		InventoryType::Id oldtab = tab;
@@ -362,8 +394,7 @@ namespace ms
 
 		if (tab != oldtab)
 		{
-			uint16_t row = slotrange.at(tab).first / COLUMNS;
-			slider.setrows(row, 6, 1 + inventory.get_slotmax(tab) / COLUMNS);
+			update_slider();
 
 			buttons[button_by_tab(oldtab)]->set_state(Button::State::NORMAL);
 			buttons[button_by_tab(tab)]->set_state(Button::State::PRESSED);
@@ -670,6 +701,8 @@ namespace ms
 					break;
 				}
 			}
+
+			update_slider();
 		}
 
 		switch (mode)

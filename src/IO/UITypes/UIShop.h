@@ -51,6 +51,8 @@ namespace ms
 		// full item list has been added so only categories present in
 		// this shop get a tab.
 		void finalize_buy_tabs();
+		// 0 = mesos; else the ETC item prices are charged in. Set before add_item.
+		void set_currency_item(int32_t itemid);
 		void add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable);
 		void add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice, int16_t buyable);
 
@@ -117,6 +119,9 @@ namespace ms
 		// Single shared meso-coin animation overlaid on every item's
 		// price row, so all items blink in sync.
 		Animation meso_anim;
+		int32_t currency_item = 0;
+		Texture currency_icon;
+		std::string currency_name;
 		// Local frame counter for the char portrait so it animates
 		// independently of whatever the player's world char is doing.
 		mutable uint8_t charframe = 0;
@@ -140,7 +145,7 @@ namespace ms
 		class BuyItem
 		{
 		public:
-			BuyItem(Texture cur, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b);
+			BuyItem(Texture cur, bool item_currency, const std::string& suffix, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b);
 
 			void draw(Point<int16_t> position) const;
 
@@ -152,6 +157,7 @@ namespace ms
 		private:
 			Texture icon;
 			Texture currency;
+			bool item_currency;
 			int32_t id;
 			int32_t price;
 			int32_t pitch;

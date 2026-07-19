@@ -212,6 +212,10 @@ namespace ms
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
 
+		// Whether the sprite draws mirrored this frame: facing right with
+		// left-authored art, or facing left with right-authored art
+		bool mirrored() const { return !noflip && (flip != facesright); }
+
 		std::map<Stance, Animation> animations;
 		std::string name;
 		Sound hitsound;
@@ -229,6 +233,11 @@ namespace ms
 		bool undead;
 		bool touchdamage;
 		bool noflip;
+		// True for AI-generated mobs (info/ai = 1): their frames are authored
+		// facing right instead of the vanilla left, so the draw mirror is
+		// inverted. Movement and the stance byte still use `flip` (the
+		// logical facing) unchanged.
+		bool facesright;
 		bool notattack;
 		bool canmove;
 		bool canjump;

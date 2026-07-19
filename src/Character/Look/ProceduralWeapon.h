@@ -24,6 +24,9 @@
 
 #include <nlnx/node.hpp>
 
+#include <map>
+#include <vector>
+
 namespace ms
 {
 	class ProceduralWeapon
@@ -54,6 +57,10 @@ namespace ms
 		};
 
 		Pose pose_for(Stance::Id stance, uint8_t frame) const;
+		// Baked pose sprite: canonical pixels rotated (supersampled + re-inked)
+		// with optional thrust foreshortening; origin = the rotated grip.
+		// Cached per (stance, frame) — angles are deterministic per frame.
+		const Texture& posed(Stance::Id stance, uint8_t frame, float th, float axial, Point<int16_t> pivot) const;
 
 		Texture texture;
 		CharacterAura glow;   // optional blade effect (default/weapon/effect), rides the transform
@@ -62,6 +69,11 @@ namespace ms
 		Point<int16_t> dim;                       // canonical canvas (96 x 96)
 		const BodyDrawInfo* drawinfo = nullptr;   // points at the process-wide static
 		Weapon::Type type = Weapon::Type::NONE;
+		int32_t itemid = 0;
 		bool valid = false;
+
+		// Canonical pixels (material-retextured when present) for pose baking
+		std::vector<uint8_t> canon;
+		mutable std::map<int32_t, Texture> posed_cache;
 	};
 }

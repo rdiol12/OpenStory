@@ -94,32 +94,51 @@ namespace ms
 
 		int16_t size = recv.read_short();
 
+		struct ShopEntry
+		{
+			int32_t itemid, price, pitch, time;
+			int16_t chargeprice, buyable;
+			bool recharge;
+		};
+		std::vector<ShopEntry> entries;
+		entries.reserve(size);
+
 		for (int16_t i = 0; i < size; i++)
 		{
-			int32_t itemid = recv.read_int();
-			int32_t price = recv.read_int();
-			int32_t pitch = recv.read_int();
-			int32_t time = recv.read_int();
+			ShopEntry e{};
+			e.itemid = recv.read_int();
+			e.price = recv.read_int();
+			e.pitch = recv.read_int();
+			e.time = recv.read_int();
 
 			recv.skip(4);
 
-			bool norecharge = recv.read_short() == 1;
+			e.recharge = recv.read_short() != 1;
 
-			if (norecharge)
+			if (!e.recharge)
 			{
-				int16_t buyable = recv.read_short();
-
-				shop.add_item(itemid, price, pitch, time, buyable);
+				e.buyable = recv.read_short();
 			}
 			else
 			{
 				recv.skip(4);
-
-				int16_t rechargeprice = recv.read_short();
-				int16_t slotmax = recv.read_short();
-
-				shop.add_rechargable(itemid, price, pitch, time, rechargeprice, slotmax);
+				e.chargeprice = recv.read_short();
+				e.buyable = recv.read_short();
 			}
+
+			entries.push_back(e);
+		}
+
+		// Trailing currency item id (0 = mesos); older servers omit it
+		int32_t currency = recv.length() >= 4 ? recv.read_int() : 0;
+		shop.set_currency_item(currency);
+
+		for (const ShopEntry& e : entries)
+		{
+			if (e.recharge)
+				shop.add_rechargable(e.itemid, e.price, e.pitch, e.time, e.chargeprice, e.buyable);
+			else
+				shop.add_item(e.itemid, e.price, e.pitch, e.time, e.buyable);
 		}
 
 		// All items loaded — now we know which categories this shop

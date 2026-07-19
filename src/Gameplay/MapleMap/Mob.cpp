@@ -47,6 +47,10 @@ namespace ms
 		touchdamage = info["bodyAttack"].get_bool();
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
+		// info/ai = 1 marks a server-generated mob. The generator always draws
+		// them facing right, opposite the vanilla left-facing convention —
+		// invert their draw mirror so they walk the way they point
+		facesright = info["ai"].get_bool();
 		notattack = info["notAttack"].get_bool();
 		boss = info["boss"].get_bool();
 		canjump = src["jump"].size() > 0;
@@ -410,7 +414,7 @@ namespace ms
 		if (it == animations.end())
 			return;
 
-		bool f = flip && !noflip;
+		bool f = mirrored();
 
 		// Scale the sprite about `position` (the mob's feet on the minimap),
 		// mirroring the world draw's flip handling.
@@ -435,10 +439,10 @@ namespace ms
 			{
 				// Blue tint for frozen mobs
 				Color freeze_color(0.5f, 0.7f, 1.0f, interopc);
-				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, Point<int16_t>(0, 0)), alpha);
+				animations.at(stance).draw(DrawArgument(absp, mirrored(), Point<int16_t>(0, 0)), alpha);
 				// Draw with blue overlay
 				DrawArgument freeze_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
-					flip && !noflip ? -1.0f : 1.0f, 1.0f, freeze_color, 0.0f);
+					mirrored() ? -1.0f : 1.0f, 1.0f, freeze_color, 0.0f);
 				animations.at(stance).draw(freeze_arg, alpha);
 			}
 			else if (poisoned)
@@ -446,7 +450,7 @@ namespace ms
 				// Green tint for poisoned mobs
 				Color poison_color(0.5f, 1.0f, 0.5f, interopc);
 				DrawArgument poison_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
-					flip && !noflip ? -1.0f : 1.0f, 1.0f, poison_color, 0.0f);
+					mirrored() ? -1.0f : 1.0f, 1.0f, poison_color, 0.0f);
 				animations.at(stance).draw(poison_arg, alpha);
 			}
 			else if (stunned)
@@ -454,12 +458,12 @@ namespace ms
 				// Yellow tint for stunned mobs
 				Color stun_color(1.0f, 1.0f, 0.5f, interopc);
 				DrawArgument stun_arg(absp, Point<int16_t>(0, 0), Point<int16_t>(0, 0),
-					flip && !noflip ? -1.0f : 1.0f, 1.0f, stun_color, 0.0f);
+					mirrored() ? -1.0f : 1.0f, 1.0f, stun_color, 0.0f);
 				animations.at(stance).draw(stun_arg, alpha);
 			}
 			else
 			{
-				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+				animations.at(stance).draw(DrawArgument(absp, mirrored(), interopc), alpha);
 			}
 
 			if (showhp)
@@ -520,7 +524,7 @@ namespace ms
 	{
 		Point<int16_t> head = animations.at(stance).get_head();
 
-		position.shift_x((flip && !noflip) ? -head.x() : head.x());
+		position.shift_x(mirrored() ? -head.x() : head.x());
 		position.shift_y(head.y());
 
 		return position;
