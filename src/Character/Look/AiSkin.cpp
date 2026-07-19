@@ -380,7 +380,7 @@ namespace ms
 				return Texture::from_pixels(key, w, h, std::move(out), origin);
 			}
 
-			// Part anchor resolution shared by synthesize and part_pixels
+			// Part anchor resolution for synthesize
 			void part_setup(const std::string& stancename, const std::string& part, nl::node partnode,
 				bool& is_arm, bool& is_prone, Point<int16_t>& anchor, Point<int16_t>& origin)
 			{
@@ -511,6 +511,128 @@ namespace ms
 			return build(iter->second, iconnode, key, true, Point<int16_t>(), false, false, iconnode["origin"]);
 		}
 
+		bool transform_pixels(const std::vector<uint8_t>& src, int16_t width, int16_t height,
+			Point<int16_t> pivot, float rot, float axial,
+			std::vector<uint8_t>& out, int16_t& out_width, int16_t& out_height, Point<int16_t>& out_pivot)
+		{
+			if (width <= 0 || height <= 0 || axial <= 0.0f ||
+				src.size() != size_t(width) * height * 4)
+				return false;
+
+			float c = std::cos(rot);
+			float s = std::sin(rot);
+
+			// Forward-transform the corners: d = R * S(axial on y) * (p - pivot)
+			float min_x = 0.0f, max_x = 0.0f, min_y = 0.0f, max_y = 0.0f;
+
+			for (int corner = 0; corner < 4; ++corner)
+			{
+				float px = ((corner & 1) ? float(width) : 0.0f) - pivot.x();
+				float py = (((corner & 2) ? float(height) : 0.0f) - pivot.y()) * axial;
+				float rx = c * px - s * py;
+				float ry = s * px + c * py;
+
+				min_x = std::min(min_x, rx);
+				max_x = std::max(max_x, rx);
+				min_y = std::min(min_y, ry);
+				max_y = std::max(max_y, ry);
+			}
+
+			out_width = int16_t(std::ceil(max_x - min_x)) + 1;
+			out_height = int16_t(std::ceil(max_y - min_y)) + 1;
+
+			if (out_width <= 0 || out_height <= 0 || out_width > 256 || out_height > 256)
+				return false;
+
+			out_pivot = Point<int16_t>(int16_t(-min_x), int16_t(-min_y));
+			out.assign(size_t(out_width) * out_height * 4, 0);
+
+			// 3x3 supersampled inverse mapping
+			constexpr float SUB[3] = { -0.33f, 0.0f, 0.33f };
+
+			for (int16_t y = 0; y < out_height; ++y)
+			{
+				for (int16_t x = 0; x < out_width; ++x)
+				{
+					float sum_b = 0.0f, sum_g = 0.0f, sum_r = 0.0f, sum_a = 0.0f;
+
+					for (int iy = 0; iy < 3; ++iy)
+					{
+						for (int ix = 0; ix < 3; ++ix)
+						{
+							float rx = float(x - out_pivot.x()) + SUB[ix];
+							float ry = float(y - out_pivot.y()) + SUB[iy];
+
+							// inverse: local = S^-1 * R^T * r; src = pivot + local
+							float lx = c * rx + s * ry;
+							float ly = (-s * rx + c * ry) / axial;
+							int src_x = int(std::floor(pivot.x() + lx));
+							int src_y = int(std::floor(pivot.y() + ly));
+
+							if (src_x < 0 || src_y < 0 || src_x >= width || src_y >= height)
+								continue;
+
+							const uint8_t* p = &src[(size_t(src_y) * width + src_x) * 4];
+							float a = p[3] / 255.0f;
+							sum_b += p[0] * a;
+							sum_g += p[1] * a;
+							sum_r += p[2] * a;
+							sum_a += a;
+						}
+					}
+
+					float alpha = sum_a / 9.0f;
+
+					if (alpha < 0.25f)
+						continue;
+
+					uint8_t* d = &out[(size_t(y) * out_width + x) * 4];
+					d[0] = uint8_t(std::min(sum_b / sum_a, 255.0f));
+					d[1] = uint8_t(std::min(sum_g / sum_a, 255.0f));
+					d[2] = uint8_t(std::min(sum_r / sum_a, 255.0f));
+					d[3] = alpha >= 0.62f ? 255 : uint8_t(alpha * 255.0f);
+				}
+			}
+
+			// Re-ink the outline: boundary pixels get pulled toward black so the
+			// transformed sprite keeps a hand-drawn 1px ink line
+			std::vector<uint8_t> alpha_map(size_t(out_width) * out_height);
+
+			for (size_t i = 0; i < alpha_map.size(); ++i)
+				alpha_map[i] = out[i * 4 + 3];
+
+			auto solid = [&](int x, int y) -> bool
+			{
+				if (x < 0 || y < 0 || x >= out_width || y >= out_height)
+					return false;
+
+				return alpha_map[size_t(y) * out_width + x] >= 64;
+			};
+
+			for (int16_t y = 0; y < out_height; ++y)
+			{
+				for (int16_t x = 0; x < out_width; ++x)
+				{
+					if (!solid(x, y))
+						continue;
+
+					bool boundary = !solid(x - 1, y) || !solid(x + 1, y) ||
+						!solid(x, y - 1) || !solid(x, y + 1);
+
+					if (!boundary)
+						continue;
+
+					uint8_t* d = &out[(size_t(y) * out_width + x) * 4];
+					d[0] = uint8_t(d[0] * 0.35f);
+					d[1] = uint8_t(d[1] * 0.35f);
+					d[2] = uint8_t(d[2] * 0.35f);
+					d[3] = 255;
+				}
+			}
+
+			return true;
+		}
+
 		Texture lean_shell(int32_t itemid, nl::node info, nl::node viewnode, const std::string& key, float rot)
 		{
 			if (viewnode.data_type() != nl::node::type::bitmap)
@@ -524,50 +646,14 @@ namespace ms
 
 			Point<int16_t> origin = viewnode["origin"];
 
-			// Rotate around the collar origin (nearest sampling), expanding the
-			// canvas to the rotated bounding box
-			float c = std::cos(rot);
-			float s = std::sin(rot);
+			// Supersampled rotation + outline re-ink — the lean reads as
+			// hand-drawn instead of jagged
+			std::vector<uint8_t> out;
+			int16_t out_w = 0, out_h = 0;
+			Point<int16_t> out_origin;
 
-			float min_x = 0.0f, max_x = 0.0f, min_y = 0.0f, max_y = 0.0f;
-
-			for (int corner = 0; corner < 4; ++corner)
-			{
-				float cx = (corner & 1) ? float(w) : 0.0f;
-				float cy = (corner & 2) ? float(h) : 0.0f;
-				float rx = c * (cx - origin.x()) - s * (cy - origin.y());
-				float ry = s * (cx - origin.x()) + c * (cy - origin.y());
-
-				min_x = std::min(min_x, rx);
-				max_x = std::max(max_x, rx);
-				min_y = std::min(min_y, ry);
-				max_y = std::max(max_y, ry);
-			}
-
-			int16_t out_w = int16_t(std::ceil(max_x - min_x)) + 1;
-			int16_t out_h = int16_t(std::ceil(max_y - min_y)) + 1;
-
-			if (out_w <= 0 || out_h <= 0 || out_w > 256 || out_h > 256)
+			if (!transform_pixels(px, w, h, origin, rot, 1.0f, out, out_w, out_h, out_origin))
 				return Texture();
-
-			Point<int16_t> out_origin(int16_t(-min_x), int16_t(-min_y));
-			std::vector<uint8_t> out(size_t(out_w) * out_h * 4, 0);
-
-			for (int16_t y = 0; y < out_h; ++y)
-			{
-				for (int16_t x = 0; x < out_w; ++x)
-				{
-					float rx = float(x - out_origin.x());
-					float ry = float(y - out_origin.y());
-					int src_x = int(std::floor(c * rx + s * ry + origin.x()));
-					int src_y = int(std::floor(-s * rx + c * ry + origin.y()));
-
-					if (src_x < 0 || src_y < 0 || src_x >= w || src_y >= h)
-						continue;
-
-					std::copy_n(&px[(size_t(src_y) * w + src_x) * 4], 4, &out[(size_t(y) * out_w + x) * 4]);
-				}
-			}
 
 			return Texture::from_pixels(key, out_w, out_h, std::move(out), out_origin);
 		}
@@ -680,22 +766,6 @@ namespace ms
 			b = std::min(b / mx, 1.0f);
 
 			return true;
-		}
-
-		bool part_pixels(int32_t itemid, nl::node info, const std::string& stancename, const std::string& part, nl::node partnode, std::vector<uint8_t>& bgra, int16_t& width, int16_t& height)
-		{
-			const Material& material = load_material(itemid, info);
-
-			if (!material.valid)
-				return false;
-
-			bool is_arm, is_prone;
-			Point<int16_t> anchor, origin;
-			part_setup(stancename, part, partnode, is_arm, is_prone, anchor, origin);
-
-			const Material& chosen = (is_arm && material.arm) ? *material.arm : material;
-
-			return build_pixels(chosen, partnode, is_arm, anchor, is_prone, !is_arm, bgra, width, height);
 		}
 
 		bool shell_pixels(int32_t itemid, nl::node info, nl::node viewnode, bool rotate90, std::vector<uint8_t>& bgra, int16_t& width, int16_t& height)

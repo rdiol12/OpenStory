@@ -195,10 +195,13 @@ namespace ms
 		uint64_t firstmask = recv.read_long();
 		uint64_t secondmask = recv.read_long();
 
-		switch (secondmask)
+		// Battleship's mask spans three bits and is sent alone; match it whole
+		// here so the per-bit loop below can never partially match it against
+		// ordinary WDEF/MDEF/MANA_REFLECTION buffs.
+		if (secondmask == Buffstat::second_codes.at(Buffstat::BATTLESHIP))
 		{
-		case Buffstat::BATTLESHIP:
 			handle_buff(recv, Buffstat::BATTLESHIP);
+			Stage::get().get_player().recalc_stats(false);
 			return;
 		}
 
@@ -207,7 +210,7 @@ namespace ms
 				handle_buff(recv, iter.first);
 
 		for (auto& iter : Buffstat::second_codes)
-			if (secondmask & iter.second)
+			if (iter.first != Buffstat::BATTLESHIP && (secondmask & iter.second))
 				handle_buff(recv, iter.first);
 
 		Stage::get().get_player().recalc_stats(false);
@@ -215,6 +218,12 @@ namespace ms
 
 	void ApplyBuffHandler::handle_buff(InPacket& recv, Buffstat::Id bs) const
 	{
+		// Each stat consumes one 10-byte record. If the server flagged a stat
+		// we map differently (or sent fewer records), drop the extras instead
+		// of reading into the packet tail.
+		if (recv.length() < 10)
+			return;
+
 		int16_t value = recv.read_short();
 		int32_t skillid = recv.read_int();
 		int32_t duration = recv.read_int();

@@ -128,7 +128,22 @@ namespace ms
 		Point<int16_t> speaker_pos = position + Point<int16_t>(22, 11 + speaker_y);
 		Point<int16_t> center_pos = speaker_pos + Point<int16_t>(nametag.width() / 2, 0);
 
-		speaker.draw(DrawArgument(center_pos, true));
+		// Oversized (AI-generated) NPC art: shrink it about its feet anchor so
+		// it never grows past the dialog panel. Vanilla-sized art is untouched.
+		constexpr int16_t SPEAKER_MAX_W = 100;
+		const int16_t speaker_max_h = static_cast<int16_t>(speaker_y - 6);
+		float fit = 1.0f;
+
+		if (speaker.height() > speaker_max_h)
+			fit = static_cast<float>(speaker_max_h) / speaker.height();
+
+		if (speaker.width() * fit > SPEAKER_MAX_W)
+			fit = static_cast<float>(SPEAKER_MAX_W) / speaker.width();
+
+		if (fit < 1.0f)
+			speaker.draw(DrawArgument(center_pos, center_pos, Point<int16_t>(0, 0), -fit, fit, 1.0f, 0.0f));
+		else
+			speaker.draw(DrawArgument(center_pos, true));
 		nametag.draw(speaker_pos);
 		name.draw(center_pos + Point<int16_t>(0, -4));
 

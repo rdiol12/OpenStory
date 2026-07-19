@@ -308,6 +308,13 @@ namespace ms
 			std::string sign = (gain < 0) ? "-" : "+";
 			show_status(Color::Name::WHITE, "You have gained mesos. (" + sign + std::to_string(amt) + ")");
 		}
+		else if (mode == 9)
+		{
+			// Cosmic showInfoText / getDojoInfoMessage: a plain system info
+			// string (events, dojo, live-ops scripts)
+			if (recv.available())
+				show_status(Color::Name::YELLOW, recv.read_string());
+		}
 		else
 		{
 			// Surface unknown info modes so we can spot anything still unhandled.

@@ -104,5 +104,11 @@ namespace ms
 		// Client-side rate limit on Teleport (ticks). The base skill has no data
 		// cooldown, so without this the player could blink every frame.
 		int16_t teleport_cooldown = 0;
+
+		// Skill we just cast (use effect already played locally) — the server
+		// echoes the cast back as SHOW_ITEM_GAIN_INCHAT/1 and show_player_buff
+		// must not replay it, or every sound plays twice
+		int32_t local_cast_id = 0;
+		int16_t local_cast_timeout = 0;
 	};
 }

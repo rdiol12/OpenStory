@@ -16,8 +16,9 @@
 
 namespace ms
 {
-	ProceduralWeapon::ProceduralWeapon(nl::node weaponnode, int32_t itemid, const BodyDrawInfo& di)
+	ProceduralWeapon::ProceduralWeapon(nl::node weaponnode, int32_t id, const BodyDrawInfo& di)
 	{
+		itemid = id;
 		nl::node wnode = weaponnode["default"]["weapon"];
 
 		texture = Texture(wnode);
@@ -32,6 +33,12 @@ namespace ms
 
 			if (themed.is_valid())
 				texture = themed;
+		}
+
+		// Canonical pixels for pose baking (retextured when material present)
+		{
+			int16_t cw = 0, ch = 0;
+			AiSkin::shell_pixels(itemid, weaponnode["info"], wnode, false, canon, cw, ch);
 		}
 		grip = wnode["map"]["grip"];
 		tip = wnode["map"]["tip"];
@@ -325,64 +332,75 @@ namespace ms
 		{
 			th = pose.angle * DEG;
 		}
-		float c = std::cos(th);
-		float s = std::sin(th);
+		// Thrust foreshortening: an extending blade points partly toward the
+		// viewer, so shorten it along its axis for the depth read
+		float axial = 1.0f;
 
-		float hw = dim.x() / 2.0f;
-		float hh = dim.y() / 2.0f;
+		if (pose.track_arm)
+		{
+			bool is_stab = stance == Stance::Id::STABO1 || stance == Stance::Id::STABO2 ||
+				stance == Stance::Id::STABOF || stance == Stance::Id::STABT1 ||
+				stance == Stance::Id::STABT2 || stance == Stance::Id::STABTF ||
+				stance == Stance::Id::PRONESTAB;
+
+			if (is_stab)
+				axial = frame == 0 ? 0.9f : 0.78f;
+		}
+
 		// Per-type hold adjustment (e.g. hold a pike lower for a two-handed look) —
 		// only at rest; during attacks the grip stays at the true pivot so the
 		// swing/thrust rotates cleanly.
 		Point<int16_t> g = (pose.track_arm || pose.back) ? grip : grip + grip_offset(type);
-		float gx = g.x() - hw; // grip relative to sprite centre
-		float gy = g.y() - hh;
+
+		// Baked pose sprite: supersampled rotation + outline re-ink, cached per
+		// (stance, frame). Its origin is the rotated grip, so it draws like any
+		// authored equip part — the engine's mirror handles facing.
+		const Texture& posedtex = posed(stance, frame, th, axial, g);
+
+		if (!posedtex.is_valid())
+			return;
 
 		bool flip = args.get_xscale() < 0.0f;
 
-		// Place the sprite so the rotated grip lands on the hand anchor.
-		// (Rotation is about the rect centre; this offset compensates. 0 px error.)
-		// The engine mirrors the sprite for facing-left but still rotates by the
-		// DrawArgument angle, so the blade direction is (sin, -cos) either way —
-		// facing-left must NEGATE the angle to point the mirrored direction.
-		float py = hand.y() - hh - (gx * s + gy * c);
-		float px = flip ? (hw - hand.x() - (gx * c + gy * s))
-		                : (hand.x() - hw - (gx * c - gy * s));
-
-		// A gun is chiral (distinct top/bottom: sight up, grip down). Pointing it
-		// forward needs the angle negation above, which REFLECTS the sprite — a
-		// symmetric blade doesn't care, but the gun lands upside-down. Re-mirror
-		// the gun sprite about its own Y axis to restore chirality: the barrel
-		// direction is unchanged (it depends only on the draw angle), only the
-		// sight side swaps. The mirror moves the grip, so add the compensating
-		// shift that pins it back onto the hand.
-		bool gun = (type == Weapon::Type::GUN);
-		if (gun)
-		{
-			float fsign = flip ? -1.0f : 1.0f;
-			px += 2.0f * fsign * (hw + gx * c);
-			py += 2.0f * fsign * (gx * s);
-		}
-
-		// The placement above is in full sprite pixels. When the whole look is
-		// drawn scaled (e.g. shrunk to ~0.28x on the minimap), the weapon texture
-		// scales with `args`, but this positional shift must scale too — otherwise
-		// the weapon lands a full-size offset away from the tiny character and
-		// smears across the minimap. At world scale |scale| == 1, so this is a
-		// no-op there.
+		// Positional shift scales with the args (minimap) and mirrors with facing
 		float sx = std::fabs(args.get_xscale());
 		float sy = std::fabs(args.get_yscale());
-		Point<int16_t> shift(static_cast<int16_t>(std::lround(px * sx)), static_cast<int16_t>(std::lround(py * sy)));
+		Point<int16_t> shift(
+			static_cast<int16_t>(std::lround((flip ? -hand.x() : hand.x()) * sx)),
+			static_cast<int16_t>(std::lround(hand.y() * sy)));
 
-		float draw_angle = flip ? -th : th;
+		DrawArgument wargs = args + shift;
 
-		// Compose onto the character args (keeps its flip + flip-centre), add
-		// rotation. For a gun the extra flip=true mirrors the sprite (chirality fix).
-		DrawArgument wargs = (args + shift) + DrawArgument(draw_angle, Point<int16_t>(0, 0), gun, 1.0f);
+		// The glow keeps the live-rotation path (soft light — sampling artifacts
+		// are invisible there) so it still wraps the blade angle
+		DrawArgument gargs = wargs + DrawArgument(flip ? -th : th, Point<int16_t>(0, 0), false, 1.0f);
 
-		// The glow is authored in the same canvas, so the identical transform makes
-		// it wrap the blade — behind, then the weapon, then in front.
-		glow.draw_back(wargs, 1.0f);
-		texture.draw(wargs);
-		glow.draw_front(wargs, 1.0f);
+		glow.draw_back(gargs, 1.0f);
+		posedtex.draw(wargs);
+		glow.draw_front(gargs, 1.0f);
+	}
+
+	const Texture& ProceduralWeapon::posed(Stance::Id stance, uint8_t frame, float th, float axial, Point<int16_t> pivot) const
+	{
+		int32_t key = int32_t(stance) * 256 + frame;
+		auto iter = posed_cache.find(key);
+
+		if (iter != posed_cache.end())
+			return iter->second;
+
+		Texture baked;
+		std::vector<uint8_t> out;
+		int16_t out_w = 0, out_h = 0;
+		Point<int16_t> out_pivot;
+
+		if (!canon.empty() &&
+			AiSkin::transform_pixels(canon, dim.x(), dim.y(), pivot, th, axial, out, out_w, out_h, out_pivot))
+		{
+			baked = Texture::from_pixels(
+				"procwpn/" + std::to_string(itemid) + "/" + std::to_string(key),
+				out_w, out_h, std::move(out), out_pivot);
+		}
+
+		return posed_cache.emplace(key, std::move(baked)).first->second;
 	}
 }

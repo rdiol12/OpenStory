@@ -38,6 +38,9 @@ namespace ms
 			{ Id::SPEED_INFUSION, 0x100000000000000L }
 		};
 
+		// One record is read per set bit, so every entry must own a unique bit
+		// (values mirror the server's BuffStat). BATTLESHIP is a composite mask
+		// handled whole in BuffHandler, never bit-by-bit.
 		const std::unordered_map<Id, uint64_t> second_codes =
 		{
 			{ Id::NONE, 0x0 },
@@ -69,7 +72,6 @@ namespace ms
 			{ Id::ACC, 0x1000000000L },
 			{ Id::AVOID, 0x2000000000L },
 			{ Id::HANDS, 0x4000000000L },
-			{ Id::SHOWDASH, 0x4000000000L },
 			{ Id::SPEED, 0x8000000000L },
 			{ Id::JUMP, 0x10000000000L },
 			{ Id::MAGIC_GUARD, 0x20000000000L },
@@ -85,14 +87,13 @@ namespace ms
 			{ Id::SEAL, 0x8000000000000L },
 			{ Id::DARKNESS, 0x10000000000000L },
 			{ Id::COMBO, 0x20000000000000L },
-			{ Id::SUMMON, 0x20000000000000L },
 			{ Id::WK_CHARGE, 0x40000000000000L },
 			{ Id::DRAGONBLOOD, 0x80000000000000L },
 			{ Id::HOLY_SYMBOL, 0x100000000000000L },
 			{ Id::MESOUP, 0x200000000000000L },
 			{ Id::SHADOWPARTNER, 0x400000000000000L },
 			{ Id::PICKPOCKET, 0x800000000000000L },
-			{ Id::PUPPET, 0x800000000000000L },
+			{ Id::PUPPET, 0x4000L },
 			{ Id::MESOGUARD, 0x1000000000000000L },
 			{ Id::WEAKEN, 0x4000000000000000L }
 		};

@@ -220,10 +220,26 @@ namespace ms
 	{
 		npc.update();
 
-		int64_t num_mesos = inventory.get_meso();
-		std::string mesostr = std::to_string(num_mesos);
-		string_format::split_number(mesostr);
-		mesolabel.change_text(mesostr);
+		if (currency_item > 0)
+		{
+			InventoryType::Id ctype = InventoryType::by_item_id(currency_item);
+			int32_t total = 0;
+
+			for (int16_t i = 1; i <= inventory.get_slotmax(ctype); i++)
+				if (inventory.get_item_id(ctype, i) == currency_item)
+					total += inventory.get_item_count(ctype, i);
+
+			std::string cstr = std::to_string(total);
+			string_format::split_number(cstr);
+			mesolabel.change_text(cstr + " " + currency_name);
+		}
+		else
+		{
+			int64_t num_mesos = inventory.get_meso();
+			std::string mesostr = std::to_string(num_mesos);
+			string_format::split_number(mesostr);
+			mesolabel.change_text(mesostr);
+		}
 	}
 
 	Button::State UIShop::button_pressed(uint16_t buttonid)
@@ -612,6 +628,9 @@ namespace ms
 
 	void UIShop::reset(int32_t npcid)
 	{
+		currency_item = 0;
+		currency_name.clear();
+
 		std::string strid = string_format::extend_id(npcid, 7);
 		// Load the shopkeeper's animated stand so the portrait breathes /
 		// blinks instead of being a still frame. Follow an "info/link"
@@ -665,6 +684,18 @@ namespace ms
 			changeselltab(type);
 	}
 
+	void UIShop::set_currency_item(int32_t itemid)
+	{
+		currency_item = itemid;
+
+		if (itemid > 0)
+		{
+			const ItemData& idata = ItemData::get(itemid);
+			currency_icon = idata.get_icon(false);
+			currency_name = idata.is_valid() ? idata.get_name() : "Coin";
+		}
+	}
+
 	void UIShop::add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable)
 	{
 		add_rechargable(id, price, pitch, time, 0, buyable);
@@ -672,7 +703,10 @@ namespace ms
 
 	void UIShop::add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice, int16_t buyable)
 	{
-		auto buyitem = BuyItem(meso, id, price, pitch, time, chargeprice, buyable);
+		const bool coin = currency_item > 0;
+		auto buyitem = coin
+			? BuyItem(currency_icon, true, " " + currency_name, id, price, pitch, time, chargeprice, buyable)
+			: BuyItem(meso, false, "meso", id, price, pitch, time, chargeprice, buyable);
 		buystate.add(buyitem);
 
 		// lastslot reflects the filtered view only; enable slider if
@@ -769,7 +803,7 @@ namespace ms
 		NpcShopActionPacket().dispatch();
 	}
 
-	UIShop::BuyItem::BuyItem(Texture cur, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b) : currency(cur), id(i), price(p), pitch(pt), time(t), chargeprice(cp), buyable(b)
+	UIShop::BuyItem::BuyItem(Texture cur, bool ic, const std::string& suffix, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b) : currency(cur), item_currency(ic), id(i), price(p), pitch(pt), time(t), chargeprice(cp), buyable(b)
 	{
 		namelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
 		pricelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
@@ -785,14 +819,20 @@ namespace ms
 		int32_t display_price = (chargeprice > 0 && price == 0) ? chargeprice : price;
 		std::string mesostr = std::to_string(display_price);
 		string_format::split_number(mesostr);
-		pricelabel.change_text(mesostr + "meso");
+		pricelabel.change_text(mesostr + suffix);
 	}
 
 	void UIShop::BuyItem::draw(Point<int16_t> pos) const
 	{
 		icon.draw(pos + Point<int16_t>(0, 42));
 		namelabel.draw(pos + Point<int16_t>(40, 6));
-		currency.draw(pos + Point<int16_t>(38, 29));
+
+		// 32px item icon at half scale where the meso coin sits
+		if (item_currency)
+			currency.draw(DrawArgument(pos + Point<int16_t>(38, 43), 0.5f, 0.5f));
+		else
+			currency.draw(pos + Point<int16_t>(38, 29));
+
 		pricelabel.draw(pos + Point<int16_t>(55, 24));
 	}
 

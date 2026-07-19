@@ -75,6 +75,14 @@ namespace ms
 		// attacks, so it follows the lunge instead of staying bolt-upright
 		Texture lean_shell(int32_t itemid, nl::node info, nl::node viewnode, const std::string& key, float rot);
 
+		// Quality transform for pixel art: rotate around a pivot with 3x3
+		// supersampling (no jaggies), optional axial scale along the sprite's
+		// vertical axis (thrust foreshortening), then re-ink the 1px outline —
+		// arbitrary angles come out looking hand-drawn instead of rotated.
+		bool transform_pixels(const std::vector<uint8_t>& src, int16_t width, int16_t height,
+			Point<int16_t> pivot, float rot, float axial,
+			std::vector<uint8_t>& out, int16_t& out_width, int16_t& out_height, Point<int16_t>& out_pivot);
+
 		// Icon rendered from the aiShell upright view (scaled to fit the icon
 		// canvas), so shell items show their real shape in the inventory
 		Texture icon_from_shell(int32_t itemid, nl::node info);
@@ -89,10 +97,10 @@ namespace ms
 		// (info/effectTint=1). Returns false when the item has no material.
 		bool accent_color(int32_t itemid, nl::node info, float& r, float& g, float& b);
 
-		// Preview support (Custom/preview.txt): synthesized BGRA pixels of a
-		// part frame / shell view, without touching the GL atlas. Return false
-		// when no material is present or the node is not a bitmap.
-		bool part_pixels(int32_t itemid, nl::node info, const std::string& stancename, const std::string& part, nl::node partnode, std::vector<uint8_t>& bgra, int16_t& width, int16_t& height);
+		// Synthesized BGRA pixels of a shell view (raw copy when no material),
+		// without touching the GL atlas — feeds icon synthesis and the
+		// procedural weapon's canonical pixels. Returns false when the node is
+		// not a bitmap.
 		bool shell_pixels(int32_t itemid, nl::node info, nl::node viewnode, bool rotate90, std::vector<uint8_t>& bgra, int16_t& width, int16_t& height);
 	}
 }
