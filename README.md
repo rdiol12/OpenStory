@@ -1,8 +1,21 @@
 # OpenStory
 
+> ⚠️ **Very much WIP** — client and server are under heavy active development; expect rough edges.
+
 A v83 MapleStory client for Cosmic/private servers. Forked from [HeavenClient](https://github.com/HeavenClient/HeavenClient).
 
 **Status: Playable** — functional for gameplay, UI polish ongoing.
+
+## Launcher & live server
+
+[`launcher/`](launcher/) holds the GenMs launcher (WPF, .NET 8): it syncs game data/client
+from the update server and launches the game — see its [README](launcher/README.md).
+Safe to point at if you want to see the client working:
+
+- Game server: `genms.fun` (`72.60.176.12`), port `8484`
+- Update server: `https://72.60.176.12/updates`
+
+CI builds both the client and the launcher on every push (Actions → artifacts).
 
 ## Screenshots
 

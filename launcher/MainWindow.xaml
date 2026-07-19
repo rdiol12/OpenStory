@@ -1,0 +1,392 @@
+<Window x:Class="AugurLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GenMs" Width="980" Height="640" Icon="icon.ico"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        FontFamily="{StaticResource Brand}"
+        MouseLeftButtonDown="Window_Drag">
+
+    <Border CornerRadius="8" BorderBrush="{StaticResource MapleWood}" BorderThickness="1">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="{StaticResource SkyTopColor}" Offset="0"/>
+                <GradientStop Color="{StaticResource SkyColor}" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <Border.Effect>
+            <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="0" Opacity="0.45"/>
+        </Border.Effect>
+
+        <Grid Margin="1">
+            <!-- animated drifting maple leaves (populated in code) -->
+            <Canvas x:Name="LeafCanvas" ClipToBounds="True" IsHitTestVisible="False"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,10,0" Panel.ZIndex="10">
+                <Button x:Name="GearBtn" Style="{StaticResource ChromeButton}" Content="&#x2699;" Click="Settings_Click" ToolTip="Settings"/>
+                <Button x:Name="MinBtn" Style="{StaticResource ChromeButton}" Content="&#x2013;" Click="Min_Click"/>
+                <Button x:Name="CloseBtn" Style="{StaticResource ChromeButton}" Content="&#x2715;" Click="Close_Click"/>
+            </StackPanel>
+
+            <!-- ============ main two-column layout ============ -->
+            <!-- top margin reserves a strip for the window buttons so they don't overlap the cards -->
+            <Grid Margin="20,46,20,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="352"/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ===== LEFT: launch card ===== -->
+                <Border Grid.Column="0" Background="{StaticResource Parchment}" CornerRadius="8"
+                        BorderBrush="{StaticResource MapleWood}" BorderThickness="2" Padding="26,22">
+                    <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="2" Opacity="0.40"/></Border.Effect>
+
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center">
+                            <Image x:Name="LogoImage" Height="118" Stretch="Uniform" Margin="0,2,0,0">
+                                <Image.Effect><DropShadowEffect Color="#f4c542" BlurRadius="28" ShadowDepth="0" Opacity="0.75"/></Image.Effect>
+                            </Image>
+                            <TextBlock x:Name="Wordmark" Text="GenMs" FontSize="42" FontWeight="Bold"
+                                       Foreground="{StaticResource InkPrimary}" HorizontalAlignment="Center"
+                                       Visibility="Collapsed" Margin="0,8,0,0"/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,2">
+                                <Ellipse x:Name="StatusDot" Width="11" Height="11" Fill="{StaticResource Grey}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="ServerText" Text="Connecting…" Margin="8,0,0,0"
+                                           Foreground="{StaticResource InkSecondary}" FontSize="13" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <TextBlock x:Name="StatusText" Text="Checking for updates…" TextAlignment="Center"
+                                       TextWrapping="Wrap" Foreground="{StaticResource InkPrimary}" FontSize="15"
+                                       FontWeight="SemiBold" Margin="0,14,0,10"/>
+
+                            <!-- file picker (shown only when there are updates to choose) -->
+                            <Border x:Name="PickerPanel" Visibility="Collapsed"
+                                    Background="{StaticResource ParchmentHover}" CornerRadius="6"
+                                    BorderBrush="{StaticResource MapleWood}" BorderThickness="1" Padding="12,10" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,6">
+                                        <CheckBox x:Name="SelectAll" Style="{StaticResource FileCheck}" Content="Select all"
+                                                  FontWeight="SemiBold" Click="SelectAll_Click"/>
+                                        <TextBlock x:Name="SelSummary" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource InkSecondary}" FontSize="12"/>
+                                    </Grid>
+                                    <Border Height="1" Background="{StaticResource MapleWood}" Opacity="0.5" Margin="0,0,0,6"/>
+                                    <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl x:Name="FileList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox Style="{StaticResource FileCheck}" Margin="0,3"
+                                                              IsChecked="{Binding Selected, Mode=TwoWay}">
+                                                        <DockPanel LastChildFill="True" MinWidth="270">
+                                                            <TextBlock Text="{Binding SizeText}" DockPanel.Dock="Right"
+                                                                       Foreground="{StaticResource InkMuted}" FontSize="12"
+                                                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                            <Border DockPanel.Dock="Right" CornerRadius="6" Padding="6,1" Margin="8,0,0,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Background="{Binding IsNew, Converter={StaticResource TagBrush}}">
+                                                                <TextBlock Text="{Binding Tag}" Foreground="White" FontSize="10"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{StaticResource InkPrimary}" FontSize="13" VerticalAlignment="Center"/>
+                                                        </DockPanel>
+                                                    </CheckBox>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock x:Name="FileText" Text="" HorizontalAlignment="Left"
+                                           Foreground="{StaticResource InkMuted}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="SpeedText" Text="" HorizontalAlignment="Right"
+                                           Foreground="{StaticResource InkMuted}" FontSize="12"/>
+                            </Grid>
+
+                            <ProgressBar x:Name="Progress" Style="{StaticResource AugurProgress}" Minimum="0" Maximum="100" Value="0"/>
+
+                            <Button x:Name="ActionBtn" Style="{StaticResource PlayButton}" Content="&#x25B6;  PLAY"
+                                    Margin="0,22,0,0" IsEnabled="False" Click="Action_Click"/>
+
+                            <CheckBox x:Name="FullscreenQuick" Style="{StaticResource FileCheck}" Content="Launch in fullscreen"
+                                      HorizontalAlignment="Center" Margin="0,12,0,0"
+                                      Checked="FullscreenQuick_Toggled" Unchecked="FullscreenQuick_Toggled"/>
+
+                            <Button x:Name="SkipBtn" Style="{StaticResource LinkButton}" Content="Skip &amp; play with current files"
+                                    HorizontalAlignment="Center" Margin="0,8,0,0" Visibility="Collapsed" Click="Skip_Click"/>
+
+                            <Button x:Name="VerifyBtn" Style="{StaticResource LinkButton}" Content="&#x27F3;  Verify game files"
+                                    HorizontalAlignment="Center" Margin="0,8,0,0" Visibility="Collapsed" Click="Verify_Click"/>
+
+                            <TextBlock x:Name="ErrorText" Text="" TextAlignment="Center" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Red}" FontSize="12" Margin="0,10,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="VersionText" Text="v1.0" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                   Foreground="{StaticResource InkMuted}" FontSize="11"/>
+                    </Grid>
+                </Border>
+
+                <!-- ===== RIGHT: News (top) + GenAI's Log (bottom), always visible ===== -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="47*"/>
+                        <RowDefinition Height="16"/>
+                        <RowDefinition Height="53*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- News & Patch Notes -->
+                    <Border Grid.Row="0" Background="{StaticResource Parchment}" CornerRadius="8"
+                            BorderBrush="{StaticResource MapleWood}" BorderThickness="2" Padding="18,14">
+                        <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="2" Opacity="0.40"/></Border.Effect>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="2,0,0,10">
+                                <TextBlock Text="&#x1F4F0;" FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="News &amp; Patch Notes" FontSize="18" FontWeight="Bold"
+                                           Foreground="{StaticResource InkPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <ItemsControl x:Name="NewsList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource ParchmentHover}" CornerRadius="6" Padding="14,11" Margin="0,0,0,9"
+                                                        BorderBrush="{StaticResource MapleWood}" BorderThickness="1">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <Border DockPanel.Dock="Left" CornerRadius="6" Padding="7,1" Margin="0,0,8,0"
+                                                                    Background="{StaticResource MapleWood}"
+                                                                    Visibility="{Binding HasTag, Converter={StaticResource BoolVis}}">
+                                                                <TextBlock Text="{Binding Tag}" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                                                            </Border>
+                                                            <TextBlock DockPanel.Dock="Left" Text="{Binding Title}" FontWeight="Bold"
+                                                                       Foreground="{StaticResource InkPrimary}" FontSize="14" VerticalAlignment="Center"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding DateText}" Foreground="{StaticResource InkMuted}"
+                                                                       FontSize="11" VerticalAlignment="Center"/>
+                                                        </DockPanel>
+                                                        <TextBlock Text="{Binding Body}" TextWrapping="Wrap" Foreground="{StaticResource InkSecondary}" FontSize="13"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:Name="NewsEmpty" Text="No news yet — check back soon."
+                                               Foreground="{StaticResource InkMuted}" FontSize="12" TextAlignment="Center"
+                                               Margin="0,20" Visibility="Collapsed"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- GenAI's Log (live feed) -->
+                    <Border Grid.Row="2" Background="{StaticResource Parchment}" CornerRadius="8"
+                            BorderBrush="{StaticResource MapleWood}" BorderThickness="2" Padding="18,14">
+                        <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="2" Opacity="0.40"/></Border.Effect>
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Margin="2,0,0,10">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#x1F52E;" FontSize="17" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="GenAI's Log" FontSize="18" FontWeight="Bold"
+                                               Foreground="{StaticResource InkPrimary}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Ellipse x:Name="LiveDot" Width="9" Height="9" Fill="{StaticResource Green}" VerticalAlignment="Center">
+                                        <Ellipse.Triggers>
+                                            <EventTrigger RoutedEvent="Loaded">
+                                                <BeginStoryboard>
+                                                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.2" Duration="0:0:0.9"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </EventTrigger>
+                                        </Ellipse.Triggers>
+                                    </Ellipse>
+                                    <TextBlock Text="LIVE" Foreground="{StaticResource Green}" FontSize="11" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                            <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <ItemsControl x:Name="FeedList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource ParchmentHover}" CornerRadius="6" Padding="12,9" Margin="0,0,0,8"
+                                                        BorderBrush="{StaticResource MapleWood}" BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8" VerticalAlignment="Top" Margin="0,0,11,0"
+                                                                Background="{Binding Accent, Converter={StaticResource HexBrush}}">
+                                                            <TextBlock Text="{Binding Icon}" Foreground="White" FontSize="16"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1">
+                                                            <Grid>
+                                                                <TextBlock Text="{Binding Heading}" FontWeight="Bold" FontSize="12"
+                                                                           Foreground="{Binding Accent, Converter={StaticResource HexBrush}}"/>
+                                                                <TextBlock Text="{Binding When}" HorizontalAlignment="Right"
+                                                                           Foreground="{StaticResource InkMuted}" FontSize="11"/>
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{StaticResource InkPrimary}"
+                                                                       FontSize="13" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:Name="FeedEmpty" Text="No live-ops activity yet — the server AI will post here as it tunes rates, events and drops."
+                                               TextWrapping="Wrap" Foreground="{StaticResource InkMuted}" FontSize="12" TextAlignment="Center"
+                                               Margin="10,20" Visibility="Collapsed"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ===================== SETTINGS OVERLAY ===================== -->
+            <Grid x:Name="SettingsOverlay" Visibility="Collapsed" Background="#77000000">
+                <Border Width="390" VerticalAlignment="Center" Margin="0,10"
+                        Background="{StaticResource Parchment}" CornerRadius="8"
+                        BorderBrush="{StaticResource MapleWood}" BorderThickness="2" Padding="24,20">
+                    <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="4" Opacity="0.5"/></Border.Effect>
+                    <ScrollViewer MaxHeight="580" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <TextBlock Text="Settings" FontSize="23" FontWeight="Bold"
+                                       Foreground="{StaticResource InkPrimary}" HorizontalAlignment="Center"/>
+                            <Button Style="{StaticResource ChromeButton}" Content="&#x2715;" HorizontalAlignment="Right" Click="SettingsCancel_Click"/>
+                        </Grid>
+
+                        <!-- Connection -->
+                        <TextBlock Text="SERVER" Foreground="{StaticResource InkSecondary}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="86"/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Server address" Foreground="{StaticResource InkPrimary}" FontSize="13" Margin="0,0,0,4"/>
+                                <TextBox x:Name="ServerAddrBox" Style="{StaticResource AugurTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Port" Foreground="{StaticResource InkPrimary}" FontSize="13" Margin="0,0,0,4"/>
+                                <TextBox x:Name="ServerPortBox" Style="{StaticResource AugurTextBox}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="Update server (game data / NX downloads)" Foreground="{StaticResource InkPrimary}" FontSize="13" Margin="0,0,0,4"/>
+                        <TextBox x:Name="UpdateServerBox" Style="{StaticResource AugurTextBox}"/>
+                        <TextBlock Text="Where .nx game data and client updates are downloaded from — host, host:port or https://host."
+                                   Foreground="{StaticResource InkMuted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,18"/>
+
+                        <!-- Display -->
+                        <TextBlock Text="DISPLAY" Foreground="{StaticResource InkSecondary}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <TextBlock Text="Resolution" Foreground="{StaticResource InkPrimary}" FontSize="13" Margin="0,0,0,6"/>
+                        <WrapPanel x:Name="ResPanel">
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="3840 × 2160 (4K)" Tag="3840x2160"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="2560 × 1440" Tag="2560x1440"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="1920 × 1080" Tag="1920x1080"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="1600 × 900"  Tag="1600x900"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="1366 × 768"  Tag="1366x768"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="1280 × 720"  Tag="1280x720"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="1024 × 768"  Tag="1024x768"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="res" Content="800 × 600"   Tag="800x600"/>
+                        </WrapPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <CheckBox x:Name="FullscreenCheck" Style="{StaticResource FileCheck}" Content="Fullscreen" Margin="0,0,20,0"/>
+                            <CheckBox x:Name="VsyncCheck" Style="{StaticResource FileCheck}" Content="VSync"/>
+                        </StackPanel>
+
+                        <!-- Audio -->
+                        <TextBlock Text="AUDIO" Foreground="{StaticResource InkSecondary}" FontSize="11" FontWeight="Bold" Margin="0,18,0,8"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Music" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="BgmSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=BgmSlider, StringFormat={}{0:0}}"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Effects" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="SfxSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=SfxSlider, StringFormat={}{0:0}}"/>
+                        </Grid>
+
+                        <!-- Performance -->
+                        <TextBlock Text="PERFORMANCE" Foreground="{StaticResource InkSecondary}" FontSize="11" FontWeight="Bold" Margin="0,18,0,8"/>
+                        <TextBlock Text="Max FPS" Foreground="{StaticResource InkPrimary}" FontSize="13" Margin="0,0,0,6"/>
+                        <WrapPanel x:Name="FpsPanel">
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="30"  Tag="30"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="60"  Tag="60"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="120" Tag="120"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="144" Tag="144"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="240" Tag="240"/>
+                            <RadioButton Style="{StaticResource Pill}" GroupName="fps" Content="Unlimited" Tag="0"/>
+                        </WrapPanel>
+
+                        <CheckBox x:Name="ShowFpsCheck" Style="{StaticResource FileCheck}" Content="Show FPS counter (top-right)" Margin="0,10,0,0"/>
+
+                        <Grid Margin="0,8,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Graphics" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="GfxSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=GfxSlider, StringFormat={}{0:0}}"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Effects" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="EfxSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=EfxSlider, StringFormat={}{0:0}}"/>
+                        </Grid>
+
+                        <!-- Gameplay -->
+                        <TextBlock Text="GAMEPLAY" Foreground="{StaticResource InkSecondary}" FontSize="11" FontWeight="Bold" Margin="0,18,0,8"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="HP warning" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="HpSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=HpSlider, StringFormat={}{0:0}%}"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="MP warning" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="MpSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=MpSlider, StringFormat={}{0:0}%}"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="88"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Mouse speed" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource InkPrimary}" FontSize="13"/>
+                            <Slider x:Name="MouseSlider" Grid.Column="1" Style="{StaticResource AugurSlider}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Foreground="{StaticResource InkSecondary}" FontSize="12"
+                                       Text="{Binding Value, ElementName=MouseSlider, StringFormat={}{0:0}}"/>
+                        </Grid>
+
+                        <WrapPanel Margin="0,14,0,0">
+                            <CheckBox x:Name="ShakeCheck" Style="{StaticResource FileCheck}" Content="Screen shake" Margin="0,0,20,8"/>
+                            <CheckBox x:Name="ChatOpenCheck" Style="{StaticResource FileCheck}" Content="Open chat on start" Margin="0,0,20,8"/>
+                            <CheckBox x:Name="SaveLoginCheck" Style="{StaticResource FileCheck}" Content="Remember login" Margin="0,0,0,8"/>
+                        </WrapPanel>
+
+                        <TextBlock x:Name="SettingsHint" Text="Changes apply the next time the game starts."
+                                   Foreground="{StaticResource InkMuted}" FontSize="11" TextAlignment="Center" Margin="0,16,0,14"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Style="{StaticResource SmallSecondary}" Content="Cancel" Click="SettingsCancel_Click"/>
+                            <Button Grid.Column="2" Style="{StaticResource SmallPrimary}" Content="Save" Click="SettingsSave_Click"/>
+                        </Grid>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
