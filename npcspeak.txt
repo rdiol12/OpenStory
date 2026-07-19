@@ -1,6 +1,0 @@
-npc 2040015 "Manager Karl":
-   |Those workers ...  are they working hard even when I'm not around?|
-npc 9900005 "Foreman Tick":
-   |That runaway wind-up jammed the whole line!|
-   |Bring me thirty bent cogs and I will crown you for it.|
-   |Mind the gears, friend  they bite the careless.|
