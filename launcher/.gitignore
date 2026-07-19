@@ -1,0 +1,4 @@
+bin/
+obj/
+*.user
+.augur_hashcache.json

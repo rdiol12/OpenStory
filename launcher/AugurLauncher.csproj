@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <AssemblyName>GenMs</AssemblyName>
+    <RootNamespace>AugurLauncher</RootNamespace>
+    <Product>GenMs Launcher</Product>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+
+    <!-- Single-file, self-contained publish: one .exe, no .NET install needed. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- InvariantGlobalization must stay OFF: WPF needs culture support
+         (it resolves en-US for text/XmlLanguage) or it throws at startup. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- Embed the icon + logo so a bare GenMs.exe always shows its branding. -->
+  <ItemGroup>
+    <Resource Include="icon.ico" />
+    <Resource Include="logo.png" />
+  </ItemGroup>
+
+  <!-- The WPF SDK's implicit-usings set is narrow; add the ones we rely on. -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+  </ItemGroup>
+
+</Project>
