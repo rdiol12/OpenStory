@@ -23,6 +23,7 @@
 #include "../Components/Gauge.h"
 #include "../Components/Slider.h"
 
+#include "../../Character/Look/CharLook.h"
 #include "../../Data/ItemData.h"
 #include "../../Graphics/Text.h"
 
@@ -37,8 +38,9 @@ namespace ms
 
 		UICashShop();
 
-		void draw(float inter) const;
+			void draw(float inter) const;
 		void update() override;
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		Button::State button_pressed(uint16_t buttonid);
 
@@ -51,7 +53,17 @@ namespace ms
 	private:
 		void update_items();
 
-		static constexpr uint8_t MAX_ITEMS = 7u * 2u + 1u;
+		// 5 columns x 3 rows of the classic card cells (119x184) in the
+		// center panel, clear of the baked right-column panels
+		static constexpr uint8_t GRID_COLS = 5u;
+		static constexpr uint8_t GRID_ROWS = 3u;
+		static constexpr uint8_t MAX_ITEMS = GRID_COLS * GRID_ROWS;
+		static constexpr int16_t GRID_X = 140;
+		static constexpr int16_t GRID_Y = 50;
+		static constexpr int16_t STRIDE_X = 128;
+		static constexpr int16_t STRIDE_Y = 210;
+		static constexpr int16_t CARD_W = 119;
+		static constexpr int16_t CARD_H = 184;
 
 		class Item
 		{
@@ -82,10 +94,13 @@ namespace ms
 				NONE
 			};
 
-			Item(int32_t itemid, int32_t sn, Label label, int32_t discount, uint16_t count) : sn(sn), label(label), discount_price(discount), count(count), data(ItemData::get(itemid)) {}
+			// price is the NX cash price from Commodity.img, not the
+			// item's meso shop price
+			Item(int32_t itemid, int32_t sn, Label label, int32_t price, uint16_t count) : sn(sn), label(label), price(price), discount_price(0), count(count), data(ItemData::get(itemid)) {}
 
 			int32_t sn;
 			Label label;
+			int32_t price;
 			int32_t discount_price;
 			uint16_t count;
 
@@ -99,9 +114,19 @@ namespace ms
 				return data.get_name();
 			}
 
+			const std::string& get_desc() const
+			{
+				return data.get_desc();
+			}
+
+			int32_t get_itemid() const
+			{
+				return data.get_id();
+			}
+
 			const int32_t get_price() const
 			{
-				return data.get_price();
+				return price;
 			}
 
 		private:
@@ -116,7 +141,6 @@ namespace ms
 			BtExit,
 			BtChargeNX,
 			BtChargeRefresh,
-			BtWish,
 			BtMileage,
 			BtHelp,
 			BtCoupon,
@@ -126,7 +150,6 @@ namespace ms
 			BtNonGrade,
 			BtBuyAvatar,
 			BtDefaultAvatar,
-			BtInventory,
 			BtSaveAvatar,
 			BtTakeoffAvatar,
 			BtBuy
@@ -142,6 +165,25 @@ namespace ms
 
 		Text job_label;
 		Text name_label;
+		mutable Text cash_balance_text[3];
+
+		int16_t selected_item;
+		CharLook preview_look;
+
+		// Controllable stage character
+		float char_x = 820.0f;
+		float char_yoff = 0.0f;
+		float char_vy = 0.0f;
+		bool char_jumping = false;
+		bool key_left = false;
+		bool key_right = false;
+		bool facing_right = true;
+		uint8_t cur_stance = 0;
+
+		Texture preview_scene[3];
+		mutable Text preview_name;
+		mutable Text preview_desc;
+		mutable Text preview_price;
 
 		std::vector<Sprite> promotion_sprites;
 		Point<int16_t> promotion_pos;

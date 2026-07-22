@@ -30,7 +30,7 @@ namespace ms
 
 	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name text_color, Rectangle<int16_t> bounds, size_t limit) : Textfield(font, alignment, text_color, text_color, 1.0f, bounds, limit) {}
 
-	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name text_color, Color::Name marker_color, float marker_opacity, Rectangle<int16_t> bounds, size_t limit) : bounds(bounds), limit(limit)
+	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name text_color, Color::Name marker_color, float marker_opacity, Rectangle<int16_t> bounds, size_t limit) : font(font), alignment(alignment), text_color(text_color), bounds(bounds), limit(limit)
 	{
 		textlabel = Text(font, alignment, text_color, "", 0, false);
 		marker = ColorLine(12, marker_color, marker_opacity, true);
@@ -58,13 +58,29 @@ namespace ms
 
 		if (state == State::FOCUSED && showmarker)
 		{
-			Point<int16_t> mpos = absp + Point<int16_t>(textlabel.advance(markerpos) - 1, 8) + marker_adjust;
+			Point<int16_t> mpos;
+
+			if (wrap_width > 0)
+				mpos = absp + textlabel.endoffset() + Point<int16_t>(-1, 8) + marker_adjust;
+			else
+				mpos = absp + Point<int16_t>(textlabel.advance(markerpos) - 1, 8) + marker_adjust;
 
 			if (crypt > 0)
 				mpos.shift(1, -3);
 
 			marker.draw(mpos);
 		}
+	}
+
+	void Textfield::set_wrap(uint16_t width)
+	{
+		wrap_width = width;
+		textlabel = Text(font, alignment, text_color, text, width, false);
+	}
+
+	int16_t Textfield::text_height() const
+	{
+		return textlabel.height();
 	}
 
 	void Textfield::update(Point<int16_t> parent)

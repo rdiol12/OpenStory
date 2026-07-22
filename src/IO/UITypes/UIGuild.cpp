@@ -18,11 +18,15 @@
 #include "UIGuild.h"
 
 #include "UIGuildBBS.h"
+#include "UIAlliance.h"
+#include "UINotice.h"
 
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 #include "../UI.h"
 
+#include "../../Character/Job.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/SocialPackets.h"
 
 #ifdef USE_NX
@@ -31,7 +35,7 @@
 
 namespace ms
 {
-	UIGuild::UIGuild() : UIDragElement<PosGUILD>(Point<int16_t>(300, 20)), tab(0), capacity(0), scroll_offset(0)
+	UIGuild::UIGuild() : UIDragElement<PosGUILD>(Point<int16_t>(W, 90)), tab(TAB_MEMBERS), guildlevel(1), gp_value(0), capacity(0), scroll_offset(0)
 	{
 		// Default v83 rank titles — replaced by the titles the server
 		// sends with the full guild info block (sub-op 0x1A).
@@ -40,56 +44,108 @@ namespace ms
 		for (int i = 0; i < 5; i++)
 			rank_titles[i] = default_titles[i];
 
-		nl::node src = nl::nx::ui["UIWindow2.img"]["UserList"];
-		nl::node main = src["Main"];
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
+		nl::node src = nl::nx::ui["GuildUI.img"];
+		nl::node top = src["top"];
+		nl::node member = src["member"];
 
-		nl::node backgrnd = main["backgrnd"];
-		Texture bg = backgrnd;
+		sprites.emplace_back(src["backgrnd1"]);
+		sprites.emplace_back(src["backgrnd2"]);
 
-		sprites.emplace_back(backgrnd);
+		for (int i = 0; i < 5; i++)
+			flags[i] = top["flag"][std::to_string(i)];
 
-		nl::node taben = main["Tab"]["enabled"];
-		nl::node tabdis = main["Tab"]["disabled"];
+		lvnum = Charset(top["flag"]["lvNumber"], Charset::Alignment::CENTER);
+		nomark = top["noGuildMark"];
+		cover = src["guildInfo"]["layer:cover"];
 
-		if (taben.size() > 0)
+		head_tex = member["layer:head"];
+		row_tex = member["table"]["list"];
+		on_tex = member["userOn"];
+		off_tex = member["userOff"];
+
+		bginfo_tex = src["guildInfo"]["layer:bgInfo"];
+		charframe_tex = src["guildInfo"]["layer:char"];
+
+		buttons[BT_CLOSE] = std::make_unique<MapleButton>(top["guildMember"]["button:Min"]);
+
+		nl::node taben = top["tab"]["enabled"];
+		nl::node tabdis = top["tab"]["disabled"];
+
+		// No Skills tab — Cosmic (v83) has no guild skills. Board and
+		// Alliance shift one slot left to close the gap.
+		for (uint16_t i = 0; i < 5; i++)
 		{
-			for (uint16_t i = 0; i < 4; i++)
-			{
-				std::string idx = std::to_string(i);
+			if (i == TAB_SKILLS)
+				continue;
 
-				if (taben[idx] && tabdis[idx])
-					buttons[Buttons::BT_TAB0 + i] = std::make_unique<TwoSpriteButton>(tabdis[idx], taben[idx]);
+			std::string idx = std::to_string(i);
+
+			if (taben[idx] && tabdis[idx])
+			{
+				Point<int16_t> shift(i > TAB_SKILLS ? -69 : 0, 0);
+				buttons[BT_TAB0 + i] = std::make_unique<TwoSpriteButton>(tabdis[idx], taben[idx], shift);
 			}
 		}
 
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg.get_dimensions().x() - 19, 7));
+		buttons[BT_LEAVE] = std::make_unique<MapleButton>(
+			src["guildInfo"]["button:LeaveGuild"],
+			Point<int16_t>(CONTENT_X, CONTENT_Y));
+		buttons[BT_LEAVE]->set_active(false);
 
-		guild_name = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "No Guild");
-		guild_notice = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "");
-		guild_level = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Lv. 1");
-		guild_capacity = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "0/100");
-		member_count_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Members: 0");
-		member_name_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK);
-		member_info_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
+		guild_name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, "No Guild");
+		guild_notice = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "", 290);
+		member_count_text = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE, "0/0");
+		cell_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+		value_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
 
-		dimension = bg.get_dimensions();
-		dragarea = Point<int16_t>(dimension.x(), 20);
+		dimension = Point<int16_t>(W, H);
 
-		change_tab(0);
+		change_tab(TAB_MEMBERS);
 	}
 
 	void UIGuild::draw(float inter) const
 	{
 		UIElement::draw_sprites(inter);
 
-		guild_name.draw(position + Point<int16_t>(dimension.x() / 2, 30));
+		// Flag with the guild level, mark placeholder and name
+		int16_t flag_idx = guildlevel - 1;
 
-		if (tab == 0)
+		if (flag_idx < 0)
+			flag_idx = 0;
+
+		if (flag_idx > 4)
+			flag_idx = 4;
+
+		flags[flag_idx].draw(DrawArgument(position));
+		lvnum.draw(std::to_string(guildlevel), DrawArgument(position + Point<int16_t>(40, 48)));
+
+		// Real guild emblem when the server sent one, placeholder otherwise
+		if (emblem_bg.is_valid() || emblem_mark.is_valid())
 		{
-			guild_notice.draw(position + Point<int16_t>(20, 65));
-			member_count_text.draw(position + Point<int16_t>(15, 98));
-			guild_level.draw(position + Point<int16_t>(dimension.x() - 60, 98));
+			Point<int16_t> mark_pos = position + Point<int16_t>(69, 30);
+
+			if (emblem_bg.is_valid())
+				emblem_bg.draw(DrawArgument(mark_pos));
+
+			if (emblem_mark.is_valid())
+				emblem_mark.draw(DrawArgument(mark_pos));
+		}
+		else
+		{
+			nomark.draw(DrawArgument(position));
+		}
+
+		guild_name.draw(position + Point<int16_t>(95, 33));
+
+		cover.draw(DrawArgument(position));
+		guild_notice.draw(position + Point<int16_t>(112, 62));
+
+		Point<int16_t> content = position + Point<int16_t>(CONTENT_X, CONTENT_Y);
+
+		if (tab == TAB_MEMBERS)
+		{
+			head_tex.draw(DrawArgument(content));
+			member_count_text.draw(position + Point<int16_t>(510, 96));
 
 			int16_t visible_count = static_cast<int16_t>(members.size()) - scroll_offset;
 
@@ -103,18 +159,65 @@ namespace ms
 				if (idx >= static_cast<int16_t>(members.size()))
 					break;
 
-				const auto& member = members[idx];
+				const auto& m = members[idx];
 				int16_t row_y = MEMBER_LIST_Y + i * MEMBER_ROW_HEIGHT;
+				Point<int16_t> row_pos = position + Point<int16_t>(25, row_y);
 
-				member_name_label.change_text(member.name);
-				member_name_label.draw(position + Point<int16_t>(20, row_y + 2));
+				row_tex.draw(DrawArgument(row_pos));
 
-				std::string info = "Lv." + std::to_string(member.level) + " " + rank_title(member.rank);
-				info += member.online ? " [ON]" : " [OFF]";
+				cell_text.change_text(m.name);
+				cell_text.draw(position + Point<int16_t>(78, row_y + 4));
 
-				member_info_label.change_text(info);
-				member_info_label.draw(position + Point<int16_t>(130, row_y + 2));
+				cell_text.change_text(Job(m.job).get_name());
+				cell_text.draw(position + Point<int16_t>(168, row_y + 4));
+
+				cell_text.change_text(std::to_string(m.level));
+				cell_text.draw(position + Point<int16_t>(250, row_y + 4));
+
+				cell_text.change_text(rank_title(m.rank));
+				cell_text.draw(position + Point<int16_t>(325, row_y + 4));
+
+				const Texture& status = m.online ? on_tex : off_tex;
+				status.draw(DrawArgument(position + Point<int16_t>(455, row_y + 8)));
 			}
+		}
+		else if (tab == TAB_PROFILE)
+		{
+			bginfo_tex.draw(DrawArgument(content));
+			charframe_tex.draw(DrawArgument(content));
+
+			// Only Cosmic-backed values are drawn; labels without a
+			// server-side counterpart (Honor EXP, Ranking, Contribution,
+			// IGP) stay empty
+			std::string master;
+
+			for (const auto& m : members)
+				if (m.rank == 1)
+					master = m.name;
+
+			int16_t left_x = 145;
+			int16_t row0 = 255;
+			int16_t step = 19;
+
+			value_text.change_text(master);
+			value_text.draw(position + Point<int16_t>(left_x, row0));
+
+			value_text.change_text(std::to_string(members.size()) + "/" + std::to_string(capacity));
+			value_text.draw(position + Point<int16_t>(left_x, row0 + step));
+
+			value_text.change_text(std::to_string(gp_value));
+			value_text.draw(position + Point<int16_t>(left_x, row0 + step * 3));
+
+			// My Profile: rank is the only Cosmic-backed value
+			std::string myrank;
+			int32_t mycid = Stage::get().get_player().get_oid();
+
+			for (const auto& m : members)
+				if (m.cid == mycid)
+					myrank = rank_title(m.rank);
+
+			value_text.change_text(myrank);
+			value_text.draw(position + Point<int16_t>(390, row0));
 		}
 
 		UIElement::draw_buttons(inter);
@@ -129,7 +232,7 @@ namespace ms
 	{
 		guild_name.change_text(name);
 		guild_notice.change_text(notice);
-		guild_level.change_text("Lv. " + std::to_string(level));
+		guildlevel = level;
 		capacity = cap;
 
 		refresh_member_count();
@@ -149,7 +252,8 @@ namespace ms
 
 	void UIGuild::set_gp(int32_t gp)
 	{
-		guild_level.change_text("Lv. " + std::to_string(level_for_gp(gp)));
+		gp_value = gp;
+		guildlevel = level_for_gp(gp);
 	}
 
 	int16_t UIGuild::level_for_gp(int32_t gp)
@@ -225,6 +329,46 @@ namespace ms
 		return "";
 	}
 
+	void UIGuild::set_guild_emblem(int16_t bg, int8_t bgcolor, int16_t logo, int8_t logocolor)
+	{
+		emblem_bg = Texture();
+		emblem_mark = Texture();
+
+		nl::node markimg = nl::nx::ui["GuildMark.img"];
+
+		auto pad = [](int16_t id)
+		{
+			std::string s = std::to_string(id);
+			return std::string(8 - s.size(), '0') + s;
+		};
+
+		if (bg > 0)
+		{
+			nl::node n = markimg["BackGround"][pad(bg)][std::to_string(bgcolor)];
+
+			if (n)
+				emblem_bg = n;
+		}
+
+		if (logo > 0)
+		{
+			for (const char* cat : { "Animal", "Etc", "Letter", "Pattern", "Plant" })
+			{
+				nl::node n = markimg["Mark"][cat][pad(logo)];
+
+				if (n)
+				{
+					nl::node c = n[std::to_string(logocolor)];
+
+					if (c)
+						emblem_mark = c;
+
+					break;
+				}
+			}
+		}
+	}
+
 	void UIGuild::clear_members()
 	{
 		members.clear();
@@ -250,12 +394,11 @@ namespace ms
 	void UIGuild::refresh_member_count()
 	{
 		std::string count = std::to_string(members.size());
-		guild_capacity.change_text(count + "/" + std::to_string(capacity));
 
 		if (capacity > 0)
-			member_count_text.change_text("Members: " + count + "/" + std::to_string(capacity));
+			member_count_text.change_text(count + "/" + std::to_string(capacity));
 		else
-			member_count_text.change_text("Members: " + count);
+			member_count_text.change_text(count);
 	}
 
 	void UIGuild::send_key(int32_t keycode, bool pressed, bool escape)
@@ -274,6 +417,25 @@ namespace ms
 		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
+	void UIGuild::send_scroll(double yoffset)
+	{
+		if (tab != TAB_MEMBERS)
+			return;
+
+		int16_t max_offset = static_cast<int16_t>(members.size()) - MAX_VISIBLE_MEMBERS;
+
+		if (max_offset < 0)
+			max_offset = 0;
+
+		scroll_offset -= static_cast<int16_t>(yoffset);
+
+		if (scroll_offset < 0)
+			scroll_offset = 0;
+
+		if (scroll_offset > max_offset)
+			scroll_offset = max_offset;
+	}
+
 	UIElement::Type UIGuild::get_type() const
 	{
 		return TYPE;
@@ -283,14 +445,31 @@ namespace ms
 	{
 		switch (buttonid)
 		{
-		case Buttons::BT_CLOSE:
+		case BT_CLOSE:
 			deactivate();
 			break;
-		case Buttons::BT_TAB0:
-		case Buttons::BT_TAB1:
-		case Buttons::BT_TAB2:
-		case Buttons::BT_TAB3:
-			change_tab(buttonid - Buttons::BT_TAB0);
+		case BT_LEAVE:
+		{
+			std::string myname = Stage::get().get_player().get_name();
+			int32_t mycid = Stage::get().get_player().get_oid();
+
+			UI::get().emplace<UIYesNo>(
+				"Leave the guild?",
+				[mycid, myname](bool yes)
+				{
+					if (yes)
+						GuildLeavePacket(mycid, myname).dispatch();
+				}
+			);
+
+			return Button::State::NORMAL;
+		}
+		case BT_TAB0:
+		case BT_TAB1:
+		case BT_TAB2:
+		case BT_TAB3:
+		case BT_TAB4:
+			change_tab(buttonid - BT_TAB0);
 			return Button::State::IDENTITY;
 		default:
 			break;
@@ -302,37 +481,62 @@ namespace ms
 	void UIGuild::change_tab(uint16_t tabid)
 	{
 		uint16_t oldtab = tab;
+
+		// The board lives in its own window; the alliance too. Opening
+		// them doesn't switch the page under this window.
+		if (tabid == TAB_BOARD || tabid == TAB_ALLIANCE)
+		{
+			auto it = buttons.find(BT_TAB0 + tabid);
+
+			if (it != buttons.end() && it->second)
+				it->second->set_state(Button::State::NORMAL);
+
+			if (!has_guild())
+			{
+				UI::get().emplace<UIOk>("You are not in a guild.", [](bool) {});
+				return;
+			}
+
+			if (tabid == TAB_BOARD)
+			{
+				if (auto bbs = UI::get().get_element<UIGuildBBS>())
+				{
+					bbs->makeactive();
+					GuildBBSListPacket(0).dispatch();
+				}
+				else
+				{
+					UI::get().emplace<UIGuildBBS>();
+				}
+			}
+			else
+			{
+				if (auto alliance = UI::get().get_element<UIAlliance>())
+					alliance->makeactive();
+				else
+					UI::get().emplace<UIAlliance>();
+			}
+
+			return;
+		}
+
 		tab = tabid;
 
 		if (oldtab != tab)
 		{
-			auto old_it = buttons.find(Buttons::BT_TAB0 + oldtab);
+			auto old_it = buttons.find(BT_TAB0 + oldtab);
 
 			if (old_it != buttons.end() && old_it->second)
 				old_it->second->set_state(Button::State::NORMAL);
 		}
 
-		auto new_it = buttons.find(Buttons::BT_TAB0 + tab);
+		auto new_it = buttons.find(BT_TAB0 + tab);
 
 		if (new_it != buttons.end() && new_it->second)
 			new_it->second->set_state(Button::State::PRESSED);
 
 		scroll_offset = 0;
 
-		// Tab 1 is the bulletin board in the v83 layout. The board lives
-		// in its own window; opening it requests the thread list from the
-		// server (BBS_OPERATION mode 2).
-		if (tab == 1)
-		{
-			if (auto bbs = UI::get().get_element<UIGuildBBS>())
-			{
-				bbs->makeactive();
-				GuildBBSListPacket(0).dispatch();
-			}
-			else
-			{
-				UI::get().emplace<UIGuildBBS>();
-			}
-		}
+		buttons[BT_LEAVE]->set_active(tab == TAB_PROFILE);
 	}
 }

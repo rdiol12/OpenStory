@@ -20,6 +20,7 @@
 #include "Helpers/LoginParser.h"
 #include "Helpers/MovementParser.h"
 
+#include "../../Gameplay/MiniRooms.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Mob.h"
 #include "../../Gameplay/MapleMap/Summon.h"
@@ -108,8 +109,25 @@ namespace ms
 		recv.read_int(); // mountexp
 		recv.read_int(); // mounttiredness
 
-		// Mini room indicator (shop/game/etc.)
-		recv.read_byte();
+		int8_t box_type = recv.read_byte();
+		int32_t box_oid = 0;
+		std::string box_desc;
+
+		int8_t box_skin = 0;
+
+		if (box_type != 0)
+		{
+			box_oid = recv.read_int();
+			box_desc = recv.read_string();
+			recv.read_byte();
+			box_skin = recv.read_byte();
+			recv.skip(3);
+			MiniRooms::get().set(cid, box_type, box_oid, box_desc, box_skin);
+		}
+		else
+		{
+			MiniRooms::get().clear(cid);
+		}
 
 		bool chalkboard = recv.read_bool();
 		std::string chalktext = chalkboard ? recv.read_string() : "";
@@ -800,6 +818,30 @@ namespace ms
 
 		// Cancel the visual effect of a skill on a character
 		// The buff cancellation is handled separately via CANCEL_FOREIGN_BUFF
+	}
+
+	void UpdateCharBoxHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int8_t type = recv.read_byte();
+
+		if (type == 0)
+		{
+			MiniRooms::get().clear(cid);
+			return;
+		}
+
+		int32_t oid = recv.read_int();
+		std::string desc = recv.read_string();
+		int8_t skin = 0;
+
+		if (recv.available() >= 2)
+		{
+			recv.read_byte();
+			skin = recv.read_byte();
+		}
+
+		MiniRooms::get().set(cid, type, oid, desc, skin);
 	}
 
 	void ChalkboardHandler::handle(InPacket& recv) const

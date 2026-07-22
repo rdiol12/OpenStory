@@ -280,7 +280,7 @@ namespace ms
 		// remember whether a partner/victim was sent so the TV header can
 		// show "sender <3 victim" later (we don't have names from the
 		// CharLook payload in v83, so the header just notes partnered).
-		LoginParser::parse_look(recv);
+		LookEntry sender_look = LoginParser::parse_look(recv);
 		bool has_victim = (has_partner == 3);
 		if (has_victim)
 			LoginParser::parse_look(recv);
@@ -299,6 +299,7 @@ namespace ms
 		// for received broadcasts (UIMapleTV is compose-only).
 		MapleTVBroadcast::get().start("", lines,
 			has_victim ? "partner" : "", remaining_ms);
+		MapleTVBroadcast::get().set_look(sender_look);
 
 		chat::log("[MapleTV] Broadcast received.", chat::LineType::YELLOW);
 	}
@@ -315,7 +316,6 @@ namespace ms
 		recv.read_int(); // 0
 		recv.read_byte(); // 0
 
-		chat::log("[MapleTV] MapleTV enabled.", chat::LineType::YELLOW);
 	}
 
 	void SetAvatarMegaphoneHandler::handle(InPacket& recv) const

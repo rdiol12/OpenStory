@@ -66,14 +66,14 @@ namespace ms
 		// chBackgrn sheet (which carries the divider line), the world title
 		// above the divider, the channel grid below it, Enter Channel at the
 		// parchment's bottom right
-		constexpr Point<int16_t> CHBACK_OFF(32, 118);     // sheet top-left (art origin 224,116)
-		constexpr Point<int16_t> TITLE_OFF(52, 140);      // world/N decoration
+		constexpr Point<int16_t> CHBACK_OFF(37, 136);     // sheet top-left (art origin 224,116)
+		constexpr Point<int16_t> TITLE_OFF(52, 135);      // world/N decoration
 		constexpr Point<int16_t> EVENT_TITLE_OFF(185, 146);
 		constexpr int16_t CH_COLS = 4;
 		constexpr Point<int16_t> CH_GRID_OFF(55, 205);    // channel button grid
 		constexpr Point<int16_t> CH_STRIDE(106, 35);
 		constexpr Point<int16_t> CHSELECT_OFF(46, 15);    // highlight anchor in a button
-		constexpr Point<int16_t> GOWORLD_OFF(357, 325);   // Enter Channel button
+		constexpr Point<int16_t> GOWORLD_OFF(361, 344);   // Enter Channel button
 
 		// EVENT balloon above an event-flagged world's plank
 		constexpr Point<int16_t> EVENT_PLANK_OFF(-1, -16);
@@ -82,7 +82,7 @@ namespace ms
 		// has origin (36,4); the stretch width encodes the load fraction).
 		// The fill is relative to the busiest channel, with a floor so a
 		// nearly-empty server still shows sensible slivers.
-		constexpr Point<int16_t> GAUGE_OFF(46, 19);
+		constexpr Point<int16_t> GAUGE_OFF(43, 21);
 		constexpr int16_t GAUGE_W = 73;
 		constexpr int32_t GAUGE_MIN_CAP = 20;
 
@@ -289,7 +289,11 @@ namespace ms
 			// event-flagged worlds
 			chback.draw(DrawArgument(
 				lay(SCROLL_POS + CHBACK_OFF + chback.get_origin()), ui_scale, ui_scale));
-			world_title.draw(DrawArgument(lay(SCROLL_POS + TITLE_OFF), ui_scale, ui_scale));
+			// World name centered on the sheet, above the divider line
+			Point<int16_t> title_off(
+				static_cast<int16_t>(CHBACK_OFF.x() + (449 - world_title.width()) / 2),
+				TITLE_OFF.y());
+			world_title.draw(DrawArgument(lay(SCROLL_POS + title_off), ui_scale, ui_scale));
 
 			for (auto& w : worlds)
 				if (w.wid == worldid && w.flag == 1)

@@ -17,50 +17,48 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../Template/Singleton.h"
 
-#include "../../Graphics/Text.h"
+#include <cstdint>
+#include <map>
+#include <string>
 
 namespace ms
 {
-	// "MY RANKING" window (UIWindow2.img/Ranking): the player's overall
-	// and job rank with movement, plus level and fame. All values come
-	// from data Cosmic already sends (login char entry + live stats).
-	class UIRanking : public UIDragElement<PosRANKING>
+	class MiniRooms : public Singleton<MiniRooms>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::RANKING;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
-
-		UIRanking();
-
-		void draw(float inter) const override;
-		void update() override;
-
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		enum Buttons : uint16_t
+		struct Box
 		{
-			BT_CLOSE
+			int8_t type;
+			int32_t oid;
+			std::string desc;
+			int8_t skin;
 		};
 
-		static constexpr int16_t ROW_X = 24;
-		static constexpr int16_t VALUE_X = 279;
-		static constexpr int16_t ROW_Y = 96;
-		static constexpr int16_t ROW_STEP = 42;
+		void set(int32_t cid, int8_t type, int32_t oid, const std::string& desc, int8_t skin = 0)
+		{
+			boxes[cid] = { type, oid, desc, skin };
+		}
 
-		mutable Text label_text;
-		mutable Text value_text;
-		mutable Text name_text;
-		mutable Text hint_text;
-		Texture divider;
+		void clear(int32_t cid)
+		{
+			boxes.erase(cid);
+		}
+
+		void clear_all()
+		{
+			boxes.clear();
+		}
+
+		const Box* find(int32_t cid) const
+		{
+			auto it = boxes.find(cid);
+
+			return it == boxes.end() ? nullptr : &it->second;
+		}
+
+	private:
+		std::map<int32_t, Box> boxes;
 	};
 }

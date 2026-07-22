@@ -115,7 +115,7 @@ namespace ms
 			inventory.add_equip(invtype, slot, id, cash, expire, slots, level, stats, owner, flag, itemlevel, itemexp, vicious);
 		}
 
-		void skip_item(InPacket& recv)
+		int32_t skip_item(InPacket& recv)
 		{
 			int8_t type = recv.read_byte();
 			int32_t iid = recv.read_int();
@@ -171,6 +171,7 @@ namespace ms
 				if ((iid / 10000 == 233) || (iid / 10000 == 207))
 					recv.skip(8); // rechargeable
 			}
+			return iid;
 		}
 
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)

@@ -24,6 +24,9 @@
 
 #include "../Graphics/GraphicsGL.h"
 
+#include "../Constants.h"
+#include "../Gameplay/MiniRooms.h"
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -36,6 +39,68 @@
 
 namespace ms
 {
+	namespace
+	{
+		// Shared death art: the falling/landed tomb (Effect/Tomb.img) and
+		// the hovering ghost (the ghost stance baked into the body files)
+		struct GhostFrame
+		{
+			Texture body;
+			Point<int16_t> head_shift;
+			uint16_t delay;
+		};
+
+		struct DeathArt
+		{
+			std::vector<Texture> fall;
+			Texture land;
+			std::vector<GhostFrame> ghost;
+			Texture head;
+			bool loaded = false;
+		};
+
+		DeathArt& death_art()
+		{
+			static DeathArt art;
+
+			if (!art.loaded)
+			{
+				art.loaded = true;
+
+				nl::node tomb = nl::nx::effect["Tomb.img"];
+
+				for (nl::node f : tomb["fall"])
+					art.fall.emplace_back(f);
+
+				art.land = tomb["land"]["0"];
+
+				// Ghost variant "1" is the little soul; the character's
+				// head composites onto it via the neck map points
+				nl::node stand = nl::nx::character["00002000.img"]["ghoststand"]["1"];
+				nl::node headnode = nl::nx::character["00012000.img"]["front"]["head"];
+
+				art.head = headnode;
+				Point<int16_t> head_neck = headnode["map"]["neck"];
+
+				for (nl::node frame : stand)
+				{
+					if (!frame["body"])
+						continue;
+
+					GhostFrame gf;
+					gf.body = frame["body"];
+					Point<int16_t> body_neck = frame["body"]["map"]["neck"];
+					gf.head_shift = body_neck - head_neck;
+					gf.delay = frame["delay"].get_integer() > 0
+						? static_cast<uint16_t>(frame["delay"].get_integer()) : 500;
+					art.ghost.push_back(gf);
+				}
+			}
+
+			return art;
+		}
+	}
+
 	// Aura pivot offset from absp (= character feet). Seeds validated by an
 	// offline render across stand/walk/jump; the neck barely moves so these are
 	// single constants. On prone a lying body can't be described by a vertical
@@ -142,7 +207,39 @@ namespace ms
 			color = Color::Code::CWHITE;
 		}
 
-		look.draw(DrawArgument(absp, color), alpha);
+		if (state == State::DIED)
+			draw_death(absp, alpha);
+		else
+			look.draw(DrawArgument(absp, color), alpha);
+
+		if (const auto* box = MiniRooms::get().find(get_oid()))
+		{
+			static Texture psskins[7];
+			static bool skins_loaded = false;
+
+			if (!skins_loaded)
+			{
+				skins_loaded = true;
+				nl::node ps = nl::nx::ui["ChatBalloon.img"]["miniroom"]["PSSkin"];
+
+				for (int i = 0; i < 7; i++)
+					psskins[i] = ps[std::to_string(i)];
+			}
+
+			static Text shoptext(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK);
+
+			int8_t skin = (box->skin >= 0 && box->skin < 7 && psskins[box->skin].is_valid()) ? box->skin : 0;
+			const Texture& sign = psskins[skin];
+			int16_t w = sign.get_dimensions().x();
+			int16_t h = sign.get_dimensions().y();
+			Point<int16_t> tl(absp.x() - w / 2, absp.y() - 78 - h);
+
+			sign.draw(DrawArgument(tl + sign.get_origin()));
+
+			std::string d = box->desc.size() > 14 ? box->desc.substr(0, 14) : box->desc;
+			shoptext.change_text(d);
+			shoptext.draw(tl + Point<int16_t>(w / 2, skin == 0 ? 9 : 68));
+		}
 
 		// Only show the swing trail during an actual attack stance. Otherwise a
 		// trail whose animation outlasts a short attack keeps drawing over the
@@ -249,6 +346,9 @@ namespace ms
 
 	bool Char::update(const Physics& physics, float speed)
 	{
+		if (state == State::DIED)
+			update_death();
+
 		damagenumbers.remove_if(
 			[](DamageNumber& number)
 			{
@@ -585,6 +685,78 @@ namespace ms
 		chatballoon.change_text(line);
 	}
 
+	void Char::draw_death(Point<int16_t> absp, float alpha) const
+	{
+		auto& art = death_art();
+
+		if (!tomb_landed && !art.fall.empty())
+		{
+			art.fall[tomb_frame % art.fall.size()].draw(
+				DrawArgument(absp + Point<int16_t>(0, tomb_yoff)));
+		}
+		else if (art.land.is_valid())
+		{
+			art.land.draw(DrawArgument(absp));
+		}
+
+		// The soul hovers over the tomb with a slow bob
+		if (!art.ghost.empty())
+		{
+			int16_t bob = static_cast<int16_t>(std::sinf(ghost_bob / 45.0f) * 5.0f);
+			const GhostFrame& g = art.ghost[ghost_frame % art.ghost.size()];
+			Point<int16_t> gpos = absp + Point<int16_t>(0, -30 + bob);
+			bool flip = !facing_right;
+
+			g.body.draw(DrawArgument(gpos, flip));
+
+			// The soul wears the character's face, not the full head
+			if (const Face* face = look.get_face())
+			{
+				Point<int16_t> hs = g.head_shift + Point<int16_t>(0, 6);
+
+				if (flip)
+					hs = Point<int16_t>(-hs.x(), hs.y());
+
+				face->draw(Expression::Id::DEFAULT, 0, DrawArgument(gpos + hs, flip));
+			}
+		}
+	}
+
+	void Char::update_death()
+	{
+		auto& art = death_art();
+
+		if (!tomb_landed)
+		{
+			tomb_yoff += 9;
+			tomb_elapsed += Constants::TIMESTEP;
+
+			if (tomb_elapsed >= 30)
+			{
+				tomb_elapsed = 0;
+				tomb_frame = static_cast<uint8_t>((tomb_frame + 1) % (art.fall.empty() ? 1 : art.fall.size()));
+			}
+
+			if (tomb_yoff >= 0)
+			{
+				tomb_yoff = 0;
+				tomb_landed = true;
+			}
+		}
+
+		if (!art.ghost.empty())
+		{
+			ghost_elapsed += Constants::TIMESTEP;
+			ghost_bob++;
+
+			if (ghost_elapsed >= art.ghost[ghost_frame % art.ghost.size()].delay)
+			{
+				ghost_elapsed = 0;
+				ghost_frame = static_cast<uint8_t>((ghost_frame + 1) % art.ghost.size());
+			}
+		}
+	}
+
 	void Char::set_guild(const std::string& name)
 	{
 		guildlabel.change_text(name);
@@ -688,6 +860,7 @@ namespace ms
 
 	void Char::set_state(State st)
 	{
+		bool was_dead = (state == State::DIED);
 		state = st;
 
 		Stance::Id stance = Stance::by_state(state);
@@ -700,6 +873,20 @@ namespace ms
 			// speed (get_stancespeed returns attack speed while attacking).
 			attacking = false;
 			look.set_stance_forced(stance);
+
+			// Kick off the tomb drop + ghost hover — only on the
+			// transition into death (the server re-sends the dead state,
+			// which must not restart the sequence)
+			if (!was_dead)
+			{
+				tomb_yoff = -420;
+				tomb_landed = false;
+				tomb_frame = 0;
+				tomb_elapsed = 0;
+				ghost_frame = 0;
+				ghost_elapsed = 0;
+				ghost_bob = 0;
+			}
 		}
 		else
 		{

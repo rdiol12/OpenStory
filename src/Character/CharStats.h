@@ -79,6 +79,10 @@ namespace ms
 		int8_t get_attackspeed() const;
 		const Job& get_job() const;
 		bool get_female() const;
+		// Overall / job ranking as sent in the login char entry:
+		// (rank, movement char '+'/'-'/'=')
+		std::pair<int32_t, int8_t> get_rank() const { return rank; }
+		std::pair<int32_t, int8_t> get_jobrank() const { return jobrank; }
 
 	private:
 		int32_t calculateaccuracy() const;

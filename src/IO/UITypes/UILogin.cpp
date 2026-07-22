@@ -69,12 +69,12 @@ namespace ms
 		sprites.emplace_back(signboard, signboard_pos);
 		// The light rays are 6 SEPARATE animated elements (effect/0..5, each its
 		// own animation), layered at the same spot to build the full sunbeam.
-		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(500, 50));
-		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(500, 50));
+		sprites.emplace_back(loginUI["effect"]["0"], Point<int16_t>(735, -10));
+		sprites.emplace_back(loginUI["effect"]["1"], Point<int16_t>(735, -10));
+		sprites.emplace_back(loginUI["effect"]["2"], Point<int16_t>(735, -10));
+		sprites.emplace_back(loginUI["effect"]["3"], Point<int16_t>(735, -10));
+		sprites.emplace_back(loginUI["effect"]["4"], Point<int16_t>(735, -10));
+		sprites.emplace_back(loginUI["effect"]["5"], Point<int16_t>(735, -10));
 		sprites.emplace_back(frame, UIScale::bg_args());
 
 

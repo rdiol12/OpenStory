@@ -21,10 +21,15 @@
 #include "../Components/Textfield.h"
 
 #include "../../Graphics/Text.h"
-#include "../../Graphics/Geometry.h"
+#include "../../Graphics/Texture.h"
+
+#include <vector>
 
 namespace ms
 {
+	// Whisper window on the v83 MESSAGE art (UIWindow2.img/MemoInGame/Send):
+	// RECIPIENT field, message area showing the conversation with the input
+	// line at its bottom, OK sends, CANCEL closes
 	class UIWhisper : public UIDragElement<PosWHISPER>
 	{
 	public:
@@ -49,26 +54,36 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		bool indragrange(Point<int16_t> cursorpos) const override;
+
 		void send_whisper();
-		void update_title();
 
 		enum Buttons : uint16_t
 		{
-			BT_CLOSE,
 			BT_SEND,
-			BT_FIND
+			BT_CLOSE
 		};
 
-		static constexpr int16_t WIDTH = 300;
-		static constexpr int16_t CHAT_HEIGHT = 150;
-		static constexpr int16_t INPUT_HEIGHT = 24;
-		static constexpr int16_t HEADER_HEIGHT = 25;
-		static constexpr int16_t LINE_HEIGHT = 14;
+		static constexpr int16_t W = 268;
+		static constexpr int16_t H = 244;
+
+		// Field geometry (window-local, from the Send art)
+		static constexpr int16_t NAME_L = 76;
+		static constexpr int16_t NAME_T = 87;
+		static constexpr int16_t NAME_R = 252;
+		static constexpr int16_t NAME_B = 100;
+		static constexpr int16_t AREA_L = 12;
+		static constexpr int16_t AREA_T = 136;
+		static constexpr int16_t AREA_R = 257;
+		static constexpr int16_t AREA_B = 194;
+		static constexpr int16_t LINE_Y = 177;
+		static constexpr int16_t LINE_HEIGHT = 12;
+		static constexpr int16_t SHOWN_LINES = 3;
 		static constexpr int16_t MAX_LINES = 50;
 
 		std::string target_name;
-		Textfield chatfield;
 		Textfield namefield;
+		Textfield chatfield;
 
 		struct ChatLine
 		{
@@ -77,16 +92,6 @@ namespace ms
 		};
 
 		std::vector<ChatLine> chat_lines;
-		int16_t scroll_offset;
-
-		ColorBox background;
-		ColorBox header_bg;
-		ColorBox input_bg;
-		Text title_text;
-
-		// Pre-allocated draw objects
-		Text close_x;
-		ColorBox send_bg;
-		Text send_text;
+		Texture divider;
 	};
 }

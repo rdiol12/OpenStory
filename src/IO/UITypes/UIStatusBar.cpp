@@ -142,7 +142,6 @@ namespace ms
 		show_quickslot = false;
 		// menu_bg and sys_bg are initialized after sub-panel buttons are created (sizes computed there)
 		chat_open = false;
-		chat_target_id = 0;
 
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
@@ -303,43 +302,13 @@ namespace ms
 		chat_space = Texture(mainbar["chatSpace"]);
 		chat_space2 = Texture(mainbar["chatSpace2"]);
 
-		// === Chat target textures ===
-		nl::node ct = mainbar["chatTarget"];
-		chat_target_base = Texture(ct["base"]);
-		chat_target_all = Texture(ct["all"]);
-		chat_target_party = Texture(ct["party"]);
-		chat_target_guild = Texture(ct["guild"]);
-		chat_target_friend = Texture(ct["friend"]);
-		chat_target_expedition = Texture(ct["expedition"]);
-		chat_target_association = Texture(ct["association"]);
-		chat_target_afctv = Texture(ct["afctv"]);
-
-		// === Chat tab bar (from chat section) ===
-		tap_bar = Texture(chat["tapBar"]);
-		tap_bar_over = Texture(chat["tapBarOver"]);
-
+		// Chat targets are handled by the chat bar's own To: button
+		// (UIChatBar cycles All/Buddy/Guild/Alliance/Party and sends the
+		// matching MultiChat packet) — the old half-built tab row here
+		// was never positioned and never wired, so it's gone.
 		nl::node chat_scroll = chat["scroll"];
 		chat_scroll_normal = Texture(chat_scroll["normal"]);
 		chat_scroll_over = Texture(chat_scroll["over"]);
-
-		// === Chat tab buttons ===
-		nl::node tap = chat["Tap"];
-		buttons[BT_TAP_ALL]         = std::make_unique<MapleButton>(tap["all"]);
-		buttons[BT_TAP_PARTY]       = std::make_unique<MapleButton>(tap["party"]);
-		buttons[BT_TAP_GUILD]       = std::make_unique<MapleButton>(tap["guild"]);
-		buttons[BT_TAP_FRIEND]      = std::make_unique<MapleButton>(tap["friend"]);
-		buttons[BT_TAP_EXPEDITION]  = std::make_unique<MapleButton>(tap["expedition"]);
-		buttons[BT_TAP_ASSOCIATION] = std::make_unique<MapleButton>(tap["association"]);
-		buttons[BT_TAP_AFREECATV]   = std::make_unique<MapleButton>(tap["afreecaTV"]);
-
-		// Chat tabs hidden until chat is open
-		buttons[BT_TAP_ALL]->set_active(false);
-		buttons[BT_TAP_PARTY]->set_active(false);
-		buttons[BT_TAP_GUILD]->set_active(false);
-		buttons[BT_TAP_FRIEND]->set_active(false);
-		buttons[BT_TAP_EXPEDITION]->set_active(false);
-		buttons[BT_TAP_ASSOCIATION]->set_active(false);
-		buttons[BT_TAP_AFREECATV]->set_active(false);
 
 		// === Quick slot ===
 		nl::node qs = mainbar["quickSlot"];
@@ -394,21 +363,12 @@ namespace ms
 		buttons[BT_MENU_RANK]          = std::make_unique<MapleButton>(menu_node["BtRank"],      Point<int16_t>(menu_x, menu_y + MENU_STEP * 7));
 		buttons[BT_MENU_EPISODBOOK]    = std::make_unique<MapleButton>(menu_node["BtEpisodBook"],    Point<int16_t>(menu_x, menu_y + MENU_STEP * 8));
 
-		// Post-BB buttons — created but disabled and never shown
-		buttons[BT_MENU_MONSTERBATTLE] = std::make_unique<MapleButton>(menu_node["BtMonsterBattle"], Point<int16_t>(menu_x, menu_y + MENU_STEP * 9));
-		buttons[BT_MENU_MONSTERLIFE]   = std::make_unique<MapleButton>(menu_node["BtMonsterLife"],   Point<int16_t>(menu_x, menu_y + MENU_STEP * 10));
-		buttons[BT_MENU_MSN]           = std::make_unique<MapleButton>(menu_node["BtMSN"],           Point<int16_t>(menu_x, menu_y + MENU_STEP * 11));
-		buttons[BT_MENU_AFREECATV]     = std::make_unique<MapleButton>(menu_node["BtAfreecaTV"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 12));
+		// Post-BB rows (Monster Battle / Monster Life / MSN / AfreecaTV)
+		// have no Cosmic counterpart and are not created at all.
 
 		// All menu buttons hidden until menu is toggled
-		for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_AFREECATV; i++)
+		for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_EPISODBOOK; i++)
 			buttons[i]->set_active(false);
-
-		// Disable post-BB buttons permanently
-		buttons[BT_MENU_MONSTERBATTLE]->set_state(Button::State::DISABLED);
-		buttons[BT_MENU_MONSTERLIFE]->set_state(Button::State::DISABLED);
-		buttons[BT_MENU_MSN]->set_state(Button::State::DISABLED);
-		buttons[BT_MENU_AFREECATV]->set_state(Button::State::DISABLED);
 
 		// Menu background sized to cover visible buttons
 
@@ -779,8 +739,6 @@ namespace ms
 		if (menu_fade > 0.0f)
 		{
 			// Bottom reference is the last v83-visible entry (EpisodBook).
-			// BT_MENU_AFREECATV and other post-BB rows are permanently
-			// disabled — anchoring to them over-sized the backdrop.
 			draw_subpanel(*buttons.at(BT_MENU_STAT),
 			              *buttons.at(BT_MENU_EPISODBOOK),
 			              menu_bg_top, menu_bg_mid, menu_bg_bot, menu_fade);
@@ -1078,13 +1036,6 @@ namespace ms
 			buttons[BT_CHATCLOSE]->set_active(true);
 			buttons[BT_SCROLLUP]->set_active(true);
 			buttons[BT_SCROLLDOWN]->set_active(true);
-			buttons[BT_TAP_ALL]->set_active(true);
-			buttons[BT_TAP_PARTY]->set_active(true);
-			buttons[BT_TAP_GUILD]->set_active(true);
-			buttons[BT_TAP_FRIEND]->set_active(true);
-			buttons[BT_TAP_EXPEDITION]->set_active(true);
-			buttons[BT_TAP_ASSOCIATION]->set_active(true);
-			buttons[BT_TAP_AFREECATV]->set_active(true);
 			return Button::State::NORMAL;
 
 		case BT_CHATCLOSE:
@@ -1093,36 +1044,7 @@ namespace ms
 			buttons[BT_CHATOPEN]->set_active(true);
 			buttons[BT_SCROLLUP]->set_active(false);
 			buttons[BT_SCROLLDOWN]->set_active(false);
-			buttons[BT_TAP_ALL]->set_active(false);
-			buttons[BT_TAP_PARTY]->set_active(false);
-			buttons[BT_TAP_GUILD]->set_active(false);
-			buttons[BT_TAP_FRIEND]->set_active(false);
-			buttons[BT_TAP_EXPEDITION]->set_active(false);
-			buttons[BT_TAP_ASSOCIATION]->set_active(false);
-			buttons[BT_TAP_AFREECATV]->set_active(false);
 			return Button::State::NORMAL;
-
-		case BT_TAP_ALL:
-			chat_target_id = 0;
-			return Button::State::PRESSED;
-		case BT_TAP_PARTY:
-			chat_target_id = 1;
-			return Button::State::PRESSED;
-		case BT_TAP_GUILD:
-			chat_target_id = 2;
-			return Button::State::PRESSED;
-		case BT_TAP_FRIEND:
-			chat_target_id = 3;
-			return Button::State::PRESSED;
-		case BT_TAP_EXPEDITION:
-			chat_target_id = 4;
-			return Button::State::PRESSED;
-		case BT_TAP_ASSOCIATION:
-			chat_target_id = 5;
-			return Button::State::PRESSED;
-		case BT_TAP_AFREECATV:
-			chat_target_id = 6;
-			return Button::State::PRESSED;
 
 		case BT_QS_OPEN:
 			toggle_qs();
@@ -1149,13 +1071,6 @@ namespace ms
 
 		case BT_MENU_EPISODBOOK:
 			UI::get().emplace<UIMonsterBook>();
-			remove_menus();
-			return Button::State::NORMAL;
-
-		case BT_MENU_MONSTERBATTLE:
-		case BT_MENU_MONSTERLIFE:
-		case BT_MENU_MSN:
-		case BT_MENU_AFREECATV:
 			remove_menus();
 			return Button::State::NORMAL;
 

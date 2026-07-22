@@ -49,6 +49,9 @@ namespace ms
 		void set_state(State state);
 		void change_text(const std::string& text);
 		void set_cryptchar(int8_t character);
+		// Wrap typed text at the given pixel width (0 = single line)
+		void set_wrap(uint16_t width);
+		int16_t text_height() const;
 
 		void set_enter_callback(std::function<void(std::string)> onreturn);
 		void set_key_callback(KeyAction::Id key, std::function<void(void)> action);
@@ -67,6 +70,10 @@ namespace ms
 		bool belowlimit() const;
 
 		Text textlabel;
+		Text::Font font = Text::A11M;
+		Text::Alignment alignment = Text::LEFT;
+		Color::Name text_color = Color::Name::BLACK;
+		uint16_t wrap_width = 0;
 		std::string text;
 		ColorLine marker;
 		bool showmarker;

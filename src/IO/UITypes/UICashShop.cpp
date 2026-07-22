@@ -17,11 +17,13 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashShop.h"
 
+#include "../KeyAction.h"
 #include "../UI.h"
 #include "../Window.h"
 
 #include "../Components/MapleButton.h"
 
+#include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Handlers/CashShopHandlers.h"
@@ -63,7 +65,10 @@ namespace ms
 		BestNew_dim = Point<int16_t>();
 
 		for (size_t i = 0; i < 3; i++)
+		{
 			preview_sprites[i] = Preview[i];
+			preview_scene[i] = Texture(Preview[i]);
+		}
 
 		for (size_t i = 0; i < 3; i++)
 			buttons[Buttons::BtPreview1 + i] = std::make_unique<TwoSpriteButton>(Base["Tab"]["Disable"][i], Base["Tab"]["Enable"][i], Point<int16_t>(957 + (i * 17), 46));
@@ -108,32 +113,35 @@ namespace ms
 		// Korean CSEffect labels omitted; item_labels stays empty so no
 		// HOT/NEW/SALE sticker draws with Korean text.
 
-		items.push_back({ 5220000, 20000001, Item::Label::HOT,		34000,	11 });
-		items.push_back({ 5220000, 20000002, Item::Label::HOT,		34000,	11 });
-		items.push_back({ 5220000, 20000003, Item::Label::HOT,		0,		0 });
-		items.push_back({ 5220000, 20000004, Item::Label::HOT,		0,		0 });
-		items.push_back({ 5220000, 20000005, Item::Label::HOT,		10000,	11 });
-		items.push_back({ 5220000, 20000006, Item::Label::NEW,		0,		0 });
-		items.push_back({ 5220000, 20000007, Item::Label::SALE,	7000,	0 });
-		items.push_back({ 5220000, 20000008, Item::Label::NEW,		13440,	0 });
-		items.push_back({ 5220000, 20000009, Item::Label::NEW,		7480,	0 });
-		items.push_back({ 5220000, 20000010, Item::Label::NEW,		7480,	0 });
-		items.push_back({ 5220000, 20000011, Item::Label::NEW,		7480,	0 });
-		items.push_back({ 5220000, 20000012, Item::Label::NONE,	12000,	11 });
-		items.push_back({ 5220000, 20000013, Item::Label::NONE,	22000,	11 });
-		items.push_back({ 5220000, 20000014, Item::Label::NONE,	0,		0 });
-		items.push_back({ 5220000, 20000015, Item::Label::NONE,	0,		0 });
-		items.push_back({ 5220000, 20000016, Item::Label::MASTER,	0,		15 });
+		// The real catalog from Etc/Commodity.img — the same data Cosmic's
+		// CashItemFactory sells from, so the SNs and NX prices match the
+		// server exactly. Only OnSale entries are listed.
+		for (nl::node entry : nl::nx::etc["Commodity.img"])
+		{
+			int32_t onsale = entry["OnSale"];
+
+			if (onsale != 1)
+				continue;
+
+			int32_t itemid = entry["ItemId"];
+
+			if (!ItemData::get(itemid).is_valid())
+				continue;
+
+			int32_t sn = entry["SN"];
+			int32_t price = entry["Price"];
+			int32_t count = entry["Count"];
+
+			items.push_back(Item(itemid, sn, Item::Label::NONE, price, static_cast<uint16_t>(count)));
+		}
 
 		for (size_t i = 0; i < MAX_ITEMS; i++)
 		{
-			div_t div = std::div(i, 7);
+			div_t div = std::div(i, GRID_COLS);
 
-			// CashShopGL's MainItem/BtBuy is the English "Buy" button. Its
-			// bitmap has origin (-81, -54) relative to its containing cell,
-			// so subtract that offset so Point(..., ...) still addresses the
-			// cell's top-left corner.
-			buttons[Buttons::BtBuy + i] = std::make_unique<MapleButton>(MainItem["BtBuy"], Point<int16_t>(146 - 81, 523 - 54) + Point<int16_t>(124 * div.rem, 205 * div.quot));
+			// The GL BUY bitmap carries origin (-81, -54); this lands it
+			// at the classic card's bottom strip (in-card 9,151)
+			buttons[Buttons::BtBuy + i] = std::make_unique<MapleButton>(MainItem["BtBuy"], Point<int16_t>(GRID_X + STRIDE_X * div.rem - 72, GRID_Y + STRIDE_Y * div.quot + 97));
 
 			item_name[i] = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::MINESHAFT);
 			item_price[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GRAY);
@@ -141,17 +149,17 @@ namespace ms
 			item_percent[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::TORCHRED);
 		}
 
-		Point<int16_t> slider_pos = Point<int16_t>(1007, 372);
+		Point<int16_t> slider_pos = Point<int16_t>(770, GRID_Y);
 
 		list_slider = Slider(
 			Slider::Type::THIN_MINESHAFT,
-			Range<int16_t>(slider_pos.y(), slider_pos.y() + 381),
+			Range<int16_t>(slider_pos.y(), slider_pos.y() + GRID_ROWS * STRIDE_Y - 30),
 			slider_pos.x(),
-			2,
-			7,
+			GRID_ROWS,
+			static_cast<int16_t>(items.size() / GRID_COLS + 1),
 			[&](bool upwards)
 			{
-				int16_t shift = upwards ? -7 : 7;
+				int16_t shift = upwards ? -GRID_COLS : GRID_COLS;
 				bool above = list_offset >= 0;
 				bool below = list_offset + shift < items.size();
 
@@ -182,12 +190,27 @@ namespace ms
 		wishlist_bg = Texture(RightMenu["CartInven"]["background"]);
 		cs_inventory_bg = Texture(RightMenu["CashInven"]["background"]);
 
-		// Toggle buttons for the wishlist and cash inventory panels.
-		// CashShopGL has no English equivalents, so reuse the Korean
-		// CSStatus/BtWish (cart) and CSChar/BtInventory (storage) buttons,
-		// placed in the free stretch of the header bar left of BtCoupon.
-		buttons[Buttons::BtWish] = std::make_unique<MapleButton>(CashShop["CSStatus"]["BtWish"], Point<int16_t>(704, 7));
-		buttons[Buttons::BtInventory] = std::make_unique<MapleButton>(CashShop["CSChar"]["BtInventory"], Point<int16_t>(630, 2));
+		// No wishlist/inventory toggle buttons: the cash inventory renders
+		// permanently into its baked right-column panel, and the wishlist
+		// has no English art (its data is never parsed client-side).
+
+		// Charge NX under the baked NX-balance panel at (9,646); the
+		// button bitmap's origin drops it just below the panel
+		buttons[Buttons::BtChargeNX] = std::make_unique<MapleButton>(CashShopGL["LeftMenu"]["MyMenu"]["BtChageNx"], Point<int16_t>(10, 646));
+
+		for (int i = 0; i < 3; i++)
+			cash_balance_text[i] = Text(Text::Font::A11B, Text::Alignment::RIGHT, Color::Name::EMPEROR);
+
+		selected_item = -1;
+		preview_name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, "", 220);
+		preview_desc = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "", 220);
+		preview_price = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA);
+
+		// Your character lives on the preview stage; selecting an equip
+		// dresses it, arrow keys walk it, jump key jumps
+		preview_look = player.get_look();
+		preview_look.set_stance(Stance::Id::STAND1);
+		cur_stance = Stance::Id::STAND1;
 
 		active_subpanel = SUBPANEL_NONE;
 
@@ -196,12 +219,22 @@ namespace ms
 
 	void UICashShop::draw(float inter) const
 	{
-		preview_sprites[preview_index].draw(position + Point<int16_t>(644, 65), inter);
+		// The preview stage stretches to the window top
+		preview_scene[preview_index].draw(DrawArgument(position + Point<int16_t>(644, 40), Point<int16_t>(366, 310)));
 
 		UIElement::draw_sprites(inter);
 
 		// Korean menu_tabs / promotion_sprites / mvp_sprites / charge_charset
 		// draws removed — those elements have no English equivalent.
+
+		// NX balances beside the baked labels: NX Prepaid / NX Credit /
+		// Maple Pts (query result order: credit, points, prepaid)
+		cash_balance_text[0].change_text(std::to_string(get_cash_balance(2)));
+		cash_balance_text[1].change_text(std::to_string(get_cash_balance(0)));
+		cash_balance_text[2].change_text(std::to_string(get_cash_balance(1)));
+
+		for (int b = 0; b < 3; b++)
+			cash_balance_text[b].draw(position + Point<int16_t>(152, 653 + 26 * b));
 
 		Point<int16_t> label_pos = position + Point<int16_t>(4, 3);
 		job_label.draw(label_pos);
@@ -209,10 +242,8 @@ namespace ms
 		size_t length = job_label.width();
 		name_label.draw(label_pos + Point<int16_t>(length + 10, 0));
 
-		if (items.size() > 0)
-			item_line.draw(position + Point<int16_t>(139, 566), inter);
-		else
-			item_none.draw(position + Point<int16_t>(137, 372) - item_none.get_dimensions() / 2 + Point<int16_t>(0, list_slider.getvertical().length() / 2), inter);
+		if (items.empty())
+			item_none.draw(position + Point<int16_t>(430, 360) - item_none.get_dimensions() / 2, inter);
 
 		for (size_t i = 0; i < MAX_ITEMS; i++)
 		{
@@ -220,28 +251,40 @@ namespace ms
 
 			if (index < items.size())
 			{
-				div_t div = std::div(i, 7);
+				div_t div = std::div(i, GRID_COLS);
+				Point<int16_t> cell = position + Point<int16_t>(GRID_X + STRIDE_X * div.rem, GRID_Y + STRIDE_Y * div.quot);
 				Item item = items[index];
 
-				item_base.draw(position + Point<int16_t>(137, 372) + Point<int16_t>(124 * div.rem, 205 * div.quot), inter);
-				item.draw(DrawArgument(position + Point<int16_t>(164, 473) + Point<int16_t>(124 * div.rem, 205 * div.quot), 2.0f, 2.0f));
+				item_base.draw(cell, inter);
+				// Icon centered in the card's upper frame; v83 icons carry
+				// a (0,32) origin which doubles at 2x scale
+				item.draw(DrawArgument(cell + Point<int16_t>(27, 101), 2.0f, 2.0f));
 
-				// Korean CSEffect labels omitted.
-
-				item_name[i].draw(position + Point<int16_t>(192, 480) + Point<int16_t>(124 * div.rem, 205 * div.quot));
-
-				if (item_discount[i].get_text() == "")
-				{
-					item_price[i].draw(position + Point<int16_t>(195, 499) + Point<int16_t>(124 * div.rem, 205 * div.quot));
-				}
-				else
-				{
-					item_price[i].draw(position + Point<int16_t>(196, 506) + Point<int16_t>(124 * div.rem, 205 * div.quot));
-
-					item_discount[i].draw(position + Point<int16_t>(185, 495) + Point<int16_t>(124 * div.rem, 205 * div.quot));
-					item_percent[i].draw(position + Point<int16_t>(198 + (item_discount[i].width() / 2), 495) + Point<int16_t>(124 * div.rem, 205 * div.quot));
-				}
+				item_name[i].draw(cell + Point<int16_t>(55, 108));
+				item_price[i].draw(cell + Point<int16_t>(58, 127));
 			}
+		}
+
+		// Your character on the stage, dressed with whatever is selected
+		preview_look.draw(
+			DrawArgument(position + Point<int16_t>(static_cast<int16_t>(char_x), static_cast<int16_t>(275.0f + char_yoff)), !facing_right),
+			inter);
+
+		if (selected_item >= 0 && selected_item < static_cast<int16_t>(items.size()))
+		{
+			const Item& sel = items[selected_item];
+			Point<int16_t> pv = position + Point<int16_t>(652, 46);
+
+			preview_name.change_text(sel.get_name());
+			preview_name.draw(pv);
+
+			std::string pricestr = std::to_string(sel.get_price()) + " NX";
+
+			if (sel.count > 1)
+				pricestr += " (" + std::to_string(sel.count) + ")";
+
+			preview_price.change_text(pricestr);
+			preview_price.draw(pv + Point<int16_t>(0, 16));
 		}
 
 		list_slider.draw(position);
@@ -263,45 +306,51 @@ namespace ms
 			if (purchase_bg.is_valid())
 				purchase_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
 			break;
-		case SUBPANEL_WISHLIST:
-			if (wishlist_bg.is_valid())
-				wishlist_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-
-			// Only the empty panel frame is drawn: the wishlist SNs are
-			// never parsed client-side (SetCashShopHandler skips them), so
-			// there is no wishlist data to render yet.
-			break;
-		case SUBPANEL_INVENTORY:
-		{
-			Point<int16_t> panel_pos = position + Point<int16_t>(200, 50);
-
-			if (cs_inventory_bg.is_valid())
-				cs_inventory_bg.draw(DrawArgument(panel_pos));
-
-			// Fill the panel's 6x2 slot grid with the player's cash items.
-			const Inventory& inventory = Stage::get().get_player().get_inventory();
-			uint8_t slotmax = inventory.get_slotmax(InventoryType::Id::CASH);
-			int16_t shown = 0;
-
-			for (int16_t slot = 1; slot <= slotmax && shown < 12; slot++)
-			{
-				int32_t item_id = inventory.get_item_id(InventoryType::Id::CASH, slot);
-
-				if (item_id == 0)
-					continue;
-
-				div_t div = std::div(shown, 6);
-				Point<int16_t> slot_pos = panel_pos + Point<int16_t>(8 + 36 * div.rem, 28 + 35 * div.quot);
-
-				// v83 item icons carry a (0, 32) origin, so draw at the
-				// slot's bottom edge to land the 32x32 icon inside it.
-				ItemData::get(item_id).get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(0, 32)));
-
-				shown++;
-			}
-
+		default:
 			break;
 		}
+
+		// Player's cash items rendered into the baked CASH INVENTORY
+		// panel in the right column (7x2 slot grid)
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		uint8_t slotmax = inventory.get_slotmax(InventoryType::Id::CASH);
+		int16_t shown = 0;
+
+		for (int16_t slot = 1; slot <= slotmax && shown < 14; slot++)
+		{
+			int32_t item_id = inventory.get_item_id(InventoryType::Id::CASH, slot);
+
+			if (item_id == 0)
+				continue;
+
+			div_t sdiv = std::div(shown, 7);
+			Point<int16_t> slot_pos = position + Point<int16_t>(771 + 34 * sdiv.rem, 513 + 34 * sdiv.quot);
+
+			// v83 item icons carry a (0, 32) origin, so draw at the
+			// slot's bottom edge to land the 32x32 icon inside it.
+			ItemData::get(item_id).get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(0, 32)));
+
+			shown++;
+		}
+	}
+
+	void UICashShop::send_key(int32_t keycode, bool pressed, bool escape)
+	{
+		switch (keycode)
+		{
+		case KeyAction::Id::LEFT:
+			key_left = pressed;
+			break;
+		case KeyAction::Id::RIGHT:
+			key_right = pressed;
+			break;
+		case KeyAction::Id::JUMP:
+			if (pressed && !char_jumping)
+			{
+				char_jumping = true;
+				char_vy = -6.2f;
+			}
+			break;
 		default:
 			break;
 		}
@@ -310,6 +359,54 @@ namespace ms
 	void UICashShop::update()
 	{
 		UIElement::update();
+
+		preview_look.update(Constants::TIMESTEP);
+
+		// Walk
+		float dx = 0.0f;
+
+		if (key_left)
+			dx -= 1.3f;
+
+		if (key_right)
+			dx += 1.3f;
+
+		if (dx != 0.0f)
+		{
+			char_x += dx;
+			facing_right = dx > 0.0f;
+
+			if (char_x < 662.0f)
+				char_x = 662.0f;
+
+			if (char_x > 992.0f)
+				char_x = 992.0f;
+		}
+
+		// Jump arc
+		if (char_jumping)
+		{
+			char_yoff += char_vy;
+			char_vy += 0.28f;
+
+			if (char_yoff >= 0.0f)
+			{
+				char_yoff = 0.0f;
+				char_vy = 0.0f;
+				char_jumping = false;
+			}
+		}
+
+		// Stance follows the movement state
+		uint8_t want = char_jumping ? Stance::Id::JUMP
+			: (dx != 0.0f) ? Stance::Id::WALK1
+			: Stance::Id::STAND1;
+
+		if (want != cur_stance)
+		{
+			cur_stance = want;
+			preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
+		}
 	}
 
 	Button::State UICashShop::button_pressed(uint16_t buttonid)
@@ -383,14 +480,8 @@ namespace ms
 
 			return Button::State::NORMAL;
 		}
-		case Buttons::BtWish:
-			active_subpanel = (active_subpanel == SUBPANEL_WISHLIST) ? SUBPANEL_NONE : SUBPANEL_WISHLIST;
-			return Button::State::NORMAL;
 		case Buttons::BtCoupon:
 			active_subpanel = (active_subpanel == SUBPANEL_COUPON) ? SUBPANEL_NONE : SUBPANEL_COUPON;
-			return Button::State::NORMAL;
-		case Buttons::BtInventory:
-			active_subpanel = (active_subpanel == SUBPANEL_INVENTORY) ? SUBPANEL_NONE : SUBPANEL_INVENTORY;
 			return Button::State::NORMAL;
 		default:
 			break;
@@ -425,6 +516,42 @@ namespace ms
 
 			if (state != Cursor::State::IDLE)
 				return state;
+		}
+
+		if (clicked)
+		{
+			Point<int16_t> off = cursorpos - position;
+
+			for (int16_t i = 0; i < MAX_ITEMS; i++)
+			{
+				int16_t index = i + list_offset;
+
+				if (index >= static_cast<int16_t>(items.size()))
+					break;
+
+				div_t cdiv = std::div(i, GRID_COLS);
+				Rectangle<int16_t> card(
+					Point<int16_t>(GRID_X + STRIDE_X * cdiv.rem, GRID_Y + STRIDE_Y * cdiv.quot),
+					Point<int16_t>(GRID_X + STRIDE_X * cdiv.rem + CARD_W, GRID_Y + STRIDE_Y * cdiv.quot + CARD_H)
+				);
+
+				if (card.contains(off))
+				{
+					selected_item = index;
+
+					int32_t itemid = items[index].get_itemid();
+
+					if (itemid >= 1000000 && itemid < 2000000)
+					{
+						// Try-on: current look plus the selected equip
+						preview_look = Stage::get().get_player().get_look();
+						preview_look.add_equip(itemid);
+						preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
+					}
+
+					break;
+				}
+			}
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);

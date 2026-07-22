@@ -68,6 +68,48 @@ namespace ms
 		}
 	};
 
+	// Stock an item into your own shop (before opening it)
+	class AddShopItemPacket : public OutPacket
+	{
+	public:
+		AddShopItemPacket(int8_t invtype, int16_t slot, int16_t bundles, int16_t perbundle, int32_t price) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x16);
+			write_byte(invtype);
+			write_short(slot);
+			write_short(bundles);
+			write_short(perbundle);
+			write_int(price);
+		}
+	};
+
+	// Visit a player shop / minigame room by object id
+	class MiniRoomVisitPacket : public OutPacket
+	{
+	public:
+		MiniRoomVisitPacket(int32_t oid) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(4);
+			write_int(oid);
+		}
+	};
+
+	// Open a personal shop with a store permit (cash item 514xxxx)
+	class CreateShopPacket : public OutPacket
+	{
+	public:
+		CreateShopPacket(const std::string& desc, int32_t permit_itemid, int8_t room_type = 4) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0);
+			write_byte(room_type);
+			write_string(desc);
+			write_byte(0);
+			write_byte(0);
+			write_byte(0);
+			write_int(permit_itemid);
+		}
+	};
+
 	// Add item to trade
 	// action 15: byte invtype, short slot, short qty, byte trade_slot
 	class TradeSetItemPacket : public OutPacket
@@ -113,7 +155,7 @@ namespace ms
 	public:
 		TradeExitPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
 		{
-			write_byte(10);  // EXIT
+			write_byte(0x0A);  // EXIT
 		}
 	};
 
@@ -138,7 +180,7 @@ namespace ms
 	public:
 		ShopBuyPacket(int8_t slot, int16_t quantity) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
 		{
-			write_byte(5);
+			write_byte(0x17);
 			write_byte(slot);
 			write_short(quantity);
 		}
@@ -173,7 +215,60 @@ namespace ms
 	public:
 		ShopOpenPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
 		{
-			write_byte(13);
+			write_byte(0x0B);
+			write_byte(1);
+		}
+	};
+
+	// Leave merchant maintenance: closes if empty, reopens store if stocked
+	class MerchantMaintOffPacket : public OutPacket
+	{
+	public:
+		MerchantMaintOffPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x27);
+		}
+	};
+
+	// Tidy Up: withdraw merchant mesos, prune sold-out listings (owner only)
+	class MerchantOrganizePacket : public OutPacket
+	{
+	public:
+		MerchantOrganizePacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x28);
+		}
+	};
+
+	// Take a stocked item back (merchant owner, store closed)
+	class TakeItemBackPacket : public OutPacket
+	{
+	public:
+		TakeItemBackPacket(int16_t slot) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x26);
+			write_short(slot);
+		}
+	};
+
+	// Take a stocked item back (personal shop owner)
+	class ShopRemoveItemPacket : public OutPacket
+	{
+	public:
+		ShopRemoveItemPacket(int16_t slot) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x1B);
+			write_short(slot);
+		}
+	};
+
+	// Close the whole merchant store and reclaim contents (owner only)
+	class CloseMerchantPacket : public OutPacket
+	{
+	public:
+		CloseMerchantPacket() : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
+		{
+			write_byte(0x29);
 		}
 	};
 

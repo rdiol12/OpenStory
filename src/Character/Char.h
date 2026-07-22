@@ -111,6 +111,9 @@ namespace ms
 		void show_attack_effect(Animation animation, int8_t z);
 
 		// Party overhead HP gauge (stamped by UIPartyHUD while partied)
+		void draw_death(Point<int16_t> absp, float alpha) const;
+		void update_death();
+
 		void set_party_hp(int32_t hp, int32_t maxhp);
 		void clear_party_hp();
 		// Display an animation as an effect on top of the character
@@ -201,6 +204,14 @@ namespace ms
 
 	private:
 		Text namelabel;
+		int16_t tomb_yoff = 0;
+		bool tomb_landed = false;
+		uint8_t tomb_frame = 0;
+		uint16_t tomb_elapsed = 0;
+		uint8_t ghost_frame = 0;
+		uint16_t ghost_elapsed = 0;
+		uint16_t ghost_bob = 0;
+
 		int32_t party_hp = 0;
 		int32_t party_maxhp = 0;
 		Color name_color;

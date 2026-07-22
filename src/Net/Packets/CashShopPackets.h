@@ -21,14 +21,18 @@
 
 namespace ms
 {
-	// Opcode: BUY_CS_ITEM(215)
+	// Opcode: BUY_CS_ITEM(229) = Cosmic's CASHSHOP_OPERATION. Buy is
+	// action 0x03: byte action, byte pad, int currency (1 = NX credit,
+	// 2 = maple points, 4 = prepaid), int commodity SN.
 	class BuyCashItemPacket : public OutPacket
 	{
 	public:
 		// Request the server to purchase a cash shop item
 		BuyCashItemPacket(int8_t currency, int32_t sn_item_id) : OutPacket(OutPacket::Opcode::BUY_CS_ITEM)
 		{
-			write_byte(currency);
+			write_byte(3);
+			write_byte(0);
+			write_int(currency);
 			write_int(sn_item_id);
 		}
 	};

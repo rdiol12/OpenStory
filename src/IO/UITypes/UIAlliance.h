@@ -18,11 +18,17 @@
 #pragma once
 
 #include "../UIDragElement.h"
+
 #include "../../Graphics/Text.h"
-#include "../../Graphics/Geometry.h"
+#include "../../Graphics/Texture.h"
+
+#include <vector>
 
 namespace ms
 {
+	// Alliance window on the GuildUI.img frame + union page art:
+	// member-guild table, Invite / Leave Alliance actions (Cosmic
+	// ALLIANCE_OPERATION modes 3 / 2)
 	class UIAlliance : public UIDragElement<PosALLIANCE>
 	{
 	public:
@@ -54,6 +60,14 @@ namespace ms
 			BT_LEAVE
 		};
 
+		static constexpr int16_t W = 535;
+		static constexpr int16_t H = 391;
+		static constexpr int16_t CONTENT_X = 12;
+		static constexpr int16_t CONTENT_Y = 116;
+		static constexpr int16_t ROW_Y = 80;
+		static constexpr int16_t ROW_H = 22;
+		static constexpr int16_t MAX_VISIBLE_GUILDS = 8;
+
 		struct AllianceGuild
 		{
 			std::string name;
@@ -66,22 +80,15 @@ namespace ms
 		int8_t capacity;
 		std::vector<AllianceGuild> guilds;
 
-		Text title_label;
-		Text notice_label;
-		mutable Text guild_label;
+		Texture no_union_tex;
+		Texture head_u_tex;
+		Texture head_ut_tex;
+		Texture row_tex;
+		Texture cover_tex;
 
-		// Pre-allocated draw objects (avoid per-frame GPU allocations)
-		ColorBox bg_box;
-		ColorBox title_bar;
-		Text close_text;
-		Text name_text;
-		Text cap_text;
-		Text no_alliance_text;
-		Text notice_header;
-		Text guild_header;
-		ColorBox invite_box;
-		Text invite_text;
-		ColorBox leave_box;
-		Text leave_text;
+		mutable Text name_text;
+		mutable Text notice_text;
+		mutable Text cap_text;
+		mutable Text guild_label;
 	};
 }
