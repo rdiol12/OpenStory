@@ -430,6 +430,12 @@ namespace ms
 		PosQUESTHELPER() : PointEntry("PosQUESTHELPER", "(560,100)") {}
 	};
 
+	// The default position of UIPartyHUD
+	struct PosPARTYHUD : public Configuration::PointEntry
+	{
+		PosPARTYHUD() : PointEntry("PosPARTYHUD", "(560,320)") {}
+	};
+
 	// The default position of UIWorldMap
 	struct PosMAP : public Configuration::PointEntry
 	{

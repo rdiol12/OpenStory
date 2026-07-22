@@ -653,9 +653,11 @@ namespace ms
 		}
 		else if (tab == Buttons::BT_TAB_BLACKLIST)
 		{
-			blacklist_title.draw(position + Point<int16_t>(24, 104));
-			blacklist_grid[0].draw(position + Point<int16_t>(24, 134));
-			blacklist_name.draw(position + Point<int16_t>(24, 134));
+			// base has a baked origin of (+10,+60) — anchor so the header
+			// lands at the top of the content area with the row under it
+			blacklist_title.draw(position + Point<int16_t>(14, 40));
+			blacklist_grid[0].draw(position + Point<int16_t>(24, 130));
+			blacklist_name.draw(position + Point<int16_t>(30, 132));
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -772,18 +774,23 @@ namespace ms
 				}
 			}
 
-			// Update party button states based on whether we're in a party
+			// Update party button states on TRANSITIONS only — stomping the
+			// state every tick kills the hover/press animation
 			if (party.is_in_party())
 			{
-				buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::DISABLED);
-				buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::NORMAL);
+				if (buttons[Buttons::BT_PARTY_CREATE]->get_state() != Button::State::DISABLED)
+					buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::DISABLED);
+				if (buttons[Buttons::BT_PARTY_INVITE]->get_state() == Button::State::DISABLED)
+					buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::NORMAL);
 				buttons[Buttons::BT_PARTY_LEAVE]->set_active(true);
 				buttons[Buttons::BT_PARTY_SETTINGS]->set_active(true);
 			}
 			else
 			{
-				buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::NORMAL);
-				buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::DISABLED);
+				if (buttons[Buttons::BT_PARTY_CREATE]->get_state() == Button::State::DISABLED)
+					buttons[Buttons::BT_PARTY_CREATE]->set_state(Button::State::NORMAL);
+				if (buttons[Buttons::BT_PARTY_INVITE]->get_state() != Button::State::DISABLED)
+					buttons[Buttons::BT_PARTY_INVITE]->set_state(Button::State::DISABLED);
 				buttons[Buttons::BT_PARTY_LEAVE]->set_active(false);
 				buttons[Buttons::BT_PARTY_SETTINGS]->set_active(false);
 			}

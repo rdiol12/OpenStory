@@ -20,6 +20,8 @@
 
 #include "../Components/MapleButton.h"
 #include "../UI.h"
+
+#include "../../Graphics/Geometry.h"
 #include "../../Audio/Audio.h"
 #include "../../Configuration.h"
 #include "../../Data/ItemData.h"
@@ -41,6 +43,8 @@ namespace ms
 		reorder_drag_index(-1)
 	{
 		// === QuestAlarm (UIWindow.img — v83 primary) ===
+		tip_frame = MapleFrame(nl::nx::ui["UIToolTip.img"]["Item"]["Frame2"]);
+
 		nl::node alarm1 = nl::nx::ui["UIWindow.img"]["QuestAlarm"];
 		if (alarm1)
 		{
@@ -260,9 +264,9 @@ namespace ms
 		if (buttons.count(Buttons::BT_MAX))
 			buttons[Buttons::BT_MAX]->set_active(false);
 
-		title_text = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::BLACK, "", 170, false);
-		no_quest_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "No quest tracked", 170, false);
-		drag_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK, "", 0, false);
+		title_text = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, "", 170, false);
+		no_quest_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY, "No quest tracked", 170, false);
+		drag_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, "", 0, false);
 
 		auto_track();
 	}
@@ -327,7 +331,10 @@ namespace ms
 
 		if (header_tex.is_valid())
 		{
-			header_tex.draw(DrawArgument(position));
+			if (minimized)
+				tip_frame.draw(position + Point<int16_t>(
+					header_tex.get_dimensions().x() / 2, 24), 
+					header_tex.get_dimensions().x() - 19, 13);
 			content_pos = position - header_tex.get_origin();
 		}
 
@@ -346,22 +353,18 @@ namespace ms
 				content_h = 28;
 			content_h = std::max(content_h, (int16_t)20);
 
-			// Tile bg_center then cap with bg_bottom
-			if (bg_center.is_valid())
-			{
-				int16_t tile_h = bg_center.get_dimensions().y();
-				if (tile_h > 0)
-				{
-					int16_t drawn = 0;
-					while (drawn < content_h)
-					{
-						bg_center.draw(DrawArgument(below + Point<int16_t>(0, drawn) + bg_center.get_origin()));
-						drawn += tile_h;
-					}
-					if (bg_bottom.is_valid())
-						bg_bottom.draw(DrawArgument(below + Point<int16_t>(0, drawn) + bg_bottom.get_origin()));
-				}
-			}
+			// one tooltip-frame panel spanning header + content
+			int16_t w = header_tex.is_valid() ? header_tex.get_dimensions().x() : 200;
+			int16_t total_h = static_cast<int16_t>(header_h + content_h + 8);
+			tip_frame.draw(position + Point<int16_t>(w / 2, total_h - 6), w - 19, total_h - 17);
+
+			// white divider under the title, before the quests
+			static ColorBox divider;
+			divider.setwidth(w - 10);
+			divider.setheight(1);
+			divider.set_color(Color::Name::WHITE);
+			divider.setopacity(0.7f);
+			divider.draw(DrawArgument(position + Point<int16_t>(5, header_h - 3)));
 		}
 
 		// Draw title
@@ -796,7 +799,7 @@ namespace ms
 		if (name.empty())
 			name = "Quest " + qid_str;
 
-		tq.name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::MINESHAFT, name, 0, false);
+		tq.name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, name, 0, false);
 
 		// Requirements
 		nl::node check = quest_check[qid_str];
@@ -822,10 +825,10 @@ namespace ms
 
 			std::string line = item_name + " " + std::to_string(have) + "/" + std::to_string(count);
 			bool done = have >= count;
-			Color::Name color = done ? Color::Name::EMPEROR : Color::Name::BLACK;
+			Color::Name color = done ? Color::Name::LIGHTGREY : Color::Name::WHITE;
 
 			tq.requirements.push_back(
-				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
+				Text(Text::Font::A11B, Text::Alignment::LEFT, color, line, 145, false)
 			);
 			tq.requirements_complete.push_back(done);
 		}
@@ -861,10 +864,10 @@ namespace ms
 
 			std::string line = mob_name + " " + std::to_string(killed) + "/" + std::to_string(count);
 			bool done = killed >= count;
-			Color::Name color = done ? Color::Name::EMPEROR : Color::Name::BLACK;
+			Color::Name color = done ? Color::Name::LIGHTGREY : Color::Name::WHITE;
 
 			tq.requirements.push_back(
-				Text(Text::Font::A11M, Text::Alignment::LEFT, color, line, 145, false)
+				Text(Text::Font::A11B, Text::Alignment::LEFT, color, line, 145, false)
 			);
 			tq.requirements_complete.push_back(done);
 			mob_idx++;
@@ -878,7 +881,7 @@ namespace ms
 			if (!npc_name.empty())
 			{
 				tq.requirements.push_back(
-					Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "Talk to " + npc_name, 145, false)
+					Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, "Talk to " + npc_name, 145, false)
 				);
 				// Can't track NPC-talked state client-side without server flag; leave unchecked.
 				tq.requirements_complete.push_back(false);
@@ -895,7 +898,7 @@ namespace ms
 
 		// Progress fallback
 		if (tq.requirements.empty())
-			tq.progress = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "In progress...", 145, false);
+			tq.progress = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, "In progress...", 145, false);
 		else
 			tq.progress = Text();
 	}

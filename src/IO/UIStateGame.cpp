@@ -37,6 +37,7 @@
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMiniMap.h"
+#include "UITypes/UIPartyHUD.h"
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIPartyHelper.h"
 #include "UITypes/UIQuestLog.h"
@@ -97,6 +98,7 @@ namespace ms
 		emplace<UIBuffList>();
 		emplace<UIShop>(look, inventory);
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests());
+		emplace<UIPartyHUD>();
 		emplace<UIPartyHelper>();
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();

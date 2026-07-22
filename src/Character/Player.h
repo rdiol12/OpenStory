@@ -190,8 +190,10 @@ namespace ms
 		bool underwater;
 
 		int32_t chair_itemid = 0;
-		Animation chair_anim;
+		Animation chair_anim;         // info/effect  — drawn behind the body
 		Point<int16_t> chair_pos;
+		Animation chair_anim_front;   // info/effect2 — drawn in front of the body
+		Point<int16_t> chair_pos_front;
 
 		int32_t heal_tick_counter = 0;
 		static constexpr int32_t HEAL_TICK_INTERVAL = 300; // ~10 seconds at 30fps

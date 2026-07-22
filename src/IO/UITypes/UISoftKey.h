@@ -78,7 +78,11 @@ namespace ms
 			BtDel,
 			BtOK,
 			BtShift,
-			BtNum0
+			BtTabNum,
+			BtTabLow,
+			BtTabHigh,
+			BtLetter0,
+			BtNum0 = BtLetter0 + 10
 		};
 
 		static constexpr size_t MIN_TEXT_LEN = 6;
@@ -95,6 +99,14 @@ namespace ms
 		static constexpr uint16_t CASE_KEYS = ROW_MAX * 2 + ROW4_MAX;
 
 		bool highCase;
+		// active pad tab: 0 = digits, 1 = lowercase, 2 = uppercase
+		uint16_t pad_tab = 0;
+		Texture tab_normal[3];
+		Texture tab_selected[3];
+		// phone-style multi-tap on the letter keys
+		uint16_t multitap_key = 0xFFFF;
+		uint16_t multitap_pos = 0;
+		int16_t multitap_timer = 0;
 		std::string row1keys[ROW_MAX];
 		std::string row2keys[ROW_MAX];
 		std::string row3keys[ROW_MAX];

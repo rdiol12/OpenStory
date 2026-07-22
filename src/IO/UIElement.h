@@ -85,6 +85,7 @@ namespace ms
 			TRADE,
 			MTS,
 			QUESTHELPER,
+			PARTYHUD,
 			GUILD,
 			GUILDBBS,
 			ALLIANCE,

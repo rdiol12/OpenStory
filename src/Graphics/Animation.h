@@ -68,6 +68,10 @@ namespace ms
 		bool update(uint16_t timestep);
 		void reset();
 
+		// Play once and freeze on the final frame instead of looping (e.g.
+		// button mouse-over animations); reset() rewinds for the next play.
+		void set_hold_last(bool hold) { hold_last = hold; }
+
 		void draw(const DrawArgument& arguments, float alpha) const;
 
 		uint16_t get_delay(int16_t frame) const;
@@ -83,6 +87,7 @@ namespace ms
 		std::vector<Frame> frames;
 		bool animated;
 		bool zigzag;
+		bool hold_last = false;
 
 		Nominal<int16_t> frame;
 		Linear<float> opacity;

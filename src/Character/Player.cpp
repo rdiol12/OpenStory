@@ -33,6 +33,7 @@
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
+#include <nlnx/bitmap.hpp>
 #endif
 
 namespace ms
@@ -185,14 +186,22 @@ namespace ms
 	{
 		if (layer == get_layer())
 		{
+			Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+
+			// info/effect draws behind the body (the chair itself), grounded at
+			// the feet by chair_pos.
 			if (chair_itemid > 0)
-			{
-				Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
-				Point<int16_t> chair_offset = chair_pos + Point<int16_t>(0, -50);
-				chair_anim.draw(DrawArgument(absp + chair_offset, facing_right), alpha);
-			}
+				chair_anim.draw(DrawArgument(absp + chair_pos, facing_right), alpha);
 
 			Char::draw(viewx, viewy, alpha);
+
+			// info/effect2 draws in front of the body (signs / decorations that
+			// sit over or above the seated character). Drawn unconditionally like
+			// the chair — an absent effect2 is an empty Animation whose invalid
+			// texture is a safe no-op. (Do NOT gate on get_bounds(): a plain
+			// bitmap frame has no lt/rb, so its bounds width is always 0.)
+			if (chair_itemid > 0)
+				chair_anim_front.draw(DrawArgument(absp + chair_pos_front, facing_right), alpha);
 		}
 	}
 
@@ -236,7 +245,10 @@ namespace ms
 		climb_cooldown.update();
 
 		if (chair_itemid > 0)
+		{
 			chair_anim.update();
+			chair_anim_front.update();
+		}
 
 		// Idle HP/MP regen — send HEAL_OVER_TIME every ~10 seconds
 		// Reset and pause counter while attacking, getting hit, in hit stun, or dead.
@@ -737,24 +749,95 @@ namespace ms
 
 			nl::node item_node = nl::nx::item["Install"][strprefix + ".img"][strid];
 
-			// Chair animation is under the "effect" child node
+			// Bottom-centre a bitmap on the feet: the Animation subtracts each
+			// frame's origin at draw time, so we add it back and shift by half the
+			// width / full height. The net anchor is the sprite's bottom-centre,
+			// regardless of whatever origin the art was authored with.
+			auto ground_offset = [](nl::node frame0) -> Point<int16_t>
+			{
+				nl::bitmap bmp = frame0;
+				int16_t w = static_cast<int16_t>(bmp.width());
+				int16_t h = static_cast<int16_t>(bmp.height());
+				if (h <= 0)
+					return Point<int16_t>(0, 0);
+				Point<int16_t> origin = frame0["origin"];
+				return origin - Point<int16_t>(static_cast<int16_t>(w / 2), h);
+			};
+
 			nl::node effect_node = item_node["effect"];
+			nl::node front_node = item_node["effect2"];
 
-			// Read chair position offset
-			nl::node pos_node = effect_node["pos"];
-			if (pos_node)
-				chair_pos = Point<int16_t>(pos_node["x"], pos_node["y"]);
-			else
-				chair_pos = Point<int16_t>(0, 0);
+			// info/ai marks a Nano-Banana-generated chair. Only those get the
+			// automatic geometry (size from the sprite, ground at the feet, seat
+			// the body in the middle). Real Nexon chairs keep their hand-authored
+			// origin/pos and the legacy -50 lift, untouched.
+			if (item_node["info"]["ai"].get_bool())
+			{
+				chair_pos = ground_offset(effect_node["0"]);
 
-			if (effect_node)
-				chair_anim = Animation(effect_node);
+				int16_t chair_h = static_cast<int16_t>(nl::bitmap(effect_node["0"]).height());
+
+				// The seated pose carries the hips this many pixels above the
+				// character's foot-anchor, so lifting the anchor exactly to the
+				// cushion floats the body above it. Drop the body by this constant
+				// so the butt meets the seat. It is a property of the single sit
+				// pose — calibrated once, identical for every chair — so seat data
+				// stays the true cushion top and must NOT pre-shave it.
+				constexpr int16_t SIT_HIP_OFFSET = 12;
+
+				if (chair_h > 0)
+				{
+					// A side-view character sits on the chair's centreline, so the
+					// body is always centred horizontally on the chair — seat.x is
+					// ignored (an off-centre value just throws the body to one side,
+					// worse on wide front-facing chairs). Only the vertical seat
+					// matters: info/seat.y is the measured cushion-top pixel (y from
+					// the top), read off the render like the hat brow. Absent -> seat
+					// at the chair's vertical middle.
+					nl::node seat = item_node["info"]["seat"];
+					int16_t dy = seat
+						? static_cast<int16_t>((int16_t)seat["y"] - chair_h)
+						: static_cast<int16_t>(-(chair_h / 2));
+
+					sit_offset = Point<int16_t>(0, static_cast<int16_t>(dy + SIT_HIP_OFFSET));
+				}
+				else
+				{
+					sit_offset = Point<int16_t>(0, 0);
+				}
+
+				// effect2 (sign / aura in front of the body): centre it on the chair
+				// and sit its bottom edge on the chair's top edge, so one rule floats
+				// it above the seat for any chair. ground_offset centres it and puts
+				// its bottom at the feet; lift by the chair height to reach the top.
+				chair_pos_front = ground_offset(front_node["0"])
+					- Point<int16_t>(0, (chair_h > 0) ? chair_h : (int16_t)0);
+			}
 			else
-				chair_anim = Animation();
+			{
+				// Vanilla chair: draw the effect at feet + info/pos + the fixed
+				// -50 lift, and leave the body foot-anchored (original behaviour).
+				nl::node pos_node = effect_node["pos"];
+				chair_pos = (pos_node
+					? Point<int16_t>(pos_node["x"], pos_node["y"])
+					: Point<int16_t>(0, 0)) + Point<int16_t>(0, -50);
+
+				nl::node front_pos = front_node["pos"];
+				chair_pos_front = (front_pos
+					? Point<int16_t>(front_pos["x"], front_pos["y"])
+					: Point<int16_t>(0, 0)) + Point<int16_t>(0, -50);
+
+				sit_offset = Point<int16_t>(0, 0);
+			}
+
+			chair_anim = effect_node ? Animation(effect_node) : Animation();
+			chair_anim_front = front_node ? Animation(front_node) : Animation();
 		}
 		else
 		{
 			chair_anim = Animation();
+			chair_anim_front = Animation();
+			sit_offset = Point<int16_t>(0, 0);
 		}
 	}
 }

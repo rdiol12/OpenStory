@@ -109,6 +109,10 @@ namespace ms
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);
+
+		// Party overhead HP gauge (stamped by UIPartyHUD while partied)
+		void set_party_hp(int32_t hp, int32_t maxhp);
+		void clear_party_hp();
 		// Display an animation as an effect on top of the character
 		void show_effect_id(CharEffect::Id toshow);
 		// Start/stop a persistent looping item-use aura (Effect.wz/ItemEff.img).
@@ -190,9 +194,15 @@ namespace ms
 		State state;
 		bool attacking;
 		bool facing_right;
+		// Screen-space offset added to the character's draw position. Non-zero
+		// only while seated in a chair, so the body lands on the seat (the
+		// chair's info/seat point provided in the item data).
+		Point<int16_t> sit_offset;
 
 	private:
 		Text namelabel;
+		int32_t party_hp = 0;
+		int32_t party_maxhp = 0;
 		Color name_color;
 		// Nametag 9-slice sprite pieces loaded from NameTag.img/<style>/{w,c,e}.
 		// w = left edge, c = tiled center, e = right edge.

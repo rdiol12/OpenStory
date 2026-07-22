@@ -23,7 +23,21 @@ namespace ms
 	{
 		id = partyid;
 		leader = leader_cid;
-		members = new_members;
+
+		// carry known HP over — the full-party packets don't include HP, so a
+		// silent update must not wipe the gauges until the next HP packet
+		std::vector<PartyMember> merged = new_members;
+
+		for (auto& nm : merged)
+			for (const auto& om : members)
+				if (om.cid == nm.cid)
+				{
+					nm.hp = om.hp;
+					nm.maxhp = om.maxhp;
+					break;
+				}
+
+		members = std::move(merged);
 	}
 
 	void Party::update_member_hp(int32_t cid, int32_t hp, int32_t maxhp)

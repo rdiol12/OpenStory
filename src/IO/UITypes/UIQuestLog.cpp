@@ -2076,9 +2076,9 @@ namespace ms
 
 				if (entry_index < 0)
 				{
-					// Divider between area groups — compact, not a full row
-					if (drop_texture.is_valid())
-						drop_texture.draw(DrawArgument(position + Point<int16_t>(8, entry_y + (DIVIDER_H - drop_texture.get_dimensions().y()) / 2)));
+					// Divider between area groups — just a compact gap. (No sprite:
+					// the only fitting NX art was recommend/drop, a dropdown box with
+					// a baked-in chevron that read as a stray combo box.)
 					entry_y += DIVIDER_H;
 					idx++;
 					continue;
@@ -2465,37 +2465,9 @@ namespace ms
 				y_offset += 18;
 			}
 
-			// === Detail progress gauge ===
-			if (detail_progress > 0.0f)
-			{
-				const Texture& g_frame = detail_gauge_frame.is_valid() ? detail_gauge_frame : gauge2_frame;
-				const Texture& g_bar = detail_gauge_bar.is_valid() ? detail_gauge_bar : gauge2_bar;
-				const Texture& g_spot = detail_gauge_spot.is_valid() ? detail_gauge_spot : gauge2_spot;
-
-				int16_t gauge_h = g_frame.is_valid() ? g_frame.get_dimensions().y() : 18;
-				if (g_frame.is_valid() && IN_VIEW_H(y_offset, gauge_h))
-				{
-					Point<int16_t> gauge_pos = detail_pos + Point<int16_t>(15, DETAIL_Y(y_offset));
-					g_frame.draw(DrawArgument(gauge_pos));
-
-					if (g_bar.is_valid())
-					{
-						auto bar_dim = g_bar.get_dimensions();
-						int16_t fill_w = static_cast<int16_t>(bar_dim.x() * std::min(detail_progress, 1.0f));
-						if (fill_w > 0)
-							g_bar.draw(DrawArgument(gauge_pos, Point<int16_t>(fill_w, bar_dim.y())));
-					}
-
-					if (g_spot.is_valid())
-					{
-						auto frame_dim = g_frame.get_dimensions();
-						int16_t spot_x = static_cast<int16_t>(frame_dim.x() * std::min(detail_progress, 1.0f));
-						g_spot.draw(DrawArgument(gauge_pos + Point<int16_t>(spot_x, 0)));
-					}
-				}
-				if (g_frame.is_valid())
-					y_offset += g_frame.get_dimensions().y() + 8;
-			}
+			// Progress gauge removed: the required-item "collected/needed" counts
+			// below already convey progress, and the vanilla Gauge2 spot read as a
+			// stray widget over the description.
 
 			// === Quest description ===
 			if (IN_VIEW(y_offset))

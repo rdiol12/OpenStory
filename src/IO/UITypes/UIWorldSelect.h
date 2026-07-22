@@ -21,7 +21,6 @@
 
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
-#include "../../Gameplay/MapleMap/MapBackgrounds.h"
 #include "../../Net/Login.h"
 
 namespace ms
@@ -70,6 +69,11 @@ namespace ms
 			BT_CHANGEREGION = 29
 		};
 
+		// The whole 800x600 design is rendered scaled by a uniform factor,
+		// centered in the view; lay() maps design coords to screen coords.
+		Point<int16_t> lay(int16_t x, int16_t y) const;
+		Point<int16_t> lay(Point<int16_t> p) const;
+
 		uint8_t worldid;
 		uint8_t channelid;
 		uint8_t worldcount;
@@ -78,36 +82,56 @@ namespace ms
 		std::vector<World> worlds;
 
 		bool world_selected;
-		bool draw_chatballoon;
 
 		// NX node references (kept for draw_world/set_region)
 		nl::node world_select;
 		nl::node world_src;
 		nl::node channel_src;
 
-		// Panel positions
-		Point<int16_t> channel_pos;
+		// Uniform content scale and centered content-box origin
+		float ui_scale;
+		Point<int16_t> box;
+
+		// Design-space anchors
 		Point<int16_t> world_pos;
 
-		// Textures
-		Texture channels_background;
-		Texture worlds_background;
+		// Full-view city backdrop (single cover-scaled copy of the scene)
+		Texture backdrop;
+		DrawArgument backdrop_args;
+
+		// The v83 scroll: closed frame, open/close animations (scroll/0 and
+		// scroll/1), and the held-open frame the channel grid draws on
+		int8_t scroll_state;
+		Texture scroll_closed_tex;
+		Texture scroll_open_tex;
+		Animation scroll_opening;
+		Animation scroll_closing;
+
+		// Selected world's title decoration on the open parchment, and the
+		// divider sheet it sits on
+		nl::node world_title_src;
+		Texture world_title;
+		Texture chback;
+
+		// Rope hanger and step indicator, drawn over the scroll
+		Texture hanger;
+		Texture step_tex;
+
+		// Population gauge drawn over each channel button's bar, scaled by
+		// the channel load from the serverlist packet
 		Texture channel_gauge;
-		Animation scroll_closed;
-		Animation scroll_open;
-		std::vector<Texture> world_textures;
+
+		// World plank focused by keyboard navigation (-1 = none)
+		int16_t focused_world;
+
+		// Activate the channel grid once the scroll has fully opened
+		void show_channels();
 
 		// Channel selection highlight
 		Animation channel_selected;
 
-		// Scroll/springboard position
-		Point<int16_t> scroll_pos;
-
-		// Channel panel top-left (cached for drawing)
-		Point<int16_t> ch_panel_tl;
-
-		// Map backgrounds (from MapLogin.img)
-		MapBackgrounds map_backgrounds;
+		// Bouncing EVENT balloon for event-flagged worlds
+		Animation event_badge;
 
 		// Version text
 		Text version;

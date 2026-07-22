@@ -88,6 +88,10 @@ namespace ms
 		// Return the vslot, used to distinguish some layering types.
 		const std::string& get_vslot() const;
 
+		// z-name -> layer mapping, shared with the procedural weapon's
+		// donor-measured rest poses
+		static const std::unordered_map<std::string, Layer> sublayernames;
+
 	private:
 		EnumMap<Stance::Id, EnumMap<Layer, std::unordered_multimap<uint8_t, Texture>, Layer::NUM_LAYERS>> stances;
 		// Kept so the climbing fallback can reposition to the per-frame head.
@@ -99,7 +103,5 @@ namespace ms
 		std::string vslot;
 		bool twohanded;
 		bool transparent;
-
-		static const std::unordered_map<std::string, Layer> sublayernames;
 	};
 }

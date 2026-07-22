@@ -29,6 +29,8 @@
 #include <fstream>
 
 #ifdef USE_NX
+#include "../Graphics/Geometry.h"
+
 #include <nlnx/nx.hpp>
 #endif
 
@@ -59,11 +61,12 @@ namespace ms
 		// We drop Text::Background::NAMETAG (programmatic black rectangle)
 		// and instead paint the real sprite pieces in Char::draw.
 		name_color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+		sit_offset = Point<int16_t>(0, 0);
 	}
 
 	void Char::draw(double viewx, double viewy, float alpha) const
 	{
-		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha) + sit_offset;
 
 		effects.drawbelow(absp, alpha);
 
@@ -219,6 +222,17 @@ namespace ms
 		// Draw guild name below character name
 		if (!guildlabel.get_text().empty())
 			guildlabel.draw(absp + Point<int16_t>(0, 8));
+
+		// party overhead HP bar — same look and behaviour as the mob bar
+		if (party_maxhp > 0)
+		{
+			static MobHpBar partybar;
+			int16_t percent = static_cast<int16_t>(
+				party_hp > 0 ? (100 * party_hp) / party_maxhp : 0);
+			if (percent > 100)
+				percent = 100;
+			partybar.draw(absp + Point<int16_t>(0, -58), percent);
+		}
 
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 
@@ -704,6 +718,18 @@ namespace ms
 	PetLook& Char::get_pet(uint8_t index)
 	{
 		return pets[index < 3 ? index : 0];
+	}
+
+	void Char::set_party_hp(int32_t hp, int32_t maxhp)
+	{
+		party_hp = hp;
+		party_maxhp = maxhp;
+	}
+
+	void Char::clear_party_hp()
+	{
+		party_hp = 0;
+		party_maxhp = 0;
 	}
 
 	void Char::apply_nametag_style(bool is_gm)
