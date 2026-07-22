@@ -171,6 +171,7 @@ namespace ms
 		REMOVE_CHAR = 161,      // 0xA1
 		CHAT_RECEIVED = 162,    // 0xA2
 		CHALKBOARD = 164,       // 0xA4
+		UPDATE_CHAR_BOX = 165,  // 0xA5
 		SCROLL_RESULT = 167,    // 0xA7
 		SPAWN_PET = 168,        // 0xA8
 		MOVE_PET = 170,         // 0xAA
@@ -368,6 +369,7 @@ namespace ms
 		emplace<PET_CHAT, PetChatHandler>();
 		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<CHALKBOARD, ChalkboardHandler>();
+		emplace<UPDATE_CHAR_BOX, UpdateCharBoxHandler>();
 		emplace<CANCEL_SKILL_EFFECT, CancelSkillEffectHandler>();
 		emplace<SUMMON_SKILL, SummonSkillHandler>();
 		emplace<SPAWN_DRAGON, SpawnDragonHandler>();

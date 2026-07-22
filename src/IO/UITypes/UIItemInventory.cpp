@@ -32,6 +32,7 @@
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Packets/InventoryPackets.h"
+#include "../../Net/Packets/TradePackets.h"
 
 #include <functional>
 #include <memory>
@@ -442,6 +443,22 @@ namespace ms
 					}
 					case InventoryType::Id::CASH:
 					{
+						if (item_id / 10000 == 514 || item_id / 10000 == 503)
+						{
+							int8_t room_type = item_id / 10000 == 503 ? 5 : 4;
+
+							UI::get().emplace<UIEnterText>(
+								"Shop name:",
+								[item_id, room_type](const std::string& desc)
+								{
+									if (!desc.empty())
+										CreateShopPacket(desc, item_id, room_type).dispatch();
+								},
+								30
+							);
+							break;
+						}
+
 						// Avatar megaphones (539xxxx): Diablo / Cloud 9 /
 						// Lion King — open the AvatarMegaphone compose.
 						if (item_id / 10000 == 539)

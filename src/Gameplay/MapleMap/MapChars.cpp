@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapChars.h"
 
+#include "../MiniRooms.h"
+#include "../../Net/Packets/TradePackets.h"
+
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICharInfo.h"
 #include "../../Net/Packets/PlayerInteractionPackets.h"
@@ -45,6 +48,15 @@ namespace ms
 			{
 				if (pressed)
 				{
+					if (const auto* box = MiniRooms::get().find(ochar->get_oid()))
+					{
+						if (box->type == 4)
+						{
+							MiniRoomVisitPacket(box->oid).dispatch();
+							return Cursor::State::IDLE;
+						}
+					}
+
 					// Request character info from the server
 					CharInfoRequestPacket(ochar->get_oid()).dispatch();
 					return Cursor::State::IDLE;

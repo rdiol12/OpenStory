@@ -31,6 +31,7 @@
 #include "UITypes/UIChatWindow.h"
 #include "UITypes/UIFarmChat.h"
 #include "UITypes/UIMapleChat.h"
+#include "UITypes/UIMapleTVView.h"
 #include "UITypes/UISocialChat.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIEvent.h"
@@ -581,7 +582,12 @@ namespace ms
 				{
 					remove_cursor(focusedelement->get_type());
 
-					return focusedelement->send_cursor(clicked, cursorpos);
+					// Cursor moves dispatch as IDLE even while the button is
+					// held; the dragged-element path below compensates by
+					// forcing clicked, but the focused path must do the same
+					// or dragging cancels on the first move after mousedown
+					return focusedelement->send_cursor(
+						clicked || UI::get().is_mouse_held(), cursorpos);
 				}
 				else
 				{

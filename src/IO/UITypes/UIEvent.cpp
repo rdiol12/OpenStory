@@ -17,11 +17,14 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIEvent.h"
 
+#include "UIClock.h"
+
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Data/ItemData.h"
 #include "../../Net/Packets/GameplayPackets.h"
 
@@ -344,6 +347,20 @@ namespace ms
 		offset = 0;
 		selected_slot = 0;
 		countdown_accumulator = 0;
+
+		// The soonest-ending live event drives the on-screen countdown
+		// clock — unless a real map clock/timer is already showing
+		int32_t soonest = 0;
+
+		for (const auto& ev : events)
+			if (ev.seconds_remaining > 0 && (soonest == 0 || ev.seconds_remaining < soonest))
+				soonest = ev.seconds_remaining;
+
+		if (soonest > 0 && !Stage::get().is_clock_active() && !Stage::get().is_countdown_active())
+		{
+			Stage::get().set_countdown(soonest);
+			UI::get().emplace<UIClock>();
+		}
 	}
 
 	void UIEvent::request_events()

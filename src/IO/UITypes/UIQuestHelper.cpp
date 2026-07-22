@@ -984,9 +984,44 @@ namespace ms
 			break;
 		}
 		case Buttons::BT_AUTO:
+		{
+			// Auto-pin: fill the tracker with the newest in-progress
+			// quests (highest quest ids first) up to the cap
 			tracked_quests.clear();
-			auto_track();
+
+			const auto& started = questlog.get_started();
+
+			nl::node quest_info = nl::nx::quest["QuestInfo.img"];
+
+			for (auto it = started.rbegin(); it != started.rend(); ++it)
+			{
+				if (static_cast<int>(tracked_quests.size()) >= MAX_TRACKED)
+					break;
+
+				// Skip the server's internal tracker quests — they have
+				// no QuestInfo entry (no name/description to show)
+				std::string name = quest_info[std::to_string(it->first)]["name"];
+
+				if (name.empty())
+					continue;
+
+				TrackedQuest tq;
+				tq.questid = it->first;
+				tq.collapsed = false;
+				refresh_quest_info(tq);
+				tracked_quests.push_back(std::move(tq));
+			}
+
+			recalc_dimension();
+
+			std::vector<int16_t> ids;
+
+			for (const auto& t : tracked_quests)
+				ids.push_back(t.questid);
+
+			save_tracked_quests(ids);
 			break;
+		}
 		case Buttons::BT_MAX:
 			minimized = false;
 			dimension = expanded_dimension;

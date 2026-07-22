@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Stage.h"
 
+#include "MapleTVBroadcast.h"
+#include "HiredMerchants.h"
+#include "MiniRooms.h"
+
 #include "../Configuration.h"
 
 #include "../IO/UI.h"
@@ -24,6 +28,7 @@
 
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
+#include "../Net/Packets/TradePackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Graphics/GraphicsGL.h"
 #include "../Character/MapleStat.h"
@@ -74,6 +79,8 @@ namespace ms
 
 	void Stage::clear()
 	{
+		MiniRooms::get().clear_all();
+		HiredMerchants::get().clear_all();
 		state = State::INACTIVE;
 
 		chars.clear();
@@ -153,6 +160,12 @@ namespace ms
 				mists.draw(id, viewx, viewy, alpha);
 		}
 
+		HiredMerchants::get().draw(viewpos, alpha);
+
+		// Portals sit behind characters — otherwise the portal glow paints
+		// over a character (and the death tomb/ghost) standing in it
+		portals.draw(viewpos, alpha);
+
 		// Pass 3 — players (self + other characters) and their name tags,
 		// drawn after EVERYTHING else regardless of layer. This keeps a
 		// character and their name visible even when standing on top of a
@@ -165,7 +178,6 @@ namespace ms
 		}
 
 		combat.draw(viewx, viewy, alpha);
-		portals.draw(viewpos, alpha);
 
 		if (gfx_quality > 10)
 			backgrounds.drawforegrounds(viewx, viewy, alpha);
@@ -222,6 +234,8 @@ namespace ms
 			return;
 
 		combat.update();
+		HiredMerchants::get().update();
+		MapleTVBroadcast::get().tick();
 		backgrounds.update();
 		environments.update();
 		effect.update();
@@ -380,6 +394,19 @@ namespace ms
 
 			if (statusbar->is_in_range(position))
 				return statusbar->send_cursor(pressed, position);
+		}
+
+		Point<int16_t> mappos = position - camera.position();
+
+		if (const auto* m = HiredMerchants::get().find_at(mappos))
+		{
+			if (pressed)
+			{
+				MiniRoomVisitPacket(m->oid).dispatch();
+				return Cursor::State::CLICKING;
+			}
+
+			return Cursor::State::CANCLICK;
 		}
 
 		// Check characters first, then NPCs

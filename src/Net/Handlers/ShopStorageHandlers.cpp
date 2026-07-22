@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "ShopStorageHandlers.h"
 
+#include "../../Gameplay/HiredMerchants.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -365,8 +366,35 @@ namespace ms
 			break;
 		}
 
-		case 4:  // VISIT — partner joined the trade
+		case 4:  // VISIT — someone joined the room
 		{
+			{
+				auto shop = UI::get().get_element<UIPersonalShop>();
+				auto hm = UI::get().get_element<UIHiredMerchant>();
+				bool shop_open = shop && shop->is_active();
+				bool hm_open = hm && hm->is_active();
+
+				if (shop_open || hm_open)
+				{
+					int8_t vslot = recv.read_byte();
+					LookEntry vlook = LoginParser::parse_look(recv);
+					std::string vname = recv.read_string();
+
+					if (shop_open)
+					{
+						shop->set_slot_look(vslot, vlook, vname);
+						shop->add_chat(vname + " entered the shop.", 0);
+					}
+					else
+					{
+						hm->set_slot_look(vslot, vlook, vname);
+						hm->add_chat(vname + " entered the shop.", 0);
+					}
+
+					break;
+				}
+			}
+
 			uint8_t slot = recv.read_byte();
 
 			// addCharLook — identical layout to the login/char-select
@@ -387,6 +415,32 @@ namespace ms
 		case 5:  // ROOM — trade room setup
 		{
 			int8_t room_type = recv.read_byte();
+
+			if (room_type == 0)
+			{
+				int8_t code = recv.read_byte();
+				std::string msg;
+
+				switch (code)
+				{
+				case 1: msg = "That room is already closed."; break;
+				case 2: msg = "The room is full."; break;
+				case 4: msg = "You can't do that while dead."; break;
+				case 6: msg = "You need a store permit to do that."; break;
+				case 10: msg = "You can't open a store this close to a portal."; break;
+				case 13: msg = "You can't set up a store right here."; break;
+				case 15: msg = "Stores can only be opened in the Free Market."; break;
+				case 17: msg = "You may not enter this store."; break;
+				case 18: msg = "The owner is doing store maintenance."; break;
+				case 22: msg = "Incorrect password."; break;
+				default: msg = "Unable to do that right now. (" + std::to_string(code) + ")"; break;
+				}
+
+				if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+					messenger->show_status(Color::Name::RED, msg);
+
+				break;
+			}
 
 			if (room_type == 3) // Trade
 			{
@@ -423,11 +477,248 @@ namespace ms
 				if (recv.available())
 					recv.skip_byte(); // 0xFF
 			}
+			else if (room_type == 5) // Hired merchant
+			{
+				recv.read_byte();
+				int16_t myslot = recv.read_short();
+				int32_t hm_itemid = recv.read_int();
+				recv.read_string();
+
+				std::vector<std::pair<int8_t, std::pair<LookEntry, std::string>>> hm_visitors;
+
+				while (recv.available())
+				{
+					int8_t vslot = recv.read_byte();
+
+					if (vslot == -1 || static_cast<uint8_t>(vslot) == 0xFF)
+						break;
+
+					LookEntry vlook = LoginParser::parse_look(recv);
+					std::string vname = recv.read_string();
+					hm_visitors.push_back({ vslot, { vlook, vname } });
+				}
+
+				bool owner = (myslot == 0);
+				int16_t msg_count = recv.read_short();
+				std::vector<std::pair<std::string, int8_t>> hm_msgs;
+
+				for (int16_t i = 0; i < msg_count; i++)
+				{
+					std::string mtext = recv.read_string();
+					int8_t mslot = recv.read_byte();
+					hm_msgs.push_back({ mtext, mslot });
+				}
+
+				std::string owner_name = recv.read_string();
+				bool hm_first = false;
+
+				if (owner)
+				{
+					recv.read_short();
+					recv.read_short();
+					hm_first = recv.read_byte() != 0;
+					int8_t sold_n = recv.read_byte();
+
+					for (int8_t i = 0; i < sold_n; i++)
+					{
+						recv.read_int();
+						recv.read_short();
+						recv.read_int();
+						recv.read_string();
+					}
+
+					recv.read_int();
+				}
+
+				std::string desc = recv.read_string();
+				recv.read_byte();
+				int64_t meso = recv.read_int();
+				int8_t item_count = recv.read_byte();
+
+				if (item_count == 0)
+					recv.read_byte();
+
+				UI::get().remove(UIElement::Type::HIREDMERCHANT);
+				UI::get().emplace<UIHiredMerchant>();
+
+				if (auto hm = UI::get().get_element<UIHiredMerchant>())
+				{
+					hm->set_owner(owner_name + " : " + desc);
+					hm->set_mode(owner, hm_first);
+					hm->set_merchant(hm_itemid);
+					hm->set_slot_look(0, LookEntry(), owner_name);
+					hm->set_meso(meso);
+
+					for (const auto& v : hm_visitors)
+						hm->set_slot_look(v.first, v.second.first, v.second.second);
+
+					for (const auto& m : hm_msgs)
+						hm->add_chat(m.first, m.second);
+
+					hm->clear_items();
+
+					for (int8_t i = 0; i < item_count; i++)
+					{
+						int16_t bundles = recv.read_short();
+						recv.read_short();
+						int32_t price = recv.read_int();
+						int32_t itemid = ItemParser::skip_item(recv);
+						hm->add_item(i, itemid, bundles, price);
+					}
+				}
+			}
+			else if (room_type == 4) // Personal shop
+			{
+				recv.read_byte();
+				int8_t myslot = recv.read_byte();
+
+				int8_t sold_count = recv.read_byte();
+
+				for (int8_t i = 0; i < sold_count; i++)
+				{
+					recv.read_int();
+					recv.read_short();
+					recv.read_int();
+					recv.read_string();
+				}
+
+				LookEntry owner_look = LoginParser::parse_look(recv);
+				std::string owner_name = recv.read_string();
+
+				std::vector<std::pair<int8_t, std::pair<LookEntry, std::string>>> visitors;
+
+				while (recv.available())
+				{
+					int8_t vslot = recv.read_byte();
+
+					if (vslot == -1 || vslot == 0x7F || static_cast<uint8_t>(vslot) == 0xFF)
+						break;
+
+					LookEntry vlook = LoginParser::parse_look(recv);
+					std::string vname = recv.read_string();
+					visitors.push_back({ vslot, { vlook, vname } });
+				}
+
+				std::string desc = recv.read_string();
+				recv.read_byte();
+				int8_t item_count = recv.read_byte();
+
+				UI::get().remove(UIElement::Type::PERSONALSHOP);
+				UI::get().emplace<UIPersonalShop>();
+
+				if (auto shop = UI::get().get_element<UIPersonalShop>())
+				{
+					shop->set_owner(owner_name + " : " + desc);
+					shop->set_mode(myslot == 0);
+					shop->set_slot_look(0, owner_look, owner_name);
+
+					for (const auto& v : visitors)
+						shop->set_slot_look(v.first, v.second.first, v.second.second);
+
+					shop->clear_items();
+
+					for (int8_t i = 0; i < item_count; i++)
+					{
+						int16_t bundles = recv.read_short();
+						recv.read_short();
+						int32_t price = recv.read_int();
+						int32_t itemid = ItemParser::skip_item(recv);
+						shop->add_item(i, itemid, bundles, price);
+					}
+				}
+			}
 			break;
 		}
 
-		case 10: // EXIT — trade cancelled/completed
+		case 0x19: // UPDATE_MERCHANT — item list refresh; merchant variant leads with int meso
 		{
+			auto hm = UI::get().get_element<UIHiredMerchant>();
+
+			if (hm && hm->is_active())
+			{
+				int32_t meso = recv.read_int();
+				int8_t item_count = recv.read_byte();
+
+				hm->set_meso(meso);
+				hm->clear_items();
+
+				for (int8_t i = 0; i < item_count; i++)
+				{
+					int16_t bundles = recv.read_short();
+					recv.read_short();
+					int32_t price = recv.read_int();
+					int32_t itemid = ItemParser::skip_item(recv);
+					hm->add_item(i, itemid, bundles, price);
+				}
+
+				break;
+			}
+
+			int8_t item_count = recv.read_byte();
+
+			if (auto shop = UI::get().get_element<UIPersonalShop>())
+			{
+				shop->clear_items();
+
+				for (int8_t i = 0; i < item_count; i++)
+				{
+					int16_t bundles = recv.read_short();
+					recv.read_short();
+					int32_t price = recv.read_int();
+					int32_t itemid = ItemParser::skip_item(recv);
+					shop->add_item(i, itemid, bundles, price);
+				}
+			}
+			break;
+		}
+
+		case 0x1A: // UPDATE_PLAYERSHOP — an item sold
+		{
+			int8_t pos = recv.read_byte();
+			recv.read_short();
+			std::string buyer = recv.read_string();
+
+			if (auto shop = UI::get().get_element<UIPersonalShop>())
+				shop->set_sold_out(pos);
+
+			chat::log("[Shop] " + buyer + " bought an item!", chat::LineType::YELLOW);
+			break;
+		}
+
+		case 10: // EXIT — room left/closed
+		{
+			{
+				auto shop = UI::get().get_element<UIPersonalShop>();
+				auto hm = UI::get().get_element<UIHiredMerchant>();
+				bool shop_open = shop && shop->is_active();
+				bool hm_open = hm && hm->is_active();
+
+				if (shop_open || hm_open)
+				{
+					if (recv.available())
+					{
+						int8_t vslot = recv.read_byte();
+
+						if (vslot >= 1 && vslot <= 3)
+						{
+							if (shop_open)
+								shop->remove_visitor(vslot);
+							else
+								hm->remove_visitor(vslot);
+
+							break;
+						}
+					}
+
+					if (shop_open)
+						shop->deactivate();
+					else
+						hm->deactivate();
+
+					break;
+				}
+			}
+
 			uint8_t player_num = recv.read_byte();
 			uint8_t result = recv.read_byte();
 
@@ -543,8 +834,32 @@ namespace ms
 				uint8_t speaker = recv.read_byte();
 				std::string message = recv.read_string();
 
-				if (auto trade = UI::get().get_element<UITrade>())
-					trade->add_chat(message);
+				bool routed = false;
+
+				if (auto shop = UI::get().get_element<UIPersonalShop>())
+				{
+					if (shop->is_active())
+					{
+						shop->add_chat(message, static_cast<int8_t>(speaker));
+						routed = true;
+					}
+				}
+
+				if (!routed)
+				{
+					if (auto hm = UI::get().get_element<UIHiredMerchant>())
+					{
+						if (hm->is_active())
+						{
+							hm->add_chat(message, static_cast<int8_t>(speaker));
+							routed = true;
+						}
+					}
+				}
+
+				if (!routed)
+					if (auto trade = UI::get().get_element<UITrade>())
+						trade->add_chat(message);
 			}
 			break;
 		}
@@ -730,18 +1045,18 @@ namespace ms
 		recv.read_byte(); // 0x05
 		int32_t object_id = recv.read_int();
 		std::string description = recv.read_string();
-		recv.read_byte(); // sprite index
+		int8_t skin = recv.read_byte();
 		recv.read_byte(); // 1
 		recv.read_byte(); // 4
 
-		chat::log("[HiredMerchant] " + owner_name + "'s shop: " + description, chat::LineType::YELLOW);
+		HiredMerchants::get().add(owner_id, object_id, item_id, position, owner_name, description, skin);
 	}
 
 	void DestroyHiredMerchantHandler::handle(InPacket& recv) const
 	{
 		int32_t owner_id = recv.read_int();
 
-		chat::log("[HiredMerchant] A hired merchant has been removed.", chat::LineType::YELLOW);
+		HiredMerchants::get().remove(owner_id);
 	}
 
 	void UpdateHiredMerchantHandler::handle(InPacket& recv) const

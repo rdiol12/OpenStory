@@ -29,6 +29,7 @@
 #endif
 
 #include "UITypes/UIAvatarBanner.h"
+#include "UITypes/UICashShop.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
@@ -65,7 +66,15 @@ namespace ms
 	{
 		state->draw(alpha, cursor.get_position());
 
-		scrollingnotice.draw(alpha);
+		// The scrolling world notice stays out of the cash shop — it lands
+		// on the shop's own black header bar
+		bool in_cashshop = false;
+
+		if (auto cs = const_cast<UI*>(this)->get_element<UICashShop>())
+			in_cashshop = cs->is_active();
+
+		if (!in_cashshop)
+			scrollingnotice.draw(alpha);
 
 		// The avatar-megaphone receiver banner must sit above every other
 		// UI layer (including the scrolling world-notice that super
@@ -284,8 +293,15 @@ namespace ms
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			auto report = UI::get().get_element<UIReport>();
 			auto whisper = UI::get().get_element<UIWhisper>();
+			auto cashshop = UI::get().get_element<UICashShop>();
 
-			if (npctalk && npctalk->is_active())
+			if (cashshop && cashshop->is_active())
+			{
+				// The cash shop stage character takes the movement keys
+				cashshop->send_key(mapping.action, pressed, escape);
+				sent = true;
+			}
+			else if (npctalk && npctalk->is_active())
 			{
 				npctalk->send_key(mapping.action, pressed, escape);
 				sent = true;
@@ -440,7 +456,9 @@ namespace ms
 
 	void UI::focus_textfield(Textfield* tofocus)
 	{
-		if (focusedtextfield)
+		// Guard against refocusing the same field: unfocusing it here would
+		// leave it NORMAL (no caret) while still receiving keyboard input
+		if (focusedtextfield && focusedtextfield.get() != tofocus)
 			focusedtextfield->set_state(Textfield::State::NORMAL);
 
 		focusedtextfield = tofocus;

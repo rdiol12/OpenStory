@@ -21,7 +21,9 @@
 #include "../Components/Textfield.h"
 
 #include "../../Graphics/Text.h"
-#include "../../Graphics/Geometry.h"
+#include "../../Graphics/Texture.h"
+
+#include <vector>
 
 namespace ms
 {
@@ -48,21 +50,37 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		bool indragrange(Point<int16_t> cursorpos) const override;
+
+		void open_name_list();
+		void open_reason_list();
+		void close_list();
 		void send_report();
 
 		enum Buttons : uint16_t
 		{
-			BT_CLOSE,
 			BT_SEND,
-			BT_REASON0,
-			BT_REASON1,
-			BT_REASON2,
-			BT_REASON3,
-			BT_REASON4
+			BT_CANCEL
 		};
 
-		static constexpr int16_t W = 280;
-		static constexpr int16_t H = 300;
+		enum class DropList : uint8_t
+		{
+			NONE,
+			NAME,
+			REASON
+		};
+
+		static constexpr int16_t W = 266;
+		static constexpr int16_t H = 302;
+
+		// Box geometry (window-local, from UIWindow2 Claim/report art)
+		static constexpr int16_t BOX_W = 144;
+		static constexpr int16_t BOX_H = 18;
+		static constexpr int16_t NB_X = 110;
+		static constexpr int16_t NB_Y = 143;
+		static constexpr int16_t DD_X = 110;
+		static constexpr int16_t DD_Y = 163;
+		static constexpr int16_t ROW_H = 17;
 
 		static constexpr int NUM_REASONS = 5;
 		static constexpr const char* REASON_LABELS[NUM_REASONS] = {
@@ -77,20 +95,13 @@ namespace ms
 		Textfield namefield;
 		Textfield descfield;
 		int16_t selected_reason;
+		Text reason_text;
 
-		Texture backgrnd;
-		ColorBox background;
-
-		Text title_text;
-		Text close_x;
-		Text name_label;
-		Text reason_label;
-		Text desc_label;
-		ColorBox reason_bgs[NUM_REASONS];
-		Text reason_texts[NUM_REASONS];
-		ColorBox selected_reason_bg;
-		ColorBox input_bg;
-		ColorBox btn_bg;
-		Text btn_text;
+		DropList open_list;
+		Point<int16_t> list_pos;
+		std::vector<std::string> list_values;
+		std::vector<Text> list_texts;
+		int16_t hovered_option;
+		Texture dd_box;
 	};
 }

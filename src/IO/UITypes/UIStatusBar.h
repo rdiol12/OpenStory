@@ -119,24 +119,12 @@ namespace ms
 			BT_MENU_EVENT,
 			BT_MENU_RANK,
 			BT_MENU_EPISODBOOK,
-			BT_MENU_MONSTERBATTLE,
-			BT_MENU_MONSTERLIFE,
-			BT_MENU_MSN,
-			BT_MENU_AFREECATV,
 			// System sub-panel (v83: 5 buttons — Channel, JoyPad, KeySetting, Option, Quit)
 			BT_SYS_CHANNEL,
 			BT_SYS_GAMEQUIT,
 			BT_SYS_JOYPAD,
 			BT_SYS_KEYSETTING,
 			BT_SYS_OPTION,
-			// Chat tabs
-			BT_TAP_ALL,
-			BT_TAP_PARTY,
-			BT_TAP_GUILD,
-			BT_TAP_FRIEND,
-			BT_TAP_EXPEDITION,
-			BT_TAP_ASSOCIATION,
-			BT_TAP_AFREECATV
 		};
 
 		const CharStats& stats;
@@ -195,19 +183,8 @@ namespace ms
 		bool chat_open;
 
 		// Chat target
-		Texture chat_target_base;
-		Texture chat_target_all;
-		Texture chat_target_party;
-		Texture chat_target_guild;
-		Texture chat_target_friend;
-		Texture chat_target_expedition;
-		Texture chat_target_association;
-		Texture chat_target_afctv;
-		uint8_t chat_target_id;
 
 		// Chat tab bar
-		Texture tap_bar;
-		Texture tap_bar_over;
 		Texture chat_scroll_normal;
 		Texture chat_scroll_over;
 

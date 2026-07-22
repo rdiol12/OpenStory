@@ -28,6 +28,6 @@ namespace ms
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory);
 
 		// Consume an item's data from the packet without storing it (e.g., Duey packages)
-		void skip_item(InPacket& recv);
+		int32_t skip_item(InPacket& recv);
 	}
 }

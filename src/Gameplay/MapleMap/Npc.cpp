@@ -190,8 +190,20 @@ namespace ms
 		speak_timer = 500 + (id % 4000);
 	}
 
+	// MapleTV set NPCs (the TV boards + their reporters) — see draw()
+	static bool is_mapletv_npc(int32_t npcid)
+	{
+		return (npcid == 9201066) ||
+			(npcid >= 9250020 && npcid <= 9250100) ||
+			(npcid >= 9270000 && npcid < 9271000);
+	}
+
 	void Npc::draw_minimap(Point<int16_t> position, float scale, float alpha) const
 	{
+		// TV boards are scenery, not someone to look for on the minimap
+		if (is_mapletv_npc(npcid))
+			return;
+
 		auto it = animations.find(stance);
 		if (it == animations.end())
 			return;
@@ -251,10 +263,7 @@ namespace ms
 		//   9270000..9270999 — later variants (Amoria 00, Lith Harbor 01,
 		//     Sleepywood 02, Omega 03, Korean Folk Town 04, Murung 06,
 		//     Bak Cho 07, …).
-		const bool is_tv =
-			(npcid == 9201066) ||
-			(npcid >= 9250020 && npcid <= 9250100) ||
-			(npcid >= 9270000 && npcid < 9271000);
+		const bool is_tv = is_mapletv_npc(npcid);
 		if (is_tv)
 		{
 			auto& b = MapleTVBroadcast::get();
@@ -278,25 +287,25 @@ namespace ms
 			};
 			int16_t msg_x = read_short(info["MapleTVmsgX"]);
 			int16_t msg_y = read_short(info["MapleTVmsgY"]);
+			int16_t ad_x = read_short(info["MapleTVadX"]);
+			int16_t ad_y = read_short(info["MapleTVadY"]);
+			bool has_screen = (ad_x != 0 || ad_y != 0);
 #else
 			int16_t msg_x = -200;
 			int16_t msg_y = -350;
 #endif
 
-			int16_t screen_cx = absp.x() + msg_x;
-			int16_t screen_top_y = absp.y() + msg_y;
-			int16_t screen_w = 180;
+			int16_t screen_cx = absp.x() + msg_x + 120;
+			int16_t screen_top_y = absp.y() + msg_y + 8;
+			int16_t screen_w = 210;
 
-			// Diagnostic marker on every MapleTV NPC so we can confirm the
-			// id detection + draw path even when no broadcast is active.
-			{
-				std::string tag = "TV #" + std::to_string(npcid)
-					+ (b.active() ? " [LIVE]" : " [idle]");
-				Text marker(Text::Font::A11M, Text::Alignment::CENTER,
-					b.active() ? Color::Name::YELLOW : Color::Name::LIGHTGREEN,
-					tag, static_cast<uint16_t>(screen_w));
-				marker.draw(Point<int16_t>(screen_cx, screen_top_y - 14));
-			}
+			// TV screens: show screen at the msg anchor, ad reel at the
+			// ad anchor. NPCs without one (the reporter half) draw nothing.
+			if (has_screen)
+				MapleTVBroadcast::get().draw_screen(
+					Point<int16_t>(absp.x() + ad_x, absp.y() + ad_y),
+					Point<int16_t>(absp.x() + msg_x, absp.y() + msg_y), alpha);
+
 
 			if (b.active())
 			{

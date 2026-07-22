@@ -17,50 +17,45 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../UIElement.h"
 
+#include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Animation.h"
+#include "../../Graphics/Texture.h"
 
 namespace ms
 {
-	// "MY RANKING" window (UIWindow2.img/Ranking): the player's overall
-	// and job rank with movement, plus level and fame. All values come
-	// from data Cosmic already sends (login char entry + live stats).
-	class UIRanking : public UIDragElement<PosRANKING>
+	// On-air MapleTV overlay (MapleTV.img/TVbasic): the TV frame in the
+	// top-right corner with the sender's character and the broadcast
+	// lines, shown while a SEND_TV broadcast is live
+	class UIMapleTVView : public UIElement
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::RANKING;
+		static constexpr Type TYPE = UIElement::Type::MAPLETVVIEW;
 		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		static constexpr bool TOGGLED = false;
 
-		UIRanking();
+		UIMapleTVView();
 
 		void draw(float inter) const override;
 		void update() override;
 
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
+		// Never intercept clicks — it's a pure overlay
+		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
 
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
 	private:
-		enum Buttons : uint16_t
-		{
-			BT_CLOSE
-		};
-
-		static constexpr int16_t ROW_X = 24;
-		static constexpr int16_t VALUE_X = 279;
-		static constexpr int16_t ROW_Y = 96;
-		static constexpr int16_t ROW_STEP = 42;
-
-		mutable Text label_text;
-		mutable Text value_text;
+		Texture tv_frame;
+		Animation tv_off;
+		mutable Text line_text;
 		mutable Text name_text;
-		mutable Text hint_text;
-		Texture divider;
+
+		CharLook sender_look;
+		bool has_look = false;
+		int32_t seen_serial = -1;
+		uint16_t line_tick = 0;
+		size_t line_index = 0;
 	};
 }

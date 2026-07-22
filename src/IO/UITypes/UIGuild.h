@@ -18,12 +18,17 @@
 #pragma once
 
 #include "../UIDragElement.h"
-#include "../Components/TwoSpriteButton.h"
+#include "../Components/Charset.h"
 
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
+
+#include <vector>
 
 namespace ms
 {
+	// Guild window on the GuildUI.img art: flag + name top bar, tabs
+	// (Members / Profile / Skills / Board / Alliance), member table
 	class UIGuild : public UIDragElement<PosGUILD>
 	{
 	public:
@@ -38,6 +43,7 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void send_scroll(double yoffset) override;
 
 		UIElement::Type get_type() const override;
 
@@ -54,9 +60,13 @@ namespace ms
 		void set_member_rank(int32_t cid, int32_t rank);
 		std::string get_member_name(int32_t cid) const;
 		void clear_members();
+		void set_guild_emblem(int16_t bg, int8_t bgcolor, int16_t logo, int8_t logocolor);
 
 		// Guild "level" derived from GP (approximate v83 formula)
 		static int16_t level_for_gp(int32_t gp);
+
+		// True once the server delivered real guild info
+		bool has_guild() const { return capacity > 0; }
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -67,19 +77,56 @@ namespace ms
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
+			BT_LEAVE,
 			BT_TAB0,
 			BT_TAB1,
 			BT_TAB2,
-			BT_TAB3
+			BT_TAB3,
+			BT_TAB4
 		};
 
+		enum Tabs : uint16_t
+		{
+			TAB_MEMBERS,
+			TAB_PROFILE,
+			TAB_SKILLS,
+			TAB_BOARD,
+			TAB_ALLIANCE
+		};
+
+		static constexpr int16_t W = 535;
+		static constexpr int16_t H = 391;
+
+		// Tab-page textures carry origins relative to this content anchor
+		static constexpr int16_t CONTENT_X = 12;
+		static constexpr int16_t CONTENT_Y = 116;
+
+		static constexpr int16_t MAX_VISIBLE_MEMBERS = 10;
+		static constexpr int16_t MEMBER_ROW_HEIGHT = 22;
+		static constexpr int16_t MEMBER_LIST_Y = 152;
+
 		uint16_t tab;
+		int16_t guildlevel;
+		int32_t gp_value;
+
+		Texture flags[5];
+		Texture nomark;
+		Texture cover;
+		Texture head_tex;
+		Texture row_tex;
+		Texture on_tex;
+		Texture off_tex;
+		Texture bginfo_tex;
+		Texture charframe_tex;
+		Texture emblem_bg;
+		Texture emblem_mark;
+		Charset lvnum;
 
 		mutable Text guild_name;
 		mutable Text guild_notice;
-		mutable Text guild_level;
-		mutable Text guild_capacity;
 		mutable Text member_count_text;
+		mutable Text cell_text;
+		mutable Text value_text;
 
 		struct MemberEntry
 		{
@@ -98,12 +145,6 @@ namespace ms
 		std::vector<MemberEntry> members;
 		std::string rank_titles[5];
 		int16_t capacity;
-		mutable Text member_name_label;
-		mutable Text member_info_label;
 		int16_t scroll_offset;
-
-		static constexpr int16_t MAX_VISIBLE_MEMBERS = 8;
-		static constexpr int16_t MEMBER_ROW_HEIGHT = 24;
-		static constexpr int16_t MEMBER_LIST_Y = 115;
 	};
 }

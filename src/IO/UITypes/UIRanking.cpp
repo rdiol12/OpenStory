@@ -18,9 +18,8 @@
 #include "UIRanking.h"
 
 #include "../Components/MapleButton.h"
-#include "../Components/TwoSpriteButton.h"
 
-#include "../../Configuration.h"
+#include "../../Gameplay/Stage.h"
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -28,7 +27,7 @@
 
 namespace ms
 {
-	UIRanking::UIRanking() : UIDragElement<PosRANKING>(Point<int16_t>(300, 20)), tab(Buttons::BT_TAB0)
+	UIRanking::UIRanking() : UIDragElement<PosRANKING>(Point<int16_t>(303, 25))
 	{
 		nl::node src = nl::nx::ui["UIWindow2.img"]["Ranking"];
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
@@ -38,66 +37,89 @@ namespace ms
 
 		sprites.emplace_back(backgrnd);
 
-		nl::node backgrnd2 = src["backgrnd2"];
+		buttons[BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 21, 7));
 
-		if (backgrnd2.size() > 0)
-			sprites.emplace_back(backgrnd2);
+		name_text = Text(Text::Font::A13B, Text::Alignment::CENTER, Color::Name::BLACK);
+		label_text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		value_text = Text(Text::Font::A12B, Text::Alignment::RIGHT, Color::Name::BLACK);
+		hint_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY, "Ranks update with the server's ranking sweep.", 260);
 
-		nl::node backgrnd3 = src["backgrnd3"];
-
-		if (backgrnd3.size() > 0)
-			sprites.emplace_back(backgrnd3);
-
-		// Close button positioned at top-right of background
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
-
-		// Tab buttons — try Tab node with enabled/disabled states first
-		nl::node tab_node = src["Tab"];
-
-		if (tab_node && tab_node["enabled"].size() > 0)
-		{
-			nl::node taben = tab_node["enabled"];
-			nl::node tabdis = tab_node["disabled"];
-
-			buttons[Buttons::BT_TAB0] = std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"]);
-			buttons[Buttons::BT_TAB1] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"]);
-			buttons[Buttons::BT_TAB2] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"]);
-		}
-		else
-		{
-			// Fall back to BtTab buttons
-			buttons[Buttons::BT_TAB0] = std::make_unique<MapleButton>(src["BtTab0"]);
-			buttons[Buttons::BT_TAB1] = std::make_unique<MapleButton>(src["BtTab1"]);
-			buttons[Buttons::BT_TAB2] = std::make_unique<MapleButton>(src["BtTab2"]);
-		}
-
-		// Prev/Next page buttons
-		nl::node bt_prev = src["BtPrev"];
-		nl::node bt_next = src["BtNext"];
-
-		if (bt_prev.size() > 0)
-			buttons[Buttons::BT_PREV] = std::make_unique<MapleButton>(bt_prev);
-
-		if (bt_next.size() > 0)
-			buttons[Buttons::BT_NEXT] = std::make_unique<MapleButton>(bt_next);
-
-		// Start on the first tab
-		change_tab(Buttons::BT_TAB0);
-
-		// Placeholder text shown in the list area
-		empty_text = Text(Text::Font::A11M, Text::Alignment::CENTER,
-			Color::Name::GRAY, "No ranking data available.");
+		divider = nl::nx::ui["UIWindow2.img"]["MemoInGame"]["Get"]["line"];
 
 		dimension = bg_dimensions;
-		dragarea = Point<int16_t>(dimension.x(), 20);
+		dragarea = Point<int16_t>(dimension.x(), 25);
 	}
 
 	void UIRanking::draw(float inter) const
 	{
 		UIElement::draw(inter);
 
-		// Draw placeholder text centered in the list area
-		empty_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() / 2));
+		const CharStats& stats = Stage::get().get_player().get_stats();
+
+		// A movement char rides along with each rank ('+'/'-'/'=');
+		// climbing shows green, dropping red
+		auto rank_string = [](std::pair<int32_t, int8_t> r) -> std::string
+		{
+			if (r.first <= 0)
+				return "Unranked";
+
+			std::string s = "#" + std::to_string(r.first);
+
+			if (r.second == '+')
+				s += "  (up)";
+			else if (r.second == '-')
+				s += "  (down)";
+
+			return s;
+		};
+
+		auto rank_color = [](std::pair<int32_t, int8_t> r) -> Color::Name
+		{
+			if (r.first <= 0)
+				return Color::Name::DUSTYGRAY;
+			if (r.second == '+')
+				return Color::Name::JAPANESELAUREL;
+			if (r.second == '-')
+				return Color::Name::RED;
+
+			return Color::Name::BLACK;
+		};
+
+		name_text.change_text(stats.get_name());
+		name_text.draw(position + Point<int16_t>(dimension.x() / 2, 62));
+
+		struct Row
+		{
+			const char* label;
+			std::string value;
+			Color::Name color;
+		};
+
+		Row rows[5] = {
+			{ "Job", stats.get_jobname(), Color::Name::BLACK },
+			{ "Overall Rank", rank_string(stats.get_rank()), rank_color(stats.get_rank()) },
+			{ "Job Rank", rank_string(stats.get_jobrank()), rank_color(stats.get_jobrank()) },
+			{ "Level", std::to_string(stats.get_stat(MapleStat::Id::LEVEL)), Color::Name::BLACK },
+			{ "Fame", std::to_string(static_cast<int16_t>(stats.get_stat(MapleStat::Id::FAME))), Color::Name::BLACK }
+		};
+
+		for (int i = 0; i < 5; i++)
+		{
+			int16_t y = ROW_Y + i * ROW_STEP;
+
+			label_text.change_text(rows[i].label);
+			label_text.draw(position + Point<int16_t>(ROW_X, y));
+
+			value_text.change_color(rows[i].color);
+			value_text.change_text(rows[i].value);
+			value_text.draw(position + Point<int16_t>(VALUE_X, y));
+
+			divider.draw(DrawArgument(
+				position + Point<int16_t>(ROW_X, y + 26) + divider.get_origin(),
+				Point<int16_t>(255, 0)));
+		}
+
+		hint_text.draw(position + Point<int16_t>(dimension.x() / 2, ROW_Y + 5 * ROW_STEP + 4));
 	}
 
 	void UIRanking::update()
@@ -123,43 +145,9 @@ namespace ms
 
 	Button::State UIRanking::button_pressed(uint16_t buttonid)
 	{
-		switch (buttonid)
-		{
-		case Buttons::BT_CLOSE:
+		if (buttonid == BT_CLOSE)
 			deactivate();
-			break;
-		case Buttons::BT_TAB0:
-		case Buttons::BT_TAB1:
-		case Buttons::BT_TAB2:
-			change_tab(buttonid);
-			return Button::State::PRESSED;
-		case Buttons::BT_PREV:
-			// No-op: no ranking data to page through
-			break;
-		case Buttons::BT_NEXT:
-			// No-op: no ranking data to page through
-			break;
-		default:
-			break;
-		}
 
 		return Button::State::NORMAL;
-	}
-
-	void UIRanking::change_tab(uint16_t tabid)
-	{
-		uint16_t oldtab = tab;
-		tab = tabid;
-
-		if (oldtab != tab)
-		{
-			// Deselect the old tab
-			if (buttons.count(oldtab) && buttons[oldtab])
-				buttons[oldtab]->set_state(Button::State::NORMAL);
-		}
-
-		// Select the new tab
-		if (buttons.count(tab) && buttons[tab])
-			buttons[tab]->set_state(Button::State::PRESSED);
 	}
 }

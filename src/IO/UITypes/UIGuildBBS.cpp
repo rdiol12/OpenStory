@@ -21,9 +21,7 @@
 
 #include "../Components/MapleButton.h"
 #include "../UI.h"
-#include "UIChatBar.h"
 
-#include "../../Configuration.h"
 #include "../../Net/Packets/SocialPackets.h"
 
 #include <ctime>
@@ -34,36 +32,69 @@
 
 namespace ms
 {
-	UIGuildBBS::UIGuildBBS() : UIDragElement<PosGUILDBBS>(Point<int16_t>(300, 20)), current_page(0), total_pages(1)
+	UIGuildBBS::UIGuildBBS() : UIDragElement<PosGUILDBBS>(Point<int16_t>(W, H)), current_page(0), total_pages(1)
 	{
 		nl::node src = nl::nx::ui["GuildBBS.img"]["GuildBBS"];
 
-		nl::node backgrnd = src["backgrnd"];
-		Texture bg = backgrnd;
+		sprites.emplace_back(src["backgrnd"]);
 
-		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(src["backgrnd2"]);
-		sprites.emplace_back(src["backgrnd3"]);
+		popup_tex = src["backgrnd3"];
 
-		// Close button (BtQuit in NX)
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(src["BtQuit"]);
+		buttons[BT_CLOSE] = std::make_unique<MapleButton>(src["BtQuit"], Point<int16_t>(692, 31));
+		buttons[BT_WRITE] = std::make_unique<MapleButton>(src["BtWrite"], Point<int16_t>(50, 481));
+		buttons[BT_NOTICE] = std::make_unique<MapleButton>(src["BtNotice"], Point<int16_t>(115, 481));
+		buttons[BT_DELETE] = std::make_unique<MapleButton>(src["BtDelete"], Point<int16_t>(180, 481));
+		buttons[BT_REPLY] = std::make_unique<MapleButton>(src["BtReply"], Point<int16_t>(702, 456));
+		buttons[BT_REGISTER] = std::make_unique<MapleButton>(src["BtRegister"], Point<int16_t>(330, 356));
+		buttons[BT_CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], Point<int16_t>(400, 356));
 
-		// Action buttons
-		buttons[Buttons::BT_WRITE] = std::make_unique<MapleButton>(src["BtWrite"]);
-		buttons[Buttons::BT_DELETE] = std::make_unique<MapleButton>(src["BtDelete"]);
-		buttons[Buttons::BT_REPLY] = std::make_unique<MapleButton>(src["BtReply"]);
+		buttons[BT_REGISTER]->set_active(false);
+		buttons[BT_CANCEL]->set_active(false);
 
-		// Initialize text labels
-		title_text = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "Guild Board");
-		page_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "1 / 1");
-		post_title_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK);
-		post_author_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
-		post_date_label = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY);
-		body_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "", 250);
-		empty_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY, "No posts yet.");
+		subject_field = Textfield(
+			Text::A11M, Text::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(
+				Point<int16_t>(POPUP_X + 56, POPUP_Y + 12),
+				Point<int16_t>(POPUP_X + 320, POPUP_Y + 28)
+			),
+			25
+		);
 
-		dimension = bg.get_dimensions();
-		dragarea = Point<int16_t>(dimension.x(), 20);
+		content_field = Textfield(
+			Text::A11M, Text::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(
+				Point<int16_t>(POPUP_X + 56, POPUP_Y + 40),
+				Point<int16_t>(POPUP_X + 318, POPUP_Y + 205)
+			),
+			600
+		);
+		content_field.set_wrap(255);
+
+		reply_field = Textfield(
+			Text::A11M, Text::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(
+				Point<int16_t>(430, 458),
+				Point<int16_t>(695, 476)
+			),
+			25
+		);
+		reply_field.set_enter_callback(
+			[this](std::string)
+			{
+				button_pressed(BT_REPLY);
+			}
+		);
+
+		page_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "1 / 1");
+		pane_hint = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::DUSTYGRAY, "Select a post on the left to read it here.");
+		notice_hint = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::ORANGE, "This post will be pinned as the guild notice.");
+		post_title_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
+		post_author_label = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+		post_date_label = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+		body_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "", 310);
+		empty_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::LIGHTGREY, "No posts yet.");
+
+		dimension = Point<int16_t>(W, H);
 
 		request_list();
 	}
@@ -98,82 +129,95 @@ namespace ms
 	{
 		UIElement::draw_sprites(inter);
 
-		title_text.draw(position + Point<int16_t>(dimension.x() / 2, 28));
-
-		list_backgrnd.draw(DrawArgument(position));
-
-		if (viewing)
+		// --- Thread list (left table) ---
+		if (posts.empty())
 		{
-			// --- Thread view ---
-			post_title_label.change_text(view_title);
-			post_title_label.draw(position + Point<int16_t>(15, POST_LIST_Y));
-
-			post_author_label.change_text(view_author);
-			post_author_label.draw(position + Point<int16_t>(15, POST_LIST_Y + 18));
-
-			post_date_label.change_text(view_date);
-			post_date_label.draw(position + Point<int16_t>(dimension.x() - 15, POST_LIST_Y + 18));
-
-			body_text.change_text(view_content);
-			body_text.draw(position + Point<int16_t>(15, POST_LIST_Y + 40));
-
-			// Replies below the body.
-			int16_t reply_y = POST_LIST_Y + 48 + body_text.height();
-			for (const auto& reply : view_replies)
-			{
-				if (reply_y > dimension.y() - 60)
-					break;
-
-				post_author_label.change_text(reply.author + ":");
-				post_author_label.draw(position + Point<int16_t>(20, reply_y));
-
-				post_date_label.change_text(reply.date);
-				post_date_label.draw(position + Point<int16_t>(dimension.x() - 15, reply_y));
-
-				body_text.change_text(reply.content);
-				body_text.draw(position + Point<int16_t>(30, reply_y + 16));
-
-				reply_y += 20 + body_text.height();
-			}
-
-			page_text.change_text("Press ESC for the post list");
-			page_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() - 30));
+			empty_text.draw(position + Point<int16_t>(197, LIST_Y + 80));
 		}
 		else
 		{
-			// --- Thread list ---
-			if (posts.empty())
+			int16_t visible_count = static_cast<int16_t>(posts.size());
+
+			if (visible_count > MAX_VISIBLE_POSTS)
+				visible_count = MAX_VISIBLE_POSTS;
+
+			for (int16_t i = 0; i < visible_count; i++)
 			{
-				empty_text.draw(position + Point<int16_t>(dimension.x() / 2, POST_LIST_Y + 60));
+				const auto& post = posts[i];
+				int16_t row_y = LIST_Y + i * ROW_H + 8;
+				bool selected = viewing && post.id == view_id;
+
+				post_title_label.change_color(selected ? Color::Name::ORANGE : Color::Name::WHITE);
+				post_title_label.change_text(
+					post.is_notice ? "[Notice] " + post.title : post.title);
+				post_title_label.draw(position + Point<int16_t>(20, row_y));
+
+				post_author_label.change_color(selected ? Color::Name::ORANGE : Color::Name::WHITE);
+				post_author_label.change_text(post.author);
+				post_author_label.draw(position + Point<int16_t>(285, row_y));
+
+				post_date_label.change_color(selected ? Color::Name::ORANGE : Color::Name::WHITE);
+				post_date_label.change_text(post.date);
+				post_date_label.draw(position + Point<int16_t>(352, row_y));
 			}
-			else
+		}
+
+		page_text.change_text(std::to_string(current_page + 1) + " / " + std::to_string(total_pages));
+		page_text.draw(position + Point<int16_t>(255, 481));
+
+		// --- Opened thread (right pane) ---
+		if (!viewing && !writing)
+			pane_hint.draw(position + Point<int16_t>(560, 140));
+
+		if (viewing)
+		{
+			post_title_label.change_color(Color::Name::BLACK);
+			post_title_label.change_text(view_title);
+			post_title_label.draw(position + Point<int16_t>(PANE_X, PANE_Y));
+
+			post_author_label.change_color(Color::Name::DUSTYGRAY);
+			post_author_label.change_text(view_author + "  " + view_date);
+			post_author_label.draw(position + Point<int16_t>(PANE_X + 90, PANE_Y + 18));
+
+			body_text.change_text(view_content);
+			body_text.draw(position + Point<int16_t>(PANE_X, PANE_Y + 40));
+
+			// Replies in the baked rows bottom right
+			int16_t shown = static_cast<int16_t>(view_replies.size());
+
+			if (shown > MAX_VISIBLE_REPLIES)
+				shown = MAX_VISIBLE_REPLIES;
+
+			int16_t start = static_cast<int16_t>(view_replies.size()) - shown;
+
+			for (int16_t i = 0; i < shown; i++)
 			{
-				int16_t visible_count = static_cast<int16_t>(posts.size());
-				if (visible_count > MAX_VISIBLE_POSTS)
-					visible_count = MAX_VISIBLE_POSTS;
+				const auto& reply = view_replies[start + i];
+				int16_t row_y = REPLY_Y + i * REPLY_ROW_H;
 
-				for (int16_t i = 0; i < visible_count; i++)
-				{
-					const auto& post = posts[i];
-					int16_t row_y = POST_LIST_Y + i * POST_ROW_HEIGHT;
+				post_author_label.change_color(Color::Name::WHITE);
+				post_author_label.change_text(reply.author);
+				post_author_label.draw(position + Point<int16_t>(REPLY_X + 35, row_y));
 
-					post_title_label.change_text(
-						post.is_notice ? "[Notice] " + post.title : post.title);
-					post_title_label.draw(position + Point<int16_t>(15, row_y + 2));
-
-					post_author_label.change_text(post.author);
-					post_author_label.draw(position + Point<int16_t>(180, row_y + 2));
-
-					std::string right = post.date;
-					if (post.reply_count > 0)
-						right += " (" + std::to_string(post.reply_count) + ")";
-					post_date_label.change_text(right);
-					post_date_label.draw(position + Point<int16_t>(dimension.x() - 15, row_y + 2));
-				}
+				body_text.change_text(reply.content);
+				body_text.draw(position + Point<int16_t>(REPLY_X + 80, row_y));
 			}
+		}
 
-			page_text.change_text(std::to_string(current_page + 1) + " / " + std::to_string(total_pages));
-			page_text.draw(position + Point<int16_t>(dimension.x() / 2, dimension.y() - 30));
+		// --- Write popup ---
+		if (writing)
+		{
+			popup_tex.draw(DrawArgument(position + Point<int16_t>(POPUP_X, POPUP_Y) + popup_tex.get_origin()));
+
+			if (writing_notice)
+				notice_hint.draw(position + Point<int16_t>(POPUP_X + 164, POPUP_Y - 18));
+
+			subject_field.draw(position, Point<int16_t>(0, -5));
+			content_field.draw(position, Point<int16_t>(0, -5));
+		}
+		else
+		{
+			reply_field.draw(position, Point<int16_t>(0, -5));
 		}
 
 		UIElement::draw_buttons(inter);
@@ -182,22 +226,69 @@ namespace ms
 	void UIGuildBBS::update()
 	{
 		UIElement::update();
+
+		subject_field.update(position);
+		content_field.update(position);
+		reply_field.update(position);
+	}
+
+	bool UIGuildBBS::indragrange(Point<int16_t> cursorpos) const
+	{
+		// Drag by the title bar only — the rest of the window is content
+		Rectangle<int16_t> bar(position, position + Point<int16_t>(W, 48));
+
+		return bar.contains(cursorpos);
+	}
+
+	void UIGuildBBS::set_write_mode(bool on, bool notice)
+	{
+		writing = on;
+		writing_notice = notice;
+
+		buttons[BT_REGISTER]->set_active(on);
+		buttons[BT_CANCEL]->set_active(on);
+		buttons[BT_WRITE]->set_active(!on);
+		buttons[BT_NOTICE]->set_active(!on);
+		buttons[BT_DELETE]->set_active(!on);
+		buttons[BT_REPLY]->set_active(!on);
+
+		if (on)
+		{
+			subject_field.change_text("");
+			content_field.change_text("");
+			subject_field.set_state(Textfield::State::FOCUSED);
+		}
+		else
+		{
+			subject_field.set_state(Textfield::State::NORMAL);
+			content_field.set_state(Textfield::State::NORMAL);
+		}
+	}
+
+	void UIGuildBBS::submit_post()
+	{
+		std::string title = subject_field.get_text();
+		std::string content = content_field.get_text();
+
+		if (title.empty() || content.empty())
+		{
+			UI::get().emplace<UIOk>("Please enter both a subject and content.", [](bool) {});
+			return;
+		}
+
+		GuildBBSWritePacket(false, 0, writing_notice, title, content).dispatch();
+		set_write_mode(false, false);
+		request_list();
 	}
 
 	void UIGuildBBS::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
 		{
-			if (viewing)
-			{
-				// Back out of the opened thread to the list.
-				viewing = false;
-				request_list();
-			}
+			if (writing)
+				set_write_mode(false, false);
 			else
-			{
 				deactivate();
-			}
 		}
 	}
 
@@ -208,16 +299,62 @@ namespace ms
 		if (dragged)
 			return dstate;
 
-		// Clicking a row in list view opens the thread.
-		if (!viewing && clicked)
+		Point<int16_t> local = cursorpos - position;
+
+		if (writing)
 		{
-			Point<int16_t> local = cursorpos - position;
-
-			if (local.x() >= 10 && local.x() <= dimension.x() - 10)
+			if (clicked)
 			{
-				int16_t row = (local.y() - POST_LIST_Y) / POST_ROW_HEIGHT;
+				Rectangle<int16_t> subject_rect(
+					Point<int16_t>(POPUP_X + 50, POPUP_Y + 8),
+					Point<int16_t>(POPUP_X + 324, POPUP_Y + 32)
+				);
+				Rectangle<int16_t> content_rect(
+					Point<int16_t>(POPUP_X + 50, POPUP_Y + 36),
+					Point<int16_t>(POPUP_X + 320, POPUP_Y + 210)
+				);
 
-				if (local.y() >= POST_LIST_Y && row >= 0
+				if (subject_rect.contains(local))
+				{
+					content_field.set_state(Textfield::State::NORMAL);
+					subject_field.set_state(Textfield::State::FOCUSED);
+					return Cursor::State::CLICKING;
+				}
+
+				if (content_rect.contains(local))
+				{
+					subject_field.set_state(Textfield::State::NORMAL);
+					content_field.set_state(Textfield::State::FOCUSED);
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			return UIElement::send_cursor(clicked, cursorpos);
+		}
+
+		if (clicked)
+		{
+			// Reply input focus
+			Rectangle<int16_t> reply_rect(
+				Point<int16_t>(422, 452),
+				Point<int16_t>(700, 480)
+			);
+
+			if (viewing && reply_rect.contains(local))
+			{
+				reply_field.set_state(Textfield::State::FOCUSED);
+				return Cursor::State::CLICKING;
+			}
+
+			if (reply_field.get_state() == Textfield::State::FOCUSED)
+				reply_field.set_state(Textfield::State::NORMAL);
+
+			// Clicking a row in the list opens the thread in the right pane
+			if (local.x() >= 12 && local.x() <= 383)
+			{
+				int16_t row = (local.y() - LIST_Y) / ROW_H;
+
+				if (local.y() >= LIST_Y && row >= 0
 					&& row < static_cast<int16_t>(posts.size())
 					&& row < MAX_VISIBLE_POSTS)
 				{
@@ -235,79 +372,45 @@ namespace ms
 		return TYPE;
 	}
 
-	void UIGuildBBS::open_write_dialog()
-	{
-		// Title first, then content — chained UIEnterText prompts.
-		// Cosmic caps title at 25 chars and body at 600.
-		auto title_handler = [](const std::string& title)
-		{
-			if (title.empty())
-				return;
-
-			std::string title_copy = title;
-			auto content_handler = [title_copy](const std::string& content)
-			{
-				if (content.empty())
-					return;
-
-				GuildBBSWritePacket(false, 0, false, title_copy, content).dispatch();
-
-				if (auto bbs = UI::get().get_element<UIGuildBBS>())
-					GuildBBSListPacket(0).dispatch();
-			};
-
-			UI::get().emplace<UIEnterText>("Post content:", content_handler, 600);
-		};
-
-		UI::get().emplace<UIEnterText>("Post title:", title_handler, 25);
-	}
-
-	void UIGuildBBS::open_reply_dialog()
-	{
-		int32_t thread_id = view_id;
-
-		auto reply_handler = [thread_id](const std::string& content)
-		{
-			if (content.empty())
-				return;
-
-			GuildBBSReplyPacket(thread_id, content).dispatch();
-
-			// The server responds with a fresh showThread for this id.
-		};
-
-		// Cosmic caps replies at 25 characters.
-		UI::get().emplace<UIEnterText>("Reply:", reply_handler, 25);
-	}
-
 	Button::State UIGuildBBS::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
 		{
-		case Buttons::BT_CLOSE:
+		case BT_CLOSE:
 			deactivate();
 			break;
-		case Buttons::BT_WRITE:
-			open_write_dialog();
+		case BT_WRITE:
+			set_write_mode(true, false);
 			break;
-		case Buttons::BT_DELETE:
+		case BT_NOTICE:
+			set_write_mode(true, true);
+			break;
+		case BT_DELETE:
 			if (viewing)
 			{
 				GuildBBSDeletePacket(view_id).dispatch();
 				viewing = false;
 				request_list();
 			}
-			else
+			break;
+		case BT_REGISTER:
+			submit_post();
+			break;
+		case BT_CANCEL:
+			set_write_mode(false, false);
+			break;
+		case BT_REPLY:
+		{
+			std::string reply = reply_field.get_text();
+
+			if (viewing && !reply.empty())
 			{
-				chat::log("Open a post first, then press Delete to remove it.", chat::LineType::YELLOW);
+				GuildBBSReplyPacket(view_id, reply).dispatch();
+				reply_field.change_text("");
 			}
+
 			break;
-		case Buttons::BT_REPLY:
-			if (viewing)
-				open_reply_dialog();
-			else
-				chat::log("Open a post first, then press Reply.", chat::LineType::YELLOW);
-			break;
+		}
 		default:
 			break;
 		}
@@ -318,7 +421,6 @@ namespace ms
 	void UIGuildBBS::start_post_list(int32_t thread_count)
 	{
 		posts.clear();
-		viewing = false;
 
 		set_total_threads(thread_count);
 	}

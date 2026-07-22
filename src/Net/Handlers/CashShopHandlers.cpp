@@ -159,6 +159,10 @@ namespace ms
 		s_pre_cashshop_ui_scale = Constants::Constants::get().get_ui_scale();
 		Constants::Constants::get().set_ui_scale(1.0f);
 
+		// Drop any focused textfield (e.g. the chat bar) so the arrow
+		// keys reach the cash shop stage character
+		UI::get().remove_textfield();
+
 		Constants::Constants::get().set_viewwidth(1024);
 		Constants::Constants::get().set_viewheight(768);
 
@@ -185,16 +189,22 @@ namespace ms
 		Timer::get().start();
 	}
 
+	static int32_t s_cash_balances[3] = { 0, 0, 0 };
+
+	int32_t get_cash_balance(int which)
+	{
+		return (which >= 0 && which < 3) ? s_cash_balances[which] : 0;
+	}
+
 	void QueryCashResultHandler::handle(InPacket& recv) const
 	{
-		// Cash query result — returns the player's NX cash balance
+		// Cash query result — the balances render in the cash shop's
+		// left panel next to the baked NX labels
 		if (recv.available())
 		{
-			int32_t cash_nx = recv.read_int();
-			int32_t maple_points = recv.read_int();
-			int32_t cash_prepaid = recv.read_int();
-
-			chat::log("[Cash] NX: " + std::to_string(cash_nx) + " | MaplePoints: " + std::to_string(maple_points) + " | Prepaid: " + std::to_string(cash_prepaid), chat::LineType::YELLOW);
+			s_cash_balances[0] = recv.read_int(); // NX credit
+			s_cash_balances[1] = recv.read_int(); // maple points
+			s_cash_balances[2] = recv.read_int(); // NX prepaid
 		}
 	}
 

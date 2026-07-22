@@ -20,6 +20,10 @@
 #include "../Template/Singleton.h"
 
 #include <cstdint>
+#include "../Graphics/Animation.h"
+#include "../Graphics/Texture.h"
+#include "../Net/Login.h"
+
 #include <string>
 #include <vector>
 
@@ -39,6 +43,19 @@ namespace ms
 		void stop();
 		void update();
 
+		// Per-frame tick from Stage: advances the off-air loop and the
+		// broadcast countdown
+		void tick();
+		// Paints both TV screens: the top show screen at the msg anchor
+		// (TVbasic frame + chatting hosts when idle, backdrop when live)
+		// and the ad reel at the ad anchor
+		void draw_screen(Point<int16_t> ad_anchor, Point<int16_t> msg_anchor, float alpha) const;
+
+		void set_look(const LookEntry& entry) { sender_look_ = entry; has_look_ = true; }
+		bool has_look() const { return has_look_; }
+		const LookEntry& get_look() const { return sender_look_; }
+		int32_t serial() const { return serial_; }
+
 		bool active() const { return active_; }
 		const std::string& sender_name() const { return sender_name_; }
 		const std::string& victim_name() const { return victim_name_; }
@@ -47,6 +64,16 @@ namespace ms
 
 	private:
 		bool active_ = false;
+		LookEntry sender_look_;
+		bool has_look_ = false;
+		int32_t serial_ = 0;
+		mutable Animation tv_ads_[3];
+		mutable int ad_index_ = 0;
+		mutable Texture tv_basic_;
+		mutable Animation tv_show_[2];
+		mutable int show_index_ = 0;
+		mutable bool anims_loaded_ = false;
+		void load_anims() const;
 		std::string sender_name_;
 		std::string victim_name_;
 		std::vector<std::string> lines_;

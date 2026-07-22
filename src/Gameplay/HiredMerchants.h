@@ -17,50 +17,42 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../Graphics/Animation.h"
+#include "../Graphics/Text.h"
+#include "../Template/Point.h"
+#include "../Template/Singleton.h"
 
-#include "../../Graphics/Text.h"
+#include <cstdint>
+#include <map>
+#include <string>
 
 namespace ms
 {
-	// "MY RANKING" window (UIWindow2.img/Ranking): the player's overall
-	// and job rank with movement, plus level and fame. All values come
-	// from data Cosmic already sends (login char entry + live stats).
-	class UIRanking : public UIDragElement<PosRANKING>
+	class HiredMerchants : public Singleton<HiredMerchants>
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::RANKING;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
-
-		UIRanking();
-
-		void draw(float inter) const override;
-		void update() override;
-
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		enum Buttons : uint16_t
+		struct Merchant
 		{
-			BT_CLOSE
+			int32_t oid;
+			int32_t item_id;
+			Point<int16_t> pos;
+			std::string owner;
+			std::string desc;
+			int8_t skin;
+			Animation stand;
 		};
 
-		static constexpr int16_t ROW_X = 24;
-		static constexpr int16_t VALUE_X = 279;
-		static constexpr int16_t ROW_Y = 96;
-		static constexpr int16_t ROW_STEP = 42;
+		void add(int32_t owner_id, int32_t oid, int32_t item_id, Point<int16_t> pos,
+			const std::string& owner, const std::string& desc, int8_t skin);
+		void remove(int32_t owner_id);
+		void clear_all();
 
-		mutable Text label_text;
-		mutable Text value_text;
-		mutable Text name_text;
-		mutable Text hint_text;
-		Texture divider;
+		void draw(Point<int16_t> viewpos, float alpha) const;
+		void update();
+
+		const Merchant* find_at(Point<int16_t> mappos) const;
+
+	private:
+		std::map<int32_t, Merchant> merchants;
 	};
 }

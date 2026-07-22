@@ -18,16 +18,19 @@
 #pragma once
 
 #include "../UIDragElement.h"
+#include "../Components/Textfield.h"
 
 #include "../../Graphics/Text.h"
+#include "../../Graphics/Texture.h"
 
 #include <vector>
 
 namespace ms
 {
-	// Guild bulletin board (GuildBBS.img/GuildBBS). Two views:
-	// the thread list, and an opened thread with its replies.
-	// Wire protocol matches Cosmic's BBSOperationHandler / GuildPackets.
+	// Guild bulletin board (GuildBBS.img/GuildBBS): thread list on the
+	// left, the opened thread + its replies on the right, write-post
+	// popup (backgrnd3) drawn centered. Wire protocol matches Cosmic's
+	// BBSOperationHandler / GuildPackets.
 	class UIGuildBBS : public UIDragElement<PosGUILDBBS>
 	{
 	public:
@@ -64,12 +67,17 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		bool indragrange(Point<int16_t> cursorpos) const override;
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
 			BT_WRITE,
+			BT_NOTICE,
 			BT_DELETE,
-			BT_REPLY
+			BT_REPLY,
+			BT_REGISTER,
+			BT_CANCEL
 		};
 
 		struct BBSPost
@@ -90,13 +98,35 @@ namespace ms
 			std::string date;
 		};
 
+		static constexpr int16_t W = 731;
+		static constexpr int16_t H = 526;
+
+		// Thread list table
+		static constexpr int16_t LIST_Y = 85;
+		static constexpr int16_t ROW_H = 30;
+		static constexpr int16_t MAX_VISIBLE_POSTS = 12;
+
+		// Right-hand reading pane
+		static constexpr int16_t PANE_X = 400;
+		static constexpr int16_t PANE_Y = 15;
+
+		// Replies panel
+		static constexpr int16_t REPLY_X = 403;
+		static constexpr int16_t REPLY_Y = 330;
+		static constexpr int16_t REPLY_ROW_H = 30;
+		static constexpr int16_t MAX_VISIBLE_REPLIES = 4;
+
+		// Write popup (backgrnd3, 328x254, centered)
+		static constexpr int16_t POPUP_X = 202;
+		static constexpr int16_t POPUP_Y = 119;
+
 		void request_list() const;
-		void open_write_dialog();
-		void open_reply_dialog();
+		void set_write_mode(bool on, bool notice);
+		void submit_post();
 
 		std::vector<BBSPost> posts;
 
-		// Opened-thread state; viewing == true switches draw to thread view.
+		// Opened-thread state shown in the right pane
 		bool viewing = false;
 		int32_t view_id = 0;
 		std::string view_author;
@@ -105,25 +135,25 @@ namespace ms
 		std::string view_date;
 		std::vector<BBSReply> view_replies;
 
+		// Write-popup state
+		bool writing = false;
+		bool writing_notice = false;
+		Texture popup_tex;
+		Textfield subject_field;
+		Textfield content_field;
+		Textfield reply_field;
+
 		// Pagination
 		int16_t current_page;
 		int16_t total_pages;
 
-		// Text labels
-		mutable Text title_text;
 		mutable Text page_text;
+		mutable Text pane_hint;
+		mutable Text notice_hint;
 		mutable Text post_title_label;
 		mutable Text post_author_label;
 		mutable Text post_date_label;
 		mutable Text body_text;
 		mutable Text empty_text;
-
-		// Post list area
-		Texture list_backgrnd;
-
-		// List display constants
-		static constexpr int16_t MAX_VISIBLE_POSTS = 10;
-		static constexpr int16_t POST_ROW_HEIGHT = 20;
-		static constexpr int16_t POST_LIST_Y = 60;
 	};
 }

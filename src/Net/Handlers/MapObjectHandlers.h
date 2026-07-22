@@ -224,6 +224,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Shop/minigame balloon above a character
+	class UpdateCharBoxHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Display or hide a chalkboard above a character
 	// Opcode: CHALKBOARD(164)
 	class ChalkboardHandler : public PacketHandler

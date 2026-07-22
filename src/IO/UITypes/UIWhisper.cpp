@@ -20,188 +20,192 @@
 #include "../UI.h"
 #include "UIChatBar.h"
 #include "../Components/MapleButton.h"
-#include "../Components/AreaButton.h"
 
 #include "../../Net/Packets/BuddyPackets.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
 	UIWhisper::UIWhisper(const std::string& target) :
-		UIDragElement<PosWHISPER>(Point<int16_t>(WIDTH, HEADER_HEIGHT)),
-		target_name(target),
-		scroll_offset(0)
+		UIDragElement<PosWHISPER>(Point<int16_t>(W, H)),
+		target_name(target)
 	{
-		int16_t total_h = HEADER_HEIGHT + CHAT_HEIGHT + INPUT_HEIGHT + 4;
+		nl::node memo = nl::nx::ui["UIWindow2.img"]["MemoInGame"];
+		nl::node send = memo["Send"];
 
-		background = ColorBox(WIDTH, total_h, Color::Name::BLACK, 0.85f);
-		header_bg = ColorBox(WIDTH, HEADER_HEIGHT, Color::Name::EMPEROR, 0.9f);
-		input_bg = ColorBox(WIDTH - 60, INPUT_HEIGHT, Color::Name::GALLERY, 1.0f);
+		sprites.emplace_back(memo["backgrnd"]);
+		sprites.emplace_back(send["backgrnd"]);
+		sprites.emplace_back(send["backgrnd2"]);
 
-		title_text = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
-		update_title();
+		buttons[BT_SEND] = std::make_unique<MapleButton>(send["BtOK"]);
+		buttons[BT_CLOSE] = std::make_unique<MapleButton>(send["BtCancle"]);
 
-		// Name input field at the top (for entering target name)
+		divider = memo["Get"]["line"];
+
 		namefield = Textfield(
-			Text::A11M, Text::LEFT, Color::Name::WHITE,
-			Rectangle<int16_t>(Point<int16_t>(40, 5), Point<int16_t>(WIDTH - 10, 20)),
+			Text::A11M, Text::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(
+				Point<int16_t>(NAME_L, NAME_T),
+				Point<int16_t>(NAME_R, NAME_B)
+			),
 			15
 		);
 
 		if (!target_name.empty())
 			namefield.change_text(target_name);
 
-		// Chat input field at the bottom
+		// Typing line at the top of the white area, history below it;
+		// text wraps at the box width so long messages keep going down
 		chatfield = Textfield(
 			Text::A11M, Text::LEFT, Color::Name::BLACK,
 			Rectangle<int16_t>(
-				Point<int16_t>(5, HEADER_HEIGHT + CHAT_HEIGHT + 2),
-				Point<int16_t>(WIDTH - 60, HEADER_HEIGHT + CHAT_HEIGHT + INPUT_HEIGHT)
+				Point<int16_t>(AREA_L + 4, AREA_T),
+				Point<int16_t>(AREA_R - 4, AREA_T + 14)
 			),
-			100
+			120
+		);
+		chatfield.set_wrap(AREA_R - AREA_L - 10);
+
+		chatfield.set_enter_callback(
+			[this](std::string)
+			{
+				send_whisper();
+			}
 		);
 
-		// Buttons
-		buttons[BT_CLOSE] = std::make_unique<AreaButton>(
-			Point<int16_t>(WIDTH - 18, 3), Point<int16_t>(15, 15)
-		);
-
-		buttons[BT_SEND] = std::make_unique<AreaButton>(
-			Point<int16_t>(WIDTH - 55, HEADER_HEIGHT + CHAT_HEIGHT + 2),
-			Point<int16_t>(50, INPUT_HEIGHT)
-		);
-
-		buttons[BT_FIND] = std::make_unique<AreaButton>(
-			Point<int16_t>(5, 3), Point<int16_t>(30, 18)
-		);
-
-		// Pre-allocate draw objects
-		close_x = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::WHITE, "X");
-		send_bg = ColorBox(50, INPUT_HEIGHT, Color::Name::MALIBU, 0.8f);
-		send_text = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "Send");
-
-		dimension = Point<int16_t>(WIDTH, total_h);
-		dragarea = Point<int16_t>(WIDTH, HEADER_HEIGHT);
-	}
-
-	void UIWhisper::update_title()
-	{
-		if (target_name.empty())
-			title_text.change_text("To: ");
-		else
-			title_text.change_text("To: " + target_name);
+		dimension = Point<int16_t>(W, H);
 	}
 
 	void UIWhisper::draw(float inter) const
 	{
-		// Background
-		background.draw(DrawArgument(position));
-		header_bg.draw(DrawArgument(position));
+		UIElement::draw_sprites(inter);
 
-		// Title
-		title_text.draw(position + Point<int16_t>(5, 5));
+		namefield.draw(position, Point<int16_t>(0, -5));
 
-		// Close button marker
-		close_x.draw(position + Point<int16_t>(WIDTH - 10, 5));
+		chatfield.draw(position, Point<int16_t>(0, -5));
 
-		// Chat area
-		int16_t chat_y = HEADER_HEIGHT + CHAT_HEIGHT - LINE_HEIGHT;
-		int16_t lines_shown = CHAT_HEIGHT / LINE_HEIGHT;
-		int16_t start = static_cast<int16_t>(chat_lines.size()) - lines_shown - scroll_offset;
+		// Divider tracks the wrapped typing block; history flows below it
+		int16_t typing_h = chatfield.text_height();
 
-		if (start < 0) start = 0;
+		if (typing_h < 14)
+			typing_h = 14;
 
-		for (int16_t i = start; i < static_cast<int16_t>(chat_lines.size()) && (i - start) < lines_shown; i++)
+		int16_t div_y = AREA_T + typing_h + 8;
+
+		if (div_y > AREA_B - 6)
+			div_y = AREA_B - 6;
+
+		divider.draw(DrawArgument(
+			position + Point<int16_t>(AREA_L + 2, div_y) + divider.get_origin()));
+
+		int16_t count = static_cast<int16_t>(chat_lines.size());
+		int16_t start = count > SHOWN_LINES ? count - SHOWN_LINES : 0;
+		int16_t line_y = div_y + 3;
+
+		for (int16_t i = start; i < count; i++)
 		{
-			int16_t y_pos = HEADER_HEIGHT + (i - start) * LINE_HEIGHT + 2;
-			chat_lines[i].text.draw(position + Point<int16_t>(5, y_pos));
+			if (line_y + LINE_HEIGHT > AREA_B)
+				break;
+
+			chat_lines[i].text.draw(
+				position + Point<int16_t>(AREA_L + 4, line_y));
+			line_y += LINE_HEIGHT;
 		}
-
-		// Input area
-		input_bg.draw(DrawArgument(position + Point<int16_t>(2, HEADER_HEIGHT + CHAT_HEIGHT + 2)));
-		chatfield.draw(position);
-
-		// Send button
-		send_bg.draw(DrawArgument(position + Point<int16_t>(WIDTH - 55, HEADER_HEIGHT + CHAT_HEIGHT + 2)));
-		send_text.draw(position + Point<int16_t>(WIDTH - 30, HEADER_HEIGHT + CHAT_HEIGHT + 6));
-
-		// Name field (if no target set)
-		if (target_name.empty())
-			namefield.draw(position);
 
 		UIElement::draw_buttons(inter);
 	}
 
 	void UIWhisper::update()
 	{
+		namefield.update(position);
 		chatfield.update(position);
+	}
 
-		if (target_name.empty())
-			namefield.update(position);
+	bool UIWhisper::indragrange(Point<int16_t> cursorpos) const
+	{
+		Rectangle<int16_t> window(position, position + dimension);
+
+		if (!window.contains(cursorpos))
+			return false;
+
+		Point<int16_t> off = cursorpos - position;
+
+		Rectangle<int16_t> name_box(Point<int16_t>(NAME_L - 3, NAME_T - 2), Point<int16_t>(NAME_R + 3, NAME_B + 2));
+		Rectangle<int16_t> area(Point<int16_t>(AREA_L, AREA_T), Point<int16_t>(AREA_R, AREA_B));
+
+		if (name_box.contains(off) || area.contains(off))
+			return false;
+
+		for (auto& btit : buttons)
+			if (btit.second->is_active() && btit.second->bounds(position).contains(cursorpos))
+				return false;
+
+		return true;
 	}
 
 	Cursor::State UIWhisper::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
+
+		if (dragged)
+			return dstate;
+
 		Point<int16_t> cursoroffset = cursorpos - position;
 
-		if (chatfield.get_state() == Textfield::State::FOCUSED)
-		{
-			if (clicked)
-			{
-				Cursor::State tstate = chatfield.send_cursor(cursoroffset, clicked);
-				if (tstate != Cursor::State::IDLE)
-					return tstate;
-			}
-		}
-
-		if (target_name.empty() && namefield.get_state() == Textfield::State::FOCUSED)
-		{
-			if (clicked)
-			{
-				Cursor::State tstate = namefield.send_cursor(cursoroffset, clicked);
-				if (tstate != Cursor::State::IDLE)
-					return tstate;
-			}
-		}
-
-		// Click on chat input area -> focus it
-		Rectangle<int16_t> input_rect(
-			Point<int16_t>(2, HEADER_HEIGHT + CHAT_HEIGHT + 2),
-			Point<int16_t>(WIDTH - 60, HEADER_HEIGHT + CHAT_HEIGHT + INPUT_HEIGHT)
-		);
-
-		if (clicked && input_rect.contains(cursoroffset))
-		{
-			chatfield.set_state(Textfield::State::FOCUSED);
-			UI::get().focus_textfield(&chatfield);
-			return Cursor::State::CLICKING;
-		}
-
-		// Click on name area -> focus it
-		if (target_name.empty() && clicked)
+		if (clicked)
 		{
 			Rectangle<int16_t> name_rect(
-				Point<int16_t>(40, 3),
-				Point<int16_t>(WIDTH - 10, 20)
+				Point<int16_t>(NAME_L - 3, NAME_T - 2),
+				Point<int16_t>(NAME_R + 3, NAME_B + 2)
 			);
 
 			if (name_rect.contains(cursoroffset))
 			{
+				if (chatfield.get_state() == Textfield::State::FOCUSED)
+					chatfield.set_state(Textfield::State::NORMAL);
+
 				namefield.set_state(Textfield::State::FOCUSED);
-				UI::get().focus_textfield(&namefield);
 				return Cursor::State::CLICKING;
 			}
+
+			// Anywhere in the white message area focuses the input line
+			Rectangle<int16_t> input_rect(
+				Point<int16_t>(AREA_L, AREA_T),
+				Point<int16_t>(AREA_R, AREA_B)
+			);
+
+			if (input_rect.contains(cursoroffset))
+			{
+				if (namefield.get_state() == Textfield::State::FOCUSED)
+					namefield.set_state(Textfield::State::NORMAL);
+
+				chatfield.set_state(Textfield::State::FOCUSED);
+				return Cursor::State::CLICKING;
+			}
+
+			if (namefield.get_state() == Textfield::State::FOCUSED)
+				namefield.set_state(Textfield::State::NORMAL);
+
+			if (chatfield.get_state() == Textfield::State::FOCUSED)
+				chatfield.set_state(Textfield::State::NORMAL);
 		}
 
-		return UIDragElement::send_cursor(clicked, cursorpos);
+		if (Cursor::State new_state = namefield.send_cursor(cursorpos, clicked))
+			return new_state;
+
+		if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicked))
+			return new_state;
+
+		return dstate;
 	}
 
 	void UIWhisper::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-		{
 			deactivate();
-			return;
-		}
 	}
 
 	UIElement::Type UIWhisper::get_type() const
@@ -213,15 +217,11 @@ namespace ms
 	{
 		switch (buttonid)
 		{
-		case BT_CLOSE:
-			deactivate();
-			break;
 		case BT_SEND:
 			send_whisper();
 			break;
-		case BT_FIND:
-			if (!target_name.empty())
-				FindPlayerPacket(target_name).dispatch();
+		case BT_CLOSE:
+			deactivate();
 			break;
 		}
 
@@ -230,17 +230,13 @@ namespace ms
 
 	void UIWhisper::send_whisper()
 	{
-		// If no target, take from name field
-		if (target_name.empty())
-		{
-			std::string name = namefield.get_text();
+		std::string name = namefield.get_text();
 
-			if (name.empty())
-				return;
-
+		if (!name.empty())
 			target_name = name;
-			update_title();
-		}
+
+		if (target_name.empty())
+			return;
 
 		std::string message = chatfield.get_text();
 
@@ -258,8 +254,8 @@ namespace ms
 
 		// Also keep a copy in the whisper window's own chat history.
 		ChatLine line;
-		line.text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MALIBU, "To " + target_name + ": " + message);
-		line.color = Color::Name::MALIBU;
+		line.text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MEDIUMBLUE, "To " + target_name + ": " + message);
+		line.color = Color::Name::MEDIUMBLUE;
 		chat_lines.push_back(line);
 
 		if (static_cast<int16_t>(chat_lines.size()) > MAX_LINES)
@@ -271,7 +267,7 @@ namespace ms
 	void UIWhisper::recv_whisper(const std::string& from, const std::string& message, bool from_admin)
 	{
 		ChatLine line;
-		Color::Name color = from_admin ? Color::Name::YELLOW : Color::Name::WHITE;
+		Color::Name color = from_admin ? Color::Name::ORANGE : Color::Name::BLACK;
 		line.text = Text(Text::Font::A11M, Text::Alignment::LEFT, color, from + ": " + message);
 		line.color = color;
 		chat_lines.push_back(line);
@@ -283,7 +279,7 @@ namespace ms
 		if (target_name.empty())
 		{
 			target_name = from;
-			update_title();
+			namefield.change_text(from);
 		}
 	}
 
@@ -291,6 +287,5 @@ namespace ms
 	{
 		target_name = name;
 		namefield.change_text(name);
-		update_title();
 	}
 }

@@ -642,6 +642,7 @@ namespace ms
 				// Update player's own guild label and emblem
 				Stage::get().get_player().set_guild(guild_name);
 				Stage::get().get_player().set_guild_mark(logo_bg, logo_bg_color, logo, logo_color);
+				guild->set_guild_emblem(logo_bg, logo_bg_color, logo, logo_color);
 			}
 		}
 	}
@@ -890,10 +891,11 @@ namespace ms
 			int16_t logo = recv.read_short();
 			int8_t logocolor = recv.read_byte();
 
-			// The guild window has no emblem display yet — store the mark
-			// on the player so the name-label code can pick it up once
-			// emblem rendering is implemented.
 			Stage::get().get_player().set_guild_mark(bg, bgcolor, logo, logocolor);
+
+			if (auto guild = UI::get().get_element<UIGuild>())
+				guild->set_guild_emblem(bg, bgcolor, logo, logocolor);
+
 			break;
 		}
 		case 0x44: // Notice changed
