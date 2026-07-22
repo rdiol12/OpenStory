@@ -201,6 +201,9 @@ namespace ms
 
 	void Animation::draw(const DrawArgument& args, float alpha) const
 	{
+		if (frames.empty())
+			return;
+
 		int16_t interframe = frame.get(alpha);
 
 		if (interframe < 0)
@@ -227,6 +230,9 @@ namespace ms
 
 	bool Animation::update(uint16_t timestep)
 	{
+		if (frames.empty())
+			return true;
+
 		const Frame& framedata = get_frame();
 
 		opacity += framedata.opcstep(timestep);
@@ -246,6 +252,14 @@ namespace ms
 			int16_t lastframe = static_cast<int16_t>(frames.size() - 1);
 			int16_t nextframe;
 			bool ended;
+
+			// Play-once mode: freeze on the final frame instead of wrapping
+			if (hold_last && !zigzag && frame == lastframe)
+			{
+				frame.normalize();
+
+				return true;
+			}
 
 			if (zigzag && lastframe > 0)
 			{
@@ -348,6 +362,12 @@ namespace ms
 	{
 		// Clamp the frame index — a stale/oversized index (e.g. from a bullet
 		// animation reused across attacks) must never index past the vector.
+		// An empty vector (moved-from animation) would otherwise clamp to -1.
+		static const Frame null_frame;
+
+		if (frames.empty())
+			return null_frame;
+
 		int16_t index = frame.get();
 
 		if (index < 0)

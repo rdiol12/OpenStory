@@ -53,13 +53,31 @@ namespace ms
 		void randomize_look();
 		const std::string& get_equipname(EquipSlot::Id slot) const;
 
+		// Uniform 800x600 content scaling, centered in the view (same treatment
+		// as UIWorldSelect / UICharSelect). lay() maps a design point to screen;
+		// scl() scales an offset only.
+		Point<int16_t> lay(int16_t x, int16_t y) const;
+		Point<int16_t> scl(int16_t x, int16_t y) const;
+		float ui_scale;
+		Point<int16_t> box;
+
 		enum Buttons : uint16_t
 		{
 			BT_BACK,
 			BT_CHARC_OK,
 			BT_CHARC_CANCEL,
+			BT_CHARC_FACEL,
+			BT_CHARC_FACER,
+			BT_CHARC_HAIRL,
+			BT_CHARC_HAIRR,
 			BT_CHARC_SKINL,
 			BT_CHARC_SKINR,
+			BT_CHARC_TOPL,
+			BT_CHARC_TOPR,
+			BT_CHARC_BOTL,
+			BT_CHARC_BOTR,
+			BT_CHARC_SHOESL,
+			BT_CHARC_SHOESR,
 			BT_CHARC_WEPL,
 			BT_CHARC_WEPR,
 			BT_CHARC_GENDER_M,

@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/MapleFrame.h"
+
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Character/QuestLog.h"
@@ -117,6 +119,7 @@ namespace ms
 		const QuestLog& questlog;
 
 		// QuestAlarm backgrounds
+		MapleFrame tip_frame;
 		Texture bg_min;
 		Texture bg_center;
 		Texture bg_bottom;

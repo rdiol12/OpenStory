@@ -43,6 +43,34 @@ namespace ms
 		grip = wnode["map"]["grip"];
 		tip = wnode["map"]["tip"];
 		dim = Point<int16_t>(texture.width(), texture.height());
+
+		// Opaque extent of the canonical sprite (blade up): top = tip end,
+		// bottom = butt end, cx = the shaft's horizontal mass center. Used to
+		// map the vanilla donor's fractional hold point onto this sprite.
+		{
+			int w = dim.x(), h = dim.y();
+			double sx = 0.0;
+			int n = 0, top = h, bot = -1;
+
+			if (!canon.empty() && w > 0 && h > 0)
+				for (int y = 0; y < h; ++y)
+					for (int x = 0; x < w; ++x)
+						if (canon[(size_t(y) * w + x) * 4 + 3] >= 64)
+						{
+							sx += x;
+							n++;
+
+							if (y < top) top = y;
+							if (y > bot) bot = y;
+						}
+
+			if (n > 0)
+			{
+				canon_cx = static_cast<float>(sx / n);
+				canon_top = static_cast<int16_t>(top);
+				canon_bot = static_cast<int16_t>(bot);
+			}
+		}
 		drawinfo = &di;
 		type = WeaponData::get(itemid).get_type();
 		valid = texture.is_valid();
@@ -104,29 +132,43 @@ namespace ms
 		}
 	}
 
-	// Vanilla-measured blade angle for frames whose arm anchor is fused into
-	// the body sprite: sample the TYPE's base vanilla weapon (id prefix*10000
-	// + 2000, e.g. 1402000 for 2H swords) at the same stance/frame and measure
-	// its blade axis from its opaque pixels (principal axis, signed away from
-	// its map anchor). Cached per (type, stance, frame). Returns false when the
-	// reference has no usable art for that frame.
-	static bool reference_angle(Weapon::Type type, Stance::Id stance, uint8_t frame, float& out_rad)
+	// Full pose measured from the TYPE's base vanilla weapon (id prefix*10000
+	// + 2000, e.g. 1402000 for 2H swords) at a given stance/frame: blade angle
+	// (principal axis of the opaque pixels, signed away from the hand anchor),
+	// the hand's fractional position along the sprite's axial extent, the
+	// sideways offset of the sprite's mass from the hand, and the authored
+	// z-layer. angle stays sentinel when the donor has no usable art.
+	struct RefPose
 	{
-		static std::map<int64_t, float> cache;
+		float angle = -999.0f;    // radians; <= -100 means no usable art
+		float frac = 0.35f;       // hand position along the axis, 0 = butt, 1 = tip
+		float perp = 0.0f;        // mass offset perpendicular to the axis, px
+		Clothing::Layer layer = Clothing::Layer::WEAPON;
 
-		int64_t key = (int64_t(type) << 16) | (int64_t(stance) << 8) | frame;
+		bool valid() const { return angle > -100.0f; }
+	};
+
+	// hold_first: when the donor stance has fewer frames than the body
+	// animation, hold its first frame instead of reporting no art. Right for
+	// rest stances; wrong for attacks, where freezing frame 0 would stall the
+	// swing arc mid-animation.
+	static const RefPose& reference_pose(Weapon::Type type, Stance::Id stance, uint8_t frame, bool hold_first = false)
+	{
+		static std::map<int64_t, RefPose> cache;
+
+		int64_t key = (int64_t(hold_first) << 32) | (int64_t(type) << 16) | (int64_t(stance) << 8) | frame;
 		auto iter = cache.find(key);
 
 		if (iter != cache.end())
-		{
-			out_rad = iter->second;
+			return iter->second;
 
-			return out_rad > -100.0f;
-		}
-
-		float result = -999.0f;
+		RefPose result;
 		int32_t refid = int32_t(type) * 10000 + 2000;
-		nl::node part = nl::nx::character["Weapon"]["0" + std::to_string(refid) + ".img"][Stance::names[stance]][frame]["weapon"];
+		nl::node stnode = nl::nx::character["Weapon"]["0" + std::to_string(refid) + ".img"][Stance::names[stance]];
+		nl::node part = stnode[frame]["weapon"];
+
+		if (hold_first && part.data_type() != nl::node::type::bitmap)
+			part = stnode["0"]["weapon"];
 
 		if (part.data_type() == nl::node::type::bitmap)
 		{
@@ -168,16 +210,32 @@ namespace ms
 					float ax = std::cos(axis);
 					float ay = std::sin(axis);
 
-					// Blade points away from the anchor (grip-ish) point
+					// Anchor = where the hand lands when the part is drawn;
+					// prefer the "hand" map point over navel/handMove
 					Point<int16_t> origin = part["origin"];
 					Point<int16_t> anchor;
+					bool hashand = false;
 
 					for (nl::node mapnode : part["map"])
 						if (mapnode.data_type() == nl::node::type::vector)
-							anchor = mapnode;
+						{
+							if (mapnode.name() == "hand")
+							{
+								anchor = mapnode;
+								hashand = true;
+							}
+							else if (!hashand)
+							{
+								anchor = mapnode;
+							}
+						}
 
-					float to_blade_x = float(cx) - float(origin.x() + anchor.x());
-					float to_blade_y = float(cy) - float(origin.y() + anchor.y());
+					float anchor_x = float(origin.x() + anchor.x());
+					float anchor_y = float(origin.y() + anchor.y());
+
+					// Blade points away from the anchor (grip-ish) point
+					float to_blade_x = float(cx) - anchor_x;
+					float to_blade_y = float(cy) - anchor_y;
 
 					if (ax * to_blade_x + ay * to_blade_y < 0.0f)
 					{
@@ -185,15 +243,45 @@ namespace ms
 						ay = -ay;
 					}
 
-					result = std::atan2(ax, -ay);
+					result.angle = std::atan2(ax, -ay);
+
+					// Project the opaque pixels onto the blade axis relative to
+					// the anchor: [smin, smax] spans butt -> tip and the anchor
+					// sits at s = 0, so its fraction along that span is where
+					// the donor's hand actually holds the weapon
+					double smin = 1e9, smax = -1e9;
+
+					for (int y = 0; y < h; ++y)
+						for (int x = 0; x < w; ++x)
+							if (px[(size_t(y) * w + x) * 4 + 3] >= 64)
+							{
+								double s = (x - anchor_x) * ax + (y - anchor_y) * ay;
+
+								if (s < smin) smin = s;
+								if (s > smax) smax = s;
+							}
+
+					if (smax - smin > 1.0)
+					{
+						double f = (0.0 - smin) / (smax - smin);
+						result.frac = static_cast<float>(f < 0.0 ? 0.0 : f > 1.0 ? 1.0 : f);
+					}
+
+					// Sideways offset of the mass from the hand (e.g. a gun's
+					// barrel riding above the trigger grip)
+					result.perp = static_cast<float>(
+						(cx - anchor_x) * -ay + (cy - anchor_y) * ax);
+
+					std::string zs = part["z"].get_string();
+					auto zit = Clothing::sublayernames.find(zs);
+
+					if (zit != Clothing::sublayernames.end())
+						result.layer = zit->second;
 				}
 			}
 		}
 
-		cache[key] = result;
-		out_rad = result;
-
-		return result > -100.0f;
+		return cache.emplace(key, result).first->second;
 	}
 
 	ProceduralWeapon::Pose ProceduralWeapon::pose_for(Stance::Id stance, uint8_t frame) const
@@ -237,7 +325,26 @@ namespace ms
 			// the back) instead of the hand.
 			return { 28.0f, Clothing::Layer::BACKWEAPON, false, 0.0f, true };
 		default: // STAND1/2, WALK1/2, ALERT, JUMP — held at rest
+		{
+			// Rest pose measured from the type's vanilla base weapon at this
+			// stance/frame, so each category rests the way Nexon drew it (2H
+			// on the shoulder behind the head, spear across the body, bow
+			// vertical) — angle, hold point and z-layer all derived, no
+			// per-type tables. Canned angle only if the donor has no art.
+			const RefPose& ref = reference_pose(type, stance, frame, true);
+
+			if (ref.valid())
+			{
+				Pose pose{ ref.angle / 0.017453293f, ref.layer, false, 0.0f };
+				pose.ref_rest = true;
+				pose.hold_frac = ref.frac;
+				pose.perp = ref.perp;
+
+				return pose;
+			}
+
 			return { rest_angle(type), L, false, 0.0f };
+		}
 		}
 	}
 
@@ -300,11 +407,11 @@ namespace ms
 				// type's vanilla base weapon at this exact stance/frame — the
 				// real arc Nexon drew. Canned constants only if even the
 				// reference has no art here.
-				float measured;
+				const RefPose& ref = reference_pose(type, stance, frame);
 
-				if (reference_angle(type, stance, frame, measured))
+				if (ref.valid())
 				{
-					th = measured;
+					th = ref.angle;
 				}
 				else
 				{
@@ -347,10 +454,23 @@ namespace ms
 				axial = frame == 0 ? 0.9f : 0.78f;
 		}
 
-		// Per-type hold adjustment (e.g. hold a pike lower for a two-handed look) —
-		// only at rest; during attacks the grip stays at the true pivot so the
-		// swing/thrust rotates cleanly.
-		Point<int16_t> g = (pose.track_arm || pose.back) ? grip : grip + grip_offset(type);
+		// Pose pivot (the point placed on the hand). Donor-measured rest poses
+		// map the vanilla hand fraction onto this sprite's own opaque extent,
+		// so a longer custom blade is still held at the same relative point;
+		// otherwise the authored grip (plus the per-type rest adjustment).
+		Point<int16_t> g;
+
+		if (pose.ref_rest && canon_bot > canon_top)
+		{
+			float py = canon_bot - pose.hold_frac * float(canon_bot - canon_top);
+			g = Point<int16_t>(
+				static_cast<int16_t>(std::lround(canon_cx - pose.perp)),
+				static_cast<int16_t>(std::lround(py)));
+		}
+		else
+		{
+			g = (pose.track_arm || pose.back) ? grip : grip + grip_offset(type);
+		}
 
 		// Baked pose sprite: supersampled rotation + outline re-ink, cached per
 		// (stance, frame). Its origin is the rotated grip, so it draws like any

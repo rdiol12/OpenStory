@@ -47,10 +47,22 @@ if(WIN32)
     TARGET_INCLUDE_DIRECTORIES(OpenStory PUBLIC ${CMAKE_SOURCE_DIR}/vendor/glew-2.1.0/include/GL)
     TARGET_INCLUDE_DIRECTORIES(OpenStory PUBLIC ${CMAKE_SOURCE_DIR}/vendor/bass24/c)
     TARGET_INCLUDE_DIRECTORIES(OpenStory PUBLIC ${CMAKE_SOURCE_DIR}/vendor/glfw-3.3.2.bin.WIN32/include/GLFW)
-    
+
+    # Build NoLifeNx (and lz4) from source instead of the stale prebuilt
+    # NoLifeNx.lib, so fixes to the bitmap/node code take effect on a normal
+    # rebuild. lz4.c is compiled with MSVC here (the bundled liblz4_static.lib is
+    # a MinGW build and won't link against MSVC).
+    TARGET_INCLUDE_DIRECTORIES(OpenStory PUBLIC ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/includes/lz4_v1_8_2_win64/include)
+    target_sources(OpenStory PRIVATE
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/audio.cpp
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/bitmap.cpp
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/file.cpp
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/node.cpp
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/nx.cpp
+        ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/includes/lz4_v1_8_2_win64/lz4.c)
+
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/freetype/win64/freetype.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/bass24/c/x64/bass.lib)
-    target_link_libraries(OpenStory optimized ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/x64/Release/NoLifeNx.lib debug ${CMAKE_SOURCE_DIR}/vendor/NoLifeNx/nlnx/x64/Debug/NoLifeNx.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/glew-2.1.0/lib/Release/x64/glew32s.lib)
     target_link_libraries(OpenStory ${CMAKE_SOURCE_DIR}/vendor/glfw-3.3.2.bin.WIN64/lib-vc2019/glfw3.lib)
     target_link_libraries(OpenStory Iphlpapi.lib)

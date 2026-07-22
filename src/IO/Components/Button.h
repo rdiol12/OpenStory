@@ -31,6 +31,7 @@ namespace ms
 			DISABLED,
 			MOUSEOVER,
 			PRESSED,
+			KEYFOCUSED,
 			IDENTITY,
 			NUM_STATES
 		};
@@ -47,9 +48,12 @@ namespace ms
 		virtual uint16_t get_selected() const;
 
 		void set_position(Point<int16_t> position);
-		void set_state(State state);
+		virtual void set_state(State state);
 		void set_active(bool active);
 		void toggle_pressed();
+		// Uniform draw/bounds scale, used by login-flow screens that render
+		// the whole 800x600 design scaled up for large views
+		void set_scale(float scale) { btn_scale = scale; }
 
 		bool is_active() const;
 		State get_state() const;
@@ -60,5 +64,6 @@ namespace ms
 		Point<int16_t> position;
 		bool active;
 		bool pressed;
+		float btn_scale = 1.0f;
 	};
 }

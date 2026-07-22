@@ -54,6 +54,10 @@ namespace ms
 			float arm_offset;         // degrees added to the forearm angle when tracking
 			bool back = false;        // true = slung on the back (climbing), anchored to
 			                          // the body instead of the hand
+			bool ref_rest = false;    // rest pose measured from the type's vanilla base
+			                          // weapon: hold_frac/perp place the sprite like the donor
+			float hold_frac = 0.0f;   // hand position along the sprite (0 = butt, 1 = tip)
+			float perp = 0.0f;        // sideways offset of the sprite's mass from the hand, px
 		};
 
 		Pose pose_for(Stance::Id stance, uint8_t frame) const;
@@ -74,6 +78,11 @@ namespace ms
 
 		// Canonical pixels (material-retextured when present) for pose baking
 		std::vector<uint8_t> canon;
+		// Opaque extent of the canonical sprite, for mapping the donor's
+		// fractional hold point onto this sprite's own length
+		float canon_cx = 0.0f;
+		int16_t canon_top = 0;
+		int16_t canon_bot = 0;
 		mutable std::map<int32_t, Texture> posed_cache;
 	};
 }

@@ -51,6 +51,7 @@ namespace ms
 		settings.emplace<PosSKILL>();
 		settings.emplace<PosQUEST>();
 		settings.emplace<PosQUESTHELPER>();
+		settings.emplace<PosPARTYHUD>();
 		settings.emplace<PosMAP>();
 		settings.emplace<PosUSERLIST>();
 		settings.emplace<PosCHAT>();

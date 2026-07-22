@@ -35,6 +35,9 @@ namespace ms
 		// yet live for input.
 		void draw(Point<int16_t> position, float alpha) const;
 		void update();
+		// Entering a state rewinds its animation, so a play-once mouse-over
+		// (e.g. the v83 world planks) replays from the first frame each hover
+		void set_state(Button::State state) override;
 		Rectangle<int16_t> bounds(Point<int16_t> parentpos) const;
 		int16_t width() const;
 		Point<int16_t> origin() const;

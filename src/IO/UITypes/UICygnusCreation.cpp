@@ -40,75 +40,83 @@
 
 namespace ms
 {
-	UICygnusCreation::UICygnusCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET)
+	UICygnusCreation::UICygnusCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
 	{
 		gender = false;
 		charSet = false;
 		named = false;
 
+		ui_scale = std::min(UIScale::scale_x(), UIScale::scale_y());
+		box = Point<int16_t>(
+			static_cast<int16_t>((UIScale::view_width() - 800.0f * ui_scale) / 2.0f),
+			static_cast<int16_t>((UIScale::view_height() - 600.0f * ui_scale) / 2.0f));
+
 		std::string version_text = Configuration::get().get_version();
 		version = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::LEMONGRASS, "Ver. " + version_text);
 
 		nl::node Login = nl::nx::ui["Login.img"];
-		nl::node Common = Login["Common"];
 		nl::node CustomizeChar = Login["CustomizeChar"]["1000"];
-		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
-		nl::node signboard = nl::nx::mapLatest["Obj"]["login.img"]["NewChar"]["signboard"];
+		nl::node back = nl::nx::map["Back"]["ereb.img"]["back"];
 		nl::node board = CustomizeChar["board"];
 		nl::node genderSelect = CustomizeChar["genderSelect"];
-		nl::node frame = nl::nx::mapLatest["Obj"]["login.img"]["Common"]["frame"]["2"]["0"];
 
-		sky = back["2"];
-		cloud = back["27"];
+		// Cygnus Knights are created on Ereve: the floating islands with
+		// waterfalls (ereb.img/back/10 is the full scene).
+		sky = Texture(back["10"]);
+		cloud = back["10"];
 
-		sprites.emplace_back(back["46"], UIScale::bg_args());
-		sprites.emplace_back(signboard["2"], DrawArgument(Point<int16_t>(212, 217), 2.0f));
-		sprites_gender_select.emplace_back(board["genderTop"], Point<int16_t>(423, 104));
-		sprites_gender_select.emplace_back(board["boardMid"], Point<int16_t>(423, 222));
-		sprites_gender_select.emplace_back(board["boardBottom"], Point<int16_t>(423, 348));
-		sprites_lookboard.emplace_back(board["avatarTop"], Point<int16_t>(415, 89));
-		sprites_lookboard.emplace_back(board["boardMid"], Point<int16_t>(415, 207));
-		sprites_lookboard.emplace_back(board["boardBottom"], Point<int16_t>(415, 351));
+		// misty Ereve hilltop as the ground the new knight stands on
+		sprites.emplace_back(back["22"], DrawArgument(lay(394, 482), ui_scale, ui_scale));
+
+		// The v83 Cygnus boards self-place: every piece and row carries an
+		// origin measured from the board anchors used below.
+		sprites_gender_select.emplace_back(board["genderTop"], DrawArgument(lay(423, 104), ui_scale, ui_scale));
+		sprites_gender_select.emplace_back(board["boardMid"], DrawArgument(lay(423, 222), ui_scale, ui_scale));
+		sprites_gender_select.emplace_back(board["boardBottom"], DrawArgument(lay(423, 348), ui_scale, ui_scale));
+
+		sprites_lookboard.emplace_back(board["avatarTop"], DrawArgument(lay(415, 89), ui_scale, ui_scale));
+		sprites_lookboard.emplace_back(board["boardMid"], DrawArgument(lay(415, 207), ui_scale, ui_scale));
+		sprites_lookboard.emplace_back(board["boardBottom"], DrawArgument(lay(415, 351), ui_scale, ui_scale));
 
 		for (size_t i = 0; i <= 6; i++)
-		{
-			int16_t y = 0;
+			sprites_lookboard.emplace_back(CustomizeChar["avatarSel"][i]["normal"], DrawArgument(lay(416, 98), ui_scale, ui_scale));
 
-			if (i == 3)
-				y = 2;
-
-			sprites_lookboard.emplace_back(CustomizeChar["avatarSel"][i]["normal"], Point<int16_t>(416, 98 + y));
-		}
-
-		buttons[Buttons::BT_CHARC_GENDER_M] = std::make_unique<MapleButton>(genderSelect["male"], Point<int16_t>(425, 107));
-		buttons[Buttons::BT_CHARC_GEMDER_F] = std::make_unique<MapleButton>(genderSelect["female"], Point<int16_t>(423, 107));
-		buttons[Buttons::BT_CHARC_SKINL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(418, 81 + (4 * 18)));
-		buttons[Buttons::BT_CHARC_SKINR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(415, 81 + (4 * 18)));
-		buttons[Buttons::BT_CHARC_WEPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], Point<int16_t>(418, 81 + (8 * 18)));
-		buttons[Buttons::BT_CHARC_WEPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], Point<int16_t>(415, 81 + (8 * 18)));
+		buttons[Buttons::BT_CHARC_GENDER_M] = std::make_unique<MapleButton>(genderSelect["male"], lay(425, 107));
+		buttons[Buttons::BT_CHARC_GEMDER_F] = std::make_unique<MapleButton>(genderSelect["female"], lay(423, 107));
+		buttons[Buttons::BT_CHARC_FACEL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], lay(418, 98));
+		buttons[Buttons::BT_CHARC_FACER] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], lay(415, 98));
+		buttons[Buttons::BT_CHARC_HAIRL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], lay(418, 116));
+		buttons[Buttons::BT_CHARC_HAIRR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], lay(415, 116));
+		buttons[Buttons::BT_CHARC_SKINL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], lay(418, 153));
+		buttons[Buttons::BT_CHARC_SKINR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], lay(415, 153));
+		buttons[Buttons::BT_CHARC_WEPL] = std::make_unique<MapleButton>(CustomizeChar["BtLeft"], lay(418, 225));
+		buttons[Buttons::BT_CHARC_WEPR] = std::make_unique<MapleButton>(CustomizeChar["BtRight"], lay(415, 225));
 
 		for (size_t i = 0; i <= 7; i++)
 		{
-			buttons[Buttons::BT_CHARC_HAIRC0 + i] = std::make_unique<MapleButton>(CustomizeChar["hairSelect"][i], Point<int16_t>(553 + (i * 15), 238));
+			buttons[Buttons::BT_CHARC_HAIRC0 + i] = std::make_unique<MapleButton>(CustomizeChar["hairSelect"][i], lay(static_cast<int16_t>(553 + (i * 15)), 238));
 			buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 		}
 
+		buttons[Buttons::BT_CHARC_FACEL]->set_active(false);
+		buttons[Buttons::BT_CHARC_FACER]->set_active(false);
+		buttons[Buttons::BT_CHARC_HAIRL]->set_active(false);
+		buttons[Buttons::BT_CHARC_HAIRR]->set_active(false);
 		buttons[Buttons::BT_CHARC_SKINL]->set_active(false);
 		buttons[Buttons::BT_CHARC_SKINR]->set_active(false);
 		buttons[Buttons::BT_CHARC_WEPL]->set_active(false);
 		buttons[Buttons::BT_CHARC_WEPR]->set_active(false);
 
-		buttons[Buttons::BT_CHARC_OK] = std::make_unique<MapleButton>(CustomizeChar["BtYes"], Point<int16_t>(510, 396));
-		buttons[Buttons::BT_CHARC_CANCEL] = std::make_unique<MapleButton>(CustomizeChar["BtNo"], Point<int16_t>(615, 396));
+		buttons[Buttons::BT_CHARC_OK] = std::make_unique<MapleButton>(CustomizeChar["BtYes"], lay(510, 396));
+		buttons[Buttons::BT_CHARC_CANCEL] = std::make_unique<MapleButton>(CustomizeChar["BtNo"], lay(615, 396));
 
 		nameboard = CustomizeChar["charName"];
-		namechar = Textfield(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::BLACK, Rectangle<int16_t>(Point<int16_t>(539, 209), Point<int16_t>(631, 252)), 12);
+		namechar = Textfield(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::BLACK, Rectangle<int16_t>(lay(539, 209), lay(631, 252)), 12);
 
-		sprites.emplace_back(frame, UIScale::bg_args());
-		sprites.emplace_back(Common["frame"], UIScale::bg_args());
-		sprites.emplace_back(Common["step"]["3"], Point<int16_t>(40, 0));
+		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(Login["Common"]["BtStart"], lay(0, 515));
 
-		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(Login["Common"]["BtStart"], Point<int16_t>(0, 515));
+		for (auto& btit : buttons)
+			btit.second->set_scale(ui_scale);
 
 		namechar.set_state(Textfield::DISABLED);
 
@@ -135,7 +143,8 @@ namespace ms
 		shoename = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK);
 		wepname = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK);
 
-		nl::node mkinfo = nl::nx::etc["MakeCharInfo.img"]["Info"];
+		// Cosmic validates Cygnus appearance against the PremiumChar pools.
+		nl::node mkinfo = nl::nx::etc["MakeCharInfo.img"];
 
 		for (size_t i = 0; i < 2; i++)
 		{
@@ -145,12 +154,12 @@ namespace ms
 			if (i == 0)
 			{
 				f = true;
-				CharGender = mkinfo["CharFemale"];
+				CharGender = mkinfo["PremiumCharFemale"];
 			}
 			else
 			{
 				f = false;
-				CharGender = mkinfo["CharMale"];
+				CharGender = mkinfo["PremiumCharMale"];
 			}
 
 			for (auto node : CharGender)
@@ -200,68 +209,82 @@ namespace ms
 		cloudfx = 200.0f;
 	}
 
+	Point<int16_t> UICygnusCreation::lay(int16_t x, int16_t y) const
+	{
+		return box + Point<int16_t>(
+			static_cast<int16_t>(x * ui_scale),
+			static_cast<int16_t>(y * ui_scale));
+	}
+
+	Point<int16_t> UICygnusCreation::scl(int16_t x, int16_t y) const
+	{
+		return Point<int16_t>(
+			static_cast<int16_t>(x * ui_scale),
+			static_cast<int16_t>(y * ui_scale));
+	}
+
 	void UICygnusCreation::draw(float inter) const
 	{
-		int16_t vw = UIScale::view_width();
+		if (sky.is_valid())
+		{
+			Point<int16_t> o = sky.get_origin();
+			sky.draw(DrawArgument(
+				o, o,
+				Point<int16_t>(
+					static_cast<int16_t>(UIScale::view_width()),
+					static_cast<int16_t>(UIScale::view_height())),
+				1.0f, 1.0f, 1.0f, 0.0f));
+		}
 
-		for (size_t i = 0; i < 2; i++)
-			for (int16_t k = 0; k < vw; k += sky.width())
-				sky.draw(Point<int16_t>(k, (400 * i) - 100));
+		UIElement::draw_sprites(inter);
 
-		int16_t cloudx = static_cast<int16_t>(cloudfx) % vw;
-		cloud.draw(Point<int16_t>(cloudx - cloud.width(), 310));
-		cloud.draw(Point<int16_t>(cloudx, 310));
-		cloud.draw(Point<int16_t>(cloudx + cloud.width(), 310));
+		DrawArgument charargs(lay(394, 339), ui_scale, ui_scale);
 
 		if (!gender)
 		{
-			UIElement::draw_sprites(inter);
-
 			for (size_t i = 0; i < sprites_gender_select.size(); i++)
 			{
 				if (i == 1)
 				{
 					for (size_t f = 0; f <= 6; f++)
-						sprites_gender_select[i].draw(get_draw_position() + Point<int16_t>(0, 18 * f), inter);
+						sprites_gender_select[i].draw(scl(0, 18 * static_cast<int16_t>(f)), inter);
 				}
 				else
 				{
-					sprites_gender_select[i].draw(get_draw_position(), inter);
+					sprites_gender_select[i].draw(Point<int16_t>(0, 0), inter);
 				}
 			}
 
-			UIElement::draw_buttons(inter);
+			newchar.draw(charargs, inter);
 
-			newchar.draw(scaled(394, 339), inter);
+			UIElement::draw_buttons(inter);
 		}
 		else
 		{
 			if (!charSet)
 			{
-				UIElement::draw_sprites(inter);
-
 				for (size_t i = 0; i < sprites_lookboard.size(); i++)
 				{
 					if (i == 1)
 					{
 						for (size_t f = 0; f <= 7; f++)
-							sprites_lookboard[i].draw(get_draw_position() + Point<int16_t>(0, 18 * f), inter);
+							sprites_lookboard[i].draw(scl(0, 18 * static_cast<int16_t>(f)), inter);
 					}
 					else
 					{
-						sprites_lookboard[i].draw(get_draw_position(), inter);
+						sprites_lookboard[i].draw(Point<int16_t>(0, 0), inter);
 					}
 				}
 
-				facename.draw(scaled(620, 218 + (-1 * 18)));
-				hairname.draw(scaled(620, 218 + (0 * 18)));
-				bodyname.draw(scaled(620, 218 + (2 * 18)));
-				topname.draw(scaled(620, 218 + (3 * 18)));
-				botname.draw(scaled(620, 218 + (4 * 18)));
-				shoename.draw(scaled(620, 218 + (5 * 18)));
-				wepname.draw(scaled(620, 218 + (6 * 18)));
+				facename.draw(lay(620, 200));
+				hairname.draw(lay(620, 218));
+				bodyname.draw(lay(620, 254));
+				topname.draw(lay(620, 272));
+				botname.draw(lay(620, 290));
+				shoename.draw(lay(620, 308));
+				wepname.draw(lay(620, 326));
 
-				newchar.draw(scaled(394, 339), inter);
+				newchar.draw(charargs, inter);
 
 				UIElement::draw_buttons(inter);
 			}
@@ -269,30 +292,26 @@ namespace ms
 			{
 				if (!named)
 				{
-					UIElement::draw_sprites(inter);
+					nameboard.draw(DrawArgument(lay(423, 104), ui_scale, ui_scale));
 
-					nameboard.draw(scaled(423, 104));
-
-					namechar.draw(get_draw_position());
-					newchar.draw(scaled(394, 339), inter);
+					namechar.draw(Point<int16_t>(0, 0));
+					newchar.draw(charargs, inter);
 
 					UIElement::draw_buttons(inter);
 				}
 				else
 				{
-					UIElement::draw_sprites(inter);
-
-					nameboard.draw(scaled(423, 104));
+					nameboard.draw(DrawArgument(lay(423, 104), ui_scale, ui_scale));
 
 					UIElement::draw_buttons(inter);
 
 					for (auto& sprite : sprites_keytype)
-						sprite.draw(get_draw_position(), inter);
+						sprite.draw(Point<int16_t>(0, 0), inter);
 				}
 			}
 		}
 
-		version.draw(scaled(707, 4));
+		version.draw(lay(707, 4));
 	}
 
 	void UICygnusCreation::update()
@@ -436,17 +455,20 @@ namespace ms
 					buttons[Buttons::BT_CHARC_GENDER_M]->set_active(false);
 					buttons[Buttons::BT_CHARC_GEMDER_F]->set_active(false);
 
+					buttons[Buttons::BT_CHARC_FACEL]->set_active(true);
+					buttons[Buttons::BT_CHARC_FACER]->set_active(true);
+					buttons[Buttons::BT_CHARC_HAIRL]->set_active(true);
+					buttons[Buttons::BT_CHARC_HAIRR]->set_active(true);
 					buttons[Buttons::BT_CHARC_SKINL]->set_active(true);
 					buttons[Buttons::BT_CHARC_SKINR]->set_active(true);
-
 					buttons[Buttons::BT_CHARC_WEPL]->set_active(true);
 					buttons[Buttons::BT_CHARC_WEPR]->set_active(true);
 
 					for (size_t i = 0; i <= 7; i++)
 						buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(true);
 
-					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(502, 381));
-					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(607, 381));
+					buttons[Buttons::BT_CHARC_OK]->set_position(lay(502, 381));
+					buttons[Buttons::BT_CHARC_CANCEL]->set_position(lay(607, 381));
 
 					return Button::State::NORMAL;
 				}
@@ -456,17 +478,20 @@ namespace ms
 					{
 						charSet = true;
 
+						buttons[Buttons::BT_CHARC_FACEL]->set_active(false);
+						buttons[Buttons::BT_CHARC_FACER]->set_active(false);
+						buttons[Buttons::BT_CHARC_HAIRL]->set_active(false);
+						buttons[Buttons::BT_CHARC_HAIRR]->set_active(false);
 						buttons[Buttons::BT_CHARC_SKINL]->set_active(false);
 						buttons[Buttons::BT_CHARC_SKINR]->set_active(false);
-
 						buttons[Buttons::BT_CHARC_WEPL]->set_active(false);
 						buttons[Buttons::BT_CHARC_WEPR]->set_active(false);
 
 						for (size_t i = 0; i <= 7; i++)
 							buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 
-						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(510, 289));
-						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(615, 289));
+						buttons[Buttons::BT_CHARC_OK]->set_position(lay(510, 289));
+						buttons[Buttons::BT_CHARC_CANCEL]->set_position(lay(615, 289));
 
 						namechar.set_state(Textfield::State::FOCUSED);
 
@@ -553,17 +578,20 @@ namespace ms
 				{
 					charSet = false;
 
+					buttons[Buttons::BT_CHARC_FACEL]->set_active(true);
+					buttons[Buttons::BT_CHARC_FACER]->set_active(true);
+					buttons[Buttons::BT_CHARC_HAIRL]->set_active(true);
+					buttons[Buttons::BT_CHARC_HAIRR]->set_active(true);
 					buttons[Buttons::BT_CHARC_SKINL]->set_active(true);
 					buttons[Buttons::BT_CHARC_SKINR]->set_active(true);
-
 					buttons[Buttons::BT_CHARC_WEPL]->set_active(true);
 					buttons[Buttons::BT_CHARC_WEPR]->set_active(true);
 
 					for (size_t i = 0; i <= 7; i++)
 						buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(true);
 
-					buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(502, 381));
-					buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(607, 381));
+					buttons[Buttons::BT_CHARC_OK]->set_position(lay(502, 381));
+					buttons[Buttons::BT_CHARC_CANCEL]->set_position(lay(607, 381));
 
 					namechar.set_state(Textfield::State::DISABLED);
 
@@ -578,17 +606,20 @@ namespace ms
 						buttons[Buttons::BT_CHARC_GENDER_M]->set_active(true);
 						buttons[Buttons::BT_CHARC_GEMDER_F]->set_active(true);
 
+						buttons[Buttons::BT_CHARC_FACEL]->set_active(false);
+						buttons[Buttons::BT_CHARC_FACER]->set_active(false);
+						buttons[Buttons::BT_CHARC_HAIRL]->set_active(false);
+						buttons[Buttons::BT_CHARC_HAIRR]->set_active(false);
 						buttons[Buttons::BT_CHARC_SKINL]->set_active(false);
 						buttons[Buttons::BT_CHARC_SKINR]->set_active(false);
-
 						buttons[Buttons::BT_CHARC_WEPL]->set_active(false);
 						buttons[Buttons::BT_CHARC_WEPR]->set_active(false);
 
 						for (size_t i = 0; i <= 7; i++)
 							buttons[Buttons::BT_CHARC_HAIRC0 + i]->set_active(false);
 
-						buttons[Buttons::BT_CHARC_OK]->set_position(Point<int16_t>(510, 396));
-						buttons[Buttons::BT_CHARC_CANCEL]->set_position(Point<int16_t>(615, 396));
+						buttons[Buttons::BT_CHARC_OK]->set_position(lay(510, 396));
+						buttons[Buttons::BT_CHARC_CANCEL]->set_position(lay(615, 396));
 
 						return Button::State::NORMAL;
 					}
@@ -600,6 +631,38 @@ namespace ms
 					}
 				}
 			}
+			case Buttons::BT_CHARC_FACEL:
+			{
+				face = (face > 0) ? face - 1 : faces[female].size() - 1;
+				newchar.set_face(faces[female][face]);
+				facename.change_text(newchar.get_face()->get_name());
+
+				return Button::State::NORMAL;
+			}
+			case Buttons::BT_CHARC_FACER:
+			{
+				face = (face < faces[female].size() - 1) ? face + 1 : 0;
+				newchar.set_face(faces[female][face]);
+				facename.change_text(newchar.get_face()->get_name());
+
+				return Button::State::NORMAL;
+			}
+			case Buttons::BT_CHARC_HAIRL:
+			{
+				hair = (hair > 0) ? hair - 1 : hairs[female].size() - 1;
+				newchar.set_hair(hairs[female][hair] + haircolors[female][haircolor]);
+				hairname.change_text(newchar.get_hair()->get_name());
+
+				return Button::State::NORMAL;
+			}
+			case Buttons::BT_CHARC_HAIRR:
+			{
+				hair = (hair < hairs[female].size() - 1) ? hair + 1 : 0;
+				newchar.set_hair(hairs[female][hair] + haircolors[female][haircolor]);
+				hairname.change_text(newchar.get_hair()->get_name());
+
+				return Button::State::NORMAL;
+			}
 			case Buttons::BT_CHARC_HAIRC0:
 			case Buttons::BT_CHARC_HAIRC1:
 			case Buttons::BT_CHARC_HAIRC2:
@@ -609,7 +672,6 @@ namespace ms
 			case Buttons::BT_CHARC_HAIRC6:
 			case Buttons::BT_CHARC_HAIRC7:
 			{
-				// Direct color selection: button index maps to color index
 				size_t colorindex = buttonid - Buttons::BT_CHARC_HAIRC0;
 
 				if (colorindex < haircolors[female].size())
@@ -680,8 +742,8 @@ namespace ms
 
 	void UICygnusCreation::randomize_look()
 	{
-		hair = 0;
-		face = 0;
+		hair = randomizer.next_int(hairs[female].size());
+		face = randomizer.next_int(faces[female].size());
 		skin = randomizer.next_int(skins[female].size());
 		haircolor = randomizer.next_int(haircolors[female].size());
 		top = 0;

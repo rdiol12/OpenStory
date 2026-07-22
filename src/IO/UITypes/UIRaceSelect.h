@@ -19,13 +19,15 @@
 
 #include "../UIElement.h"
 
-#include "../Components/Textfield.h"
-
+#include "../../Graphics/Text.h"
 #include "../../Template/BoolPair.h"
 
 namespace ms
 {
-	// Race selection screen
+	// Authentic v83 race selection: three class illustrations (Explorer, Cygnus
+	// Knights, Aran). The unselected ones are greyed out; the selected one lights
+	// up in colour, its description bar shows at the bottom, and a scenic v83
+	// login background sits behind it all.
 	class UIRaceSelect : public UIElement
 	{
 	public:
@@ -52,88 +54,44 @@ namespace ms
 	private:
 		void select_class(uint16_t index);
 		void show_charselect();
-		Point<int16_t> get_class_pos(size_t index) const;
+		void launch_creation();
 		std::string to_lower(std::string value) const;
-		uint16_t get_corrected_class_index(uint16_t index) const;
 
-		static constexpr uint16_t INDEX_COUNT = 5;
-		static constexpr uint16_t SELECTED_LIST = 33;
+		// v83 exposes exactly three creatable Explorer-era classes.
+		static constexpr uint16_t CLASS_COUNT = 3;
+
+		// The 800x600 scene renders centered in the view (CENTER_OFFSET); lay()
+		// maps a design point to its on-screen position.
+		Point<int16_t> lay(int16_t x, int16_t y) const;
 
 		enum Buttons : uint16_t
 		{
 			BACK,
-			MAKE,
-			LEFT,
-			RIGHT,
-			CLASS0,
-			CLASS1,
-			CLASS2,
-			CLASS3,
-			CLASS4
+			SELECT,
+			CLASS0 // CLASS0 .. CLASS0 + CLASS_COUNT-1 are the class panels
 		};
 
 		enum Classes : uint16_t
 		{
-			RESISTANCE,
 			EXPLORER,
 			CYGNUSKNIGHTS,
-			ARAN,
-			EVAN,
-			MERCEDES,
-			DEMON,
-			PHANTOM,
-			DUALBLADE,
-			MIHILE,
-			LUMINOUS,
-			KAISER,
-			ANGELICBUSTER,
-			CANNONEER,
-			XENON,
-			ZERO,
-			SHADE,
-			PINKBEAN,
-			KINESIS,
-			CADENA,
-			ILLIUM,
-			ARK,
-			PATHFINDER,
-			HOYOUNG,
-			JETT,
-			HAYATO,
-			KANNA,
-			CHASE
+			ARAN
+		};
+
+		struct ClassPanel
+		{
+			BoolPair<Texture> panel; // [false]=grey normal, [true]=hover
+			Texture glow;            // OnAnimation — the lit, coloured art
+			Texture desc;            // 579x163 bottom description bar
+			Point<int16_t> pos;      // top-left in design space
+			Point<int16_t> dim;      // panel dimensions
 		};
 
 		Text version;
-		Point<int16_t> pos;
-		Point<int16_t> posZero;
-		nl::node order;
-		nl::node hotlist;
-		nl::node newlist;
-		nl::node bgm;
-		Sprite hotlabel;
-		Sprite hotlabelZero;
-		Sprite newlabel;
-		Sprite hotbtn;
-		Sprite newbtn;
-		uint16_t class_index[INDEX_COUNT];
-		bool mouseover[INDEX_COUNT];
-		uint16_t selected_class;
-		uint16_t index_shift;
-		uint16_t selected_index;
-		uint16_t class_count;
-		std::vector<bool> class_isdisabled;
-		std::vector<BoolPair<Texture>> class_disabled;
-		std::vector<BoolPair<Texture>> class_normal;
-		std::vector<Texture> class_background;
-		std::vector<Texture> class_details;
-		std::vector<Texture> class_title;
-		std::vector<uint16_t> class_map;
-		Texture backFull;
-		Texture back;
-		Texture backZero;
-		Sprite back_ani;
-		Texture class_details_background;
-		Texture class_details_backgroundZero;
+		Texture backdrop;
+		Texture header;             // "Choose Character Type"
+		ClassPanel classes[CLASS_COUNT];
+		uint16_t selected;
+		bool hovered[CLASS_COUNT];
 	};
 }

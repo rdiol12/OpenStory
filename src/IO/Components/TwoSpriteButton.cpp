@@ -34,32 +34,27 @@ namespace ms
 		if (active)
 		{
 			bool selected = state == Button::State::MOUSEOVER || state == Button::State::PRESSED;
+			Point<int16_t> pos = selected ? spos : npos;
 
-			if (selected)
-				textures[selected].draw(spos + parentpos);
-			else
-				textures[selected].draw(npos + parentpos);
+			textures[selected].draw(DrawArgument(pos + parentpos, btn_scale, btn_scale));
 		}
 	}
 
 	Rectangle<int16_t> TwoSpriteButton::bounds(Point<int16_t> parentpos) const
 	{
 		bool selected = state == Button::State::MOUSEOVER || state == Button::State::PRESSED;
-		Point<int16_t> absp;
-		Point<int16_t> dim;
+		Point<int16_t> pos = selected ? spos : npos;
+		Point<int16_t> origin = textures[selected].get_origin();
+		Point<int16_t> dim = textures[selected].get_dimensions();
 
-		if (selected)
-		{
-			absp = parentpos + spos - textures[selected].get_origin();
-			dim = textures[selected].get_dimensions();
-		}
-		else
-		{
-			absp = parentpos + npos - textures[selected].get_origin();
-			dim = textures[selected].get_dimensions();
-		}
+		Point<int16_t> absp = parentpos + pos - Point<int16_t>(
+			static_cast<int16_t>(origin.x() * btn_scale),
+			static_cast<int16_t>(origin.y() * btn_scale));
+		Point<int16_t> rb = absp + Point<int16_t>(
+			static_cast<int16_t>(dim.x() * btn_scale),
+			static_cast<int16_t>(dim.y() * btn_scale));
 
-		return Rectangle<int16_t>(absp, absp + dim);
+		return Rectangle<int16_t>(absp, rb);
 	}
 
 	int16_t TwoSpriteButton::width() const

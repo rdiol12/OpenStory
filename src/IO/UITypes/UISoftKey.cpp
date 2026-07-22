@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UISoftKey.h"
 
+#include "../Components/AreaButton.h"
+
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
@@ -35,7 +37,9 @@ namespace ms
 	{
 		nl::node SoftKey = nl::nx::ui["Login.img"]["Common"]["SoftKey"];
 		nl::node backgrnd = SoftKey["backgrnd"];
-		dragarea = Point<int16_t>(140, 30);
+		// Drag handle = the title/input area only; the tab strip starts at
+		// y=70 and must stay clickable.
+		dragarea = Point<int16_t>(140, 65);
 
 		sprites.emplace_back(backgrnd);
 
@@ -64,6 +68,25 @@ namespace ms
 		// Place Del button next to 0 in row 4
 		// BtDel has a large NX origin (~51,199) so we use raw position to compensate
 		buttons[Buttons::BtDel] = std::make_unique<MapleButton>(SoftKey["BtDel"], Point<int16_t>(-3, 8));
+
+		// The three pad tabs (digits / abc / ABC). The tab bitmaps carry baked
+		// origins that self-place them at +12/+52/+92, +70 from the dialog.
+		for (uint16_t t = 0; t < 3; t++)
+		{
+			tab_normal[t] = SoftKey["Tab"]["normal"][t];
+			tab_selected[t] = SoftKey["Tab"]["selected"][t];
+			buttons[Buttons::BtTabNum + t] = std::make_unique<AreaButton>(
+				Point<int16_t>(static_cast<int16_t>(12 + 40 * t), 70), Point<int16_t>(39, 17));
+		}
+
+		// Letter keys share the digit grid; the multi-letter caps (abc, def, ...)
+		// enter letters phone-style: tap cycles through the cap's letters.
+		for (uint16_t i = 0; i < 10; i++)
+		{
+			buttons[Buttons::BtLetter0 + i] = std::make_unique<MapleButton>(
+				SoftKey[highCase ? "BtHighCase" : "BtLowCase"][std::to_string(i)], keypos(i, 0));
+			buttons[Buttons::BtLetter0 + i]->set_active(false);
+		}
 #pragma endregion
 #pragma endregion
 
@@ -109,9 +132,10 @@ namespace ms
 		(void)caseKeyIndex;
 #pragma endregion
 
-		Point<int16_t> textfield_tl = UIScale::at(350, 205);
-
-		textfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, Rectangle<int16_t>(textfield_tl, textfield_tl + Point<int16_t>(117, 20)), MAX_TEXT_LEN);
+		// Input field is (0,0)-relative; it's drawn at `position + textfield_pos`
+		// each frame so the masked PIC shows INSIDE the SoftKey's top input box
+		// (and follows the dialog when dragged) — not at a fixed screen point.
+		textfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, Rectangle<int16_t>(Point<int16_t>(0, 0), Point<int16_t>(117, 20)), MAX_TEXT_LEN);
 		textfield.set_cryptchar('*');
 
 		textfield.set_enter_callback(
@@ -136,7 +160,8 @@ namespace ms
 			}
 		);
 
-		textfield_pos = Point<int16_t>(0, -4);
+		// offset of the input box from the dialog's top-left (tune vs a screenshot)
+		textfield_pos = Point<int16_t>(16, 44);
 
 		show_text(tooltip_text);
 
@@ -158,7 +183,13 @@ namespace ms
 				btn->draw(position);
 		}
 
-		textfield.draw(textfield_pos, Point<int16_t>(1, 0));
+		for (uint16_t t = 0; t < 3; t++)
+		{
+			const Texture& tex = (t == pad_tab) ? tab_selected[t] : tab_normal[t];
+			tex.draw(DrawArgument(position));
+		}
+
+		textfield.draw(position + textfield_pos, Point<int16_t>(1, 0));
 
 		if (tooltip)
 			tooltip->draw(position + Point<int16_t>(419, 50) + tooltip_pos);
@@ -168,7 +199,10 @@ namespace ms
 	{
 		UIElement::update();
 
-		textfield.update(textfield_pos);
+		if (multitap_timer > 0)
+			multitap_timer -= Constants::TIMESTEP;
+
+		textfield.update(position + textfield_pos);
 		textfield.set_state(Textfield::State::FOCUSED);
 
 		if (tooltip)
@@ -207,8 +241,19 @@ namespace ms
 		}
 		else
 		{
+			// Cursor movement in the login flow reports "not clicked" even while
+			// the button is held, which would kill the drag instantly. Keep
+			// dragging as long as the mouse is actually still down.
 			if (dragged)
+			{
+				if (UI::get().is_mouse_held())
+				{
+					position = cursorpos - cursoroffset;
+					return Cursor::State::CLICKING;
+				}
+
 				dragged = false;
+			}
 		}
 
 		if (Cursor::State new_state = textfield.send_cursor(cursorpos, clicked))
@@ -318,6 +363,73 @@ namespace ms
 		else if (buttonid == Buttons::BtShift)
 		{
 			highCase = !highCase;
+
+			return Button::State::NORMAL;
+		}
+		else if (buttonid >= Buttons::BtTabNum && buttonid <= Buttons::BtTabHigh)
+		{
+			uint16_t newtab = buttonid - Buttons::BtTabNum;
+
+			if (newtab != pad_tab)
+			{
+				pad_tab = newtab;
+				highCase = (pad_tab == 2);
+				multitap_key = 0xFFFF;
+				multitap_timer = 0;
+
+				// swap which key set is live on the shared grid
+				nl::node SoftKey = nl::nx::ui["Login.img"]["Common"]["SoftKey"];
+				for (uint16_t i = 0; i < 10; i++)
+				{
+					buttons[Buttons::BtNum0 + i]->set_active(pad_tab == 0);
+
+					if (pad_tab != 0)
+						buttons[Buttons::BtLetter0 + i] = std::make_unique<MapleButton>(
+							SoftKey[pad_tab == 2 ? "BtHighCase" : "BtLowCase"][std::to_string(i)],
+							keypos(i, 0));
+
+					buttons[Buttons::BtLetter0 + i]->set_active(pad_tab != 0);
+				}
+
+				buttons[Buttons::BtDel]->set_active(pad_tab == 0);
+			}
+
+			return Button::State::NORMAL;
+		}
+		else if (buttonid >= Buttons::BtLetter0 && buttonid < Buttons::BtNum0)
+		{
+			// multi-letter caps (abc / def / ...): tapping the same cap again
+			// within the window cycles its letters, phone style
+			static const std::string groups[10] = {
+				"abc", "def", "ghi", "jkl", "mno", "pqr", "stu", "vwx", "yz", ""
+			};
+
+			uint16_t idx = buttonid - Buttons::BtLetter0;
+			std::string group = groups[idx];
+
+			if (group.empty())
+				return Button::State::NORMAL;
+
+			if (pad_tab == 2)
+				for (auto& ch : group)
+					ch = static_cast<char>(::toupper(ch));
+
+			std::string cur = textfield.get_text();
+
+			if (multitap_timer > 0 && multitap_key == idx && !cur.empty())
+			{
+				multitap_pos = (multitap_pos + 1) % group.size();
+				cur.back() = group[multitap_pos];
+				textfield.change_text(cur);
+			}
+			else
+			{
+				multitap_pos = 0;
+				append_key(std::string(1, group[0]));
+			}
+
+			multitap_key = idx;
+			multitap_timer = 900;
 
 			return Button::State::NORMAL;
 		}

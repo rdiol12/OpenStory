@@ -65,7 +65,43 @@ namespace ms
 		std::string get_infolabel(size_t index, StatsEntry character_stats) const;
 		void request_pic();
 
-		static constexpr uint8_t PAGESIZE = 8;
+		// The 800x600 design renders scaled uniformly, centered in the view
+		// (same treatment as the world select); lay() maps design coords to
+		// screen coords.
+		Point<int16_t> lay(int16_t x, int16_t y) const;
+		Point<int16_t> lay(Point<int16_t> p) const;
+		// Scale-only offset (no centering), for offsets from an already-laid point
+		Point<int16_t> scl(int16_t x, int16_t y) const;
+		Point<int16_t> scl(Point<int16_t> p) const;
+
+		float ui_scale;
+		Point<int16_t> box;
+
+		// Cover-scaled background filling the whole view
+		Texture backdrop;
+		DrawArgument backdrop_args;
+
+		// Drifting clouds: one behind the scene, one in front of the bridge.
+		// cloud_drift advances each frame; each cloud wraps across the view.
+		Texture cloud_back;
+		Texture cloud_front;
+		Point<int16_t> cloud_back_pos;
+		Point<int16_t> cloud_front_pos;
+		float cloud_drift;
+		void draw_cloud(const Texture& c, Point<int16_t> base, float speed) const;
+
+		// v83 character info: a scroll that unrolls at the signpost showing
+		// the stat sheet. Index 0 = explorer (short), 1 = KoC/Aran (tall).
+		Animation info_unroll[2];
+		Texture info_open_tex[2];
+		Texture info_sheet[2];
+		int8_t info_state;
+		bool info_tall;
+		OutlinedText level_label;
+		OutlinedText fame_label;
+		OutlinedText rank_label;
+
+		static constexpr uint8_t PAGESIZE = 3;
 
 		enum Buttons : uint16_t
 		{
@@ -103,7 +139,6 @@ namespace ms
 		Animation burning_notice;
 		Text burning_count;
 		std::vector<Sprite> world_sprites;
-		Texture charinfo;
 		Texture charslot;
 		Texture pagebase;
 		Charset pagenumber;
@@ -115,7 +150,6 @@ namespace ms
 		std::vector<CharLook> charlooks;
 		std::vector<NameTag> nametags;
 		Animation emptyslot_effect;
-		Texture emptyslot;
 		Animation selectedslot_effect[2];
 		OutlinedText charslotlabel;
 		int16_t timestamp;

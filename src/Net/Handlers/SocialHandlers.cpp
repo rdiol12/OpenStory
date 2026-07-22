@@ -287,11 +287,12 @@ namespace ms
 			for (int i = 0; i < 6; i++)
 				channels[i] = recv.read_int();
 
+			// Cosmic writes the leader id BEFORE the map ids
+			int32_t leader_cid = recv.read_int();
+
 			int32_t mapids[6];
 			for (int i = 0; i < 6; i++)
 				mapids[i] = recv.read_int();
-
-			int32_t leader_cid = recv.read_int();
 
 			std::vector<PartyMember> members;
 

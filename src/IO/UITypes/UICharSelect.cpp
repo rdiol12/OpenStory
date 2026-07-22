@@ -26,6 +26,7 @@
 
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+#include "../Components/TwoSpriteButton.h"
 
 #include "../UIScale.h"
 
@@ -48,20 +49,33 @@
 
 namespace ms
 {
-	UICharSelect::UICharSelect(std::vector<CharEntry> characters, int8_t characters_count, int32_t slots, int8_t require_pic) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600), ScaleMode::CENTER_OFFSET), characters(characters), characters_count(characters_count), slots(slots), require_pic(require_pic)
+	UICharSelect::UICharSelect(std::vector<CharEntry> characters, int8_t characters_count, int32_t slots, int8_t require_pic) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600)), characters(characters), characters_count(characters_count), slots(slots), require_pic(require_pic)
 	{
-		burning_character = true;
+		burning_character = false;
+
+		// Uniform content scale, anchored to the LEFT edge (the scene reads
+		// left-to-right: treehouse -> bridge -> signpost; extra width on wide
+		// screens stays open sky on the right)
+		ui_scale = std::min(UIScale::scale_x(), UIScale::scale_y());
+		box = Point<int16_t>(
+			0,
+			static_cast<int16_t>((UIScale::view_height() - 600.0f * ui_scale) / 2.0f));
 
 		std::string version_text = Configuration::get().get_version();
 		version = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::LEMONGRASS, "Ver. " + version_text);
 
 		pagepos = Point<int16_t>(247, 462);
-		worldpos = Point<int16_t>(586, 46);
-		charinfopos = Point<int16_t>(662, 305);
+		// selected-world plate, top-left under the CHARACTER SELECT tab
+		worldpos = Point<int16_t>(8, 90);
+		// top-left of the info scroll that unrolls above the characters
+		charinfopos = Point<int16_t>(150, 125);
 
-		Point<int16_t> character_sel_pos = charinfopos + Point<int16_t>(-76, 72);
-		Point<int16_t> character_new_pos = Point<int16_t>(200, 495);
-		Point<int16_t> character_del_pos = Point<int16_t>(320, 495);
+		// The three buttons hang on the right signpost's planks
+		// centered on the signboard's three plank bands (sign top-left 450,138;
+		// bands at design y 150-187, 190-230, 239-283)
+		Point<int16_t> character_sel_pos = Point<int16_t>(521, 154);
+		Point<int16_t> character_new_pos = Point<int16_t>(521, 192);
+		Point<int16_t> character_del_pos = Point<int16_t>(521, 240);
 
 		selected_character = Setting<DefaultCharacter>::get().load();
 		selected_page = selected_character / PAGESIZE;
@@ -101,79 +115,143 @@ namespace ms
 		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
 			world = worldselect->get_worldbyid(world_id);
 
-		world_sprites.emplace_back(selectWorld, worldpos);
-		world_sprites.emplace_back(selectedWorld["icon"][world], worldpos - Point<int16_t>(12, -1));
-		world_sprites.emplace_back(selectedWorld["name"][world], worldpos - Point<int16_t>(8, 1));
-		world_sprites.emplace_back(selectedWorld["ch"][channel_id], worldpos - Point<int16_t>(0, 1));
+		world_sprites.emplace_back(selectWorld, DrawArgument(lay(worldpos), ui_scale, ui_scale));
+		world_sprites.emplace_back(selectedWorld["icon"][world], DrawArgument(lay(worldpos - Point<int16_t>(12, -1)), ui_scale, ui_scale));
+		world_sprites.emplace_back(selectedWorld["name"][world], DrawArgument(lay(worldpos - Point<int16_t>(8, 1)), ui_scale, ui_scale));
+		world_sprites.emplace_back(selectedWorld["ch"][channel_id], DrawArgument(lay(worldpos - Point<int16_t>(0, 1)), ui_scale, ui_scale));
 
-		nl::node map_login = nl::nx::map["Back"]["login.img"];
+		// Authentic v83 character select scene, positions from the v83
+		// MapLogin data (stage camera at 349,1568): sky gradient, the giant
+		// tree with the mushroom house on the left, clouds, the log
+		// rope-bridge the characters stand on, and the wooden signpost the
+		// char info parchment pins to.
+		nl::node backs = nl::nx::map["Back"]["login.img"]["back"];
 
-		// Use v83-compatible background
-		nl::node back_node = map_login["back"]["11"];
-		if (!back_node)
-			back_node = map_login["back"]["13"];
-		if (!back_node)
-			back_node = map_login["back"]["0"];
+		// sky gradient strip stretched over the whole view
+		backdrop = Texture(backs["1"]);
 
-		if (back_node)
-			sprites.emplace_back(back_node, UIScale::bg_args());
+		if (backdrop.is_valid())
+		{
+			Point<int16_t> borigin = backdrop.get_origin();
+			backdrop_args = DrawArgument(
+				borigin, borigin,
+				Point<int16_t>(
+					static_cast<int16_t>(UIScale::view_width()),
+					static_cast<int16_t>(UIScale::view_height())),
+				1.0f, 1.0f, 1.0f, 0.0f);
+		}
 
-		if (Common["frame"])
-			sprites.emplace_back(Common["frame"], UIScale::bg_args());
+		auto scenepc = [&](nl::node src, int16_t x, int16_t y)
+		{
+			if (src)
+				sprites.emplace_back(src, DrawArgument(lay(x, y), ui_scale, ui_scale));
+		};
+
+		// All pieces native size, aligned to the bridge chunk (top-left
+		// -100,313): its baked trunk/door continue the tree above and the
+		// greenery below (seam runs match at these offsets exactly). The whole
+		// welded group sits 100px off-screen left so the walkway starts near
+		// the window edge.
+		scenepc(backs["10"], 77, 32);     // mushroom house
+		scenepc(backs["15"], 143, 81);    // tree top
+		// 2px up so the bridge (drawn later) overlaps the seam — separate
+		// rounding of the two sprites otherwise shows a sky line at y 473
+		scenepc(backs["13"], 141, 695);   // tree base / greenery
+
+		// Drifting clouds (drawn in draw() so they scroll): one behind the
+		// scene, one low in front of the bridge.
+		cloud_back = Texture(backs["3"]);
+		cloud_front = Texture(backs["5"]);
+		cloud_back_pos = Point<int16_t>(238, 71);
+		cloud_front_pos = Point<int16_t>(301, 407);
+		cloud_drift = 0.0f;
+
+		// signpost planted on the bridge (behind it, so the deck hides the
+		// pole base); its three planks carry the buttons
+		scenepc(nl::nx::map["Obj"]["login.img"]["CharSelect"]["signboard"]["0"], 571, 257);
+
+		// bridge drawn last so the deck rail covers the signpost pole and the
+		// characters read as standing on the walkway (deck top y 374)
+		scenepc(backs["14"], 315, 393);
+
 
 		if (Common["step"]["2"])
-			sprites.emplace_back(Common["step"]["2"], Point<int16_t>(40, 0));
+			sprites.emplace_back(Common["step"]["2"], DrawArgument(lay(40, -6), ui_scale, ui_scale));
 
 		burning_notice = Common["Burning"]["BurningNotice"];
 		burning_count = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::CREAM, "1");
 
-		charinfo = CharSelect["charInfo"];
 		charslot = CharSelect["charSlot"]["0"];
 		pagebase = pageNew["base"]["0"];
 		pagenumber = Charset(pageNew["number"], Charset::Alignment::LEFT);
 		pagenumberpos = pageNew["numberpos"];
 
-		signpost[0] = CharSelect["adventure"]["0"];
-		signpost[1] = CharSelect["knight"]["0"];
-		signpost[2] = CharSelect["aran"]["0"];
+		// v83 info scroll: unroll animation + held-open frame + stat sheet,
+		// short for explorers, tall for KoC/Aran
+		info_unroll[0] = Animation(CharSelect["scroll"]["0"]);
+		info_unroll[1] = Animation(CharSelect["scroll"]["2"]);
+		info_unroll[0].set_hold_last(true);
+		info_unroll[1].set_hold_last(true);
+		info_open_tex[0] = Texture(CharSelect["scroll"]["0"]["3"]);
+		info_open_tex[1] = Texture(CharSelect["scroll"]["2"]["3"]);
+		info_sheet[0] = Texture(CharSelect["charInfo"]);
+		info_sheet[1] = Texture(CharSelect["charInfo1"]);
+		info_state = 0;
+		info_tall = false;
+
+		level_label = OutlinedText(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE, Color::Name::TOBACCOBROWN);
+		fame_label = OutlinedText(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE, Color::Name::TOBACCOBROWN);
+		rank_label = OutlinedText(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, Color::Name::TOBACCOBROWN);
 
 		nametag = CharSelect["nameTag"];
 
-		buttons[Buttons::CHARACTER_SELECT] = std::make_unique<MapleButton>(CharSelect["BtSelect"], character_sel_pos);
-		buttons[Buttons::CHARACTER_NEW] = std::make_unique<MapleButton>(CharSelect["BtNew"], character_new_pos);
-		buttons[Buttons::CHARACTER_DELETE] = std::make_unique<MapleButton>(CharSelect["BtDelete"], character_del_pos);
-		buttons[Buttons::PAGELEFT] = std::make_unique<MapleButton>(CharSelect["pageL"], Point<int16_t>(100, 490));
-		buttons[Buttons::PAGERIGHT] = std::make_unique<MapleButton>(CharSelect["pageR"], Point<int16_t>(490, 490));
+		buttons[Buttons::CHARACTER_SELECT] = std::make_unique<MapleButton>(CharSelect["BtSelect"], lay(character_sel_pos));
+		buttons[Buttons::CHARACTER_NEW] = std::make_unique<MapleButton>(CharSelect["BtNew"], lay(character_new_pos));
+		buttons[Buttons::CHARACTER_DELETE] = std::make_unique<MapleButton>(CharSelect["BtDelete"], lay(character_del_pos));
+		// v83 wooden arrow signs standing on the bridge walkway, flanking the
+		// character slots (state 0 = normal, 1 = lit)
+		// (arrow art is center-anchored via origin ~(43,37); base rests on the
+		// deck line at y=373)
+		buttons[Buttons::PAGELEFT] = std::make_unique<TwoSpriteButton>(
+			CharSelect["pageL"]["0"]["0"], CharSelect["pageL"]["1"]["0"], lay(188, 337));
+		buttons[Buttons::PAGERIGHT] = std::make_unique<TwoSpriteButton>(
+			CharSelect["pageR"]["0"]["0"], CharSelect["pageR"]["1"]["0"], lay(499, 337));
 
 		if (Common["BtChangePIC"])
 		{
-			buttons[Buttons::CHANGEPIC] = std::make_unique<MapleButton>(Common["BtChangePIC"], Point<int16_t>(0, 80));
+			buttons[Buttons::CHANGEPIC] = std::make_unique<MapleButton>(Common["BtChangePIC"], lay(0, 80));
 			buttons[Buttons::CHANGEPIC]->set_active(false);
 		}
 
 		if (Login["WorldSelect"]["BtResetPIC"])
 		{
-			buttons[Buttons::RESETPIC] = std::make_unique<MapleButton>(Login["WorldSelect"]["BtResetPIC"], Point<int16_t>(0, 115));
+			buttons[Buttons::RESETPIC] = std::make_unique<MapleButton>(Login["WorldSelect"]["BtResetPIC"], lay(0, 115));
 			buttons[Buttons::RESETPIC]->set_active(false);
 		}
 
 		if (CharSelect["EditCharList"]["BtCharacter"])
 		{
-			buttons[Buttons::EDITCHARLIST] = std::make_unique<MapleButton>(CharSelect["EditCharList"]["BtCharacter"], Point<int16_t>(-1, 47));
+			buttons[Buttons::EDITCHARLIST] = std::make_unique<MapleButton>(CharSelect["EditCharList"]["BtCharacter"], lay(-1, 47));
 			buttons[Buttons::EDITCHARLIST]->set_active(false);
 		}
 
 		if (Common["BtStart"])
 		{
-			buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], Point<int16_t>(-20, 565));
-			buttons[Buttons::BACK]->set_active(false);
+			// "Back to world select" — always visible, bottom-left (matches the
+			// creation screens). It was being created inactive, so it never drew.
+			buttons[Buttons::BACK] = std::make_unique<MapleButton>(Common["BtStart"], lay(-6, 515));
 		}
 
 		for (size_t i = 0; i < PAGESIZE; i++)
 			buttons[Buttons::CHARACTER_SLOT0 + i] = std::make_unique<AreaButton>(
-				Point<int16_t>(105 + (120 * (i % 4)), 170 + (200 * (i > 3))),
-				Point<int16_t>(50, 80)
+				lay(static_cast<int16_t>(253 + (72 * i)), 298),
+				Point<int16_t>(
+					static_cast<int16_t>(50 * ui_scale),
+					static_cast<int16_t>(80 * ui_scale))
 			);
+
+		for (auto& btit : buttons)
+			btit.second->set_scale(ui_scale);
 
 		levelset = Charset(CharSelect["lv"], Charset::Alignment::CENTER);
 		namelabel = OutlinedText(Text::Font::A14B, Text::Alignment::CENTER, Color::Name::WHITE, Color::Name::IRISHCOFFEE);
@@ -187,8 +265,8 @@ namespace ms
 			nametags.emplace_back(nametag, Text::Font::A12M, entry.stats.name);
 		}
 
-		emptyslot_effect = CharSelect["character"]["0"];
-		emptyslot = CharSelect["character"]["1"]["0"];
+		// Empty slots are the pulsing glow silhouettes standing on the deck
+		emptyslot_effect = CharSelect["character"]["1"];
 
 		selectedslot_effect[0] = CharSelect["effect"][0];
 		selectedslot_effect[1] = CharSelect["effect"][1];
@@ -216,16 +294,83 @@ namespace ms
 
 	}
 
+	Point<int16_t> UICharSelect::lay(int16_t x, int16_t y) const
+	{
+		return box + Point<int16_t>(
+			static_cast<int16_t>(x * ui_scale),
+			static_cast<int16_t>(y * ui_scale));
+	}
+
+	void UICharSelect::draw_cloud(const Texture& c, Point<int16_t> base, float speed) const
+	{
+		if (!c.is_valid())
+			return;
+
+		// Drift rightward and wrap: the cloud slides from off-screen-left
+		// (-width) across to the right edge (800) over a span of width+800,
+		// then repeats — a continuous scroll.
+		int cw = c.width();
+		int span = 800 + cw;
+		int phase = base.x() + cw + static_cast<int>(cloud_drift * speed);
+		int px = ((phase % span) + span) % span - cw;
+
+		c.draw(DrawArgument(lay(static_cast<int16_t>(px), base.y()), ui_scale, ui_scale));
+	}
+
+	Point<int16_t> UICharSelect::lay(Point<int16_t> p) const
+	{
+		return lay(p.x(), p.y());
+	}
+
+	Point<int16_t> UICharSelect::scl(int16_t x, int16_t y) const
+	{
+		return Point<int16_t>(
+			static_cast<int16_t>(x * ui_scale),
+			static_cast<int16_t>(y * ui_scale));
+	}
+
+	Point<int16_t> UICharSelect::scl(Point<int16_t> p) const
+	{
+		return scl(p.x(), p.y());
+	}
+
 	void UICharSelect::draw(float inter) const
 	{
+		if (backdrop.is_valid())
+		{
+			// back/1 is a 20px-wide sky strip: tile it sideways at scene scale.
+			// Stretching it across the window smears the columns into wide
+			// vertical bands.
+			Point<int16_t> o = backdrop.get_origin();
+			int16_t vw = static_cast<int16_t>(UIScale::view_width());
+			int16_t vh = static_cast<int16_t>(UIScale::view_height());
+			int16_t tw = static_cast<int16_t>(backdrop.get_dimensions().x() * ui_scale);
+			if (tw < 1)
+				tw = 1;
+			for (int16_t x = 0; x < vw; x = static_cast<int16_t>(x + tw))
+			{
+				Point<int16_t> p = o + Point<int16_t>(x, 0);
+				backdrop.draw(DrawArgument(p, p, Point<int16_t>(tw, vh), 1.0f, 1.0f, 1.0f, 0.0f));
+			}
+		}
+
+		// far cloud drifts behind the tree/bridge
+		draw_cloud(cloud_back, cloud_back_pos, 1.0f);
+
 		UIElement::draw_sprites(inter);
 
-		auto drawpos = get_draw_position();
+		// near cloud drifts (a touch faster) in front of the bridge
+		draw_cloud(cloud_front, cloud_front_pos, 1.6f);
 
-		version.draw(drawpos + Point<int16_t>(707, 4));
+		Point<int16_t> drawpos(0, 0);
 
-		charslot.draw(drawpos + Point<int16_t>(589, 106 - charslot_y));
-		charslotlabel.draw(drawpos + Point<int16_t>(702, 111 - charslot_y));
+		version.draw(lay(707, 4));
+
+		if (charslot.is_valid())
+		{
+			charslot.draw(DrawArgument(lay(589, 106 - charslot_y), ui_scale, ui_scale));
+			charslotlabel.draw(lay(702, 111 - charslot_y));
+		}
 
 		for (Sprite sprite : world_sprites)
 			sprite.draw(drawpos, inter);
@@ -233,7 +378,7 @@ namespace ms
 		std::string total = pad_number_with_leading_zero(page_count);
 		std::string current = pad_number_with_leading_zero(selected_page + 1);
 
-		std::list<uint8_t> fliplist = { 2, 3, 6, 7 };
+		std::list<uint8_t> fliplist = { 3, 4, 5 };
 
 		for (uint8_t i = 0; i < PAGESIZE; i++)
 		{
@@ -241,79 +386,89 @@ namespace ms
 			bool flip_character = std::find(fliplist.begin(), fliplist.end(), i) != fliplist.end();
 			bool selectedslot = index == selected_character;
 
+			Point<int16_t> feet = lay(get_character_slot_pos(i, 278, 374));
+
 			if (index < characters_count)
 			{
-				Point<int16_t> charpos = drawpos + get_character_slot_pos(i, 330, 214);
-				DrawArgument chararg = DrawArgument(charpos, flip_character);
+				float xs = flip_character ? -ui_scale : ui_scale;
+				DrawArgument chararg(feet, feet, Point<int16_t>(0, 0), xs, ui_scale, 1.0f, 0.0f);
 
-				nametags[index].draw(charpos + Point<int16_t>(2, 25));
+				nametags[index].draw(feet + scl(2, 6));
 
 				const StatsEntry& character_stats = characters[index].stats;
 
 				if (selectedslot)
 				{
-					selectedslot_effect[1].draw(charpos + Point<int16_t>(-5, 16), inter);
+					// light streak from the sky down onto the character
+					// (authored origins hang both pieces from this anchor)
+					selectedslot_effect[1].draw(DrawArgument(
+						feet + scl(0, -385), ui_scale, ui_scale), inter);
 
-					Point<int16_t> infopos = drawpos + charinfopos;
+					// info scroll centered above the selected character:
+					// unroll animation, then the stat sheet on the parchment
+					Point<int16_t> scroll_at(
+						static_cast<int16_t>(get_character_slot_pos(i, 278, 374).x() - 108),
+						charinfopos.y());
+					Point<int16_t> spos = lay(scroll_at);
+					size_t t = info_tall ? 1 : 0;
 
-					charinfo.draw(infopos);
-
-					std::string levelstr = std::to_string(character_stats.stats[MapleStat::Id::LEVEL]);
-					int16_t lvx = levelset.draw(levelstr, infopos + Point<int16_t>(23, -93));
-					levelset.draw('l', infopos + Point<int16_t>(-7 - lvx / 2, -93));
-
-					namelabel.draw(infopos + Point<int16_t>(0, -85));
-
-					for (size_t i = 0; i < InfoLabel::NUM_LABELS; i++)
+					if (info_state == 1)
 					{
-						Point<int16_t> labelpos = infopos + get_infolabel_pos(i);
-						infolabels[i].draw(labelpos);
+						info_unroll[t].draw(DrawArgument(spos, ui_scale, ui_scale), inter);
+					}
+					else
+					{
+						info_open_tex[t].draw(DrawArgument(spos, ui_scale, ui_scale));
+
+						Point<int16_t> ipos = lay(scroll_at + Point<int16_t>(17, 36));
+						// the sheet art carries origin (45,57); compensate so
+						// its top-left lands at ipos
+						info_sheet[t].draw(DrawArgument(ipos + scl(45, 57), ui_scale, ui_scale));
+
+						infolabels[InfoLabel::JOB].draw(ipos + scl(176, -1));
+						level_label.draw(ipos + scl(88, 18));
+						fame_label.draw(ipos + scl(176, 18));
+						infolabels[InfoLabel::STR].draw(ipos + scl(88, 37));
+						infolabels[InfoLabel::INT].draw(ipos + scl(176, 37));
+						infolabels[InfoLabel::DEX].draw(ipos + scl(88, 56));
+						infolabels[InfoLabel::LUK].draw(ipos + scl(176, 56));
+						rank_label.draw(ipos + scl(92, 93));
 					}
 				}
 
-				uint8_t j = 0;
-				uint16_t job = character_stats.stats[MapleStat::Id::JOB];
-
-				if (job >= 0 && job < 1000)
-					j = 0;
-				else if (job >= 1000 && job < 2000)
-					j = 1;
-				else if (job >= 2000 && job < 2200)
-					j = 2;
-				else
-					j = 0;
-
-				signpost[j].draw(chararg);
 				charlooks[index].draw(chararg, inter);
 
+				// sunbeam glow over the character (hangs from the same sky
+				// anchor as the streak via its authored origin)
 				if (selectedslot)
-					selectedslot_effect[0].draw(charpos + Point<int16_t>(-5, -298), inter);
+					selectedslot_effect[0].draw(DrawArgument(
+						feet + scl(0, -385), ui_scale, ui_scale), inter);
 			}
 			else if (i < slots)
 			{
-				Point<int16_t> emptyslotpos = drawpos + get_character_slot_pos(i, 330, 214);
-
-				emptyslot_effect.draw(emptyslotpos, inter);
-				emptyslot.draw(DrawArgument(emptyslotpos, flip_character));
+				// glow silhouette standing on the deck (feet-anchored art)
+				emptyslot_effect.draw(DrawArgument(feet, ui_scale, ui_scale), inter);
 			}
 		}
 
 		UIElement::draw_buttons(inter);
 
 		if (tab_active)
-			tab.draw(drawpos + tab_pos[tab_index] + Point<int16_t>(0, tab_move_pos));
+			tab.draw(DrawArgument(
+				lay(tab_pos[tab_index]) + Point<int16_t>(0, static_cast<int16_t>(tab_move_pos * ui_scale)),
+				ui_scale, ui_scale));
 
 		if (burning_character)
 		{
-			burning_notice.draw(drawpos + Point<int16_t>(190, 502), inter);
-			burning_count.draw(drawpos + Point<int16_t>(149, 464));
+			burning_notice.draw(DrawArgument(lay(190, 502), ui_scale, ui_scale), inter);
+			burning_count.draw(lay(149, 464));
 		}
 
-		pagebase.draw(drawpos + pagepos);
-		pagenumber.draw(current.substr(0, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[0]));
-		pagenumber.draw(current.substr(1, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[1]));
-		pagenumber.draw(total.substr(0, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[2]));
-		pagenumber.draw(total.substr(1, 1), drawpos + pagepos + Point<int16_t>(pagenumberpos[3]));
+		pagebase.draw(DrawArgument(lay(pagepos), ui_scale, ui_scale));
+		pagenumber.draw(current.substr(0, 1), lay(pagepos + Point<int16_t>(pagenumberpos[0])));
+		pagenumber.draw(current.substr(1, 1), lay(pagepos + Point<int16_t>(pagenumberpos[1])));
+		pagenumber.draw(total.substr(0, 1), lay(pagepos + Point<int16_t>(pagenumberpos[2])));
+		pagenumber.draw(total.substr(1, 1), lay(pagepos + Point<int16_t>(pagenumberpos[3])));
 	}
 
 	void UICharSelect::update()
@@ -356,7 +511,13 @@ namespace ms
 		for (Animation& effect : selectedslot_effect)
 			effect.update();
 
+		// info scroll unrolling -> settle open
+		if (info_state == 1 && info_unroll[info_tall ? 1 : 0].update())
+			info_state = 2;
+
 		emptyslot_effect.update();
+
+		cloud_drift += 0.35f; // slow rightward cloud scroll
 
 		if (burning_character)
 			burning_notice.update();
@@ -376,8 +537,8 @@ namespace ms
 		auto drawpos = get_draw_position();
 
 		Rectangle<int16_t> charslot_bounds = Rectangle<int16_t>(
-			drawpos + worldpos,
-			drawpos + worldpos + world_dimensions
+			lay(worldpos),
+			lay(worldpos) + scl(world_dimensions)
 			);
 
 		if (charslot_bounds.contains(cursorpos))
@@ -505,7 +666,7 @@ namespace ms
 					uint8_t selected_index = selected_character;
 					uint8_t index_total = std::min(characters_count, static_cast<int8_t>((selected_page + 1) * PAGESIZE));
 
-					uint8_t COLUMNS = 4;
+					uint8_t COLUMNS = PAGESIZE;
 					uint8_t columns = std::min(index_total, COLUMNS);
 
 					uint8_t rows = std::floor((index_total - 1) / COLUMNS) + 1;
@@ -894,6 +1055,18 @@ namespace ms
 
 		for (size_t i = 0; i < InfoLabel::NUM_LABELS; i++)
 			infolabels[i].change_text(get_infolabel(i, character_stats));
+
+		level_label.change_text(std::to_string(character_stats.stats[MapleStat::Id::LEVEL]));
+		fame_label.change_text(std::to_string(character_stats.stats[MapleStat::Id::FAME]));
+
+		int32_t rank = character_stats.rank.first;
+		rank_label.change_text(rank > 0 ? std::to_string(rank) : "--");
+
+		// replay the info scroll unroll, tall parchment for KoC/Aran
+		uint16_t job = character_stats.stats[MapleStat::Id::JOB];
+		info_tall = job >= 1000;
+		info_state = 1;
+		info_unroll[info_tall ? 1 : 0].reset();
 	}
 
 	void UICharSelect::select_last_slot()
@@ -930,10 +1103,10 @@ namespace ms
 
 	Point<int16_t> UICharSelect::get_character_slot_pos(size_t index, uint16_t x_adj, uint16_t y_adj) const
 	{
-		int16_t x = 125 * (index % 4);
-		int16_t y = 200 * (index > 3);
+		// Characters stand in one row on the bridge walkway between the arrows
+		int16_t x = static_cast<int16_t>(72 * index);
 
-		return Point<int16_t>(x + x_adj, y + y_adj);
+		return Point<int16_t>(x + x_adj, y_adj);
 	}
 
 	Point<int16_t> UICharSelect::get_infolabel_pos(size_t index) const
