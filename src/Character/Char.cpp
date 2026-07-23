@@ -207,8 +207,13 @@ namespace ms
 			color = Color::Code::CWHITE;
 		}
 
+		if (riding_mount != 0 && state != State::DIED)
+			current_mount_ani().draw(DrawArgument(absp, facing_right), alpha);
+
 		if (state == State::DIED)
 			draw_death(absp, alpha);
+		else if (riding_mount != 0)
+			look.draw(DrawArgument(absp + mount_navel + Point<int16_t>(0, 14), color), alpha);
 		else
 			look.draw(DrawArgument(absp, color), alpha);
 
@@ -397,6 +402,12 @@ namespace ms
 
 				pet.update(physics, get_position());
 			}
+		}
+
+		if (riding_mount != 0)
+		{
+			const_cast<Animation&>(current_mount_ani()).update();
+			look.set_stance(Stance::Id::SIT);
 		}
 
 		uint16_t stancespeed = 0;
@@ -1038,6 +1049,41 @@ namespace ms
 				return true;
 
 		return false;
+	}
+
+	void Char::set_riding(int32_t mount_itemid)
+	{
+		if (mount_itemid == riding_mount)
+			return;
+
+		riding_mount = mount_itemid;
+
+		if (mount_itemid == 0)
+		{
+			mount_ani = Animation();
+			return;
+		}
+
+		std::string strid = std::to_string(mount_itemid);
+		while (strid.size() < 8)
+			strid.insert(0, 1, '0');
+
+		nl::node base = nl::nx::character["TamingMob"][strid + ".img"];
+		nl::node src = base["stand1"];
+
+		if (!src)
+			src = base["stand"];
+
+		mount_ani = Animation(src);
+		mount_walk = Animation(base["walk1"] ? base["walk1"] : base["walk"]);
+		mount_jump = Animation(base["jump"]);
+
+		nl::node navel = src["0"]["0"]["map"]["navel"];
+
+		if (!navel)
+			navel = src["0"]["map"]["navel"];
+
+		mount_navel = navel ? Point<int16_t>(navel) : Point<int16_t>(0, -30);
 	}
 
 	bool Char::has_mount() const

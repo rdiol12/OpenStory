@@ -27,6 +27,8 @@
 #include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Net/Packets/TradePackets.h"
 #include "../../Net/Packets/SocialPackets.h"
+#include "UIGuild.h"
+#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/BotInventoryPackets.h"
 
 #ifdef USE_NX
@@ -49,6 +51,15 @@ namespace ms
 		sprites.emplace_back(character["name"]);
 
 		Point<int16_t> backgrnd_dim = Texture(character["backgrnd"]).get_dimensions();
+		base_dim = backgrnd_dim;
+
+		pet_bg = UserInfo2["pet"]["backgrnd"];
+		pet_bg2 = UserInfo2["pet"]["backgrnd2"];
+		ride_bg = UserInfo2["ride"]["backgrnd"];
+		ride_bg2 = UserInfo2["ride"]["backgrnd2"];
+		wish_bg = UserInfo2["wish"]["backgrnd"];
+		wish_bg2 = UserInfo2["wish"]["backgrnd2"];
+		panel_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
 
 		Point<int16_t> close_dimensions = Point<int16_t>(backgrnd_dim.x() - 21, 6);
 		buttons[Buttons::BtClose] = std::make_unique<MapleButton>(close, close_dimensions);
@@ -135,6 +146,106 @@ namespace ms
 		fame.draw(text_pos + Point<int16_t>(0, row_height * 2));
 		guild.draw(text_pos + Point<int16_t>(0, row_height * 3) + Point<int16_t>(0, 1));
 		alliance.draw(text_pos + Point<int16_t>(0, row_height * 4));
+
+		if (panel_mode == 1)
+		{
+			Point<int16_t> ppos = position + Point<int16_t>(0, base_dim.y());
+			pet_bg.draw(ppos);
+			pet_bg2.draw(ppos);
+
+			for (size_t i = 0; i < pets_info.size() && i < 3; i++)
+			{
+				const CharPetInfo& pi = pets_info[i];
+				const ItemData& pd = ItemData::get(pi.itemid);
+				int16_t row_y = 34 + static_cast<int16_t>(i) * 46;
+
+				if (i == 0)
+				{
+					Texture stand = nl::nx::item["Pet"][std::to_string(pi.itemid) + ".img"]["stand0"]["0"];
+
+					if (stand.is_valid())
+						stand.draw(DrawArgument(ppos + Point<int16_t>(52, 118)));
+					else if (pd.is_valid())
+						pd.get_icon(false).draw(DrawArgument(ppos + Point<int16_t>(38, 110)));
+				}
+
+				if (pd.is_valid())
+					pd.get_icon(false).draw(DrawArgument(ppos + Point<int16_t>(110, row_y + 28)));
+
+				panel_label.change_text(pi.name);
+				panel_label.draw(ppos + Point<int16_t>(153, row_y - 5));
+			}
+
+			if (!pets_info.empty())
+			{
+				const CharPetInfo& pi = pets_info[0];
+				const ItemData& pd = ItemData::get(pi.itemid);
+				std::string type = pd.is_valid() ? pd.get_name() : "";
+
+				if (type.size() > 12)
+					type = type.substr(0, 11) + "..";
+
+				panel_label.change_text(type);
+				panel_label.draw(ppos + Point<int16_t>(52, 148));
+				panel_label.change_text(std::to_string(pi.level));
+				panel_label.draw(ppos + Point<int16_t>(183, 147));
+				panel_label.change_text(std::to_string(pi.closeness));
+				panel_label.draw(ppos + Point<int16_t>(52, 167));
+				panel_label.change_text(std::to_string(pi.fullness));
+				panel_label.draw(ppos + Point<int16_t>(179, 167));
+			}
+		}
+		else if (panel_mode == 2)
+		{
+			Point<int16_t> rpos = position + Point<int16_t>(0, base_dim.y());
+			ride_bg.draw(rpos);
+			ride_bg2.draw(rpos);
+
+			panel_label.change_text("Mount Level: " + std::to_string(mount_level));
+			panel_label.draw(rpos + Point<int16_t>(24, 28));
+			panel_label.change_text("Mount EXP: " + std::to_string(mount_exp));
+			panel_label.draw(rpos + Point<int16_t>(24, 48));
+			panel_label.change_text("Tiredness: " + std::to_string(mount_tired));
+			panel_label.draw(rpos + Point<int16_t>(24, 68));
+		}
+
+		if (wish_open)
+		{
+			Point<int16_t> wpos = position + Point<int16_t>(base_dim.x() + 2, 0);
+			wish_bg.draw(wpos);
+			wish_bg2.draw(wpos);
+
+			int16_t shown = 0;
+
+			for (size_t i = 0; i < wishlist.size() && shown < 3; i++, shown++)
+			{
+				const ItemData& wd = ItemData::get(wishlist[i]);
+				int16_t wy = 32 + shown * 38;
+
+				if (wd.is_valid())
+				{
+					wd.get_icon(false).draw(DrawArgument(wpos + Point<int16_t>(14, wy + 30)));
+					std::string wn = wd.get_name();
+
+					if (wn.size() > 16)
+						wn = wn.substr(0, 15) + "..";
+
+					panel_label.change_text(wn);
+					panel_label.draw(wpos + Point<int16_t>(48, wy + 8));
+				}
+			}
+
+			if (wishlist.empty())
+			{
+				panel_label.change_text("No wish list items.");
+				panel_label.draw(wpos + Point<int16_t>(30, 70));
+			}
+			else if (wishlist.size() > 3)
+			{
+				panel_label.change_text("+" + std::to_string(wishlist.size() - 3) + " more");
+				panel_label.draw(wpos + Point<int16_t>(60, 140));
+			}
+		}
 	}
 
 	void UICharInfo::update() {}
@@ -156,8 +267,12 @@ namespace ms
 			}
 			return Button::State::NORMAL;
 		case Buttons::BtFamily:
-		case Buttons::BtParty:
 			break;
+		case Buttons::BtParty:
+			if (target_character)
+				InviteToPartyPacket(target_character->get_name()).dispatch();
+			deactivate();
+			return Button::State::NORMAL;
 		case Buttons::BtTrad:
 			if (target_character)
 			{
@@ -167,12 +282,22 @@ namespace ms
 			deactivate();
 			return Button::State::NORMAL;
 		case Buttons::BtGuild:
+		{
+			auto myguild = UI::get().get_element<UIGuild>();
+
+			if (!myguild || !myguild->has_guild())
+			{
+				chat::log("You must be in a guild (with invite rights) to invite someone.", chat::LineType::RED);
+				return Button::State::NORMAL;
+			}
+
 			if (target_character)
 			{
 				GuildInvitePacket(target_character->get_name()).dispatch();
-				chat::log("Sent a guild invite to " + target_character->get_name() + ". (You must be in a guild with invite rights.)", chat::LineType::YELLOW);
+				chat::log("Sent a guild invite to " + target_character->get_name() + ".", chat::LineType::YELLOW);
 			}
 			return Button::State::NORMAL;
+		}
 		case Buttons::BtItem:
 		{
 			if (bot_inventory.is_valid())
@@ -182,10 +307,19 @@ namespace ms
 				dragarea = Point<int16_t>(dimension.x(), 20);
 				load_bot_icons();
 			}
+			else
+			{
+				wish_open = !wish_open;
+			}
 			return Button::State::NORMAL;
 		}
 		case Buttons::BtRide:
+			panel_mode = (panel_mode == 2) ? 0 : 2;
+			dimension = Point<int16_t>(base_dim.x(), panel_mode != 0 ? base_dim.y() + 190 : base_dim.y());
+			return Button::State::NORMAL;
 		case Buttons::BtPet:
+			panel_mode = (panel_mode == 1) ? 0 : 1;
+			dimension = Point<int16_t>(base_dim.x(), panel_mode != 0 ? base_dim.y() + 200 : base_dim.y());
 			return Button::State::NORMAL;
 		case Buttons::BtPopUp:
 		case Buttons::BtPopDown:
@@ -313,6 +447,25 @@ namespace ms
 	void UICharInfo::update_fame(int16_t f)
 	{
 		fame.change_text(std::to_string(f));
+	}
+
+	void UICharInfo::set_extra_info(std::vector<CharPetInfo> pets, bool mount,
+		int32_t m_level, int32_t m_exp, int32_t m_tired, std::vector<int32_t> wish)
+	{
+		pets_info = std::move(pets);
+		has_mount = mount;
+		mount_level = m_level;
+		mount_exp = m_exp;
+		mount_tired = m_tired;
+		wishlist = std::move(wish);
+
+		if (buttons.count(Buttons::BtPet))
+			buttons[Buttons::BtPet]->set_state(pets_info.empty()
+				? Button::State::DISABLED : Button::State::NORMAL);
+
+		if (buttons.count(Buttons::BtRide))
+			buttons[Buttons::BtRide]->set_state(has_mount
+				? Button::State::NORMAL : Button::State::DISABLED);
 	}
 
 	int32_t UICharInfo::get_char_id() const

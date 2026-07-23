@@ -48,6 +48,14 @@ namespace ms
 		nl::node effsrc = nl::nx::effect["PetEff.img"][strid];
 
 		animations[Stance::WARP] = effsrc["warp"];
+
+		int32_t balloon_style = src["info"]["chatBalloon"];
+		nl::node bsrc = nl::nx::ui["ChatBalloon.img"]["pet"][std::to_string(balloon_style)];
+
+		if (!bsrc)
+			bsrc = nl::nx::ui["ChatBalloon.img"]["pet"]["0"];
+
+		balloon = ChatBalloon(bsrc);
 	}
 
 	PetLook::PetLook()
@@ -64,15 +72,49 @@ namespace ms
 
 		animations[stance].draw(DrawArgument(absp, flip), alpha);
 		namelabel.draw(absp);
+		balloon.draw(absp - Point<int16_t>(0, 42));
+	}
+
+	void PetLook::speak(const std::string& text)
+	{
+		balloon.change_text(text);
+	}
+
+	void PetLook::set_name(const std::string& nm)
+	{
+		name = nm;
+		namelabel.change_text(nm);
+	}
+
+	void PetLook::play_command(Stance st)
+	{
+		set_stance(st);
+		command_timer = 240;
 	}
 
 	void PetLook::update(const Physics& physics, Point<int16_t> charpos)
 	{
+		balloon.update();
+
 		static const double PETWALKFORCE = 0.35;
 		static const double PETFLYFORCE = 0.2;
 
 		Point<int16_t> curpos = phobj.get_position();
 
+		if (command_timer > 0)
+		{
+			command_timer--;
+			phobj.hforce = 0.0;
+			phobj.type = PhysicsObject::Type::NORMAL;
+			phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
+
+			if (command_timer == 0 || curpos.distance(charpos) > 150)
+			{
+				command_timer = 0;
+				set_stance(Stance::STAND);
+			}
+		}
+		else
 		switch (stance)
 		{
 		case Stance::STAND:

@@ -58,7 +58,18 @@ namespace ms
 			return it == boxes.end() ? nullptr : &it->second;
 		}
 
+		void set_pending_permit(int32_t itemid)
+		{
+			pending_permit = itemid;
+		}
+
+		int32_t get_pending_permit() const
+		{
+			return pending_permit;
+		}
+
 	private:
 		std::map<int32_t, Box> boxes;
+		int32_t pending_permit = 0;
 	};
 }

@@ -149,6 +149,7 @@ namespace ms
 		};
 
 		Camera camera;
+		int16_t pet_loot_cd = 0;
 		Physics physics;
 		Player player;
 

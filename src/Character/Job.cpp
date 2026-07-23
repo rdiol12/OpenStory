@@ -64,6 +64,12 @@ namespace ms
 	bool Job::can_use(int32_t skill_id) const
 	{
 		uint16_t required = static_cast<uint16_t>(skill_id / 10000);
+
+		// Prefix-0 skills (000.img — common beginner skills like Monster
+		// Riding 1004) are shared across trees; GM jobs get them too.
+		if (required == 0)
+			return true;
+
 		return is_sub_job(required);
 	}
 

@@ -98,6 +98,19 @@ namespace ms
 		void set_bot_inventory(BotInventoryData data);
 		int32_t get_char_id() const;
 
+		struct CharPetInfo
+		{
+			int32_t itemid;
+			std::string name;
+			int8_t level;
+			int16_t closeness;
+			int8_t fullness;
+		};
+
+		void set_extra_info(std::vector<CharPetInfo> pets, bool mount,
+			int32_t mount_level, int32_t mount_exp, int32_t mount_tired,
+			std::vector<int32_t> wish);
+
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		void send_scroll(double yoffset) override;
@@ -152,6 +165,21 @@ namespace ms
 			BtBotEtc,
 			BtBotEquipped
 		};
+
+		/// Expander panels (vanilla Pet / Ride / Wish List)
+		std::vector<CharPetInfo> pets_info;
+		bool has_mount = false;
+		int32_t mount_level = 0;
+		int32_t mount_exp = 0;
+		int32_t mount_tired = 0;
+		std::vector<int32_t> wishlist;
+		int8_t panel_mode = 0;
+		bool wish_open = false;
+		Texture pet_bg, pet_bg2;
+		Texture ride_bg, ride_bg2;
+		Texture wish_bg, wish_bg2;
+		Point<int16_t> base_dim;
+		mutable Text panel_label;
 
 		/// Main Window
 		Text name;

@@ -30,6 +30,7 @@
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/TradePackets.h"
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Packets/InventoryPackets.h"
 #include "../Graphics/GraphicsGL.h"
 #include "../Character/MapleStat.h"
 
@@ -235,6 +236,41 @@ namespace ms
 
 		combat.update();
 		HiredMerchants::get().update();
+
+		if (--pet_loot_cd <= 0)
+		{
+			pet_loot_cd = 40;
+
+			for (uint8_t pi = 0; pi < 3; pi++)
+			{
+				PetLook& pet = player.get_pet(pi);
+
+				if (pet.get_itemid() == 0)
+					continue;
+
+				Point<int16_t> ppos = pet.get_position();
+				MapObjects* dobjs = drops.get_drops();
+
+				for (auto it = dobjs->begin(); it != dobjs->end(); ++it)
+				{
+					MapObject* mo = it->second.get();
+
+					if (!mo || !mo->is_active())
+						continue;
+
+					Point<int16_t> dpos = mo->get_position();
+
+					if (std::abs(dpos.x() - ppos.x()) <= 30 && std::abs(dpos.y() - ppos.y()) <= 25)
+					{
+						PetLootPacket(pet.get_uniqueid(), mo->get_oid()).dispatch();
+						pet_loot_cd = 80;
+						break;
+					}
+				}
+
+				break;
+			}
+		}
 		MapleTVBroadcast::get().tick();
 		backgrounds.update();
 		environments.update();

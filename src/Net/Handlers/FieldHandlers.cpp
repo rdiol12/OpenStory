@@ -68,18 +68,19 @@ namespace ms
 		}
 		case 4:
 		{
-			// Sound effect — path like "Party1/Clear" -> Sound.nx/Party1.img/Clear
+			// Sound effect — path like "Party1/Clear" -> Sound.nx/Field.img/Party1/Clear
 			std::string path = recv.read_string();
 
-			// Split "Category/Name" into img lookup
 			size_t slash = path.find('/');
 			if (slash != std::string::npos)
 			{
 				std::string category = path.substr(0, slash);
 				std::string name = path.substr(slash + 1);
-				nl::node snd = nl::nx::sound[category + ".img"][name];
+				nl::node snd = nl::nx::sound["Field.img"][category][name];
 
-				// This NX set has no Party1.img — map the PQ jingles
+				if (!snd)
+					snd = nl::nx::sound[category + ".img"][name];
+
 				if (!snd && category == "Party1")
 					snd = nl::nx::sound["Game.img"][name == "Clear" ? "QuestClear" : "QuestAlert"];
 

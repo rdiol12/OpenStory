@@ -687,6 +687,12 @@ namespace ms
 		PosALLIANCE() : PointEntry("PosALLIANCE", "(200, 80)") {}
 	};
 
+	// The default position of UIOwl
+	struct PosOWL : public Configuration::PointEntry
+	{
+		PosOWL() : PointEntry("PosOWL", "(250, 120)") {}
+	};
+
 	// The default position of UIWhisper
 	struct PosWHISPER : public Configuration::PointEntry
 	{

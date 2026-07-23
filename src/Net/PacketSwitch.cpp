@@ -251,6 +251,16 @@ namespace ms
 		CANNOT_SPAWN_KITE = 270, // 0x10E
 		SPAWN_KITE = 271,       // 0x10F
 		REMOVE_KITE = 272,      // 0x110
+		ENTRUSTED_SHOP_CHECK = 50,
+		INVENTORY_GROW = 30,
+		MAP_TRANSFER_RESULT = 42,
+		SET_TAMING_MOB_INFO = 48,
+		SHOP_SCANNER_RESULT = 70,
+		SHOP_LINK_RESULT = 71,
+		BRIDLE_MOB_CATCH_FAIL = 79,
+		NOTIFY_MARRIAGE = 106,
+		DATA_CRC_CHECK_FAILED = 123,
+		LEFT_KNOCK_BACK = 284,
 		SPAWN_HIRED_MERCHANT = 265, // 0x109
 		DESTROY_HIRED_MERCHANT = 266, // 0x10A
 		UPDATE_HIRED_MERCHANT = 267, // 0x10B
@@ -519,6 +529,16 @@ namespace ms
 		emplace<BLOCKED_MAP, BlockedMapHandler>();
 		emplace<BLOCKED_SERVER, BlockedServerHandler>();
 		emplace<OX_QUIZ, OXQuizHandler>();
+		emplace<ENTRUSTED_SHOP_CHECK, EntrustedShopCheckHandler>();
+		emplace<INVENTORY_GROW, InventoryGrowHandler>();
+		emplace<MAP_TRANSFER_RESULT, TrockResultHandler>();
+		emplace<SET_TAMING_MOB_INFO, TamingMobHandler>();
+		emplace<SHOP_SCANNER_RESULT, OwlResultHandler>();
+		emplace<SHOP_LINK_RESULT, OwlMessageHandler>();
+		emplace<BRIDLE_MOB_CATCH_FAIL, MobCatchFailHandler>();
+		emplace<NOTIFY_MARRIAGE, MarriageNoticeHandler>();
+		emplace<DATA_CRC_CHECK_FAILED, PoliceHandler>();
+		emplace<LEFT_KNOCK_BACK, LeftKnockBackHandler>();
 		emplace<SPAWN_HIRED_MERCHANT, SpawnHiredMerchantHandler>();
 		emplace<DESTROY_HIRED_MERCHANT, DestroyHiredMerchantHandler>();
 		emplace<UPDATE_HIRED_MERCHANT, UpdateHiredMerchantHandler>();

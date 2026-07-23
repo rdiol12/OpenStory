@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UINotice.h"
 
+#include "../NotificationCenter.h"
+#include "UIStatusBar.h"
+
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
@@ -521,28 +524,65 @@ namespace ms
 		int16_t icon_w = icon.is_valid() ? icon.get_dimensions().x() : 18;
 		int16_t text_x = 6 + icon_w + 6;
 		int16_t text_area = dims.x() - text_x - 6;
+		message_text = message;
 		label = Text(Text::Font::A11M, Text::Alignment::LEFT,
 			Color::Name::WHITE, message, text_area);
 
-		// OK / Cancel are 12x12 tucked into the bottom-right corner.
+		// OK above Cancel, stacked on the right edge.
 		buttons[Buttons::ACCEPT]  = std::make_unique<MapleButton>(
-			root["BtOK"],     Point<int16_t>(dims.x() - 34, dims.y() - 18));
+			root["BtOK"],     Point<int16_t>(dims.x() - 16, dims.y() / 2 - 19));
 		buttons[Buttons::DECLINE] = std::make_unique<MapleButton>(
-			root["BtCancel"], Point<int16_t>(dims.x() - 18, dims.y() - 18));
+			root["BtCancel"], Point<int16_t>(dims.x() - 16, dims.y() / 2 - 3));
 
 		Sound(Sound::Name::DLGNOTICE).play();
 	}
 
 	void UIAlarmInvite::draw(float alpha) const
 	{
-		backdrop.draw(DrawArgument(position));
+		// Fade in over the first 300ms, fade out over the last 600ms
+		// before the popup stashes itself into the drawer.
+		float a = 1.0f;
+
+		if (age_ms < 300)
+			a = age_ms / 300.0f;
+		else if (age_ms > 4400)
+			a = (5000 - age_ms) / 600.0f;
+
+		if (a < 0.0f) a = 0.0f;
+		if (a > 1.0f) a = 1.0f;
+
+		backdrop.draw(DrawArgument(position, a));
 		if (icon.is_valid())
-			icon.draw(DrawArgument(position + Point<int16_t>(6, 6)));
+			icon.draw(DrawArgument(position + Point<int16_t>(6, 6), a));
 
 		int16_t icon_w = icon.is_valid() ? icon.get_dimensions().x() : 18;
-		label.draw(position + Point<int16_t>(6 + icon_w + 6, 6));
+		label.draw(DrawArgument(position + Point<int16_t>(6 + icon_w + 6, 6), a));
 
 		UIElement::draw(alpha);
+	}
+
+	void UIAlarmInvite::update()
+	{
+		UIElement::update();
+
+		age_ms += Constants::TIMESTEP;
+
+		if (age_ms >= 5000 && !stashed)
+			stash();
+	}
+
+	void UIAlarmInvite::stash()
+	{
+		if (stashed)
+			return;
+
+		stashed = true;
+		NotificationCenter::get().push("Invite", message_text, handler);
+
+		if (auto statusbar = UI::get().get_element<UIStatusBar>())
+			statusbar->notify();
+
+		deactivate();
 	}
 
 	void UIAlarmInvite::send_key(int32_t keycode, bool pressed, bool escape)

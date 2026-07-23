@@ -94,6 +94,93 @@ namespace ms
 		}
 	};
 
+	// Summon or dismiss a pet from its CASH slot.
+	// Opcode: SPAWN_PET(98) — int tick, short slot, byte lead
+	class SpawnPetPacket : public OutPacket
+	{
+	public:
+		SpawnPetPacket(int16_t slot) : OutPacket(OutPacket::Opcode::SPAWN_PET)
+		{
+			write_int(0);
+			write_short(slot);
+			write_byte(0);
+		}
+	};
+
+	// Feed the hungriest summoned pet.
+	// Opcode: PET_FOOD(76) — int tick, short slot, int itemid
+	class PetFoodPacket : public OutPacket
+	{
+	public:
+		PetFoodPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::PET_FOOD)
+		{
+			write_int(0);
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
+	// Speak through a pet.
+	// Opcode: PET_CHAT(168) — int petid, int 0, byte 0, byte act, string text
+	class PetChatPacket : public OutPacket
+	{
+	public:
+		PetChatPacket(int32_t petid, int8_t act, const std::string& text)
+			: OutPacket(OutPacket::Opcode::PET_CHAT_SEND)
+		{
+			write_int(petid);
+			write_int(0);
+			write_byte(0);
+			write_byte(act);
+			write_string(text);
+		}
+	};
+
+	// Issue a pet command (interact id from Pet.nx).
+	// Opcode: PET_COMMAND(169) — int petid, int 0, byte 0, byte command
+	class PetCommandPacket : public OutPacket
+	{
+	public:
+		PetCommandPacket(int32_t petid, int8_t command)
+			: OutPacket(OutPacket::Opcode::PET_COMMAND_SEND)
+		{
+			write_int(petid);
+			write_int(0);
+			write_byte(0);
+			write_byte(command);
+		}
+	};
+
+	// Ask the server to let a pet pick up a drop.
+	// Opcode: PET_LOOT(170) — int petid, 13 filler bytes, int oid
+	class PetLootPacket : public OutPacket
+	{
+	public:
+		PetLootPacket(int32_t petid, int32_t oid) : OutPacket(OutPacket::Opcode::PET_LOOT)
+		{
+			write_int(petid);
+
+			for (int i = 0; i < 13; i++)
+				write_byte(0);
+
+			write_int(oid);
+		}
+	};
+
+	// Rename the first summoned pet with a Pet Name Tag.
+	// Opcode: USE_CASH_ITEM(79) — short slot, int itemid, string name
+	class UsePetNameTagPacket : public OutPacket
+	{
+	public:
+		UsePetNameTagPacket(int16_t slot, int32_t itemid, const std::string& name)
+			: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(name);
+		}
+	};
+
 	// Use a megaphone / speaker cash item.
 	// Opcode: USE_CASH_ITEM(79)
 	//

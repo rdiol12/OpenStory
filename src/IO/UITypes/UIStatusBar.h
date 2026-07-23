@@ -204,6 +204,7 @@ namespace ms
 		// and self-positions when drawn at `position`.
 		bool quickslot_bg_v83 = false;
 		bool show_quickslot;
+		Texture qs_key_sprites[8];
 
 		// Quickslot drop support.
 		// The v83 panel shows 8 key bindings laid out in 2 rows of 4;

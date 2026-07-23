@@ -100,7 +100,6 @@ namespace ms
 		emplace<UIShop>(look, inventory);
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests());
 		emplace<UIPartyHUD>();
-		emplace<UIPartyHelper>();
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();

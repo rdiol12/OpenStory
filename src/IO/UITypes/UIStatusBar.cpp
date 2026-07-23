@@ -241,6 +241,10 @@ namespace ms
 		// Bold white key label drawn in each quickslot cube's corner.
 		qs_key_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE);
 
+		nl::node keynames = nl::nx::ui["StatusBar.img"]["key"];
+		for (int i = 0; i < 8; i++)
+			qs_key_sprites[i] = keynames[std::to_string(i)];
+
 		// === Gauge animations ===
 		ani_hp_gauge = Animation(mainbar["aniHPGauge"]);
 		ani_hp_gauge_ab = Animation(mainbar["aniHPGaugeAB"]);
@@ -522,8 +526,23 @@ namespace ms
 				// knows which key fires each slot. Drawn from the real binding, so it
 				// stays correct after rebinding and on the blank panel. Bottom-left
 				// corner keeps it clear of the centred icon.
-				qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
-				qs_key_label.draw(tl + Point<int16_t>(1, CELL - 13 + QS_LABEL_NUDGE_Y));
+				static const uint8_t defcodes[8] = { 42, 82, 71, 73, 29, 83, 79, 81 };
+				bool default_key = i < 8 && (static_cast<uint8_t>(keycode) == defcodes[i]
+					|| (i == 0 && keycode == 54) || (i == 4 && keycode == 157));
+
+				if (default_key && qs_key_sprites[i].is_valid())
+				{
+					qs_key_sprites[i].draw(tl + Point<int16_t>(1, CELL - 12 + QS_LABEL_NUDGE_Y));
+				}
+				else
+				{
+					qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
+
+					ColorBox label_bg(qs_key_label.width() + 4, 12, Color::Name::BLACK, 0.65f);
+					label_bg.draw(DrawArgument(tl + Point<int16_t>(0, CELL - 11 + QS_LABEL_NUDGE_Y)));
+
+					qs_key_label.draw(tl + Point<int16_t>(1, CELL - 13 + QS_LABEL_NUDGE_Y));
+				}
 			}
 		}
 
@@ -1000,6 +1019,10 @@ namespace ms
 
 		case BT_NOTICE:
 		{
+			if (auto alarm = UI::get().get_element<UIAlarmInvite>())
+				if (alarm->is_active())
+					alarm->stash();
+
 			// Open the notification drawer anchored above this button.
 			// The popup positions itself so its bottom-right corner is
 			// the button's top-left.

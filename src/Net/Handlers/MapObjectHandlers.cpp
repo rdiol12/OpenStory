@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapObjectHandlers.h"
 
+#include "../../Audio/Audio.h"
+
 #include "Helpers/LoginParser.h"
 #include "Helpers/MovementParser.h"
 
@@ -25,6 +27,10 @@
 #include "../../Gameplay/MapleMap/Mob.h"
 #include "../../Gameplay/MapleMap/Summon.h"
 #include "../../Gameplay/MapleMap/Dragon.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -68,7 +74,7 @@ namespace ms
 
 		recv.skip(43);
 
-		recv.read_int(); // 'mount'
+		int32_t riding_mount = recv.read_int(); // monster-riding mount itemid (0 = not riding)
 
 		recv.skip(61);
 
@@ -84,25 +90,27 @@ namespace ms
 
 		recv.skip(3);
 
+		// addPetInfo(showpet=false): byte 1 marker, int itemid, string name,
+		// long uniqueid, pos, byte stance, int fh — no extra byte here (that
+		// only exists in the standalone SPAWN_PET packet).
+		std::vector<SpawnPetEntry> spawn_pets;
+
 		for (size_t i = 0; i < 3; i++)
 		{
 			int8_t available = recv.read_byte();
 
-			if (available == 1)
-			{
-				recv.read_byte();	// 'byte2'
-				recv.read_int();	// petid
-				recv.read_string();	// name
-				recv.read_int();	// unique id
-				recv.read_int();
-				recv.read_point();	// pos
-				recv.read_byte();	// stance
-				recv.read_int();	// fhid
-			}
-			else
-			{
+			if (available != 1)
 				break;
-			}
+
+			SpawnPetEntry sp;
+			sp.itemid = recv.read_int();
+			sp.name = recv.read_string();
+			sp.uniqueid = recv.read_int();
+			recv.read_int(); // uniqueid high
+			sp.pos = recv.read_point();
+			sp.stance = recv.read_byte();
+			sp.fhid = recv.read_int();
+			spawn_pets.push_back(std::move(sp));
 		}
 
 		recv.read_int(); // mountlevel
@@ -136,13 +144,16 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position }
+			{ cid, look, level, job, name, stance, position, std::move(spawn_pets) }
 		);
 
-		if (itemeffect != 0)
+		if (auto spawned = Stage::get().get_character(cid))
 		{
-			if (auto spawned = Stage::get().get_character(cid))
+			if (itemeffect != 0)
 				spawned->set_item_effect(itemeffect);
+
+			if (riding_mount != 0)
+				spawned->set_riding(riding_mount);
 		}
 	}
 
@@ -755,15 +766,14 @@ namespace ms
 	void PetChatHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
-		recv.read_byte(); // pet index
+		uint8_t pet_index = recv.read_byte();
 		recv.read_byte(); // 0
 		int8_t act = recv.read_byte();
 		std::string text = recv.read_string();
 		recv.read_byte(); // has balloon type
 
-		// Display pet chat as a speech bubble on the character
 		if (auto character = Stage::get().get_character(cid))
-			character->speak(text);
+			character->get_pet(pet_index < 3 ? pet_index : 0).speak(text);
 	}
 
 	void PetCommandHandler::handle(InPacket& recv) const
@@ -781,8 +791,15 @@ namespace ms
 		{
 			PetLook& pet = character->get_pet(pet_index);
 			if (pet.get_itemid() != 0)
-				pet.set_stance(static_cast<PetLook::Stance>(
-					animation == 0 ? PetLook::Stance::ALERT : PetLook::Stance::JUMP));
+			{
+				pet.play_command(animation == 0 ? PetLook::Stance::ALERT : PetLook::Stance::JUMP);
+
+				std::string snd = type == 1 ? "eat" : (talk ? "chat" : "alert");
+				nl::node sndnode = nl::nx::sound["Pet.img"][std::to_string(pet.get_itemid())][snd];
+
+				if (sndnode)
+					Sound(sndnode).play();
+			}
 		}
 	}
 

@@ -18,6 +18,7 @@
 #include "ShopStorageHandlers.h"
 
 #include "../../Gameplay/HiredMerchants.h"
+#include "../../Gameplay/MiniRooms.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -27,6 +28,8 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIHiredMerchant.h"
+#include "../../IO/UITypes/UIOwl.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIPersonalShop.h"
 #include "../../IO/UITypes/UIMinigame.h"
 #include "../../Net/Packets/TradePackets.h"
@@ -382,6 +385,7 @@ namespace ms
 
 					if (shop_open)
 					{
+						chat::log("[dbg] VISIT slot=" + std::to_string(vslot) + " name=" + vname, chat::LineType::YELLOW);
 						shop->set_slot_look(vslot, vlook, vname);
 						shop->add_chat(vname + " entered the shop.", 0);
 					}
@@ -564,6 +568,9 @@ namespace ms
 						int32_t price = recv.read_int();
 						int32_t itemid = ItemParser::skip_item(recv);
 						hm->add_item(i, itemid, bundles, price);
+
+						if (bundles <= 0)
+							hm->set_sold_out(i);
 					}
 				}
 			}
@@ -624,6 +631,9 @@ namespace ms
 						int32_t price = recv.read_int();
 						int32_t itemid = ItemParser::skip_item(recv);
 						shop->add_item(i, itemid, bundles, price);
+
+						if (bundles <= 0)
+							shop->set_sold_out(i);
 					}
 				}
 			}
@@ -649,6 +659,9 @@ namespace ms
 					int32_t price = recv.read_int();
 					int32_t itemid = ItemParser::skip_item(recv);
 					hm->add_item(i, itemid, bundles, price);
+
+					if (bundles <= 0)
+						hm->set_sold_out(i);
 				}
 
 				break;
@@ -667,6 +680,9 @@ namespace ms
 					int32_t price = recv.read_int();
 					int32_t itemid = ItemParser::skip_item(recv);
 					shop->add_item(i, itemid, bundles, price);
+
+					if (bundles <= 0)
+						shop->set_sold_out(i);
 				}
 			}
 			break;
@@ -1033,6 +1049,157 @@ namespace ms
 				break;
 			}
 		}
+	}
+
+
+	void EntrustedShopCheckHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		switch (mode)
+		{
+		case 0x07:
+		{
+			int32_t permit = MiniRooms::get().get_pending_permit();
+
+			if (permit == 0)
+				break;
+
+			UI::get().emplace<UIEnterText>(
+				"Shop name:",
+				[permit](const std::string& desc)
+				{
+					if (!desc.empty())
+						CreateShopPacket(desc, permit, 5).dispatch();
+				},
+				30
+			);
+			break;
+		}
+		case 0x09:
+			if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+				messenger->show_status(Color::Name::RED,
+					"Retrieve your stored items from Fredrick before opening a new store.");
+			break;
+		default:
+			break;
+		}
+	}
+
+	void OwlResultHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode == 6)
+		{
+			recv.read_int();
+			int32_t itemid = recv.read_int();
+
+			if (auto owl = UI::get().get_element<UIOwl>())
+				owl->show_results(itemid, recv);
+		}
+		else if (mode == 7)
+		{
+			int8_t count = recv.read_byte();
+			std::vector<int32_t> ids;
+
+			for (int8_t i = 0; i < count; i++)
+				ids.push_back(recv.read_int());
+
+			if (auto owl = UI::get().get_element<UIOwl>())
+				owl->set_top10(ids);
+		}
+	}
+
+	void OwlMessageHandler::handle(InPacket& recv) const
+	{
+		int8_t msg = recv.read_byte();
+		std::string text;
+
+		switch (msg)
+		{
+		case 0: return;
+		case 1: text = "That shop was closed."; break;
+		case 2: text = "The shop is at full capacity."; break;
+		case 3: text = "You cannot go to that shop right now."; break;
+		case 17: text = "You may not enter that store."; break;
+		case 18: text = "That store is closed or under maintenance."; break;
+		default: text = "Unable to visit that shop right now. (" + std::to_string(msg) + ")"; break;
+		}
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, text);
+	}
+
+	void InventoryGrowHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte();
+		uint8_t limit = static_cast<uint8_t>(recv.read_byte());
+
+		InventoryType::Id id = InventoryType::by_value(type);
+
+		if (id != InventoryType::Id::NONE)
+		{
+			Stage::get().get_player().get_inventory().set_slotmax(id, limit);
+			chat::log("Your inventory has been expanded to " + std::to_string(limit) + " slots.", chat::LineType::YELLOW);
+		}
+	}
+
+	void PoliceHandler::handle(InPacket& recv) const
+	{
+		std::string text;
+
+		if (recv.available())
+			text = recv.read_string();
+
+		if (text.empty())
+			text = "You have been disconnected by the server police.";
+
+		chat::log("[Police] " + text, chat::LineType::RED);
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, text);
+	}
+
+	void MarriageNoticeHandler::handle(InPacket& recv) const
+	{
+		int8_t type = recv.read_byte();
+		std::string name = recv.read_string();
+
+		std::string group = type == 0 ? "[Guild]" : "[Family]";
+		chat::log(group + " Congratulations on the marriage of " + name + "!", chat::LineType::PINK);
+	}
+
+	void MobCatchFailHandler::handle(InPacket& recv) const
+	{
+		int8_t msg = recv.read_byte();
+		recv.read_int();
+		recv.read_int();
+
+		std::string text = msg == 2
+			? "The monster resisted with an Elemental Rock!"
+			: "The monster is too strong to be caught right now.";
+
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED, text);
+	}
+
+	void TamingMobHandler::handle(InPacket& recv) const
+	{
+		recv.read_int();
+		recv.read_int();
+		recv.read_int();
+		recv.read_int();
+		recv.read_byte();
+	}
+
+	void TrockResultHandler::handle(InPacket& recv) const
+	{
+	}
+
+	void LeftKnockBackHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().get_phobj().hspeed = -4.0;
 	}
 
 	void SpawnHiredMerchantHandler::handle(InPacket& recv) const

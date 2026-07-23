@@ -354,16 +354,6 @@ namespace ms
 				}
 			);
 
-			Notifications::notify(
-				"Party Invite",
-				display_name + " has invited you to their party.",
-				[partyid, from_name](bool yes)
-				{
-					if (yes)
-						JoinPartyPacket(partyid).dispatch();
-					else
-						DenyPartyInvitePacket(from_name).dispatch();
-				});
 
 			break;
 		}
@@ -508,8 +498,12 @@ namespace ms
 			if (messenger) messenger->show_status(Color::Name::RED, "You are not in a party.");
 			break;
 		case 16:
-			if (messenger) messenger->show_status(Color::Name::RED, "You are already in a party.");
+		{
+			const std::string& target = InviteToPartyPacket::last_invited_name();
+			std::string who = target.empty() ? "That player" : target;
+			if (messenger) messenger->show_status(Color::Name::RED, who + " is already in a party.");
 			break;
+		}
 		case 17:
 			if (messenger) messenger->show_status(Color::Name::RED, "The party is full.");
 			break;
@@ -679,16 +673,6 @@ namespace ms
 				}
 			);
 
-			Notifications::notify(
-				"Guild Invite",
-				inviter + " has invited you to their guild.",
-				[guild_id, my_cid, inviter](bool yes)
-				{
-					if (yes)
-						AcceptGuildInvitePacket(guild_id, my_cid).dispatch();
-					else
-						DenyGuildInvitePacket(inviter).dispatch();
-				});
 			break;
 		}
 		case 0x1A: // Full guild info
@@ -1071,14 +1055,6 @@ namespace ms
 					}
 				);
 
-				Notifications::notify(
-					"Alliance Invite",
-					inviter + " has invited your guild to join their alliance.",
-					[alliance_id](bool yes)
-					{
-						if (yes)
-							AllianceAcceptInvitePacket(alliance_id).dispatch();
-					});
 			}
 			break;
 		}
@@ -1451,23 +1427,6 @@ namespace ms
 					}
 				});
 
-			Notifications::notify(
-				"Messenger Invite",
-				from + " has invited you to a Messenger conversation.",
-				[from](bool yes)
-				{
-					if (yes)
-					{
-						// Open a fresh messenger session — server joins
-						// the invited chat automatically after OPEN.
-						MessengerOpenPacket().dispatch();
-					}
-					else
-					{
-						MessengerDeclinePacket(from, "").dispatch();
-					}
-				}
-			);
 
 			chat::log(from + " has invited you to a Messenger conversation.", chat::LineType::YELLOW);
 
