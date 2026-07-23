@@ -43,6 +43,14 @@ namespace ms
 		switch (prefix)
 		{
 		case 1:
+			if (get_item_prefix(itemid) == 190)
+			{
+				category = "TamingMob";
+				src = nl::nx::character["TamingMob"][strid + ".img"]["info"];
+				strsrc = nl::nx::string["Eqp.img"]["Eqp"]["Taming"][std::to_string(itemid)];
+				break;
+			}
+
 			category = get_eqcategory(itemid);
 			src = nl::nx::character[category][strid + ".img"]["info"];
 			strsrc = nl::nx::string["Eqp.img"]["Eqp"][category][std::to_string(itemid)];
@@ -64,6 +72,14 @@ namespace ms
 			break;
 		case 5:
 			category = "Cash";
+
+			if (get_item_prefix(itemid) == 500)
+			{
+				src = nl::nx::item["Pet"][std::to_string(itemid) + ".img"]["info"];
+				strsrc = nl::nx::string["Pet.img"][std::to_string(itemid)];
+				break;
+			}
+
 			src = nl::nx::item["Cash"][strprefix + ".img"][strid]["info"];
 			strsrc = nl::nx::string["Cash.img"][std::to_string(itemid)];
 			break;

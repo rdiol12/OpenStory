@@ -77,6 +77,7 @@ namespace ms
 		settings.emplace<PosGUILDBBS>();
 		settings.emplace<PosGUILDMARK>();
 		settings.emplace<PosALLIANCE>();
+		settings.emplace<PosOWL>();
 		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosPERSONALSHOP>();
 		settings.emplace<PosHIREDMERCHANT>();

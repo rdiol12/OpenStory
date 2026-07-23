@@ -104,13 +104,28 @@ namespace ms
 		bool playerdrop;
 	};
 
+	struct SpawnPetEntry
+	{
+		int32_t itemid;
+		std::string name;
+		int32_t uniqueid;
+		Point<int16_t> pos;
+		uint8_t stance;
+		int32_t fhid;
+	};
+
 	class CharSpawn
 	{
 	public:
-		CharSpawn(int32_t cid, const LookEntry& look, uint8_t level, int16_t job, const std::string& name, int8_t stance, Point<int16_t> position);
+		CharSpawn(int32_t cid, const LookEntry& look, uint8_t level, int16_t job, const std::string& name, int8_t stance, Point<int16_t> position, std::vector<SpawnPetEntry> pets = {});
 
 		int32_t get_cid() const;
 		std::unique_ptr<MapObject> instantiate() const;
+
+		const std::vector<SpawnPetEntry>& get_pets() const
+		{
+			return pets;
+		}
 
 	private:
 		int32_t cid;
@@ -120,6 +135,7 @@ namespace ms
 		int8_t stance;
 		Point<int16_t> position;
 		LookEntry look;
+		std::vector<SpawnPetEntry> pets;
 	};
 
 	class DoorSpawn

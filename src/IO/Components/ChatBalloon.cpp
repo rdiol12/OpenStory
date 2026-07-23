@@ -54,6 +54,14 @@ namespace ms
 		duration = 0;
 	}
 
+	ChatBalloon::ChatBalloon(nl::node src)
+	{
+		arrow = src["arrow"];
+		frame = src;
+		textlabel = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, "", 80);
+		duration = 0;
+	}
+
 	ChatBalloon::ChatBalloon() : ChatBalloon(0) {}
 
 	void ChatBalloon::change_text(const std::string& text)

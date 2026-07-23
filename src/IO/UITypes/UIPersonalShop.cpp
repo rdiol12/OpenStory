@@ -346,11 +346,11 @@ namespace ms
 			if (!slot_used[v])
 				continue;
 
-			int16_t cx = 276 + (v - 1) * 96;
-			slot_looks[v].draw(DrawArgument(position + Point<int16_t>(cx, 158)), inter);
+			int16_t cx = 266 + (v - 1) * 96;
+			slot_looks[v].draw(DrawArgument(position + Point<int16_t>(cx, 124)), inter);
 			slot_name_text.change_color(Color::Name::WHITE);
 			slot_name_text.change_text(slot_names[v]);
-			slot_name_text.draw(position + Point<int16_t>(cx, 160));
+			slot_name_text.draw(position + Point<int16_t>(cx, 129));
 		}
 
 		int16_t cy = 279;
@@ -406,7 +406,7 @@ namespace ms
 				price_label.draw(position + Point<int16_t>(49, row_y + 13));
 
 				if (items[i].sold_out)
-					soldout_tex.draw(position + Point<int16_t>(33, row_y));
+					soldout_tex.draw(position + Point<int16_t>(10, row_y));
 			}
 		}
 	}

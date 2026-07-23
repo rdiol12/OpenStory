@@ -27,9 +27,18 @@ namespace ms
 {
 	Frame::Frame(nl::node src)
 	{
-		texture = src;
-		bounds = src;
-		head = src["head"];
+		// Some animation sets (e.g. Character/TamingMob rides) nest the
+		// bitmap one level down: frame/{0: bitmap, delay} instead of the
+		// frame node being the bitmap itself.
+		nl::node bit = src;
+
+		if (src.data_type() != nl::node::type::bitmap
+			&& src["0"].data_type() == nl::node::type::bitmap)
+			bit = src["0"];
+
+		texture = bit;
+		bounds = bit;
+		head = bit["head"];
 		delay = src["delay"];
 
 		if (delay == 0)
@@ -141,7 +150,10 @@ namespace ms
 
 			for (auto sub : src)
 			{
-				if (sub.data_type() == nl::node::type::bitmap)
+				bool framelike = sub.data_type() == nl::node::type::bitmap
+					|| sub["0"].data_type() == nl::node::type::bitmap;
+
+				if (framelike)
 				{
 					int16_t fid = string_conversion::or_default<int16_t>(sub.name(), -1);
 

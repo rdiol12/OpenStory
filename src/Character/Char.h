@@ -172,6 +172,11 @@ namespace ms
 		// Return whether the character has a mount (taming mob) equipped
 		bool has_mount() const;
 
+		// Monster-riding mount rendered under the character. Driven by the
+		// MONSTER_RIDING buff (self) or the spawn/foreign buff (others).
+		void set_riding(int32_t mount_itemid);
+		int32_t get_riding() const { return riding_mount; }
+
 		// Obtain a reference to this character's look
 		CharLook& get_look();
 		// Obtain a constant reference to this character's look
@@ -192,6 +197,22 @@ namespace ms
 
 		CharLook look;
 		CharLook look_preview;
+		int32_t riding_mount = 0;
+		Animation mount_ani;
+		Animation mount_walk;
+		Animation mount_jump;
+		Point<int16_t> mount_navel;
+
+		const Animation& current_mount_ani() const
+		{
+			if (state == State::WALK && mount_walk.get_delay(0) > 0)
+				return mount_walk;
+
+			if (state == State::FALL && mount_jump.get_delay(0) > 0)
+				return mount_jump;
+
+			return mount_ani;
+		}
 		PetLook pets[3];
 
 		State state;

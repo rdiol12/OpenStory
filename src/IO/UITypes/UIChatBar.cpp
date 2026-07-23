@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIChatBar.h"
 
+#include "../Window.h"
+
 #include "../UI.h"
 #include "../Components/MapleButton.h"
 #include "UIStatusBar.h"
@@ -24,6 +26,7 @@
 #include "../Notifications.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MessagingPackets.h"
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
@@ -252,7 +255,10 @@ namespace ms
 				if (!rowtexts.count(rowid))
 					break;
 
-				int16_t textheight = rowtexts.at(rowid).height() / CHATROWHEIGHT;
+				int16_t lines_here = rowtexts.at(rowid).height() / CHATROWHEIGHT;
+				if (lines_here < 1)
+					lines_here = 1;
+				int16_t textheight = lines_here;
 
 				while (textheight > 0)
 				{
@@ -318,6 +324,34 @@ namespace ms
 					rowtexts.at(rowid).draw(
 						DrawArgument(Point<int16_t>(4, msgy)), chatclip);
 				}
+
+				if (has_selection)
+				{
+					int16_t sr, sc, er, ec;
+					ordered_sel(sr, sc, er, ec);
+
+					if (rowid >= sr && rowid <= er)
+					{
+						auto rit = rowstrings.find(rowid);
+						int16_t len = rit != rowstrings.end()
+							? static_cast<int16_t>(rit->second.size()) : 0;
+						int16_t from = (rowid == sr) ? sc : 0;
+						int16_t to = (rowid == er) ? ec : len;
+						if (to < from) to = from;
+
+						int16_t x0 = 4 + static_cast<int16_t>(rowtexts.at(rowid).advance(from));
+						int16_t x1 = 4 + static_cast<int16_t>(rowtexts.at(rowid).advance(to));
+						int16_t w = x1 - x0;
+
+						if (w > 0)
+						{
+							// Hug the glyph band (A12M top ≈ msgy+5, bottom ≈ msgy+18)
+							// so the highlight sits on the text, and keep it bold.
+							ColorBox cover(w, 13, Color::Name::WHITE, 0.55f);
+							cover.draw(DrawArgument(Point<int16_t>(x0, msgy + 5)));
+						}
+					}
+				}
 			}
 
 			slider.draw(Point<int16_t>(position.x(), getchattop() + 5));
@@ -365,13 +399,13 @@ namespace ms
 
 		if (yoffset > 0)
 		{
-			if (rowpos < rowmax)
-				rowpos++;
+			if (rowpos > 0)
+				rowpos--;
 		}
 		else if (yoffset < 0)
 		{
-			if (rowpos > 0)
-				rowpos--;
+			if (rowpos < rowmax)
+				rowpos++;
 		}
 
 		slider.setrows(rowpos, chatrows, rowmax);
@@ -413,6 +447,110 @@ namespace ms
 		Point<int16_t> absp(0, getchattop() - 16);
 		Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
 		return Rectangle<int16_t>(absp, absp + dim).contains(cursorpos);
+	}
+
+	int16_t UIChatBar::row_at(Point<int16_t> cursorpos) const
+	{
+		if (!chatopen)
+			return ROW_NONE;
+
+		int16_t chattop = getchattop();
+		int16_t yshift = -CHATROWHEIGHT * chatrows;
+
+		for (int16_t i = 0; i < chatrows; i++)
+		{
+			int16_t rowid = rowpos - i;
+
+			auto it = rowtexts.find(rowid);
+			if (it == rowtexts.end())
+				break;
+
+			int16_t lines = it->second.height() / CHATROWHEIGHT;
+			if (lines < 1)
+				lines = 1;
+
+			yshift += lines * CHATROWHEIGHT;
+			int16_t msgy = chattop - yshift - 7;
+
+			if (msgy < chattop)
+				continue;
+
+			if (cursorpos.y() >= msgy && cursorpos.y() < msgy + lines * CHATROWHEIGHT)
+				return rowid;
+		}
+
+		return ROW_NONE;
+	}
+
+	int16_t UIChatBar::col_at(int16_t rowid, int16_t x) const
+	{
+		auto it = rowtexts.find(rowid);
+		auto sit = rowstrings.find(rowid);
+		if (it == rowtexts.end() || sit == rowstrings.end())
+			return 0;
+
+		int16_t relx = x - 4;
+		if (relx <= 0)
+			return 0;
+
+		size_t len = sit->second.size();
+		for (size_t i = 0; i < len; i++)
+		{
+			int16_t a = static_cast<int16_t>(it->second.advance(i));
+			int16_t b = static_cast<int16_t>(it->second.advance(i + 1));
+			if (relx < (a + b) / 2)
+				return static_cast<int16_t>(i);
+		}
+		return static_cast<int16_t>(len);
+	}
+
+	void UIChatBar::ordered_sel(int16_t& sr, int16_t& sc, int16_t& er, int16_t& ec) const
+	{
+		// reading order: smaller row id is older/higher on screen, then column
+		if (sel_arow < sel_frow || (sel_arow == sel_frow && sel_acol <= sel_fcol))
+		{
+			sr = sel_arow; sc = sel_acol; er = sel_frow; ec = sel_fcol;
+		}
+		else
+		{
+			sr = sel_frow; sc = sel_fcol; er = sel_arow; ec = sel_acol;
+		}
+	}
+
+	std::string UIChatBar::get_selected_text() const
+	{
+		if (!has_selection)
+			return "";
+
+		int16_t sr, sc, er, ec;
+		ordered_sel(sr, sc, er, ec);
+		std::string out;
+
+		for (int16_t r = sr; r <= er; r++)
+		{
+			auto it = rowstrings.find(r);
+			if (it == rowstrings.end())
+				continue;
+
+			const std::string& line = it->second;
+			int16_t from = (r == sr) ? sc : 0;
+			int16_t to = (r == er) ? ec : static_cast<int16_t>(line.size());
+			if (from < 0) from = 0;
+			if (to > static_cast<int16_t>(line.size())) to = static_cast<int16_t>(line.size());
+			if (to < from) to = from;
+
+			if (!out.empty())
+				out += "\n";
+			out += line.substr(from, to - from);
+		}
+
+		return out;
+	}
+
+	void UIChatBar::clear_selection()
+	{
+		has_selection = false;
+		sel_dragging = false;
 	}
 
 	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
@@ -538,6 +676,56 @@ namespace ms
 			}
 		}
 
+		if (!clicking)
+			sel_dragging = false;
+
+		if (chatopen && clicking)
+		{
+			int16_t ctop = getchattop();
+			int16_t cbottom = ctop + chatrows * CHATROWHEIGHT;
+
+			if (!sel_dragging)
+			{
+				// Begin a selection only when the press lands on an actual line.
+				if (cursorpos.x() >= 0 && cursorpos.x() <= 500
+					&& cursorpos.y() >= ctop && cursorpos.y() <= cbottom)
+				{
+					int16_t r = row_at(cursorpos);
+
+					if (r != ROW_NONE)
+					{
+						sel_arow = r;
+						sel_acol = col_at(r, cursorpos.x());
+						sel_frow = sel_arow;
+						sel_fcol = sel_acol;
+						sel_dragging = true;
+						has_selection = true;
+						return Cursor::State::CLICKING;
+					}
+				}
+			}
+			else
+			{
+				// Mid-drag: keep extending even when the cursor leaves the
+				// text — clamp it back into the log so the selection tracks
+				// off the end of a line / above / below like a normal drag.
+				int16_t cx = cursorpos.x();
+				if (cx < 0) cx = 0;
+				if (cx > 500) cx = 500;
+				int16_t cy = cursorpos.y();
+				if (cy < ctop) cy = ctop;
+				if (cy > cbottom - 1) cy = cbottom - 1;
+
+				int16_t r = row_at(Point<int16_t>(cx, cy));
+				if (r != ROW_NONE)
+				{
+					sel_frow = r;
+					sel_fcol = col_at(r, cx);
+				}
+				return Cursor::State::CLICKING;
+			}
+		}
+
 		return Cursor::State::IDLE;
 	}
 
@@ -608,6 +796,8 @@ namespace ms
 			std::forward_as_tuple(rowmax),
 			std::forward_as_tuple(Text::Font::A12M, Text::Alignment::LEFT, color, line, text_maxwidth)
 		);
+
+		rowstrings[rowmax] = line;
 
 		if (icon >= 0)
 		{
@@ -817,6 +1007,38 @@ namespace ms
 		std::string argument_block;
 		std::getline(whole, argument_block);
 		argument_block = trim(argument_block);
+
+		if (command == "/pet" || command == "/petcmd")
+		{
+			PetLook& pet = Stage::get().get_player().get_pet(0);
+
+			if (pet.get_itemid() == 0)
+			{
+				send_line("[Pet] You don't have a pet summoned.", RED);
+				return true;
+			}
+
+			if (command == "/pet")
+			{
+				if (argument_block.empty())
+				{
+					send_line("[Pet] Usage: /pet <message>", YELLOW);
+					return true;
+				}
+
+				PetChatPacket(pet.get_uniqueid(), 0, argument_block).dispatch();
+				return true;
+			}
+
+			int32_t cmd_id = 0;
+			parse_int32(argument_block, cmd_id);
+
+			if (cmd_id < 0 || cmd_id > 9)
+				cmd_id = 0;
+
+			PetCommandPacket(pet.get_uniqueid(), static_cast<int8_t>(cmd_id)).dispatch();
+			return true;
+		}
 
 		if (command == "/pt")
 		{

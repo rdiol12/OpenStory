@@ -47,6 +47,76 @@ namespace ms
 
 	// Spawn a hired merchant box on the map
 	// Opcode: SPAWN_HIRED_MERCHANT(265)
+	// Opcode: ENTRUSTED_SHOP_CHECK_RESULT(50)
+	class EntrustedShopCheckHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: SHOP_SCANNER_RESULT(70)
+	class OwlResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: SHOP_LINK_RESULT(71)
+	class OwlMessageHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: INVENTORY_GROW(30)
+	class InventoryGrowHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: DATA_CRC_CHECK_FAILED(123)
+	class PoliceHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: NOTIFY_MARRIAGE(106)
+	class MarriageNoticeHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: BRIDLE_MOB_CATCH_FAIL(79)
+	class MobCatchFailHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: SET_TAMING_MOB_INFO(48)
+	class TamingMobHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: MAP_TRANSFER_RESULT(42)
+	class TrockResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opcode: LEFT_KNOCK_BACK(284)
+	class LeftKnockBackHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	class SpawnHiredMerchantHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;

@@ -98,6 +98,10 @@ namespace ms
 		void send_scroll(double yoffset) override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
+
+		// Windows-style chat-log text selection (drag to highlight, Ctrl+C to copy).
+		std::string get_selected_text() const;
+		void clear_selection();
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
@@ -176,6 +180,18 @@ namespace ms
 		size_t lastpos;
 
 		std::unordered_map<int16_t, Text> rowtexts;
+		// Raw line string per row, kept so a selection can be copied to the clipboard.
+		std::unordered_map<int16_t, std::string> rowstrings;
+		static constexpr int16_t ROW_NONE = -30000;
+		int16_t row_at(Point<int16_t> cursorpos) const;
+		int16_t col_at(int16_t rowid, int16_t x) const;
+		// Selection anchor/focus as (row id, character column). Ordered into
+		// start/end by (row, col) reading order for highlight + copy.
+		void ordered_sel(int16_t& sr, int16_t& sc, int16_t& er, int16_t& ec) const;
+		int16_t sel_arow = 0, sel_acol = 0;
+		int16_t sel_frow = 0, sel_fcol = 0;
+		bool has_selection = false;
+		bool sel_dragging = false;
 		// Per-row icon id (0..3 from UIWindow.img/Megaphone) painted before
 		// the text on megaphone-broadcast rows. -1 = no icon.
 		std::unordered_map<int16_t, int8_t> rowicons;

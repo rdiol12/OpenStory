@@ -33,6 +33,8 @@
 
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/TradePackets.h"
+#include "../../Gameplay/MiniRooms.h"
+#include "UIOwl.h"
 
 #include <functional>
 #include <memory>
@@ -433,7 +435,11 @@ namespace ms
 					}
 					case InventoryType::Id::USE:
 					{
-						UseItemPacket(slot, item_id).dispatch();
+						if (item_id / 10000 == 212)
+							PetFoodPacket(slot, item_id).dispatch();
+						else
+							UseItemPacket(slot, item_id).dispatch();
+
 						break;
 					}
 					case InventoryType::Id::SETUP:
@@ -443,18 +449,50 @@ namespace ms
 					}
 					case InventoryType::Id::CASH:
 					{
-						if (item_id / 10000 == 514 || item_id / 10000 == 503)
+						if (item_id / 10000 == 503)
 						{
-							int8_t room_type = item_id / 10000 == 503 ? 5 : 4;
+							MiniRooms::get().set_pending_permit(item_id);
+							HiredMerchantRequestPacket().dispatch();
+							break;
+						}
 
+						if (item_id / 10000 == 514)
+						{
 							UI::get().emplace<UIEnterText>(
 								"Shop name:",
-								[item_id, room_type](const std::string& desc)
+								[item_id](const std::string& desc)
 								{
 									if (!desc.empty())
-										CreateShopPacket(desc, item_id, room_type).dispatch();
+										CreateShopPacket(desc, item_id, 4).dispatch();
 								},
 								30
+							);
+							break;
+						}
+
+						if (item_id / 10000 == 523)
+						{
+							UI::get().remove(UIElement::Type::OWL);
+							UI::get().emplace<UIOwl>(slot, item_id);
+							break;
+						}
+
+						if (item_id / 10000 == 500)
+						{
+							SpawnPetPacket(slot).dispatch();
+							break;
+						}
+
+						if (item_id / 10000 == 517)
+						{
+							UI::get().emplace<UIEnterText>(
+								"New pet name:",
+								[slot, item_id](const std::string& newname)
+								{
+									if (!newname.empty())
+										UsePetNameTagPacket(slot, item_id, newname).dispatch();
+								},
+								12
 							);
 							break;
 						}

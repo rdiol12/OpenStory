@@ -272,6 +272,44 @@ namespace ms
 		}
 	};
 
+	// Ask the server to validate a merchant deploy spot (Fredrick check)
+	class HiredMerchantRequestPacket : public OutPacket
+	{
+	public:
+		HiredMerchantRequestPacket() : OutPacket(OutPacket::Opcode::HIRED_MERCHANT_REQUEST) {}
+	};
+
+	// Request the most-searched-items leaderboard for the Owl dialog
+	class OwlActionPacket : public OutPacket
+	{
+	public:
+		OwlActionPacket() : OutPacket(OutPacket::Opcode::OWL_ACTION) {}
+	};
+
+	// Warp to a shop found through the Owl
+	class OwlWarpPacket : public OutPacket
+	{
+	public:
+		OwlWarpPacket(int32_t owner_id, int32_t map_id) : OutPacket(OutPacket::Opcode::OWL_WARP)
+		{
+			write_int(owner_id);
+			write_int(map_id);
+		}
+	};
+
+	// Consume an Owl of Minerva to search for an item across shops
+	class UseOwlSearchPacket : public OutPacket
+	{
+	public:
+		UseOwlSearchPacket(int16_t slot, int32_t owl_itemid, int32_t search_itemid)
+			: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(owl_itemid);
+			write_int(search_itemid);
+		}
+	};
+
 	// Ban a visitor from shop (owner only)
 	// action 14: byte slot (0 = first visitor)
 	class ShopBanVisitorPacket : public OutPacket

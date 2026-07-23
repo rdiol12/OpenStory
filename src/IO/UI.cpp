@@ -237,6 +237,24 @@ namespace ms
 		if (focusedtextfield && focusedtextfield->get_state() != Textfield::State::FOCUSED)
 			focusedtextfield = {};
 
+		// A chat-log selection copies like a normal Windows copy, ahead of the
+		// (usually empty) chat input box.
+		{
+			bool copy_ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];
+			if (copy_ctrl && pressed && keyboard.get_ctrl_action(keycode) == KeyAction::Id::COPY)
+			{
+				if (auto cb = UI::get().get_element<UIChatBar>())
+				{
+					std::string sel = cb->get_selected_text();
+					if (!sel.empty())
+					{
+						Window::get().setclipboard(sel);
+						return;
+					}
+				}
+			}
+		}
+
 		if (focusedtextfield)
 		{
 			bool ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];

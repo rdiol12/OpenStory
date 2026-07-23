@@ -91,6 +91,15 @@ namespace ms
 
 		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
 
+		// Monster Riding is broadcast with a custom body (mount id + skill id)
+		// rather than a per-stat short; seat the rider from their equipped mount.
+		if (firstmask & Buffstat::first_codes.at(Buffstat::Id::MONSTER_RIDING))
+		{
+			if (ochar)
+				ochar->set_riding(ochar->get_look().get_equips().get_equip(EquipSlot::Id::TAMEDMOB));
+			return;
+		}
+
 		// First-mask buffs (Dash, Energy Charge, Speed Infusion, ...) have no
 		// foreign-character effect path — consume their values to stay aligned.
 		for (int bit = 0; bit < 64 && recv.length() >= 2; bit++)
@@ -130,8 +139,12 @@ namespace ms
 			return;
 
 		int32_t cid = recv.read_int();
-		recv.read_long(); // firstmask — no foreign effect paths (see give)
+		uint64_t firstmask = static_cast<uint64_t>(recv.read_long());
 		uint64_t secondmask = static_cast<uint64_t>(recv.read_long());
+
+		if (firstmask & Buffstat::first_codes.at(Buffstat::Id::MONSTER_RIDING))
+			if (auto rc = Stage::get().get_chars().get_char(cid))
+				rc->set_riding(0);
 
 		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
 		if (ochar)
@@ -285,6 +298,14 @@ namespace ms
 		recv.read_byte(); // 0
 		std::string new_name = recv.read_string();
 		recv.read_byte(); // 0
+
+		if (auto character = Stage::get().get_character(cid))
+		{
+			PetLook& pet = character->get_pet(0);
+
+			if (pet.get_itemid() != 0)
+				pet.set_name(new_name);
+		}
 
 		chat::log("[Pet] Name changed to: " + new_name, chat::LineType::YELLOW);
 	}

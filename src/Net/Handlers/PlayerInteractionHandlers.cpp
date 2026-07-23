@@ -37,30 +37,36 @@ namespace ms
 		recv.read_byte(); // pMedalInfo
 
 		// Pets — sentinel-terminated (byte != 0 means pet follows, byte 0 ends list)
+		std::vector<UICharInfo::CharPetInfo> pets;
+
 		while (recv.read_byte() != 0)
 		{
-			recv.read_int();    // petItemId
-			recv.read_string(); // petName
-			recv.read_byte();   // petLevel
-			recv.read_short();  // petTameness
-			recv.read_byte();   // petFullness
-			recv.read_short();  // unknown (0)
-			recv.read_int();    // label ring itemId
+			UICharInfo::CharPetInfo pi;
+			pi.itemid = recv.read_int();
+			pi.name = recv.read_string();
+			pi.level = recv.read_byte();
+			pi.closeness = recv.read_short();
+			pi.fullness = recv.read_byte();
+			recv.read_short(); // unknown (0)
+			recv.read_int();   // label ring itemId
+			pets.push_back(std::move(pi));
 		}
 
 		int8_t mount_equipped = recv.read_byte();
+		int32_t m_level = 0, m_exp = 0, m_tired = 0;
 
 		if (mount_equipped != 0)
 		{
-			recv.read_int(); // mountLevel
-			recv.read_int(); // mountExp
-			recv.read_int(); // mountFatigue
+			m_level = recv.read_int();
+			m_exp = recv.read_int();
+			m_tired = recv.read_int();
 		}
 
 		int8_t wishlist_count = recv.read_byte();
+		std::vector<int32_t> wish;
 
 		for (int8_t w = 0; w < wishlist_count; w++)
-			recv.read_int(); // itemId
+			wish.push_back(recv.read_int());
 
 		recv.read_int(); // monsterBookLevel
 		recv.read_int(); // monsterBookNormals
@@ -92,7 +98,10 @@ namespace ms
 			UI::get().emplace<UICharInfo>(character_id);
 
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
+		{
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
+			charinfo->set_extra_info(std::move(pets), mount_equipped != 0, m_level, m_exp, m_tired, std::move(wish));
+		}
 	}
 
 	void FameResponseHandler::handle(InPacket& recv) const

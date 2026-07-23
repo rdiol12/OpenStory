@@ -21,12 +21,15 @@
 
 #include "../../Graphics/Text.h"
 
+#include <nlnx/node.hpp>
+
 namespace ms
 {
 	class ChatBalloon
 	{
 	public:
 		ChatBalloon(int8_t type);
+		ChatBalloon(nl::node src);
 		ChatBalloon();
 
 		void draw(Point<int16_t> position) const;

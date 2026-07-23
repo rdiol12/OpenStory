@@ -60,7 +60,12 @@ namespace ms
 		constexpr size_t WEAPON_TYPES = 20;
 		size_t index = (id / 10000) - 100;
 
-		if (index < NON_WEAPON_TYPES)
+		if (id / 10000 == 190)
+		{
+			type = "TAMING MOB";
+			eqslot = EquipSlot::Id::TAMEDMOB;
+		}
+		else if (index < NON_WEAPON_TYPES)
 		{
 			constexpr char* types[NON_WEAPON_TYPES] =
 			{

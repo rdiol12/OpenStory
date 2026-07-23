@@ -123,6 +123,15 @@ namespace ms
 		InviteToPartyPacket(const std::string& name) : PartyOperationPacket(PartyOperationPacket::Operation::INVITE)
 		{
 			write_string(name);
+			last_invited_name() = name;
+		}
+
+		// Remembered so status responses without a name (e.g. "already in
+		// a party", code 16) can say who they were about.
+		static std::string& last_invited_name()
+		{
+			static std::string name;
+			return name;
 		}
 	};
 

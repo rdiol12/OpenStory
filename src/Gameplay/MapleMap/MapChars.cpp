@@ -92,6 +92,14 @@ namespace ms
 			else
 			{
 				chars.add(spawn.instantiate());
+
+				if (auto added = get_char(cid))
+					for (size_t i = 0; i < spawn.get_pets().size() && i < 3; i++)
+					{
+						const SpawnPetEntry& pe = spawn.get_pets()[i];
+						added->add_pet(static_cast<uint8_t>(i), pe.itemid, pe.name,
+							pe.uniqueid, pe.pos, pe.stance, pe.fhid);
+					}
 			}
 		}
 

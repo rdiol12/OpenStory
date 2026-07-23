@@ -25,6 +25,7 @@
 #include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UISkillBook.h"
 
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
@@ -550,11 +551,17 @@ namespace ms
 
 	void Player::give_buff(Buff buff)
 	{
+		if (buff.stat == Buffstat::Id::MONSTER_RIDING)
+			set_riding(look.get_equips().get_equip(EquipSlot::Id::TAMEDMOB));
+
 		buffs[buff.stat] = buff;
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)
 	{
+		if (stat == Buffstat::Id::MONSTER_RIDING)
+			set_riding(0);
+
 		buffs[stat] = {};
 	}
 

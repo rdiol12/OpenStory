@@ -29,6 +29,7 @@
 #include "../../Character/Char.h"
 #include "../../Character/Player.h"
 #include "../../Character/Look/CharLook.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Graphics/DrawArgument.h"
 
 #ifdef USE_NX
@@ -45,7 +46,7 @@ namespace ms
 		listNpc_enabled = false;
 		drag_resize = false;
 		drag_resize_side = false;
-		zoom_scale = 1.0f;
+		zoom_scale = 1.5f;
 		drag_start_y = 0;
 		drag_start_x = 0;
 		drag_start_zoom = 1.0f;
@@ -112,6 +113,8 @@ namespace ms
 			for (auto sprite : normal_sprites)
 				sprite.draw(position, alpha);
 
+			draw_canvas_hd(0);
+
 			if (has_map)
 			{
 				Point<int16_t> scroll_off = get_scroll_offset(normal_dimensions, 0);
@@ -129,6 +132,8 @@ namespace ms
 		{
 			for (auto sprite : max_sprites)
 				sprite.draw(position, alpha);
+
+			draw_canvas_hd(MAX_ADJ);
 
 			region_text.draw(position + Point<int16_t>(48, 14));
 			town_text.draw(position + Point<int16_t>(48, 28));
@@ -593,6 +598,93 @@ namespace ms
 		map_sprite = Texture(Map["miniMap"]["canvas"]);
 		Point<int16_t> map_dimensions = map_sprite.get_dimensions();
 
+		nl::bitmap canvas_bm = Map["miniMap"]["canvas"];
+		size_t want_id = 0x4D4D4150ULL << 32 ^ canvas_bm.id();
+
+		if (has_map && canvas_bm.id() && canvas_hd_id != want_id)
+		{
+			const uint8_t* src = reinterpret_cast<const uint8_t*>(canvas_bm.data());
+			int sw = canvas_bm.width(), sh = canvas_bm.height();
+
+			if (src && sw > 0 && sh > 0)
+			{
+				const int F = 3;
+				canvas_hd_w = static_cast<int16_t>(sw * F);
+				canvas_hd_h = static_cast<int16_t>(sh * F);
+				canvas_hd.assign(static_cast<size_t>(canvas_hd_w) * canvas_hd_h * 4, 0);
+
+				// Catmull-Rom (bicubic) upscale keeps edges much crisper than
+				// bilinear, then a light unsharp pass restores line contrast.
+				auto cr_w = [](float t)
+				{
+					float a = t < 0 ? -t : t;
+					if (a <= 1.0f)
+						return 1.5f * a * a * a - 2.5f * a * a + 1.0f;
+					if (a < 2.0f)
+						return -0.5f * a * a * a + 2.5f * a * a - 4.0f * a + 2.0f;
+					return 0.0f;
+				};
+				auto clampi = [](int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); };
+
+				for (int y = 0; y < canvas_hd_h; y++)
+				{
+					float fy = (y + 0.5f) / F - 0.5f;
+					int yb = static_cast<int>(std::floor(fy));
+					float ty = fy - yb;
+
+					for (int x = 0; x < canvas_hd_w; x++)
+					{
+						float fx = (x + 0.5f) / F - 0.5f;
+						int xb = static_cast<int>(std::floor(fx));
+						float tx = fx - xb;
+
+						uint8_t* d = &canvas_hd[(static_cast<size_t>(y) * canvas_hd_w + x) * 4];
+
+						for (int ch = 0; ch < 4; ch++)
+						{
+							float v = 0.0f;
+							for (int j = -1; j <= 2; j++)
+							{
+								int sy = clampi(yb + j, 0, sh - 1);
+								float wyj = cr_w(ty - j);
+								if (wyj == 0.0f)
+									continue;
+								for (int i = -1; i <= 2; i++)
+								{
+									int sx = clampi(xb + i, 0, sw - 1);
+									v += src[(static_cast<size_t>(sy) * sw + sx) * 4 + ch]
+										* wyj * cr_w(tx - i);
+								}
+							}
+							d[ch] = static_cast<uint8_t>(clampi(static_cast<int>(v + 0.5f), 0, 255));
+						}
+					}
+				}
+
+				// unsharp mask: out = hd + 0.5 * (hd - blur3x3)
+				std::vector<uint8_t> soft = canvas_hd;
+				for (int y = 1; y < canvas_hd_h - 1; y++)
+				{
+					for (int x = 1; x < canvas_hd_w - 1; x++)
+					{
+						uint8_t* d = &canvas_hd[(static_cast<size_t>(y) * canvas_hd_w + x) * 4];
+						for (int ch = 0; ch < 3; ch++)
+						{
+							int blur = 0;
+							for (int j = -1; j <= 1; j++)
+								for (int i = -1; i <= 1; i++)
+									blur += soft[(static_cast<size_t>(y + j) * canvas_hd_w + (x + i)) * 4 + ch];
+							blur /= 9;
+							int sharp = d[ch] + (d[ch] - blur) / 2;
+							d[ch] = static_cast<uint8_t>(clampi(sharp, 0, 255));
+						}
+					}
+				}
+
+				canvas_hd_id = want_id;
+			}
+		}
+
 		// Apply zoom scale to get the effective display size of the map
 		int16_t zoomed_w = static_cast<int16_t>(map_dimensions.x() * zoom_scale);
 		int16_t zoomed_h = static_cast<int16_t>(map_dimensions.y() * zoom_scale);
@@ -654,8 +746,7 @@ namespace ms
 		// 27 = height of inner frame drawn on up and down borders
 		normal_sprites.emplace_back(MiddleCenter, DrawArgument(Point<int16_t>(7, 10), Point<int16_t>(c_stretch + 114, m_stretch + 27)));
 
-		if (has_map)
-			normal_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y), zoom_scale, zoom_scale));
+		canvas_pos = Point<int16_t>(map_draw_origin_x, map_draw_origin_y);
 
 		normal_sprites.emplace_back(Normal[MiddleLeft], DrawArgument(Point<int16_t>(0, ML_MR_Y), Point<int16_t>(0, m_stretch)));
 		normal_sprites.emplace_back(Normal[MiddleRight], DrawArgument(Point<int16_t>(middle_right_x, ML_MR_Y), Point<int16_t>(0, m_stretch)));
@@ -671,8 +762,6 @@ namespace ms
 		// Max sprites queue
 		max_sprites.emplace_back(MiddleCenter, DrawArgument(Point<int16_t>(7, 50), Point<int16_t>(c_stretch + 114, m_stretch + 27)));
 
-		if (has_map)
-			max_sprites.emplace_back(Map["miniMap"]["canvas"], DrawArgument(Point<int16_t>(map_draw_origin_x, map_draw_origin_y + MAX_ADJ), zoom_scale, zoom_scale));
 
 		max_sprites.emplace_back(Max[MiddleLeft], DrawArgument(Point<int16_t>(0, ML_MR_Y + MAX_ADJ), Point<int16_t>(0, m_stretch)));
 		max_sprites.emplace_back(Max[MiddleRight], DrawArgument(Point<int16_t>(middle_right_x, ML_MR_Y + MAX_ADJ), Point<int16_t>(0, m_stretch)));
@@ -685,6 +774,21 @@ namespace ms
 		max_sprites.emplace_back(nl::nx::map["MapHelper.img"]["mark"][Map["info"]["mapMark"]], DrawArgument(Point<int16_t>(7, 17)));
 
 		max_dimensions = normal_dimensions + Point<int16_t>(0, MAX_ADJ);
+	}
+
+	void UIMiniMap::draw_canvas_hd(int16_t yadj) const
+	{
+		if (!has_map || canvas_hd.empty())
+			return;
+
+		int16_t dw = static_cast<int16_t>(canvas_hd_w / 3.0f * zoom_scale);
+		int16_t dh = static_cast<int16_t>(canvas_hd_h / 3.0f * zoom_scale);
+		Point<int16_t> tl = position + canvas_pos + Point<int16_t>(0, yadj);
+
+		GraphicsGL::get().drawraw(
+			canvas_hd_id, canvas_hd_w, canvas_hd_h, canvas_hd.data(),
+			Rectangle<int16_t>(tl, tl + Point<int16_t>(dw, dh)),
+			Range<int16_t>(0, 0), Color(1.0f, 1.0f, 1.0f, 1.0f), 0.0f);
 	}
 
 	Point<int16_t> UIMiniMap::scale_map_pos(Point<int16_t> world_pos) const
@@ -711,10 +815,10 @@ namespace ms
 		// invisible on others. The player is drawn a bit larger to stand out.
 		float base = (zoom_scale > 0.0f) ? zoom_scale : 1.0f;
 
-		const float MM_MOB_SCALE  = base * 0.13f;
-		const float MM_NPC_SCALE  = base * 0.16f;
-		const float MM_DROP_SCALE = base * 0.16f;
-		const float MM_CHAR_SCALE = base * 0.18f;
+		const float MM_MOB_SCALE  = base * 0.07f;
+		const float MM_NPC_SCALE  = base * 0.09f;
+		const float MM_DROP_SCALE = base * 0.09f;
+		const float MM_CHAR_SCALE = base * 0.10f;
 
 		auto mm_point = [&](Point<int16_t> world_pos)
 		{

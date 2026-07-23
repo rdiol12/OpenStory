@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../../IO/Components/ChatBalloon.h"
+
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Template/EnumMap.h"
@@ -59,7 +61,23 @@ namespace ms
 		void set_stance(uint8_t stancebyte);
 
 		int32_t get_itemid() const;
+		int32_t get_uniqueid() const
+		{
+			return uniqueid;
+		}
+
+		Point<int16_t> get_position() const
+		{
+			return phobj.get_position();
+		}
+
 		Stance get_stance() const;
+
+		void speak(const std::string& text);
+		void set_name(const std::string& name);
+
+		// Play a command/feed reaction, then fall back to STAND.
+		void play_command(Stance stance);
 
 	private:
 		int32_t itemid;
@@ -71,5 +89,7 @@ namespace ms
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;
 		Text namelabel;
+		ChatBalloon balloon;
+		int16_t command_timer = 0;
 	};
 }

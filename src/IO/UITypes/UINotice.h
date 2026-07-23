@@ -192,9 +192,13 @@ namespace ms
 			int variant = 0);
 
 		void draw(float alpha) const override;
+		void update() override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
+
+		// Move this popup into the notification drawer (bell) and close it.
+		void stash();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -206,6 +210,9 @@ namespace ms
 		Texture backdrop;
 		Texture icon;
 		Text label;
+		std::string message_text;
+		int32_t age_ms = 0;
+		bool stashed = false;
 	};
 
 	// A button-less notice window used for "Waiting for partner..."

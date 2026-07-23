@@ -483,6 +483,12 @@ namespace ms
 	{
 		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
 
+		// The base hover loop resets un-hovered buttons to NORMAL; keep the
+		// currently-selected tab visually pressed regardless of the cursor.
+		uint16_t active_tab = Buttons::BT_TAB0 + tab;
+		if (buttons.count(active_tab) && buttons[active_tab]->is_active())
+			buttons[active_tab]->set_state(Button::State::PRESSED);
+
 		if (dragged)
 			return dstate;
 
@@ -777,7 +783,11 @@ namespace ms
 		std::unordered_set<int32_t> seen;
 		auto push = [&](int32_t sid)
 		{
-			if (sid / 10000 != static_cast<int32_t>(subid))
+			// Common prefix-0 skills (000.img, e.g. Monster Riding 1004)
+			// belong on the beginner tab of every tree — GM (900) included.
+			bool common_on_beginner = sid / 10000 == 0 && joblevel == Job::Level::BEGINNER;
+
+			if (sid / 10000 != static_cast<int32_t>(subid) && !common_on_beginner)
 				return;
 			// NX flags mount/item-tied skills (Balrog, spaceship, custom
 			// riding) and many GM/utility skills with invisible = 1. Hide those

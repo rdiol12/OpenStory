@@ -66,6 +66,7 @@ namespace ms
 		void update_text();
 		void update_canvas();
 		Point<int16_t> scale_map_pos(Point<int16_t> world_pos) const;
+		void draw_canvas_hd(int16_t yadj) const;
 		void draw_movable_markers(Point<int16_t> init_pos, float alpha) const;
 		Point<int16_t> get_scroll_offset(Point<int16_t> view_dims, int16_t y_adj) const;
 		void update_static_markers();
@@ -112,6 +113,14 @@ namespace ms
 		int16_t bt_min_width;
 		int16_t bt_max_width;
 		int16_t bt_map_width;
+		// CPU-upscaled minimap canvas (bilinear x3) drawn via drawraw so
+		// zooming samples a pre-smoothed image instead of stretching pixels.
+		std::vector<uint8_t> canvas_hd;
+		int16_t canvas_hd_w = 0;
+		int16_t canvas_hd_h = 0;
+		size_t canvas_hd_id = 0;
+		Point<int16_t> canvas_pos;
+
 		std::vector<Sprite> min_sprites;
 		std::vector<Sprite> normal_sprites;
 		std::vector<Sprite> max_sprites;
