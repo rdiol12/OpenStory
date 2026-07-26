@@ -15,47 +15,30 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
-#pragma once
-
-#include "../UIElement.h"
-
-#include "../../Character/Look/CharLook.h"
-#include "../../Graphics/Text.h"
-#include "../../Graphics/Animation.h"
-#include "../../Graphics/Texture.h"
+#include "Guild.h"
 
 namespace ms
 {
-	// On-air MapleTV overlay (MapleTV.img/TVbasic): the TV frame in the
-	// top-right corner with the sender's character and the broadcast
-	// lines, shown while a SEND_TV broadcast is live
-	class UIMapleTVView : public UIElement
+	GuildTag::GuildTag() : label(Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::MEDIUMBLUE))
 	{
-	public:
-		static constexpr Type TYPE = UIElement::Type::MAPLETVVIEW;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = false;
+	}
 
-		UIMapleTVView();
+	void GuildTag::draw(Point<int16_t> absp) const
+	{
+		if (!label.get_text().empty())
+			label.draw(absp + Point<int16_t>(0, 8));
+	}
 
-		void draw(float inter) const override;
-		void update() override;
+	void GuildTag::set_name(const std::string& name)
+	{
+		label.change_text(name);
+	}
 
-		// Never intercept clicks — it's a pure overlay
-		bool is_in_range(Point<int16_t> cursorpos) const override;
-
-		UIElement::Type get_type() const override;
-
-	private:
-		Texture tv_frame;
-		Animation tv_off;
-		mutable Text line_text;
-		mutable Text name_text;
-
-		CharLook sender_look;
-		bool has_look = false;
-		int32_t seen_serial = -1;
-		uint16_t line_tick = 0;
-		size_t line_index = 0;
-	};
+	void GuildTag::set_mark(int16_t bg, int8_t bgcolor, int16_t logo, int8_t logocolor)
+	{
+		mark_bg = bg;
+		mark_bgcolor = bgcolor;
+		mark_logo = logo;
+		mark_logocolor = logocolor;
+	}
 }

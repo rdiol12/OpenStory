@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Party.h"
 
+#include "../Graphics/Geometry.h"
+
 namespace ms
 {
 	void Party::update(int32_t partyid, const std::vector<PartyMember>& new_members, int32_t leader_cid)
@@ -78,5 +80,30 @@ namespace ms
 	const std::vector<PartyMember>& Party::get_members() const
 	{
 		return members;
+	}
+
+	void PartyHpBar::set(int32_t h, int32_t mh)
+	{
+		hp = h;
+		maxhp = mh;
+	}
+
+	void PartyHpBar::clear()
+	{
+		hp = 0;
+		maxhp = 0;
+	}
+
+	void PartyHpBar::draw(Point<int16_t> absp) const
+	{
+		if (maxhp <= 0)
+			return;
+
+		static MobHpBar bar;
+		int16_t percent = static_cast<int16_t>(
+			hp > 0 ? (100 * hp) / maxhp : 0);
+		if (percent > 100)
+			percent = 100;
+		bar.draw(absp + Point<int16_t>(0, -58), percent);
 	}
 }

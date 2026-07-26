@@ -22,6 +22,8 @@
 #include "../../IO/UITypes/UICharInfo.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 
+#include "../../Gameplay/Stage.h"
+
 namespace ms
 {
 	void CharInfoHandler::handle(InPacket& recv) const
@@ -96,6 +98,23 @@ namespace ms
 
 		if (!existing)
 			UI::get().emplace<UICharInfo>(character_id);
+
+		Player& player = Stage::get().get_player();
+
+		if (character_id == player.get_oid())
+		{
+			if (mount_equipped != 0)
+			{
+				player.set_mount_stats(m_level, m_exp, m_tired);
+			}
+			else if (player.get_mount_level() > 0)
+			{
+				mount_equipped = 1;
+				m_level = player.get_mount_level();
+				m_exp = player.get_mount_exp();
+				m_tired = player.get_mount_tiredness();
+			}
+		}
 
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
 		{

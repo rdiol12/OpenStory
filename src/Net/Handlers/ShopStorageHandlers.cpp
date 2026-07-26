@@ -55,71 +55,13 @@ namespace ms
 
 		UIStorage::ItemEntry parse_storage_item(InPacket& recv, InventoryType::Id forced_type, InventoryType::Id& parsed_type)
 		{
-			int8_t item_type = recv.read_byte();
-			int32_t itemid = recv.read_int();
+			ItemParser::SkimmedItem item = ItemParser::skim_item(recv);
 
 			parsed_type = forced_type;
 			if (parsed_type == InventoryType::Id::NONE)
-				parsed_type = InventoryType::by_item_id(itemid);
+				parsed_type = InventoryType::by_item_id(item.itemid);
 
-			bool cash = recv.read_bool();
-			if (cash)
-				recv.skip(8); // unique ID
-
-			recv.skip(8); // expiration
-
-			UIStorage::ItemEntry entry = { itemid, 1 };
-
-			bool is_equip = (parsed_type == InventoryType::Id::EQUIP) || (item_type == 1);
-			bool is_pet = (itemid >= 5000000 && itemid <= 5000102);
-
-			if (is_equip)
-			{
-				recv.read_byte();  // upgrade slots
-				recv.read_byte();  // level
-
-				// 15 equip stats (Cosmic v83): STR, DEX, INT, LUK, HP, MP, WATK, MATK, WDEF, MDEF, ACC, AVOID, HANDS, SPEED, JUMP
-				for (int i = 0; i < 15; i++)
-					recv.read_short();
-
-				recv.read_string(); // owner
-				recv.read_short();  // flag
-
-				if (cash)
-				{
-					recv.skip(10);
-				}
-				else
-				{
-					recv.read_byte();   // unk
-					recv.read_byte();   // item level
-					recv.read_short();  // unk
-					recv.read_short();  // item exp
-					recv.read_int();    // vicious
-					recv.read_long();   // unk
-				}
-
-				recv.skip(12); // trailing data
-			}
-			else if (is_pet)
-			{
-				recv.read_padded_string(13);
-				recv.read_byte();  // pet level
-				recv.read_short(); // closeness
-				recv.read_byte();  // fullness
-				recv.skip(18);
-			}
-			else
-			{
-				entry.count = recv.read_short();
-				recv.read_string(); // owner
-				recv.read_short();  // flag
-
-				if ((itemid / 10000 == 233) || (itemid / 10000 == 207))
-					recv.skip(8);
-			}
-
-			return entry;
+			return { item.itemid, item.count };
 		}
 
 		struct ParsedStorageItems
@@ -1186,11 +1128,16 @@ namespace ms
 
 	void TamingMobHandler::handle(InPacket& recv) const
 	{
-		recv.read_int();
-		recv.read_int();
-		recv.read_int();
-		recv.read_int();
-		recv.read_byte();
+		int32_t cid = recv.read_int();
+		int32_t level = recv.read_int();
+		int32_t exp = recv.read_int();
+		int32_t tiredness = recv.read_int();
+		recv.read_byte(); // levelup
+
+		Player& player = Stage::get().get_player();
+
+		if (cid == player.get_oid())
+			player.set_mount_stats(level, exp, tiredness);
 	}
 
 	void TrockResultHandler::handle(InPacket& recv) const

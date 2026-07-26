@@ -50,7 +50,6 @@
 #include "UIGuild.h"
 #include "UIRanking.h"
 #include "UIMonsterBook.h"
-#include "UISystemOption.h"
 #include "UIChat.h"
 #include "UIFarmChat.h"
 #include "UIWhisper.h"

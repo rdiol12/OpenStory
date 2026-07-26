@@ -220,15 +220,6 @@ namespace ms
 			{
 				toggle_active();
 			}
-			else if (keycode == KeyAction::Id::TAB)
-			{
-				uint16_t newtab = tab + 1;
-
-				if (newtab >= Buttons::BT_TABE)
-					newtab = Buttons::BT_TAB0;
-
-				change_tab(newtab);
-			}
 		}
 	}
 
@@ -320,37 +311,9 @@ namespace ms
 
 	void UIEquipInventory::change_tab(uint16_t tabid)
 	{
-		uint8_t oldtab = tab;
+		// Single-page v83 window: tab buttons are never created, so only
+		// remember the id (guards the old multi-tab code's null derefs).
 		tab = tabid;
-
-		if (oldtab != tab)
-		{
-			clear_tooltip();
-
-			buttons[oldtab]->set_state(Button::State::NORMAL);
-			buttons[tab]->set_state(Button::State::PRESSED);
-
-			if (tab == Buttons::BT_TAB0)
-				buttons[Buttons::BT_SLOT]->set_active(true);
-			else
-				buttons[Buttons::BT_SLOT]->set_active(false);
-
-			if (tab == Buttons::BT_TAB2)
-			{
-				buttons[Buttons::BT_CONSUMESETTING]->set_active(true);
-				buttons[Buttons::BT_EXCEPTION]->set_active(true);
-			}
-			else
-			{
-				buttons[Buttons::BT_CONSUMESETTING]->set_active(false);
-				buttons[Buttons::BT_EXCEPTION]->set_active(false);
-			}
-
-			if (tab == Buttons::BT_TAB3)
-				buttons[Buttons::BT_SHOP]->set_active(true);
-			else
-				buttons[Buttons::BT_SHOP]->set_active(false);
-		}
 	}
 
 	UIEquipInventory::EquipIcon::EquipIcon(int16_t s)

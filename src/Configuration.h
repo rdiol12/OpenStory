@@ -44,10 +44,6 @@ namespace ms
 		bool get_show_packets() const;
 		// Get private member AUTO_LOGIN
 		bool get_auto_login() const;
-		// Get the world to login with
-		uint8_t get_auto_world();
-		// Get the channel to login with
-		uint8_t get_auto_channel();
 		// Get the account to login with
 		std::string get_auto_acc();
 		// Get the password to login with
@@ -62,10 +58,6 @@ namespace ms
 		std::string get_version() const;
 		// Get private member LoginMusic
 		std::string get_login_music() const;
-		// Get private member LoginMusicSEA
-		std::string get_login_music_sea() const;
-		// Get private member LoginMusicNewtro
-		std::string get_login_music_newtro() const;
 		// Get private member JOINLINK
 		std::string get_joinlink() const;
 		// Get private member WEBSITE
@@ -122,13 +114,12 @@ namespace ms
 		void set_admin(bool value);
 
 		// Auto potion settings
-		int32_t get_auto_hp_pot() const { return auto_hp_pot; }
 		void set_auto_hp_pot(int32_t itemid) { auto_hp_pot = itemid; }
-		int32_t get_auto_mp_pot() const { return auto_mp_pot; }
 		void set_auto_mp_pot(int32_t itemid) { auto_mp_pot = itemid; }
+		int32_t get_auto_hp_pot() const { return auto_hp_pot; }
+		int32_t get_auto_mp_pot() const { return auto_mp_pot; }
 
 		// Extra pendant slot
-		bool get_extra_pendant_slot() const { return extra_pendant_slot; }
 		void set_extra_pendant_slot(bool enabled) { extra_pendant_slot = enabled; }
 
 		// Base class for an entry in the settings file
@@ -237,8 +228,6 @@ namespace ms
 		const char* TITLE = "OpenStory";
 		const char* VERSION = "83";
 		const char* LoginMusic = "BgmUI.img/Title";
-		const char* LoginMusicSEA = "BgmGL.img/OldMaple";
-		const char* LoginMusicNewtro = "BgmEvent2.img/Newtro_Login";
 		const char* JOINLINK = "https://www.nexon.com/account/en/create";
 		const char* WEBSITE = "http://maplestory.nexon.net/";
 		const char* FINDID = "https://www.nexon.com/account/en/login";
@@ -248,8 +237,6 @@ namespace ms
 		const bool SHOW_FPS = false;
 		const bool SHOW_PACKETS = false;
 		const bool AUTO_LOGIN = false;
-		const uint8_t auto_world = 0;
-		const uint8_t auto_channel = 0;
 		const std::string auto_acc = "";
 		const std::string auto_pass = "";
 		const std::string auto_pic = "";
@@ -651,11 +638,6 @@ namespace ms
 		PosSYSTEMOPTION() : PointEntry("PosSYSTEMOPTION", "(200, 100)") {}
 	};
 
-	// The default position of UIGameSettings
-	struct PosGAMESETTINGS : public Configuration::PointEntry
-	{
-		PosGAMESETTINGS() : PointEntry("PosGAMESETTINGS", "(300, 200)") {}
-	};
 
 	// The default position of UIChatWindow
 	struct PosCHATWINDOW : public Configuration::PointEntry

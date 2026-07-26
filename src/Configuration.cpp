@@ -297,16 +297,6 @@ namespace ms
 		return AUTO_LOGIN;
 	}
 
-	uint8_t Configuration::get_auto_world()
-	{
-		return auto_world;
-	}
-
-	uint8_t Configuration::get_auto_channel()
-	{
-		return auto_channel;
-	}
-
 	std::string Configuration::get_auto_acc()
 	{
 		return auto_acc;
@@ -340,16 +330,6 @@ namespace ms
 	std::string Configuration::get_login_music() const
 	{
 		return LoginMusic;
-	}
-
-	std::string Configuration::get_login_music_sea() const
-	{
-		return LoginMusicSEA;
-	}
-
-	std::string Configuration::get_login_music_newtro() const
-	{
-		return LoginMusicNewtro;
 	}
 
 	std::string Configuration::get_joinlink() const

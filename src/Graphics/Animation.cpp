@@ -370,6 +370,11 @@ namespace ms
 		return get_frame().get_bounds();
 	}
 
+	int16_t Animation::get_frame_index() const
+	{
+		return frame.get();
+	}
+
 	const Frame& Animation::get_frame() const
 	{
 		// Clamp the frame index — a stale/oversized index (e.g. from a bullet

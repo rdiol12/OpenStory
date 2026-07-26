@@ -43,8 +43,7 @@ namespace ms
 	//   aiSkinArm           bitmap  optional second material for sleeve parts
 	//                               ("leather coat, steel pauldrons")
 	//   aiShellFullHead     int     1 on an AI hat = intentional closed helm
-	//                               (hides head/hair/face; replaceHead is ignored
-	//                               on AI hats)
+	//                               (hides head/hair/face)
 	namespace AiSkin
 	{
 		// Whether this equip carries an aiSkin material. info = the .img's info node.

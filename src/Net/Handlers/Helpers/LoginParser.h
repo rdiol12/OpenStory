@@ -29,6 +29,9 @@ namespace ms
 		RecommendedWorld parse_recommended_world(InPacket& recv);
 		CharEntry parse_charentry(InPacket& recv);
 		StatsEntry parse_stats(InPacket& recv);
+		// has_sp_table: cash shop variant — SP-table jobs get a skill-info block
+		// instead of the SP short, and the SP short is discarded otherwise.
+		StatsEntry parse_stats(InPacket& recv, bool has_sp_table, uint8_t* skin, int32_t* faceid, int32_t* hairid);
 		LookEntry parse_look(InPacket& recv);
 		void parse_login(InPacket& recv);
 	}

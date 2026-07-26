@@ -101,40 +101,10 @@ namespace ms
 
 		int32_t cid = recv.read_int();
 
-		// Parse stats directly from packet (same fields as LoginParser::parse_stats)
-		StatsEntry statsentry;
-
-		statsentry.name = recv.read_padded_string(13);
-		statsentry.female = recv.read_bool();
-
-		uint8_t skin = recv.read_byte();
-		int32_t faceid = recv.read_int();
-		int32_t hairid = recv.read_int();
-
-		for (size_t i = 0; i < 3; i++)
-			statsentry.petids.push_back(recv.read_long());
-
-		statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte();
-		statsentry.stats[MapleStat::Id::JOB] = recv.read_short();
-		statsentry.stats[MapleStat::Id::STR] = recv.read_short();
-		statsentry.stats[MapleStat::Id::DEX] = recv.read_short();
-		statsentry.stats[MapleStat::Id::INT] = recv.read_short();
-		statsentry.stats[MapleStat::Id::LUK] = recv.read_short();
-		statsentry.stats[MapleStat::Id::HP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::MAXHP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::MP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::MAXMP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::AP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::SP] = recv.read_short();
-		statsentry.exp = recv.read_int();
-		statsentry.stats[MapleStat::Id::FAME] = recv.read_short();
-
-		recv.skip(4); // gachaexp
-
-		statsentry.mapid = recv.read_int();
-		statsentry.portal = recv.read_byte();
-
-		recv.skip(4); // timestamp
+		uint8_t skin;
+		int32_t faceid;
+		int32_t hairid;
+		StatsEntry statsentry = LoginParser::parse_stats(recv, false, &skin, &faceid, &hairid);
 
 		// Build minimal look entry with skin/face/hair
 		LookEntry look;

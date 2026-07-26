@@ -17,43 +17,54 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../../Graphics/Animation.h"
+
+#include <vector>
 
 namespace ms
 {
-	// System chat/message window (ChatWindow from UIWindow2.img)
-	class UIChatWindow : public UIDragElement<PosCHATWINDOW>
+	class MountLook
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::CHATWINDOW;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
-
-		UIChatWindow();
-
-		void draw(float inter) const override;
-
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
-
-	private:
-		void close();
-
-		enum Buttons : uint16_t
+		enum class Gait
 		{
-			BT_CLOSE,
-			BT_CONFIRM,
-			BT_YES,
-			BT_NO,
-			BT_NEXT,
-			BT_BEFORE
+			STAND,
+			WALK,
+			JUMP,
+			ROPE,
+			LADDER,
+			PRONE,
+			FLY,
+			LENGTH
 		};
 
-		Texture backgrnd;
-		std::vector<Texture> box_frames;
+		void set_mount(int32_t itemid);
+
+		int32_t get_itemid() const
+		{
+			return itemid;
+		}
+
+		bool is_active() const
+		{
+			return itemid != 0;
+		}
+
+		void update(Gait gait);
+		void draw(Point<int16_t> absp, Gait gait, bool flip, float alpha) const;
+
+		// Seat point of the mount's CURRENT animation frame — the rider is
+		// re-anchored every frame so they bob with the gallop like vanilla.
+		Point<int16_t> seat_offset(Gait gait) const;
+
+	private:
+		static constexpr size_t NUM_GAITS = static_cast<size_t>(Gait::LENGTH);
+
+		const Animation& current_ani(Gait gait) const;
+		Point<int16_t> current_navel(Gait gait) const;
+
+		int32_t itemid = 0;
+		Animation anis[NUM_GAITS];
+		std::vector<Point<int16_t>> navels[NUM_GAITS];
 	};
 }

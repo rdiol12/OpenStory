@@ -1491,6 +1491,9 @@ namespace ms
 		int32_t groom_id = recv.read_int();
 		int32_t bride_id = recv.read_int();
 
+		if (!UI::get().get_element<UIWedding>())
+			UI::get().emplace<UIWedding>();
+
 		if (auto wedding = UI::get().get_element<UIWedding>())
 			wedding->set_countdown(step);
 	}

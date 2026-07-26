@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "LoginParser.h"
 
+#include "CashShopParser.h"
+
 #include "../../Session.h"
 
 namespace ms
@@ -120,21 +122,37 @@ namespace ms
 
 	StatsEntry LoginParser::parse_stats(InPacket& recv)
 	{
-		// Note: Shares character stat parsing logic with CashShopParser::parseCharStats
+		return parse_stats(recv, false, nullptr, nullptr, nullptr);
+	}
+
+	StatsEntry LoginParser::parse_stats(InPacket& recv, bool has_sp_table, uint8_t* skin, int32_t* faceid, int32_t* hairid)
+	{
 		StatsEntry statsentry;
 
 		statsentry.name = recv.read_padded_string(13);
 		statsentry.female = recv.read_bool();
 
-		recv.read_byte();	// skin
-		recv.read_int();	// face
-		recv.read_int();	// hair
+		uint8_t cskin = recv.read_byte();
+		int32_t cface = recv.read_int();
+		int32_t chair = recv.read_int();
+
+		if (skin)
+			*skin = cskin;
+
+		if (faceid)
+			*faceid = cface;
+
+		if (hairid)
+			*hairid = chair;
 
 		for (size_t i = 0; i < 3; i++)
 			statsentry.petids.push_back(recv.read_long());
 
 		statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // v83 uses byte for level (max 200)
-		statsentry.stats[MapleStat::Id::JOB] = recv.read_short();
+
+		auto job = recv.read_short();
+
+		statsentry.stats[MapleStat::Id::JOB] = job;
 		statsentry.stats[MapleStat::Id::STR] = recv.read_short();
 		statsentry.stats[MapleStat::Id::DEX] = recv.read_short();
 		statsentry.stats[MapleStat::Id::INT] = recv.read_short();
@@ -144,7 +162,19 @@ namespace ms
 		statsentry.stats[MapleStat::Id::MP] = recv.read_short();
 		statsentry.stats[MapleStat::Id::MAXMP] = recv.read_short();
 		statsentry.stats[MapleStat::Id::AP] = recv.read_short();
-		statsentry.stats[MapleStat::Id::SP] = recv.read_short();
+
+		if (has_sp_table)
+		{
+			if (CashShopParser::hasSPTable(job))
+				CashShopParser::parseRemainingSkillInfo(recv);
+			else
+				recv.read_short(); // remaining sp
+		}
+		else
+		{
+			statsentry.stats[MapleStat::Id::SP] = recv.read_short();
+		}
+
 		statsentry.exp = recv.read_int();
 		statsentry.stats[MapleStat::Id::FAME] = recv.read_short();
 

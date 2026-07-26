@@ -117,21 +117,32 @@ namespace ms
 	class FamilySeparateLeavePacket : public OutPacket
 	{
 	public:
-		FamilySeparateLeavePacket()
+		// Cosmic's FamilySeparateHandler reads the entry id to fork on.
+		FamilySeparateLeavePacket(int32_t entry_id)
 			: OutPacket(OutPacket::Opcode::SEPARATE_FAMILY_BY_JUNIOR)
 		{
+			write_int(entry_id);
 		}
 	};
 
 	// Ask server for the tree / pedigree chart (OPEN_FAMILY_PEDIGREE).
+	// Cosmic resolves the target by NAME, not by character id.
 	class FamilyPedigreeRequestPacket : public OutPacket
 	{
 	public:
-		FamilyPedigreeRequestPacket(int32_t cid)
+		FamilyPedigreeRequestPacket(const std::string& name)
 			: OutPacket(OutPacket::Opcode::OPEN_FAMILY_PEDIGREE)
 		{
-			write_int(cid);
+			write_string(name);
 		}
+	};
+
+	// Ask the server to send our family data (OPEN_FAMILY). Cosmic's
+	// OpenFamilyHandler takes no payload and answers with the family info.
+	class FamilyOpenPacket : public OutPacket
+	{
+	public:
+		FamilyOpenPacket() : OutPacket(OutPacket::Opcode::OPEN_FAMILY) {}
 	};
 
 	// Set the family motto / precepts (leader only; max 200 chars).

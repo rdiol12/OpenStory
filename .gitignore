@@ -35,3 +35,7 @@ crash_debug.txt
 
 # local deploy scripts (never publish - contain server/ssh details)
 *.sh
+
+# python bytecode
+__pycache__/
+*.pyc

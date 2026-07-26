@@ -245,30 +245,30 @@ namespace ms
 
 			rowtext.change_color(Color::Name::BLACK);
 			rowtext.change_text("Search results for ");
-			rowtext.draw(position + Point<int16_t>(26, 81));
+			rowtext.draw(position + Point<int16_t>(26, 66));
 			int16_t adv = rowtext.width();
 			rowtext.change_color(Color::Name::RED);
 			rowtext.change_text(iname);
-			rowtext.draw(position + Point<int16_t>(26 + adv, 81));
+			rowtext.draw(position + Point<int16_t>(26 + adv, 66));
 			int16_t adv2 = rowtext.width() + 5;
 			rowtext.change_color(Color::Name::BLACK);
 			rowtext.change_text("that you entered.");
-			rowtext.draw(position + Point<int16_t>(26 + adv + adv2, 81));
+			rowtext.draw(position + Point<int16_t>(26 + adv + adv2, 66));
 
 			rowtext.change_text("Total of ");
-			rowtext.draw(position + Point<int16_t>(26, 97));
+			rowtext.draw(position + Point<int16_t>(26, 82));
 			adv = rowtext.width();
 			rowtext.change_color(Color::Name::RED);
 			rowtext.change_text(std::to_string(results.size()));
-			rowtext.draw(position + Point<int16_t>(26 + adv, 97));
+			rowtext.draw(position + Point<int16_t>(26 + adv, 82));
 			adv2 = rowtext.width() + 5;
 			rowtext.change_color(Color::Name::BLACK);
 			rowtext.change_text("results available.");
-			rowtext.draw(position + Point<int16_t>(26 + adv + adv2, 97));
+			rowtext.draw(position + Point<int16_t>(26 + adv + adv2, 82));
 
 			rowtext.change_color(Color::Name::RED);
 			rowtext.change_text("You may not use \"GO\" if the store is either on a different channel or closed.");
-			rowtext.draw(position + Point<int16_t>(26, 113));
+			rowtext.draw(position + Point<int16_t>(26, 98));
 
 			int16_t y = 174;
 			int16_t shown = 0;

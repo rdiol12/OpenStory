@@ -66,26 +66,6 @@ namespace ms
 		data.etc = parse_bot_items(recv);
 		data.equipped = parse_bot_items(recv);
 
-		// Debug log
-		static FILE* dbg = fopen("bot_inventory_debug.txt", "a");
-		if (dbg)
-		{
-			fprintf(dbg, "BOT_INV: id=%d name=%s lv=%d meso=%d equip=%zu use=%zu setup=%zu etc=%zu equipped=%zu\n",
-				data.char_id, data.name.c_str(), data.level, data.meso,
-				data.equip.size(), data.use.size(), data.setup.size(), data.etc.size(), data.equipped.size());
-
-			auto log_items = [&](const char* name, const std::vector<BotItem>& items) {
-				for (size_t i = 0; i < items.size(); i++)
-					fprintf(dbg, "  %s[%zu]: slot=%d itemid=%d count=%d\n", name, i, items[i].slot, items[i].item_id, items[i].count);
-			};
-			log_items("equip", data.equip);
-			log_items("use", data.use);
-			log_items("setup", data.setup);
-			log_items("etc", data.etc);
-			log_items("equipped", data.equipped);
-			fflush(dbg);
-		}
-
 		// Create charinfo window if it doesn't exist
 		if (!UI::get().get_element<UICharInfo>())
 			UI::get().emplace<UICharInfo>(data.char_id);
@@ -96,17 +76,6 @@ namespace ms
 				charinfo->toggle_active();
 
 			charinfo->set_bot_inventory(std::move(data));
-
-			if (dbg)
-			{
-				fprintf(dbg, "  -> set_bot_inventory called, is_valid=%d\n", charinfo->get_char_id());
-				fflush(dbg);
-			}
-		}
-		else if (dbg)
-		{
-			fprintf(dbg, "  -> UICharInfo NOT FOUND\n");
-			fflush(dbg);
 		}
 	}
 }

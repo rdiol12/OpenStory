@@ -42,6 +42,9 @@ namespace ms
 		recv.read_short(); // unused
 		recv.read_long();  // unused
 
+		if (!UI::get().get_element<UIMonsterCarnival>())
+			UI::get().emplace<UIMonsterCarnival>();
+
 		if (auto carnival = UI::get().get_element<UIMonsterCarnival>())
 		{
 			carnival->set_team(team);

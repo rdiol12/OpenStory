@@ -25,7 +25,17 @@ namespace ms
 {
 	namespace ItemParser
 	{
+		struct SkimmedItem
+		{
+			int8_t type;
+			int32_t itemid;
+			int16_t count;
+		};
+
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory);
+
+		// Consume an item's data from the packet without storing it, returning type/id/count
+		SkimmedItem skim_item(InPacket& recv);
 
 		// Consume an item's data from the packet without storing it (e.g., Duey packages)
 		int32_t skip_item(InPacket& recv);

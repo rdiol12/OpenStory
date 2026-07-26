@@ -30,7 +30,6 @@
 #include "../../IO/UITypes/UIMonsterBook.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UISkillBook.h"
-#include "../../IO/UITypes/UISkillMacro.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -123,8 +122,6 @@ namespace ms
 				player.set_state(Char::State::DIED);
 				Sound(Sound::Name::TOMBSTONE).play();
 
-				static FILE* ddbg = fopen("death_debug.txt", "a");
-				if (ddbg) { fprintf(ddbg, "DIED: HP=0, showing dialog\n"); fflush(ddbg); }
 
 				UI::get().emplace<UIDeathNotice>("You have died. Press OK to return to the nearest town.", [](bool ok) {
 					// Revive request. Cosmic's ChangeMapHandler only respawns

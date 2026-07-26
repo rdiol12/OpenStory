@@ -109,7 +109,7 @@ namespace ms
 		return std::make_unique<ItemDrop>(oid, owner, start, dest, droptype, mode, id, playerdrop, icon);
 	}
 
-	CharSpawn::CharSpawn(int32_t c, const LookEntry& lk, uint8_t l, int16_t j, const std::string& nm, int8_t st, Point<int16_t> p, std::vector<SpawnPetEntry> pt) : cid(c), look(lk), level(l), job(j), name(nm), stance(st), position(p), pets(std::move(pt)) {}
+	CharSpawn::CharSpawn(int32_t c, const LookEntry& lk, uint8_t l, int16_t j, const std::string& nm, int8_t st, Point<int16_t> p, std::vector<SpawnPetEntry> pt, int32_t rd) : cid(c), look(lk), level(l), job(j), name(nm), stance(st), position(p), pets(std::move(pt)), riding(rd) {}
 
 	int32_t CharSpawn::get_cid() const
 	{

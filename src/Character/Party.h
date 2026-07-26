@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "../Template/Point.h"
+
 #include <string>
 #include <cstdint>
 #include <vector>
@@ -51,5 +53,19 @@ namespace ms
 		int32_t id = 0;
 		int32_t leader = 0;
 		std::vector<PartyMember> members;
+	};
+
+	// Party overhead HP gauge on a character (stamped by UIPartyHUD while
+	// partied) — same look and behaviour as the mob bar.
+	class PartyHpBar
+	{
+	public:
+		void set(int32_t hp, int32_t maxhp);
+		void clear();
+		void draw(Point<int16_t> absp) const;
+
+	private:
+		int32_t hp = 0;
+		int32_t maxhp = 0;
 	};
 }

@@ -27,17 +27,12 @@
 
 namespace ms
 {
-	class UIEvanCreation : public UIElement
+	class UICreationBase : public UIElement
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::CLASSCREATION;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
-
-		UIEvanCreation();
-
-		void draw(float inter) const override;
-		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
@@ -47,39 +42,50 @@ namespace ms
 		void send_naming_result(bool nameused);
 
 	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
+		UICreationBase(uint16_t creation_job);
 
-	private:
-		void randomize_look();
+		Button::State naming_ok_pressed();
 		const std::string& get_equipname(EquipSlot::Id slot) const;
+
+		// Uniform 800x600 content scaling, centered in the view (same treatment
+		// as UIWorldSelect / UICharSelect). lay() maps a design point to screen;
+		Point<int16_t> lay(int16_t x, int16_t y) const;
+		float ui_scale;
+		Point<int16_t> box;
 
 		enum Buttons : uint16_t
 		{
 			BT_BACK,
 			BT_CHARC_OK,
 			BT_CHARC_CANCEL,
+			BT_CHARC_FACEL,
+			BT_CHARC_FACER,
+			BT_CHARC_HAIRL,
+			BT_CHARC_HAIRR,
 			BT_CHARC_SKINL,
 			BT_CHARC_SKINR,
+			BT_CHARC_TOPL,
+			BT_CHARC_TOPR,
+			BT_CHARC_BOTL,
+			BT_CHARC_BOTR,
+			BT_CHARC_SHOESL,
+			BT_CHARC_SHOESR,
+			BT_CHARC_WEPL,
+			BT_CHARC_WEPR,
 			BT_CHARC_GENDER_M,
-			BT_CHARC_GEMDER_F
+			BT_CHARC_GEMDER_F,
+			BT_CHARC_HAIRC0,
+			BT_CHARC_HAIRC1,
+			BT_CHARC_HAIRC2,
+			BT_CHARC_HAIRC3,
+			BT_CHARC_HAIRC4,
+			BT_CHARC_HAIRC5,
+			BT_CHARC_HAIRC6,
+			BT_CHARC_HAIRC7
 		};
 
-		enum GenderButtons : uint8_t
-		{
-			GENDER_BACKGROUND,
-			GENDER_HEAD,
-			GENDER_TOP,
-			GENDER_MID,
-			GENDER_BOTTOM
-		};
+		uint16_t creation_job;
 
-		std::vector<Sprite> sprites_lookboard;
-		std::vector<Sprite> sprites_gender_select;
-		std::vector<Sprite> sprites_keytype;
-		Texture sky;
-		Texture cloud;
-		float cloudfx;
-		Texture nameboard;
 		Textfield namechar;
 		CharLook newchar;
 		Randomizer randomizer;
@@ -109,7 +115,6 @@ namespace ms
 		Text hairname;
 		Text bodyname;
 		Text topname;
-		Text botname;
 		Text shoename;
 		Text wepname;
 		Text version;

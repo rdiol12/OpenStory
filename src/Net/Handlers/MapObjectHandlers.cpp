@@ -144,17 +144,12 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, std::move(spawn_pets) }
+			{ cid, look, level, job, name, stance, position, std::move(spawn_pets), riding_mount }
 		);
 
-		if (auto spawned = Stage::get().get_character(cid))
-		{
-			if (itemeffect != 0)
+		if (itemeffect != 0)
+			if (auto spawned = Stage::get().get_character(cid))
 				spawned->set_item_effect(itemeffect);
-
-			if (riding_mount != 0)
-				spawned->set_riding(riding_mount);
-		}
 	}
 
 	void RemoveCharHandler::handle(InPacket& recv) const
@@ -792,7 +787,8 @@ namespace ms
 			PetLook& pet = character->get_pet(pet_index);
 			if (pet.get_itemid() != 0)
 			{
-				pet.play_command(animation == 0 ? PetLook::Stance::ALERT : PetLook::Stance::JUMP);
+				if (!pet.play_interaction(type == 1, static_cast<uint8_t>(animation), !talk))
+					pet.play_command(animation == 0 ? PetLook::Stance::ALERT : PetLook::Stance::JUMP);
 
 				std::string snd = type == 1 ? "eat" : (talk ? "chat" : "alert");
 				nl::node sndnode = nl::nx::sound["Pet.img"][std::to_string(pet.get_itemid())][snd];

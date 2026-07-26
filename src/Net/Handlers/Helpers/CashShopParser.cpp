@@ -18,6 +18,7 @@
 #include "CashShopParser.h"
 
 #include "CharacterParser.h"
+#include "LoginParser.h"
 
 #include "../../../Gameplay/Stage.h"
 
@@ -66,50 +67,7 @@ namespace ms
 		{
 			recv.read_int(); // character id
 
-			// Note: Shares character stat parsing logic with LoginParser::parse_stats
-			StatsEntry statsentry;
-
-			statsentry.name = recv.read_padded_string(13);
-			statsentry.female = recv.read_bool();
-
-			recv.read_byte();	// skin
-			recv.read_int();	// face
-			recv.read_int();	// hair
-
-			for (size_t i = 0; i < 3; i++)
-				statsentry.petids.push_back(recv.read_long());
-
-			statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // v83 uses byte for level (max 200)
-
-			auto job = recv.read_short();
-
-			statsentry.stats[MapleStat::Id::JOB] = job;
-			statsentry.stats[MapleStat::Id::STR] = recv.read_short();
-			statsentry.stats[MapleStat::Id::DEX] = recv.read_short();
-			statsentry.stats[MapleStat::Id::INT] = recv.read_short();
-			statsentry.stats[MapleStat::Id::LUK] = recv.read_short();
-			statsentry.stats[MapleStat::Id::HP] = recv.read_short();
-			statsentry.stats[MapleStat::Id::MAXHP] = recv.read_short();
-			statsentry.stats[MapleStat::Id::MP] = recv.read_short();
-			statsentry.stats[MapleStat::Id::MAXMP] = recv.read_short();
-			statsentry.stats[MapleStat::Id::AP] = recv.read_short();
-
-			if (hasSPTable(job))
-				parseRemainingSkillInfo(recv);
-			else
-				recv.read_short(); // remaining sp
-
-			statsentry.exp = recv.read_int();
-			statsentry.stats[MapleStat::Id::FAME] = recv.read_short();
-
-			recv.skip(4); // gachaexp
-
-			statsentry.mapid = recv.read_int();
-			statsentry.portal = recv.read_byte();
-
-			recv.skip(4); // timestamp
-
-			return statsentry;
+			return LoginParser::parse_stats(recv, true, nullptr, nullptr, nullptr);
 		}
 
 		bool hasSPTable(int16_t job)

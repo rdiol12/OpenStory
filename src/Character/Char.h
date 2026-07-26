@@ -18,14 +18,19 @@
 #pragma once
 
 #include "CharEffect.h"
+#include "Guild.h"
+#include "NameTagStyle.h"
+#include "Party.h"
 
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
+#include "Look/CharAuras.h"
 #include "Look/CharLook.h"
+#include "Look/DeathArt.h"
+#include "Look/MountLook.h"
 #include "Look/PetLook.h"
 
 #include "../Graphics/EffectLayer.h"
-#include "../Graphics/CharacterAura.h"
 #include "../Graphics/Color.h"
 #include "../Graphics/Texture.h"
 
@@ -122,7 +127,7 @@ namespace ms
 		// Pass itemid=0 to clear.
 		void set_item_effect(int32_t itemid);
 		// The currently active looping item aura (0 if none).
-		int32_t get_item_effect_id() const { return item_effect_id; }
+		int32_t get_item_effect_id() const { return auras.get_item_effect_id(); }
 		// Play an item's ItemEff animation once (consumable use puff), then
 		// let it expire. Unlike set_item_effect this does not loop.
 		void show_item_use_effect(int32_t itemid);
@@ -175,7 +180,7 @@ namespace ms
 		// Monster-riding mount rendered under the character. Driven by the
 		// MONSTER_RIDING buff (self) or the spawn/foreign buff (others).
 		void set_riding(int32_t mount_itemid);
-		int32_t get_riding() const { return riding_mount; }
+		int32_t get_riding() const { return mount.get_itemid(); }
 
 		// Obtain a reference to this character's look
 		CharLook& get_look();
@@ -197,21 +202,27 @@ namespace ms
 
 		CharLook look;
 		CharLook look_preview;
-		int32_t riding_mount = 0;
-		Animation mount_ani;
-		Animation mount_walk;
-		Animation mount_jump;
-		Point<int16_t> mount_navel;
+		MountLook mount;
 
-		const Animation& current_mount_ani() const
+		MountLook::Gait mount_gait() const
 		{
-			if (state == State::WALK && mount_walk.get_delay(0) > 0)
-				return mount_walk;
-
-			if (state == State::FALL && mount_jump.get_delay(0) > 0)
-				return mount_jump;
-
-			return mount_ani;
+			switch (state)
+			{
+			case State::WALK:
+				return MountLook::Gait::WALK;
+			case State::FALL:
+				return MountLook::Gait::JUMP;
+			case State::ROPE:
+				return MountLook::Gait::ROPE;
+			case State::LADDER:
+				return MountLook::Gait::LADDER;
+			case State::PRONE:
+				return MountLook::Gait::PRONE;
+			case State::SWIM:
+				return MountLook::Gait::FLY;
+			default:
+				return MountLook::Gait::STAND;
+			}
 		}
 		PetLook pets[3];
 
@@ -224,24 +235,11 @@ namespace ms
 		Point<int16_t> sit_offset;
 
 	private:
-		Text namelabel;
-		int16_t tomb_yoff = 0;
-		bool tomb_landed = false;
-		uint8_t tomb_frame = 0;
-		uint16_t tomb_elapsed = 0;
-		uint8_t ghost_frame = 0;
-		uint16_t ghost_elapsed = 0;
-		uint16_t ghost_bob = 0;
+		NameTagStyle nametag;
+		GuildTag guildtag;
+		PartyHpBar partybar;
+		DeathArt deathart;
 
-		int32_t party_hp = 0;
-		int32_t party_maxhp = 0;
-		Color name_color;
-		// Nametag 9-slice sprite pieces loaded from NameTag.img/<style>/{w,c,e}.
-		// w = left edge, c = tiled center, e = right edge.
-		Texture tag_w;
-		Texture tag_c;
-		Texture tag_e;
-		Text guildlabel;
 		ChatBalloon chatballoon;
 		EffectLayer effects;
 		Afterimage afterimage;
@@ -250,40 +248,20 @@ namespace ms
 		bool hidden = false;
 		std::list<DamageNumber> damagenumbers;
 
-		// Persistent item aura (effect ring / cash effect). Active while
-		// item_effect_id != 0.
-		CharacterAura item_aura;
-		int32_t item_effect_id = 0;
+		CharAuras auras;
 
-		// GM set effect (Effect.img/SetEff.img/37) shown on GM characters.
-		CharacterAura gm_effect;
-
-		// Data-driven auras: any equipped item that declares info/effect adds one
-		// here (name -> CharEff.img, "Folder/name" escape, or inline subtree).
-		// ADDITIVE to item_aura/gm_effect above (which stay untouched for network
-		// item effects and the GM hat, so those can't regress). Rebuilt on equip
-		// change, capped to AURA_CAP, drawn at the per-item pivot offset from absp.
-		struct AuraInstance
+		CharAuras::Context aura_context(Point<int16_t> absp) const
 		{
-			CharacterAura aura;
-			int16_t pivot = 0;   // 0 center | 1 head | 2 feet
-			int16_t blend = 0;   // 0 normal | 1 additive (rendered via setblend)
-			int16_t prio = 0;    // higher wins the cap
-			int16_t show = 0;    // 0 always | 1 hide climbing | 2 idle only
-			float scale = 1.0f;  // effectScale: template drawn at this size
-			float drag = 1.0f;   // effectDrag: motion-drag multiplier (0 = pinned)
-			bool flip = false;   // effectFlip: mirror with the character's facing
-			// Tint color * effectOpacity alpha. effectTintColor sets it
-			// explicitly; effectTint=1 samples the aiSkin material accent, so
-			// one shared white/gray template matches every armor theme.
-			Color tint = Color(1.0f, 1.0f, 1.0f, 1.0f);
-		};
-		std::vector<AuraInstance> equip_auras;
-
-		// Eased offset opposing the character's velocity — auras trail when
-		// moving and settle when standing (see update)
-		float aura_drag_x = 0.0f;
-		float aura_drag_y = 0.0f;
+			return {
+				absp,
+				look.get_stance() == Stance::Id::PRONE,
+				state == State::LADDER || state == State::ROPE,
+				state == State::STAND || state == State::SIT,
+				facing_right,
+				look.get_stance(),
+				look.get_frame()
+			};
+		}
 
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 	};

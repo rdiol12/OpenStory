@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Combat/Combat.h"
+#include "PetAI.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapEnvironments.h"
 #include "MapleMap/MapDoors.h"
@@ -149,7 +150,7 @@ namespace ms
 		};
 
 		Camera camera;
-		int16_t pet_loot_cd = 0;
+		PetAI petai;
 		Physics physics;
 		Player player;
 

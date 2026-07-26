@@ -34,13 +34,15 @@
 
 #include "../../Net/Packets/CharCreationPackets.h"
 
+#include <cmath>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UICygnusCreation::UICygnusCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UICygnusCreation::UICygnusCreation() : UICreationBase(0)
 	{
 		gender = false;
 		charSet = false;
@@ -56,27 +58,45 @@ namespace ms
 
 		nl::node Login = nl::nx::ui["Login.img"];
 		nl::node CustomizeChar = Login["CustomizeChar"]["1000"];
-		nl::node back = nl::nx::map["Back"]["ereb.img"]["back"];
+		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
+		nl::node Common = Login["Common"];
 		nl::node board = CustomizeChar["board"];
 		nl::node genderSelect = CustomizeChar["genderSelect"];
 
-		// Cygnus Knights are created on Ereve: the floating islands with
-		// waterfalls (ereb.img/back/10 is the full scene).
-		sky = Texture(back["10"]);
-		cloud = back["10"];
+		// v83 login-map Ereve band: shared sky gradient + clouds, the Cygnus
+		// gazebo (back/30) with its vine decorations (31/32), map-authored spots.
+		sky = Texture(back["2"]);
+		cloud = Texture(back["27"]);
 
-		// misty Ereve hilltop as the ground the new knight stands on
-		sprites.emplace_back(back["22"], DrawArgument(lay(394, 482), ui_scale, ui_scale));
+		// Gazebo drawn aspect-correct: uniform scale anchored at its map spot,
+		// decorations offset in uniform space so they stay glued to it.
+		Point<int16_t> gaz_a(
+			static_cast<int16_t>(std::lround(265 * UIScale::scale_x())),
+			static_cast<int16_t>(std::lround(300 * UIScale::scale_y())));
+		auto gaz = [&](nl::node n, int16_t dx, int16_t dy)
+		{
+			sprites.emplace_back(n, UIScale::uniform_args(Texture(n), gaz_a, Point<int16_t>(0, 0), dx, dy, ui_scale));
+		};
+		gaz(back["30"], 0, 0);
+		gaz(back["31"], 430, -221);
+		gaz(back["32"], 376, -150);
+		sprites.emplace_back(Common["frame"], UIScale::stretch_args(Texture(Common["frame"]), 400, 300));
 
 		// The v83 Cygnus boards self-place: every piece and row carries an
 		// origin measured from the board anchors used below.
-		sprites_gender_select.emplace_back(board["genderTop"], DrawArgument(lay(423, 104), ui_scale, ui_scale));
-		sprites_gender_select.emplace_back(board["boardMid"], DrawArgument(lay(423, 222), ui_scale, ui_scale));
-		sprites_gender_select.emplace_back(board["boardBottom"], DrawArgument(lay(423, 348), ui_scale, ui_scale));
+		gender_plates.emplace_back(Texture(board["genderTop"]), Point<int16_t>(423, 104));
 
-		sprites_lookboard.emplace_back(board["avatarTop"], DrawArgument(lay(415, 89), ui_scale, ui_scale));
-		sprites_lookboard.emplace_back(board["boardMid"], DrawArgument(lay(415, 207), ui_scale, ui_scale));
-		sprites_lookboard.emplace_back(board["boardBottom"], DrawArgument(lay(415, 351), ui_scale, ui_scale));
+		for (int16_t f = 0; f < 7; f++)
+			gender_plates.emplace_back(Texture(board["boardMid"]), Point<int16_t>(423, static_cast<int16_t>(222 + (18 * f))));
+
+		gender_plates.emplace_back(Texture(board["boardBottom"]), Point<int16_t>(423, 348));
+
+		look_plates.emplace_back(Texture(board["avatarTop"]), Point<int16_t>(415, 89));
+
+		for (int16_t f = 0; f < 8; f++)
+			look_plates.emplace_back(Texture(board["boardMid"]), Point<int16_t>(415, static_cast<int16_t>(207 + (18 * f))));
+
+		look_plates.emplace_back(Texture(board["boardBottom"]), Point<int16_t>(415, 351));
 
 		for (size_t i = 0; i <= 6; i++)
 			sprites_lookboard.emplace_back(CustomizeChar["avatarSel"][i]["normal"], DrawArgument(lay(416, 98), ui_scale, ui_scale));
@@ -209,20 +229,6 @@ namespace ms
 		cloudfx = 200.0f;
 	}
 
-	Point<int16_t> UICygnusCreation::lay(int16_t x, int16_t y) const
-	{
-		return box + Point<int16_t>(
-			static_cast<int16_t>(x * ui_scale),
-			static_cast<int16_t>(y * ui_scale));
-	}
-
-	Point<int16_t> UICygnusCreation::scl(int16_t x, int16_t y) const
-	{
-		return Point<int16_t>(
-			static_cast<int16_t>(x * ui_scale),
-			static_cast<int16_t>(y * ui_scale));
-	}
-
 	void UICygnusCreation::draw(float inter) const
 	{
 		if (sky.is_valid())
@@ -236,24 +242,19 @@ namespace ms
 				1.0f, 1.0f, 1.0f, 0.0f));
 		}
 
+		int16_t cloudx = static_cast<int16_t>(cloudfx) % 800;
+		cloud.draw(UIScale::stretch_args(cloud, static_cast<int16_t>(cloudx - 800), 300));
+		cloud.draw(UIScale::stretch_args(cloud, cloudx, 300));
+		cloud.draw(UIScale::stretch_args(cloud, static_cast<int16_t>(cloudx + 800), 300));
+
 		UIElement::draw_sprites(inter);
 
 		DrawArgument charargs(lay(394, 339), ui_scale, ui_scale);
 
 		if (!gender)
 		{
-			for (size_t i = 0; i < sprites_gender_select.size(); i++)
-			{
-				if (i == 1)
-				{
-					for (size_t f = 0; f <= 6; f++)
-						sprites_gender_select[i].draw(scl(0, 18 * static_cast<int16_t>(f)), inter);
-				}
-				else
-				{
-					sprites_gender_select[i].draw(Point<int16_t>(0, 0), inter);
-				}
-			}
+			for (const auto& pc : gender_plates)
+				pc.first.draw(UIScale::uniform_args(pc.first, box, Point<int16_t>(0, 0), pc.second.x(), pc.second.y(), ui_scale));
 
 			newchar.draw(charargs, inter);
 
@@ -263,18 +264,11 @@ namespace ms
 		{
 			if (!charSet)
 			{
-				for (size_t i = 0; i < sprites_lookboard.size(); i++)
-				{
-					if (i == 1)
-					{
-						for (size_t f = 0; f <= 7; f++)
-							sprites_lookboard[i].draw(scl(0, 18 * static_cast<int16_t>(f)), inter);
-					}
-					else
-					{
-						sprites_lookboard[i].draw(Point<int16_t>(0, 0), inter);
-					}
-				}
+			for (const auto& pc : look_plates)
+					pc.first.draw(UIScale::uniform_args(pc.first, box, Point<int16_t>(0, 0), pc.second.x(), pc.second.y(), ui_scale));
+
+				for (auto& sprite : sprites_lookboard)
+					sprite.draw(Point<int16_t>(0, 0), inter);
 
 				facename.draw(lay(620, 200));
 				hairname.draw(lay(620, 218));
@@ -305,8 +299,6 @@ namespace ms
 
 					UIElement::draw_buttons(inter);
 
-					for (auto& sprite : sprites_keytype)
-						sprite.draw(Point<int16_t>(0, 0), inter);
 				}
 			}
 		}
@@ -318,8 +310,6 @@ namespace ms
 	{
 		if (!gender)
 		{
-			for (auto& sprite : sprites_gender_select)
-				sprite.update();
 
 			newchar.update(Constants::TIMESTEP);
 		}
@@ -341,8 +331,6 @@ namespace ms
 				}
 				else
 				{
-					for (auto& sprite : sprites_keytype)
-						sprite.update();
 
 					namechar.set_state(Textfield::State::DISABLED);
 				}
@@ -352,94 +340,6 @@ namespace ms
 		UIElement::update();
 
 		cloudfx += 0.25f;
-	}
-
-	Cursor::State UICygnusCreation::send_cursor(bool clicked, Point<int16_t> cursorpos)
-	{
-		if (namechar.get_state() == Textfield::State::NORMAL)
-		{
-			if (namechar.get_bounds().contains(cursorpos))
-			{
-				if (clicked)
-				{
-					namechar.set_state(Textfield::State::FOCUSED);
-
-					return Cursor::State::CLICKING;
-				}
-				else
-				{
-					return Cursor::State::IDLE;
-				}
-			}
-		}
-
-		return UIElement::send_cursor(clicked, cursorpos);
-	}
-
-	void UICygnusCreation::send_key(int32_t keycode, bool pressed, bool escape)
-	{
-		if (pressed)
-		{
-			if (escape)
-				button_pressed(Buttons::BT_CHARC_CANCEL);
-			else if (keycode == KeyAction::Id::RETURN)
-				button_pressed(Buttons::BT_CHARC_OK);
-		}
-	}
-
-	UIElement::Type UICygnusCreation::get_type() const
-	{
-		return TYPE;
-	}
-
-	void UICygnusCreation::send_naming_result(bool nameused)
-	{
-		if (!named)
-		{
-			if (!nameused)
-			{
-				named = true;
-
-				std::string cname = namechar.get_text();
-				int32_t cface = faces[female][face];
-				int32_t chair = hairs[female][hair];
-				uint8_t chairc = haircolors[female][haircolor];
-				uint8_t cskin = skins[female][skin];
-				int32_t ctop = tops[female][top];
-				int32_t cbot = bots[female][bot];
-				int32_t cshoe = shoes[female][shoe];
-				int32_t cwep = weapons[female][weapon];
-
-				CreateCharPacket(cname, 0, cface, chair, chairc, cskin, ctop, cbot, cshoe, cwep, female).dispatch();
-
-				auto onok = [&](bool alternate)
-				{
-					Sound(Sound::Name::SCROLLUP).play();
-
-					UI::get().remove(UIElement::Type::LOGINNOTICE_CONFIRM);
-					UI::get().remove(UIElement::Type::LOGINNOTICE);
-					UI::get().remove(UIElement::Type::CLASSCREATION);
-					UI::get().remove(UIElement::Type::RACESELECT);
-
-					if (auto charselect = UI::get().get_element<UICharSelect>())
-						charselect->post_add_character();
-				};
-
-				UI::get().emplace<UIKeySelect>(onok, true);
-			}
-			else
-			{
-				auto onok = [&]()
-				{
-					namechar.set_state(Textfield::State::FOCUSED);
-
-					buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-					buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-				};
-
-				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::NAME_IN_USE, onok);
-			}
-		}
 	}
 
 	Button::State UICygnusCreation::button_pressed(uint16_t buttonid)
@@ -499,67 +399,7 @@ namespace ms
 					}
 					else
 					{
-						if (!named)
-						{
-							std::string name = namechar.get_text();
-
-							if (name.size() <= 0)
-							{
-								return Button::State::NORMAL;
-							}
-							else if (name.size() >= 4)
-							{
-								namechar.set_state(Textfield::State::DISABLED);
-
-								buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::DISABLED);
-								buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::DISABLED);
-
-								if (auto raceselect = UI::get().get_element<UIRaceSelect>())
-								{
-									if (raceselect->check_name(name))
-									{
-										NameCharPacket(name).dispatch();
-
-										return Button::State::IDENTITY;
-									}
-								}
-
-								std::function<void()> okhandler = [&]()
-								{
-									namechar.set_state(Textfield::State::FOCUSED);
-
-									buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-									buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-								};
-
-								UI::get().emplace<UILoginNotice>(UILoginNotice::Message::ILLEGAL_NAME, okhandler);
-
-								return Button::State::NORMAL;
-							}
-							else
-							{
-								namechar.set_state(Textfield::State::DISABLED);
-
-								buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::DISABLED);
-								buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::DISABLED);
-
-								std::function<void()> okhandler = [&]()
-								{
-									namechar.set_state(Textfield::State::FOCUSED);
-
-									buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-									buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-								};
-
-								UI::get().emplace<UILoginNotice>(UILoginNotice::Message::ILLEGAL_NAME, okhandler);
-
-								return Button::State::IDENTITY;
-							}
-						}
-						else
-						{
-							return Button::State::NORMAL;
-						}
+						return naming_ok_pressed();
 					}
 				}
 			}
@@ -766,19 +606,5 @@ namespace ms
 		botname.change_text(get_equipname(EquipSlot::Id::BOTTOM));
 		shoename.change_text(get_equipname(EquipSlot::Id::SHOES));
 		wepname.change_text(get_equipname(EquipSlot::Id::WEAPON));
-	}
-
-	const std::string& UICygnusCreation::get_equipname(EquipSlot::Id slot) const
-	{
-		if (int32_t item_id = newchar.get_equips().get_equip(slot))
-		{
-			return ItemData::get(item_id).get_name();
-		}
-		else
-		{
-			static const std::string& nullstr = "Missing name.";
-
-			return nullstr;
-		}
 	}
 }

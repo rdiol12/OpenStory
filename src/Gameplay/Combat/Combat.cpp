@@ -25,7 +25,6 @@
 #include "../../MapleStory.h"
 
 #include <cstdlib>
-#include <fstream>
 
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
@@ -255,11 +254,31 @@ namespace ms
 			apply_teleport(move);
 			break;
 		case SkillId::Id::FLASH_JUMP:
-			// TODO: Flash Jump is a mid-air dash, not a ground-snapping blink —
-			// needs its own handling; left as a no-op for now.
+			apply_flash_jump();
+			break;
 		default:
 			break;
 		}
+	}
+
+	void Combat::apply_flash_jump()
+	{
+		PhysicsObject& phobj = player.get_phobj();
+
+		if (phobj.onground)
+			return;
+
+		const double FLASH_JUMP_HSPEED = 7.5;
+		const double FLASH_JUMP_VPOP = -2.0;
+
+		bool left = player.is_key_down(KeyAction::Id::LEFT);
+		bool right = player.is_key_down(KeyAction::Id::RIGHT);
+		double dir = left ? -1.0 : (right ? 1.0 : (player.is_facing_right() ? 1.0 : -1.0));
+
+		phobj.hspeed = dir * FLASH_JUMP_HSPEED;
+
+		if (phobj.vspeed > 0.0)
+			phobj.vspeed = FLASH_JUMP_VPOP;
 	}
 
 	void Combat::apply_teleport(const SpecialMove& move)

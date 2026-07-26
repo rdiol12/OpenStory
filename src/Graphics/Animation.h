@@ -81,6 +81,8 @@ namespace ms
 		Point<int16_t> get_head() const;
 		Rectangle<int16_t> get_bounds() const;
 
+		int16_t get_frame_index() const;
+
 	private:
 		const Frame& get_frame() const;
 

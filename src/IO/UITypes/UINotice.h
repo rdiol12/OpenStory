@@ -210,6 +210,11 @@ namespace ms
 		Texture backdrop;
 		Texture icon;
 		Text label;
+		// An invite needs long enough to actually read and answer; the
+		// 5s toast timing was fine for informational popups but far too
+		// short for anything with Accept/Decline on it.
+		static constexpr int32_t HOLD_MS = 30000;
+
 		std::string message_text;
 		int32_t age_ms = 0;
 		bool stashed = false;

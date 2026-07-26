@@ -79,6 +79,9 @@ namespace ms
 		// Blink the player a fixed distance in the held-direction (Magician
 		// Teleport / Flash Jump), snapping onto the foothold at the destination.
 		void apply_teleport(const SpecialMove& move);
+		// Mid-air dash: horizontal impulse in the moving/facing direction with a
+		// small upward pop, only usable while airborne.
+		void apply_flash_jump();
 		void apply_bullet_effect(const BulletEffect& effect);
 		void apply_damage_effect(const DamageEffect& effect);
 		void extract_effects(const Char& user, const SpecialMove& move, const AttackResult& result);

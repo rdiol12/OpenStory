@@ -30,6 +30,17 @@ namespace ms
 		npcs.draw(layer, viewx, viewy, alpha);
 	}
 
+	void MapNpcs::draw_names(double viewx, double viewy, float alpha) const
+	{
+		for (auto it = npcs.begin(); it != npcs.end(); ++it)
+		{
+			auto* npc = static_cast<const Npc*>(it->second.get());
+
+			if (npc && npc->is_active())
+				npc->draw_name(viewx, viewy, alpha);
+		}
+	}
+
 	void MapNpcs::update(const Physics& physics)
 	{
 		for (; !spawns.empty(); spawns.pop())

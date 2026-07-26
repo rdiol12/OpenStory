@@ -61,9 +61,6 @@ namespace ms
 		bool is_twohanded() const;
 		// Return the cap type (vslot)
 		CapType getcaptype() const;
-		// True when the equipped hat replaces the ENTIRE head (helmet-style): the
-		// head/hair/face are suppressed and only the hat is drawn. Driven by the
-		// hat's info/replaceHead data flag (set by generated full-head hats).
 		bool covers_whole_head() const;
 		// Return a stance which has been adjusted to the equipped weapon type
 		Stance::Id adjust_stance(Stance::Id stance) const;

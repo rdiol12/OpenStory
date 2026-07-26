@@ -14,6 +14,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIRaceSelect.h"
 
+
 #include "UIAranCreation.h"
 #include "UICharSelect.h"
 #include "UICygnusCreation.h"
@@ -147,6 +148,7 @@ namespace ms
 
 	void UIRaceSelect::update()
 	{
+
 		UIElement::update();
 	}
 

@@ -813,12 +813,12 @@ namespace ms
 		// rather than to the per-map magnification — that varies so wildly
 		// between maps that a proportional size looked huge on some and
 		// invisible on others. The player is drawn a bit larger to stand out.
-		float base = (zoom_scale > 0.0f) ? zoom_scale : 1.0f;
+		float base = (zoom_scale > 1.0f) ? zoom_scale : 1.0f;
 
-		const float MM_MOB_SCALE  = base * 0.07f;
-		const float MM_NPC_SCALE  = base * 0.09f;
-		const float MM_DROP_SCALE = base * 0.09f;
-		const float MM_CHAR_SCALE = base * 0.10f;
+		const float MM_MOB_SCALE  = base * 0.12f;
+		const float MM_NPC_SCALE  = base * 0.14f;
+		const float MM_DROP_SCALE = base * 0.14f;
+		const float MM_CHAR_SCALE = base * 0.16f;
 
 		auto mm_point = [&](Point<int16_t> world_pos)
 		{

@@ -19,6 +19,8 @@
 
 #include "../UI.h"
 
+#include "../../Graphics/Geometry.h"
+
 #include <sstream>
 
 namespace ms
@@ -55,6 +57,16 @@ namespace ms
 
 		if (text.size() > 0)
 			textlabel.draw(absp);
+
+		if (state == State::FOCUSED && has_selection() && selectable())
+		{
+			size_t lo = std::min(sel_anchor, sel_end);
+			size_t hi = std::max(sel_anchor, sel_end);
+			int16_t x0 = textlabel.advance(lo);
+			int16_t x1 = textlabel.advance(hi);
+			ColorBox cover(x1 - x0, 14, Color::Name::WHITE, 0.55f);
+			cover.draw(absp + Point<int16_t>(x0, 2));
+		}
 
 		if (state == State::FOCUSED && showmarker)
 		{
@@ -144,6 +156,8 @@ namespace ms
 				{
 					case KeyAction::Id::LEFT:
 					{
+						clear_selection();
+
 						if (markerpos > 0)
 							markerpos--;
 
@@ -151,6 +165,8 @@ namespace ms
 					}
 					case KeyAction::Id::RIGHT:
 					{
+						clear_selection();
+
 						if (markerpos < text.size())
 							markerpos++;
 
@@ -158,7 +174,11 @@ namespace ms
 					}
 					case KeyAction::Id::BACK:
 					{
-						if (text.size() > 0 && markerpos > 0)
+						if (has_selection())
+						{
+							erase_selection();
+						}
+						else if (text.size() > 0 && markerpos > 0)
 						{
 							text.erase(markerpos - 1, 1);
 
@@ -193,7 +213,11 @@ namespace ms
 					}
 					case KeyAction::Id::DELETE:
 					{
-						if (text.size() > 0 && markerpos < text.size())
+						if (has_selection())
+						{
+							erase_selection();
+						}
+						else if (text.size() > 0 && markerpos < text.size())
 						{
 							text.erase(markerpos, 1);
 
@@ -234,6 +258,9 @@ namespace ms
 
 	void Textfield::add_string(const std::string& str)
 	{
+		if (has_selection())
+			erase_selection();
+
 		for (char c : str)
 		{
 			if (belowlimit())
@@ -276,17 +303,48 @@ namespace ms
 				if (state == State::NORMAL)
 					set_state(State::FOCUSED);
 
+				if (selectable())
+				{
+					size_t idx = index_at(cursorpos.x());
+
+					if (!selecting)
+					{
+						selecting = true;
+						sel_anchor = idx;
+					}
+
+					sel_end = idx;
+					markerpos = idx;
+				}
+
 				return Cursor::State::CLICKING;
 			}
 			else
 			{
+				selecting = false;
+
 				return Cursor::State::CANCLICK;
 			}
 		}
 		else
 		{
-			if (clicked && state == State::FOCUSED)
-				set_state(State::NORMAL);
+			if (clicked)
+			{
+				if (selecting)
+				{
+					sel_end = index_at(cursorpos.x());
+					markerpos = sel_end;
+
+					return Cursor::State::CLICKING;
+				}
+
+				if (state == State::FOCUSED)
+					set_state(State::NORMAL);
+			}
+			else
+			{
+				selecting = false;
+			}
 
 			return Cursor::State::IDLE;
 		}
@@ -294,9 +352,68 @@ namespace ms
 
 	void Textfield::change_text(const std::string& t)
 	{
+		clear_selection();
 		modifytext(t);
 
 		markerpos = text.size();
+	}
+
+	size_t Textfield::index_at(int16_t cursor_x) const
+	{
+		int16_t relx = cursor_x - get_bounds().get_left_top().x();
+		size_t best = 0;
+		int16_t bestdist = INT16_MAX;
+
+		for (size_t i = 0; i <= text.size(); i++)
+		{
+			int16_t dist = std::abs(textlabel.advance(i) - relx);
+
+			if (dist < bestdist)
+			{
+				bestdist = dist;
+				best = i;
+			}
+		}
+
+		return best;
+	}
+
+	bool Textfield::has_selection() const
+	{
+		return sel_anchor != sel_end && sel_anchor <= text.size() && sel_end <= text.size();
+	}
+
+	bool Textfield::selectable() const
+	{
+		return alignment == Text::Alignment::LEFT && wrap_width == 0 && crypt == 0;
+	}
+
+	void Textfield::erase_selection()
+	{
+		size_t lo = std::min(sel_anchor, sel_end);
+		size_t hi = std::max(sel_anchor, sel_end);
+		text.erase(lo, hi - lo);
+		markerpos = lo;
+		clear_selection();
+		modifytext(text);
+	}
+
+	void Textfield::clear_selection()
+	{
+		sel_anchor = 0;
+		sel_end = 0;
+		selecting = false;
+	}
+
+	std::string Textfield::get_selected_text() const
+	{
+		if (!has_selection())
+			return text;
+
+		size_t lo = std::min(sel_anchor, sel_end);
+		size_t hi = std::max(sel_anchor, sel_end);
+
+		return text.substr(lo, hi - lo);
 	}
 
 	void Textfield::set_cryptchar(int8_t character)

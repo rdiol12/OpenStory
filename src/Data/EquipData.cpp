@@ -60,10 +60,20 @@ namespace ms
 		constexpr size_t WEAPON_TYPES = 20;
 		size_t index = (id / 10000) - 100;
 
-		if (id / 10000 == 190)
+		if (id / 10000 == 181)
+		{
+			type = "PET EQUIP";
+			eqslot = EquipSlot::Id::NONE;
+		}
+		else if (id / 10000 == 190)
 		{
 			type = "TAMING MOB";
 			eqslot = EquipSlot::Id::TAMEDMOB;
+		}
+		else if (id / 10000 == 191)
+		{
+			type = "SADDLE";
+			eqslot = EquipSlot::Id::SADDLE;
 		}
 		else if (index < NON_WEAPON_TYPES)
 		{

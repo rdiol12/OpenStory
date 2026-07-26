@@ -106,6 +106,9 @@ namespace ms
 		buttons[BT_GET] = std::make_unique<MapleButton>(src["BtGet"]);
 		buttons[BT_PUT] = std::make_unique<MapleButton>(src["BtPut"]);
 		buttons[BT_SORT] = std::make_unique<MapleButton>(src["BtSort"]);
+		// Cosmic's StorageProcessor has no arrange action (modes 4/5/7 only),
+		// so the sort request would be silently ignored — grey the button.
+		buttons[BT_SORT]->set_state(Button::State::DISABLED);
 		buttons[BT_EXIT] = std::make_unique<MapleButton>(src["BtExit"]);
 
 		nl::node bt_incoin = src["BtInCoin"];

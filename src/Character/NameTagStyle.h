@@ -17,36 +17,33 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include "../Graphics/Color.h"
+#include "../Graphics/Text.h"
+#include "../Graphics/Texture.h"
 
 namespace ms
 {
-	class UIGuildMark : public UIDragElement<PosGUILDMARK>
+	// The name plate under a character: the name text and the optional
+	// NameTag.img 9-slice plate.
+	class NameTagStyle
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::GUILDMARK;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		NameTagStyle(const std::string& name);
 
-		UIGuildMark();
+		void draw(Point<int16_t> absp) const;
 
-		void draw(float inter) const override;
-		void update() override;
-
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
+		// Give GMs the distinct NameTag.img plate; regular players keep the
+		// plain default name.
+		void apply(bool is_gm);
+		std::string get_name() const;
 
 	private:
-		enum Buttons : uint16_t
-		{
-			BT_CLOSE,
-			BT_SAVE,
-			BT_CANCEL
-		};
+		Text namelabel;
+		Color name_color;
+		// Nametag 9-slice sprite pieces loaded from NameTag.img/<style>/{w,c,e}.
+		// w = left edge, c = tiled center, e = right edge.
+		Texture tag_w;
+		Texture tag_c;
+		Texture tag_e;
 	};
 }

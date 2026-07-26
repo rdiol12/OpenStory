@@ -117,7 +117,7 @@ namespace ms
 	class CharSpawn
 	{
 	public:
-		CharSpawn(int32_t cid, const LookEntry& look, uint8_t level, int16_t job, const std::string& name, int8_t stance, Point<int16_t> position, std::vector<SpawnPetEntry> pets = {});
+		CharSpawn(int32_t cid, const LookEntry& look, uint8_t level, int16_t job, const std::string& name, int8_t stance, Point<int16_t> position, std::vector<SpawnPetEntry> pets = {}, int32_t riding = 0);
 
 		int32_t get_cid() const;
 		std::unique_ptr<MapObject> instantiate() const;
@@ -125,6 +125,11 @@ namespace ms
 		const std::vector<SpawnPetEntry>& get_pets() const
 		{
 			return pets;
+		}
+
+		int32_t get_riding() const
+		{
+			return riding;
 		}
 
 	private:
@@ -136,6 +141,7 @@ namespace ms
 		Point<int16_t> position;
 		LookEntry look;
 		std::vector<SpawnPetEntry> pets;
+		int32_t riding;
 	};
 
 	class DoorSpawn

@@ -91,12 +91,17 @@ namespace ms
 
 		Optional<OtherChar> ochar = Stage::get().get_chars().get_char(cid);
 
-		// Monster Riding is broadcast with a custom body (mount id + skill id)
-		// rather than a per-stat short; seat the rider from their equipped mount.
+		// Monster Riding is broadcast with a custom body (showMonsterRiding):
+		// short 0, int mountItemId, int skillId — the mount slot is never part
+		// of the visible look, so the item id MUST come from the packet.
 		if (firstmask & Buffstat::first_codes.at(Buffstat::Id::MONSTER_RIDING))
 		{
-			if (ochar)
-				ochar->set_riding(ochar->get_look().get_equips().get_equip(EquipSlot::Id::TAMEDMOB));
+			recv.read_short();
+			int32_t mount_itemid = recv.read_int();
+
+			if (ochar && mount_itemid != 0)
+				ochar->set_riding(mount_itemid);
+
 			return;
 		}
 

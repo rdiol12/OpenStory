@@ -34,13 +34,15 @@
 
 #include "../../Net/Packets/CharCreationPackets.h"
 
+#include <cmath>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
 
 namespace ms
 {
-	UIAranCreation::UIAranCreation() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
+	UIAranCreation::UIAranCreation() : UICreationBase(2)
 	{
 		// The v83 Aran board has no separate gender screen: gender is the last
 		// row on the Character Setting scroll.
@@ -58,17 +60,22 @@ namespace ms
 
 		nl::node Login = nl::nx::ui["Login.img"];
 		nl::node CustomizeChar = Login["CustomizeChar"]["2000"];
-		nl::node back = nl::nx::map["Back"]["Rien.img"]["back"];
+		nl::node back = nl::nx::map["Back"]["login.img"]["back"];
+		nl::node Common = Login["Common"];
 
-		// Aran are created on Rien: icy texture base with the frozen cavern
-		// scene (back/21, centered origin) over it.
-		sky = Texture(back["18"]);
-		cloud = back["18"];
+		// v83 login-map Rien band: shared sky gradient + clouds and the snowy
+		// gazebo (back/33) the new Aran stands on.
+		sky = Texture(back["2"]);
+		cloud = Texture(back["27"]);
 
-		sprites.emplace_back(back["21"], DrawArgument(lay(400, 329), ui_scale, ui_scale));
-
-		// snow-capped rock ledge the new Aran stands on
-		sprites.emplace_back(back["29"], DrawArgument(lay(394, 452), ui_scale, ui_scale));
+		// Gazebo drawn aspect-correct: uniform scale anchored at its map spot.
+		{
+			Point<int16_t> a(
+				static_cast<int16_t>(std::lround(256 * UIScale::scale_x())),
+				static_cast<int16_t>(std::lround(299 * UIScale::scale_y())));
+			sprites.emplace_back(back["33"], UIScale::uniform_args(Texture(back["33"]), a, Point<int16_t>(0, 0), 0, 0, ui_scale));
+		}
+		sprites.emplace_back(Common["frame"], UIScale::stretch_args(Texture(Common["frame"]), 400, 300));
 
 		sprites_lookboard.emplace_back(CustomizeChar["charSet"], DrawArgument(lay(473, 103), ui_scale, ui_scale));
 
@@ -195,20 +202,6 @@ namespace ms
 		cloudfx = 200.0f;
 	}
 
-	Point<int16_t> UIAranCreation::lay(int16_t x, int16_t y) const
-	{
-		return box + Point<int16_t>(
-			static_cast<int16_t>(x * ui_scale),
-			static_cast<int16_t>(y * ui_scale));
-	}
-
-	Point<int16_t> UIAranCreation::scl(int16_t x, int16_t y) const
-	{
-		return Point<int16_t>(
-			static_cast<int16_t>(x * ui_scale),
-			static_cast<int16_t>(y * ui_scale));
-	}
-
 	void UIAranCreation::draw(float inter) const
 	{
 		if (sky.is_valid())
@@ -221,6 +214,11 @@ namespace ms
 					static_cast<int16_t>(UIScale::view_height())),
 				1.0f, 1.0f, 1.0f, 0.0f));
 		}
+
+		int16_t cloudx = static_cast<int16_t>(cloudfx) % 800;
+		cloud.draw(UIScale::stretch_args(cloud, static_cast<int16_t>(cloudx - 800), 300));
+		cloud.draw(UIScale::stretch_args(cloud, cloudx, 300));
+		cloud.draw(UIScale::stretch_args(cloud, static_cast<int16_t>(cloudx + 800), 300));
 
 		UIElement::draw_sprites(inter);
 
@@ -261,8 +259,6 @@ namespace ms
 
 				UIElement::draw_buttons(inter);
 
-				for (auto& sprite : sprites_keytype)
-					sprite.draw(Point<int16_t>(0, 0), inter);
 			}
 		}
 
@@ -287,8 +283,6 @@ namespace ms
 			}
 			else
 			{
-				for (auto& sprite : sprites_keytype)
-					sprite.update();
 
 				namechar.set_state(Textfield::State::DISABLED);
 			}
@@ -297,94 +291,6 @@ namespace ms
 		UIElement::update();
 
 		cloudfx += 0.25f;
-	}
-
-	Cursor::State UIAranCreation::send_cursor(bool clicked, Point<int16_t> cursorpos)
-	{
-		if (namechar.get_state() == Textfield::State::NORMAL)
-		{
-			if (namechar.get_bounds().contains(cursorpos))
-			{
-				if (clicked)
-				{
-					namechar.set_state(Textfield::State::FOCUSED);
-
-					return Cursor::State::CLICKING;
-				}
-				else
-				{
-					return Cursor::State::IDLE;
-				}
-			}
-		}
-
-		return UIElement::send_cursor(clicked, cursorpos);
-	}
-
-	void UIAranCreation::send_key(int32_t keycode, bool pressed, bool escape)
-	{
-		if (pressed)
-		{
-			if (escape)
-				button_pressed(Buttons::BT_CHARC_CANCEL);
-			else if (keycode == KeyAction::Id::RETURN)
-				button_pressed(Buttons::BT_CHARC_OK);
-		}
-	}
-
-	UIElement::Type UIAranCreation::get_type() const
-	{
-		return TYPE;
-	}
-
-	void UIAranCreation::send_naming_result(bool nameused)
-	{
-		if (!named)
-		{
-			if (!nameused)
-			{
-				named = true;
-
-				std::string cname = namechar.get_text();
-				int32_t cface = faces[female][face];
-				int32_t chair = hairs[female][hair];
-				uint8_t chairc = haircolors[female][haircolor];
-				uint8_t cskin = skins[female][skin];
-				int32_t ctop = tops[female][top];
-				int32_t cbot = bots[female][bot];
-				int32_t cshoe = shoes[female][shoe];
-				int32_t cwep = weapons[female][weapon];
-
-				CreateCharPacket(cname, 2, cface, chair, chairc, cskin, ctop, cbot, cshoe, cwep, female).dispatch();
-
-				auto onok = [&](bool alternate)
-				{
-					Sound(Sound::Name::SCROLLUP).play();
-
-					UI::get().remove(UIElement::Type::LOGINNOTICE_CONFIRM);
-					UI::get().remove(UIElement::Type::LOGINNOTICE);
-					UI::get().remove(UIElement::Type::CLASSCREATION);
-					UI::get().remove(UIElement::Type::RACESELECT);
-
-					if (auto charselect = UI::get().get_element<UICharSelect>())
-						charselect->post_add_character();
-				};
-
-				UI::get().emplace<UIKeySelect>(onok, true);
-			}
-			else
-			{
-				auto onok = [&]()
-				{
-					namechar.set_state(Textfield::State::FOCUSED);
-
-					buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-					buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-				};
-
-				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::NAME_IN_USE, onok);
-			}
-		}
 	}
 
 	Button::State UIAranCreation::button_pressed(uint16_t buttonid)
@@ -408,67 +314,7 @@ namespace ms
 				}
 				else
 				{
-					if (!named)
-					{
-						std::string name = namechar.get_text();
-
-						if (name.size() <= 0)
-						{
-							return Button::State::NORMAL;
-						}
-						else if (name.size() >= 4)
-						{
-							namechar.set_state(Textfield::State::DISABLED);
-
-							buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::DISABLED);
-							buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::DISABLED);
-
-							if (auto raceselect = UI::get().get_element<UIRaceSelect>())
-							{
-								if (raceselect->check_name(name))
-								{
-									NameCharPacket(name).dispatch();
-
-									return Button::State::IDENTITY;
-								}
-							}
-
-							std::function<void()> okhandler = [&]()
-							{
-								namechar.set_state(Textfield::State::FOCUSED);
-
-								buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-								buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-							};
-
-							UI::get().emplace<UILoginNotice>(UILoginNotice::Message::ILLEGAL_NAME, okhandler);
-
-							return Button::State::NORMAL;
-						}
-						else
-						{
-							namechar.set_state(Textfield::State::DISABLED);
-
-							buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::DISABLED);
-							buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::DISABLED);
-
-							std::function<void()> okhandler = [&]()
-							{
-								namechar.set_state(Textfield::State::FOCUSED);
-
-								buttons[Buttons::BT_CHARC_OK]->set_state(Button::State::NORMAL);
-								buttons[Buttons::BT_CHARC_CANCEL]->set_state(Button::State::NORMAL);
-							};
-
-							UI::get().emplace<UILoginNotice>(UILoginNotice::Message::ILLEGAL_NAME, okhandler);
-
-							return Button::State::IDENTITY;
-						}
-					}
-					else
-					{
-						return Button::State::NORMAL;
-					}
+					return naming_ok_pressed();
 				}
 			}
 			case BT_BACK:
@@ -686,19 +532,5 @@ namespace ms
 		shoename.change_text(get_equipname(EquipSlot::Id::SHOES));
 		wepname.change_text(get_equipname(EquipSlot::Id::WEAPON));
 		gendername.change_text(female ? "Female" : "Male");
-	}
-
-	const std::string& UIAranCreation::get_equipname(EquipSlot::Id slot) const
-	{
-		if (int32_t item_id = newchar.get_equips().get_equip(slot))
-		{
-			return ItemData::get(item_id).get_name();
-		}
-		else
-		{
-			static const std::string& nullstr = "Missing name.";
-
-			return nullstr;
-		}
 	}
 }

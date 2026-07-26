@@ -66,11 +66,13 @@ namespace ms
 		dimension = Point<int16_t>(578, 386);
 		dragarea  = Point<int16_t>(578, 27);
 
-		// Ask the server for the pedigree chart using our own cid;
-		// FamilyChartResultHandler will call back into add_entry.
+		// Ask the server for our family data, then the pedigree chart.
+		// Cosmic resolves the pedigree target by name; FamilyChartResultHandler
+		// calls back into add_entry.
 		int32_t my_cid = Stage::get().get_player().get_oid();
 		current_viewed_id = my_cid;
-		FamilyPedigreeRequestPacket(my_cid).dispatch();
+		FamilyOpenPacket().dispatch();
+		FamilyPedigreeRequestPacket(Stage::get().get_player().get_name()).dispatch();
 	}
 
 	void UIFamilyTree::draw(float inter) const
@@ -351,8 +353,22 @@ namespace ms
 				{
 					if (cid != current_viewed_id)
 					{
-						current_viewed_id = cid;
-						FamilyPedigreeRequestPacket(cid).dispatch();
+						std::string target;
+
+						for (const Entry& e : entries)
+						{
+							if (e.cid == cid)
+							{
+								target = e.name;
+								break;
+							}
+						}
+
+						if (!target.empty())
+						{
+							current_viewed_id = cid;
+							FamilyPedigreeRequestPacket(target).dispatch();
+						}
 					}
 					return Cursor::State::CLICKING;
 				}
@@ -424,7 +440,7 @@ namespace ms
 				[](bool yes)
 				{
 					if (yes)
-						FamilySeparateLeavePacket().dispatch();
+						FamilySeparateLeavePacket(Stage::get().get_player().get_oid()).dispatch();
 				});
 			break;
 		}

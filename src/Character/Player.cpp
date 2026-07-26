@@ -318,6 +318,38 @@ namespace ms
 			}
 		}
 
+		if (auto_hp_pot_ticks > 0)
+			auto_hp_pot_ticks--;
+
+		if (auto_mp_pot_ticks > 0)
+			auto_mp_pot_ticks--;
+
+		if (state != Char::State::DIED && has_pet())
+		{
+			int32_t hp_pot = Configuration::get().get_auto_hp_pot();
+			int32_t mp_pot = Configuration::get().get_auto_mp_pot();
+
+			if (hp_pot != 0 || mp_pot != 0)
+			{
+				int32_t cur_hp = stats.get_stat(MapleStat::Id::HP);
+				int32_t max_hp = stats.get_stat(MapleStat::Id::MAXHP);
+				int32_t cur_mp = stats.get_stat(MapleStat::Id::MP);
+				int32_t max_mp = stats.get_stat(MapleStat::Id::MAXMP);
+
+				if (hp_pot != 0 && auto_hp_pot_ticks == 0 && cur_hp * 2 < max_hp && inventory.find_item(InventoryType::Id::USE, hp_pot))
+				{
+					use_item(hp_pot);
+					auto_hp_pot_ticks = AUTO_POT_COOLDOWN_TICKS;
+				}
+
+				if (mp_pot != 0 && auto_mp_pot_ticks == 0 && cur_mp * 2 < max_mp && inventory.find_item(InventoryType::Id::USE, mp_pot))
+				{
+					use_item(mp_pot);
+					auto_mp_pot_ticks = AUTO_POT_COOLDOWN_TICKS;
+				}
+			}
+		}
+
 		return get_layer();
 	}
 

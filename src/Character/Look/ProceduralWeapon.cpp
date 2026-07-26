@@ -317,7 +317,7 @@ namespace ms
 		case Stance::Id::SHOOTF:
 			return { 0.0f, L, true, (type == Weapon::Type::GUN) ? 0.0f : 0.0f };
 		case Stance::Id::PRONE:
-			return { 92.0f, L, false, 0.0f };
+			return { -88.0f, L, false, 0.0f };
 		case Stance::Id::LADDER:
 		case Stance::Id::ROPE:
 			// Climbing: the character is seen from behind, so slot the weapon

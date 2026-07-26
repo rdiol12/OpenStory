@@ -17,11 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
 
-#include <stb_image_write.h>
-#include <nlnx/bitmap.hpp>
-#include <vector>
-#include <cstdint>
-
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
@@ -263,40 +258,6 @@ namespace ms
 		prob_texture = Texture(questBtns["prob"]);
 		reward_texture = Texture(questBtns["reward"]);
 
-		// TEMP: dump candidate detail sprites so we can identify the stray box.
-		{
-			auto dump = [](nl::node n, const char* fname)
-			{
-				if (!n || n.data_type() != nl::node::type::bitmap) return;
-				nl::bitmap b = n;
-				int w = b.width(), h = b.height();
-				if (w <= 0 || h <= 0 || !b.data()) return;
-				std::vector<uint8_t> rgba((size_t)w * h * 4);
-				const uint8_t* src = static_cast<const uint8_t*>(b.data());
-				for (size_t i = 0; i < (size_t)w * h; ++i)
-				{
-					rgba[i*4+0] = src[i*4+2];
-					rgba[i*4+1] = src[i*4+1];
-					rgba[i*4+2] = src[i*4+0];
-					rgba[i*4+3] = src[i*4+3];
-				}
-				stbi_write_png(fname, w, h, 4, rgba.data(), w*4);
-			};
-			dump(questBtns["basic"], "qdump_basic.png");
-			dump(questBtns["reward"], "qdump_reward.png");
-			dump(questBtns["prob"], "qdump_prob.png");
-			dump(questBtns["summary"], "qdump_summary.png");
-			dump(questBtns["select"], "qdump_select.png");
-			dump(list["searchArea"], "qdump_searchArea.png");
-			dump(quest_info_node["backgrnd"], "qdump_detailbg.png");
-			nl::node ii = quest["icon_info"];
-			dump(ii["backgrnd"], "qdump_ii_bg.png");
-			dump(ii["backgrnd2"], "qdump_ii_bg2.png");
-			dump(ii["Sheet"], "qdump_ii_sheet.png");
-			dump(ii["Sheet"]["0"], "qdump_ii_sheet0.png");
-			dump(ii["Sheet"]["1"], "qdump_ii_sheet1.png");
-			dump(ii["Sheet"]["2"], "qdump_ii_sheet2.png");
-		}
 		summary_texture = Texture(questBtns["summary"]);
 		obtain_select_texture = Texture(questBtns["select"]);
 

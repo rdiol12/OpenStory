@@ -122,6 +122,10 @@ namespace ms
 
 		dimension = Point<int16_t>(214, 343);
 		dragarea = Point<int16_t>(214, 27);
+
+		// Cosmic only sends family data when asked; without this the window
+		// opens empty.
+		FamilyOpenPacket().dispatch();
 	}
 
 	void UIFamily::draw(float inter) const

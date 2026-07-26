@@ -17,41 +17,28 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
-
-#include "../../Graphics/Text.h"
-#include "../../Graphics/Texture.h"
-#include "../../Configuration.h"
-
-#include <cstdint>
-#include <vector>
+#include "../../Template/Point.h"
 
 namespace ms
 {
-	// Persistent quest-helper-style side panel that lists current
-	// party member names. Reuses the QuestAlarm chrome
-	// (UIWindow.img/QuestAlarm/backgrndmin/center/bottom) so the
-	// layout reads as a sibling of the Quest Helper. Hides itself
-	// while not in a party.
-	class UIPartyHelper : public UIDragElement<PosPARTYHELPER>
+	class CharLook;
+
+	// The falling/landed tomb (Effect/Tomb.img) and the hovering ghost (the
+	// ghost stance baked into the body files) shown while a character is dead.
+	class DeathArt
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::PARTYHELPER;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
-
-		UIPartyHelper();
-
-		void draw(float inter) const override;
-
-		UIElement::Type get_type() const override;
+		void reset();
+		void update();
+		void draw(Point<int16_t> absp, bool flip, const CharLook& look, float alpha) const;
 
 	private:
-		Texture backgrnd_min;
-		Texture backgrnd_center;
-		Texture backgrnd_bottom;
-
-		mutable Text title;
-		mutable Text row_label;
+		int16_t tomb_yoff = 0;
+		bool tomb_landed = false;
+		uint8_t tomb_frame = 0;
+		uint16_t tomb_elapsed = 0;
+		uint8_t ghost_frame = 0;
+		uint16_t ghost_elapsed = 0;
+		uint16_t ghost_bob = 0;
 	};
 }

@@ -545,8 +545,8 @@ namespace ms
 
 		if (age_ms < 300)
 			a = age_ms / 300.0f;
-		else if (age_ms > 4400)
-			a = (5000 - age_ms) / 600.0f;
+		else if (age_ms > HOLD_MS - 600)
+			a = (HOLD_MS - age_ms) / 600.0f;
 
 		if (a < 0.0f) a = 0.0f;
 		if (a > 1.0f) a = 1.0f;
@@ -567,7 +567,7 @@ namespace ms
 
 		age_ms += Constants::TIMESTEP;
 
-		if (age_ms >= 5000 && !stashed)
+		if (age_ms >= HOLD_MS && !stashed)
 			stash();
 	}
 

@@ -96,11 +96,6 @@ namespace ms
 				prochat = ProceduralHat(src, drawinfo);
 			else
 				prochat = ProceduralHat(); // authored — clear any prior procedural
-
-			// Head hiding (info/replaceHead) is retired — no hat ever hides the
-			// head/hair/face. Hair coverage stays data-driven via vslot
-			// (CpH1H5 = half cover, CpH1H5AyAs = full cover hides the hair),
-			// which is how helms/masks avoid hair poking through them.
 		}
 	}
 

@@ -43,11 +43,19 @@ namespace ms
 		switch (prefix)
 		{
 		case 1:
-			if (get_item_prefix(itemid) == 190)
+			if (get_item_prefix(itemid) == 190 || get_item_prefix(itemid) == 191)
 			{
 				category = "TamingMob";
 				src = nl::nx::character["TamingMob"][strid + ".img"]["info"];
 				strsrc = nl::nx::string["Eqp.img"]["Eqp"]["Taming"][std::to_string(itemid)];
+				break;
+			}
+
+			if (get_item_prefix(itemid) == 181)
+			{
+				category = "PetEquip";
+				src = nl::nx::character["PetEquip"][strid + ".img"]["info"];
+				strsrc = nl::nx::string["Eqp.img"]["Eqp"]["PetEquip"][std::to_string(itemid)];
 				break;
 			}
 

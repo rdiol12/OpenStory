@@ -63,11 +63,17 @@ namespace ms
 		State get_state() const;
 		Rectangle<int16_t> get_bounds() const;
 		const std::string& get_text() const;
+		std::string get_selected_text() const;
 		bool can_copy_paste() const;
 
 	private:
 		void modifytext(const std::string& t);
 		bool belowlimit() const;
+		size_t index_at(int16_t cursor_x) const;
+		bool has_selection() const;
+		bool selectable() const;
+		void erase_selection();
+		void clear_selection();
 
 		Text textlabel;
 		Text::Font font = Text::A11M;
@@ -79,6 +85,9 @@ namespace ms
 		bool showmarker;
 		uint16_t elapsed;
 		size_t markerpos;
+		size_t sel_anchor = 0;
+		size_t sel_end = 0;
+		bool selecting = false;
 		Rectangle<int16_t> bounds;
 		Point<int16_t> parentpos;
 		size_t limit;

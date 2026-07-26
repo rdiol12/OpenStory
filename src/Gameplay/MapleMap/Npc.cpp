@@ -214,19 +214,24 @@ namespace ms
 		it->second.draw(arg, alpha);
 	}
 
+	void Npc::draw_name(double viewx, double viewy, float alpha) const
+	{
+		if (hidename)
+			return;
+
+		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+
+		// If ever changing code for namelabel confirm placements with map 10000
+		namelabel.draw(absp + Point<int16_t>(0, -4));
+		funclabel.draw(absp + Point<int16_t>(0, 18));
+	}
+
 	void Npc::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
 		if (animations.count(stance))
 			animations.at(stance).draw(DrawArgument(absp, flip), alpha);
-
-		if (!hidename)
-		{
-			// If ever changing code for namelabel confirm placements with map 10000
-			namelabel.draw(absp + Point<int16_t>(0, -4));
-			funclabel.draw(absp + Point<int16_t>(0, 18));
-		}
 
 		// Draw quest mark above NPC
 		if (quest_mark_type != QuestMarkType::NONE && !animations.empty())

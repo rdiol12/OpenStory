@@ -115,10 +115,11 @@ namespace ms
 			inventory.add_equip(invtype, slot, id, cash, expire, slots, level, stats, owner, flag, itemlevel, itemexp, vicious);
 		}
 
-		int32_t skip_item(InPacket& recv)
+		SkimmedItem skim_item(InPacket& recv)
 		{
 			int8_t type = recv.read_byte();
 			int32_t iid = recv.read_int();
+			int16_t count = 1;
 
 			bool cash = recv.read_bool();
 
@@ -164,14 +165,19 @@ namespace ms
 			else
 			{
 				// Normal item
-				recv.read_short(); // count
+				count = recv.read_short();
 				recv.read_string(); // owner
 				recv.read_short(); // flag
 
 				if ((iid / 10000 == 233) || (iid / 10000 == 207))
 					recv.skip(8); // rechargeable
 			}
-			return iid;
+			return { type, iid, count };
+		}
+
+		int32_t skip_item(InPacket& recv)
+		{
+			return skim_item(recv).itemid;
 		}
 
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)

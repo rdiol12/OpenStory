@@ -17,50 +17,27 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIElement.h"
-#include "../../Graphics/Texture.h"
+#include "../Graphics/Text.h"
 
 namespace ms
 {
-	class UISystemMenu : public UIElement
+	// The guild name shown below a character's name plate, plus the guild
+	// mark parameters (emblem rendering from GuildMark.img is future work).
+	class GuildTag
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::SYSTEMMENU;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		GuildTag();
 
-		UISystemMenu();
+		void draw(Point<int16_t> absp) const;
 
-		void draw(float inter) const override;
-
-		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
+		void set_name(const std::string& name);
+		void set_mark(int16_t bg, int8_t bgcolor, int16_t logo, int8_t logocolor);
 
 	private:
-		enum Buttons : uint16_t
-		{
-			BT_CHANNEL,
-			BT_FARM,
-			BT_KEY_SETTING,
-			BT_GAME_OPTION,
-			BT_SYSTEM_OPTION,
-			BT_QUIT,
-			NUM_BUTTONS
-		};
-
-		Texture top;
-		Texture mid;
-		Texture bottom;
-
-		static constexpr int16_t WIDTH = 79;
-		static constexpr int16_t BUTTON_PADDING_HORIZ = 8;
-		static constexpr int16_t PADDING_TOP = 20;
-		static constexpr int16_t STRIDE_VERT = 27;
-		static constexpr int16_t PADDING_BOTTOM = 12;
-		static constexpr int16_t HEIGHT = PADDING_TOP + STRIDE_VERT * NUM_BUTTONS + PADDING_BOTTOM;
+		Text label;
+		int16_t mark_bg = 0;
+		int8_t mark_bgcolor = 0;
+		int16_t mark_logo = 0;
+		int8_t mark_logocolor = 0;
 	};
 }

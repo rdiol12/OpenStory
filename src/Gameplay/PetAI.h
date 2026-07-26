@@ -17,46 +17,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "../UIDragElement.h"
+#include <cstdint>
 
 namespace ms
 {
-	// Maple compact chat window (mapleChat1 from UIWindow2.img)
-	class UIMapleChat : public UIDragElement<PosMAPLECHAT1>
+	class Player;
+	class MapDrops;
+
+	class PetAI
 	{
 	public:
-		static constexpr Type TYPE = UIElement::Type::MAPLECHAT;
-		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
-
-		UIMapleChat();
-
-		void draw(float inter) const override;
-
-		void send_key(int32_t keycode, bool pressed, bool escape) override;
-
-		UIElement::Type get_type() const override;
-
-	protected:
-		Button::State button_pressed(uint16_t buttonid) override;
+		void update(Player& player, MapDrops& drops);
 
 	private:
-		void close();
-		void toggle_chat_area();
-
-		enum Buttons : uint16_t
-		{
-			BT_CLOSE,
-			BT_OPEN,
-			BT_SMALL,
-			BT_FRIEND,
-			BT_GUILD
-		};
-
-		Texture backgrnd;
-		Texture chat_area;
-		Texture chat_top;
-		Texture chat_bottom;
-		bool chat_open;
+		int16_t loot_cd = 0;
 	};
 }

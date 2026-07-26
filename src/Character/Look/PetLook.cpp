@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PetLook.h"
 
+#include <cstdlib>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -35,7 +37,7 @@ namespace ms
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name);
 
 		std::string strid = std::to_string(iid);
-		nl::node src = nl::nx::item["Pet"][strid + ".img"];
+		src = nl::nx::item["Pet"][strid + ".img"];
 
 		animations[Stance::MOVE] = src["move"];
 		animations[Stance::STAND] = src["stand0"];
@@ -70,7 +72,10 @@ namespace ms
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
-		animations[stance].draw(DrawArgument(absp, flip), alpha);
+		if (oneshot_active)
+			oneshot.draw(DrawArgument(absp, flip), alpha);
+		else
+			animations[stance].draw(DrawArgument(absp, flip), alpha);
 		namelabel.draw(absp);
 		balloon.draw(absp - Point<int16_t>(0, 42));
 	}
@@ -88,8 +93,29 @@ namespace ms
 
 	void PetLook::play_command(Stance st)
 	{
+		oneshot_active = false;
 		set_stance(st);
 		command_timer = 240;
+	}
+
+	bool PetLook::play_interaction(bool feed, uint8_t index, bool success)
+	{
+		nl::node group = feed ? src["food"]["0"] : src["interact"][std::to_string(index)];
+		nl::node branch = group[success ? "success" : "fail"];
+
+		if (!branch)
+			branch = group[success ? "fail" : "success"];
+
+		std::string act = branch["0"]["act"];
+
+		if (act.empty() || !src[act])
+			return false;
+
+		oneshot = Animation(src[act]);
+		oneshot_active = true;
+		command_timer = 240;
+
+		return true;
 	}
 
 	void PetLook::update(const Physics& physics, Point<int16_t> charpos)
@@ -111,6 +137,7 @@ namespace ms
 			if (command_timer == 0 || curpos.distance(charpos) > 150)
 			{
 				command_timer = 0;
+				oneshot_active = false;
 				set_stance(Stance::STAND);
 			}
 		}
@@ -122,17 +149,21 @@ namespace ms
 			if (curpos.distance(charpos) > 150)
 			{
 				set_position(charpos.x(), charpos.y());
+				clear_loot_target();
 			}
 			else
 			{
-				if (charpos.x() - curpos.x() > 50)
+				Point<int16_t> dest = has_loot_target ? loot_target : charpos;
+				int16_t deadzone = has_loot_target ? 8 : 50;
+
+				if (dest.x() - curpos.x() > deadzone)
 				{
 					phobj.hforce = PETWALKFORCE;
 					flip = true;
 
 					set_stance(Stance::MOVE);
 				}
-				else if (charpos.x() - curpos.x() < -50)
+				else if (dest.x() - curpos.x() < -deadzone)
 				{
 					phobj.hforce = -PETWALKFORCE;
 					flip = false;
@@ -145,6 +176,40 @@ namespace ms
 
 					set_stance(Stance::STAND);
 				}
+
+				if (phobj.onground && curpos.y() - dest.y() > 40 && std::abs(dest.x() - curpos.x()) < 70)
+					phobj.vspeed = -5.5;
+
+				if (!phobj.onground)
+					set_stance(Stance::JUMP);
+			}
+
+			phobj.type = PhysicsObject::Type::NORMAL;
+			phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
+			break;
+		case Stance::JUMP:
+			// The pet's own airborne state drives this stance.
+			if (phobj.onground)
+			{
+				set_stance(Stance::STAND);
+			}
+			else if (curpos.distance(charpos) > 150)
+			{
+				set_position(charpos.x(), charpos.y());
+			}
+			else if (charpos.x() - curpos.x() > 50)
+			{
+				phobj.hforce = PETWALKFORCE;
+				flip = true;
+			}
+			else if (charpos.x() - curpos.x() < -50)
+			{
+				phobj.hforce = -PETWALKFORCE;
+				flip = false;
+			}
+			else
+			{
+				phobj.hforce = 0.0;
 			}
 
 			phobj.type = PhysicsObject::Type::NORMAL;
@@ -191,7 +256,21 @@ namespace ms
 
 		physics.move_object(phobj);
 
-		animations[stance].update();
+		if (oneshot_active)
+			oneshot.update();
+		else
+			animations[stance].update();
+	}
+
+	void PetLook::set_loot_target(Point<int16_t> pos)
+	{
+		has_loot_target = true;
+		loot_target = pos;
+	}
+
+	void PetLook::clear_loot_target()
+	{
+		has_loot_target = false;
 	}
 
 	void PetLook::set_position(int16_t x, int16_t y)

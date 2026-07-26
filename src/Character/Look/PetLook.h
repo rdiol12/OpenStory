@@ -25,6 +25,10 @@
 
 #include "../../Gameplay/Physics/Physics.h"
 
+#ifdef USE_NX
+#include <nlnx/node.hpp>
+#endif
+
 namespace ms
 {
 	class PetLook
@@ -57,6 +61,8 @@ namespace ms
 		void update(const Physics& physics, Point<int16_t> charpos);
 
 		void set_position(int16_t xpos, int16_t ypos);
+		void set_loot_target(Point<int16_t> pos);
+		void clear_loot_target();
 		void set_stance(Stance stance);
 		void set_stance(uint8_t stancebyte);
 
@@ -65,6 +71,9 @@ namespace ms
 		{
 			return uniqueid;
 		}
+
+		bool has_loot_target = false;
+		Point<int16_t> loot_target;
 
 		Point<int16_t> get_position() const
 		{
@@ -78,6 +87,10 @@ namespace ms
 
 		// Play a command/feed reaction, then fall back to STAND.
 		void play_command(Stance stance);
+		// Play the pet's real reaction art: the interact/food entry names the
+		// animation node to play via its "act" string. False if the pet's data
+		// has no matching act, so the caller can fall back to a stance.
+		bool play_interaction(bool feed, uint8_t index, bool success);
 
 	private:
 		int32_t itemid;
@@ -86,6 +99,9 @@ namespace ms
 		Stance stance;
 		bool flip;
 
+		nl::node src;
+		Animation oneshot;
+		bool oneshot_active = false;
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;
 		Text namelabel;

@@ -143,9 +143,6 @@ namespace ms
 
 			body->draw(interstance, Body::Layer::ARM_BELOW_HEAD_OVER_MAIL, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_OVER_HAIR, interframe, args);
-			// A full-head helmet (info/replaceHead) suppresses the head, hair, face
-			// and ear/eye/face accessories entirely and draws ONLY the hat. Removing
-			// it clears the flag and the head draws again next frame.
 			bool wholehead = equips.covers_whole_head();
 
 			if (!wholehead)

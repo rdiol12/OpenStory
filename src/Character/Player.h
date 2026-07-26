@@ -198,6 +198,10 @@ namespace ms
 		int32_t heal_tick_counter = 0;
 		static constexpr int32_t HEAL_TICK_INTERVAL = 300; // ~10 seconds at 30fps
 
+		int32_t auto_hp_pot_ticks = 0;
+		int32_t auto_mp_pot_ticks = 0;
+		static constexpr int32_t AUTO_POT_COOLDOWN_TICKS = 120; // ~4 seconds at 30fps
+
 		// Track last observed HP so we can detect server-driven damage (DoT,
 		// magic, status) that bypasses Player::damage()/show_damage() and
 		// therefore never sets the invincible window. When HP drops we start
@@ -207,8 +211,17 @@ namespace ms
 		int32_t hit_lockout_ticks = 0;
 		static constexpr int32_t HIT_LOCKOUT_TICKS = 90; // ~3s at 30fps
 
+		int32_t mount_level = 0;
+		int32_t mount_exp = 0;
+		int32_t mount_tiredness = 0;
+
 	public:
 		int32_t get_chair_itemid() const { return chair_itemid; }
 		void set_chair(int32_t itemid);
+
+		void set_mount_stats(int32_t level, int32_t exp, int32_t tiredness) { mount_level = level; mount_exp = exp; mount_tiredness = tiredness; }
+		int32_t get_mount_level() const { return mount_level; }
+		int32_t get_mount_exp() const { return mount_exp; }
+		int32_t get_mount_tiredness() const { return mount_tiredness; }
 	};
 }

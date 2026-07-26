@@ -163,10 +163,6 @@ namespace ms
 
 		HiredMerchants::get().draw(viewpos, alpha);
 
-		// Portals sit behind characters — otherwise the portal glow paints
-		// over a character (and the death tomb/ghost) standing in it
-		portals.draw(viewpos, alpha);
-
 		// Pass 3 — players (self + other characters) and their name tags,
 		// drawn after EVERYTHING else regardless of layer. This keeps a
 		// character and their name visible even when standing on top of a
@@ -177,6 +173,14 @@ namespace ms
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
 		}
+
+		// Portals are part of the map's foreground: a character walking into
+		// one is covered by its glow, not painted over it.
+		portals.draw(viewpos, alpha);
+
+		// Only NPC name/function labels ride above everything — their sprites
+		// stayed down in pass 2 so a player can walk in front of them.
+		npcs.draw_names(viewx, viewy, alpha);
 
 		combat.draw(viewx, viewy, alpha);
 
@@ -237,40 +241,7 @@ namespace ms
 		combat.update();
 		HiredMerchants::get().update();
 
-		if (--pet_loot_cd <= 0)
-		{
-			pet_loot_cd = 40;
-
-			for (uint8_t pi = 0; pi < 3; pi++)
-			{
-				PetLook& pet = player.get_pet(pi);
-
-				if (pet.get_itemid() == 0)
-					continue;
-
-				Point<int16_t> ppos = pet.get_position();
-				MapObjects* dobjs = drops.get_drops();
-
-				for (auto it = dobjs->begin(); it != dobjs->end(); ++it)
-				{
-					MapObject* mo = it->second.get();
-
-					if (!mo || !mo->is_active())
-						continue;
-
-					Point<int16_t> dpos = mo->get_position();
-
-					if (std::abs(dpos.x() - ppos.x()) <= 30 && std::abs(dpos.y() - ppos.y()) <= 25)
-					{
-						PetLootPacket(pet.get_uniqueid(), mo->get_oid()).dispatch();
-						pet_loot_cd = 80;
-						break;
-					}
-				}
-
-				break;
-			}
-		}
+		petai.update(player, drops);
 		MapleTVBroadcast::get().tick();
 		backgrounds.update();
 		environments.update();

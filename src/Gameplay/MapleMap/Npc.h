@@ -48,6 +48,9 @@ namespace ms
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
+		// Name/function labels are drawn in a later pass so a character
+		// standing in front of an NPC cannot cover them.
+		void draw_name(double viewx, double viewy, float alpha) const;
 		// Draw a small scaled copy of the NPC's current sprite at a screen
 		// point (used to show the NPC on the minimap instead of a marker).
 		void draw_minimap(Point<int16_t> position, float scale, float alpha) const;

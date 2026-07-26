@@ -21,7 +21,6 @@
 #include "UITypes/UILogin.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UILogo.h"
-#include "UITypes/UIRegion.h"
 
 #include "../Configuration.h"
 
@@ -129,9 +128,8 @@ namespace ms
 	{
 		auto logo = UI::get().get_element<UILogo>();
 		auto login = UI::get().get_element<UILogin>();
-		auto region = UI::get().get_element<UIRegion>();
 
-		if (logo && logo->is_active() || login && login->is_active() || region && region->is_active())
+		if (logo && logo->is_active() || login && login->is_active())
 			UI::get().quit();
 		else
 			UI::get().emplace<UIQuitConfirm>();
