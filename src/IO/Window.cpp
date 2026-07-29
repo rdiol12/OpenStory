@@ -69,6 +69,15 @@ namespace ms
 		UI::get().send_key(key, action != GLFW_RELEASE);
 	}
 
+	// Text as the OS produced it, after the active keyboard layout and any IME.
+	// key_callback only reports physical keys, so on a Hebrew layout it reports
+	// the Latin key at that position -- this is the only path that can deliver
+	// non-ASCII characters at all.
+	void char_callback(GLFWwindow*, unsigned int codepoint)
+	{
+		UI::get().send_char(codepoint);
+	}
+
 	std::chrono::time_point<std::chrono::steady_clock> start = ContinuousTimer::get().start();
 
 	void mousekey_callback(GLFWwindow*, int button, int action, int)
@@ -246,6 +255,7 @@ namespace ms
 
 		glfwSetInputMode(glwnd, GLFW_STICKY_KEYS, GL_TRUE);
 		glfwSetKeyCallback(glwnd, key_callback);
+		glfwSetCharCallback(glwnd, char_callback);
 		glfwSetMouseButtonCallback(glwnd, mousekey_callback);
 		glfwSetCursorPosCallback(glwnd, cursor_callback);
 		glfwSetWindowFocusCallback(glwnd, focus_callback);

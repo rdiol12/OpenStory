@@ -69,6 +69,10 @@ namespace ms
 		void draw(double viewx, double viewy, float alpha) const override;
 		// Draw look
 		void draw_preview(Point<int16_t> position, float alpha) const;
+		// The look draw_preview uses. Exposed so a UI can copy it and keep
+		// drawing the last known pose after this Char has been destroyed --
+		// windows outlive the characters they show.
+		const CharLook& get_look_preview() const;
 		// Update look and movements
 		int8_t update(const Physics& physics) override;
 		// Return the current map layer, or seven if on a ladder or rope.

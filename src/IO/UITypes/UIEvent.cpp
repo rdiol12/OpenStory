@@ -17,7 +17,6 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIEvent.h"
 
-#include "UIClock.h"
 
 #include "../UI.h"
 
@@ -48,26 +47,20 @@ namespace ms
 		nl::node backgrnd = main["backgrnd"];
 		Point<int16_t> bg_dimensions = Texture(backgrnd).get_dimensions();
 
-		// Layered backgrounds
 		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(main["backgrnd2"], Point<int16_t>(1, 0));
-		sprites.emplace_back(main["backgrnd3"], Point<int16_t>(6, 29));
+		sprites.emplace_back(main["backgrnd2"]);
+		sprites.emplace_back(main["backgrnd3"]);
 
 		// Close button
 		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(bg_dimensions.x() - 19, 6));
 
-		// Event slot backgrounds (316x78)
 		slot_normal = event_node["normal"];
 		slot_selected = event_node["select"];
-
-		// Item reward slot frame (35x35)
 		slot_frame = event_node["slot"];
 
-		// Event type icons (19x19)
 		for (int i = 0; i < 4; i++)
 			event_icons[i] = event_node["icon"][std::to_string(i)];
 
-		// Status button textures
 		btn_ing = event_node["BtIng"]["normal"]["0"];
 		btn_will = event_node["BtWill"]["normal"]["0"];
 		btn_clear = event_node["BtClear"]["normal"]["0"];
@@ -82,37 +75,19 @@ namespace ms
 
 		empty_text = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::GRAY, "Requesting events...");
 
-		// Load TimeEvent timer widget from UIWindow4.img/TimeEvent
-		nl::node te = nl::nx::ui["UIWindow4.img"]["TimeEvent"];
+		nl::node clock_num = nl::nx::ui["UIWindow.img"]["muruengRaid"]["number"];
 
-		timer_bg = te["backgrnd"];
-		timer_bg2 = te["backgrnd2"];
-		timer_bg3 = te["backgrnd3"];
+		for (int i = 0; i < 10; i++)
+			clock_digit[i] = clock_num[std::to_string(i)];
 
-		// Gauge
-		nl::node gauge = te["Guage"];
+		clock_colon = clock_num["bar"];
+
+		nl::node gauge = nl::nx::ui["UIWindow4.img"]["TimeEvent"]["Guage"];
 		timer_gauge_bg = gauge["backgrnd"];
 		timer_gauge_cover = gauge["cover"];
 		timer_gauge_fill = gauge["1"]["0"];
-		gauge_width = Texture(gauge["backgrnd"]).get_dimensions().x();
-
-		// Digit sprites 0-9 (~9x12)
-		nl::node numbers = te["Number"];
-		for (int i = 0; i < 10; i++)
-			timer_digit[i] = numbers[std::to_string(i)];
-
-		timer_digit_width = timer_digit[0].get_dimensions().x();
-
-		// State overlays
-		timer_state_timer = te["State"]["Timer"]["0"];
-		timer_state_end = te["State"]["End"]["0"];
-		timer_state_complete = te["State"]["Complete"]["0"];
-
-		// Icon frame
-		timer_icon_frame = te["icon"]["frame"];
-
-		// Effect animation
-		timer_effect = te["Effect"];
+		gauge_width = timer_gauge_bg.get_dimensions().x();
+		gauge_offset = -timer_gauge_bg.get_origin();
 
 		dimension = bg_dimensions;
 		dragarea = Point<int16_t>(dimension.x(), 20);
@@ -123,6 +98,8 @@ namespace ms
 	void UIEvent::draw(float inter) const
 	{
 		UIElement::draw(inter);
+
+		draw_countdown(position + Point<int16_t>(BAR_CENTER_X, BAR_CENTER_Y), soonest_remaining());
 
 		if (events.empty())
 		{
@@ -138,39 +115,51 @@ namespace ms
 				break;
 
 			const EventData& ev = events[slot];
-			int16_t sy = SLOT_START_Y + SLOT_SPACING * i;
+			int16_t sy = SLOT_SPACING * i;
 
-			auto slot_pos = position + Point<int16_t>(SLOT_X, sy);
+			// The slot art carries origin (-11,-126), so drawing it at the window
+			// position places it; inner sprites are authored relative to the slot.
+			auto slot_pos = position + Point<int16_t>(0, sy);
+			auto content = position + Point<int16_t>(SLOT_LEFT, SLOT_TOP + sy);
 
 			if (slot == selected_slot)
 				slot_selected.draw(slot_pos);
 			else
 				slot_normal.draw(slot_pos);
 
-			// Event type icon (19x19)
 			if (ev.type >= 0 && ev.type < 4)
-				event_icons[ev.type].draw(slot_pos + Point<int16_t>(6, 6));
+				event_icons[ev.type].draw(content);
 
-			// Title text (next to icon)
-			event_title[i].draw(slot_pos + Point<int16_t>(28, 6));
+			event_title[i].draw(content + Point<int16_t>(TITLE_X, TITLE_Y));
 
-			// Status indicator top-right (inside slot, 57x32)
-			int16_t btn_x = 316 - 57 - 4;
 			if (ev.seconds_remaining > 0)
-				btn_ing.draw(slot_pos + Point<int16_t>(btn_x, 4));
+				btn_ing.draw(content);
 			else if (ev.seconds_remaining == 0)
-				btn_clear.draw(slot_pos + Point<int16_t>(btn_x, 4));
+				btn_clear.draw(content);
 			else
-				btn_will.draw(slot_pos + Point<int16_t>(btn_x, 4));
+				btn_will.draw(content);
 
-			// Description
-			event_desc[i].draw(slot_pos + Point<int16_t>(8, 26));
 
-			// Compact inline gauge + time text
-			if (ev.seconds_remaining > 0)
+			event_desc[i].draw(content + Point<int16_t>(TEXT_X, DESC_Y));
+
+			bool has_rewards = ev.has_item_rewards && !ev.rewards.empty();
+
+			if (has_rewards)
 			{
-				auto gauge_pos = slot_pos + Point<int16_t>(8, 44);
-				timer_gauge_bg.draw(gauge_pos);
+				for (size_t f = 0; f < ev.rewards.size() && f < MAX_REWARDS; f++)
+				{
+					auto frame_pos = content + Point<int16_t>(TEXT_X + REWARD_PITCH * static_cast<int16_t>(f), REWARD_Y);
+
+					slot_frame.draw(frame_pos);
+
+					const ItemData& item_data = ItemData::get(ev.rewards[f].first);
+					item_data.get_icon(true).draw(frame_pos + Point<int16_t>(2, 2));
+				}
+
+			}
+			else if (ev.seconds_remaining > 0)
+			{
+				timer_gauge_bg.draw(content);
 
 				if (ev.total_seconds > 0)
 				{
@@ -178,91 +167,80 @@ namespace ms
 					int16_t fill_width = static_cast<int16_t>(gauge_width * ratio);
 
 					for (int16_t x = 0; x < fill_width; x++)
-						timer_gauge_fill.draw(gauge_pos + Point<int16_t>(x, 0));
+						timer_gauge_fill.draw(content + gauge_offset + Point<int16_t>(x, 0));
 				}
 
-				timer_gauge_cover.draw(gauge_pos);
-
-				// Time digits right of gauge
-				event_time[i].draw(slot_pos + Point<int16_t>(gauge_width + 14, 44));
+				timer_gauge_cover.draw(content);
 			}
 			else
 			{
-				event_time[i].draw(slot_pos + Point<int16_t>(8, 44));
-			}
-
-			// Item reward slots (compact, within slot bottom area)
-			if (ev.has_item_rewards && !ev.rewards.empty())
-			{
-				for (size_t f = 0; f < ev.rewards.size() && f < 5; f++)
-				{
-					int16_t rx = 8 + 38 * static_cast<int16_t>(f);
-					int16_t ry = 58;
-
-					slot_frame.draw(slot_pos + Point<int16_t>(rx, ry));
-
-					const ItemData& item_data = ItemData::get(ev.rewards[f].first);
-					const Texture& icon = item_data.get_icon(true);
-					icon.draw(slot_pos + Point<int16_t>(rx + 2, ry + 2));
-				}
+				event_time[i].draw(content + Point<int16_t>(TEXT_X, GAUGE_Y));
 			}
 		}
 	}
 
-	void UIEvent::draw_timer(Point<int16_t> pos, int32_t seconds_remaining, int32_t total_seconds) const
+	int32_t UIEvent::soonest_remaining() const
 	{
-		if (seconds_remaining <= 0)
-		{
-			// Draw "End" state
-			timer_state_end.draw(pos);
-			return;
-		}
+		int32_t soonest = 0;
 
-		// Draw "Timer" state label
-		timer_state_timer.draw(pos);
+		for (const auto& ev : events)
+			if (ev.seconds_remaining > 0 && (soonest == 0 || ev.seconds_remaining < soonest))
+				soonest = ev.seconds_remaining;
 
-		// Draw gauge bar below the state label
-		auto gauge_pos = pos + Point<int16_t>(0, 20);
-		timer_gauge_bg.draw(gauge_pos);
-
-		// Fill the gauge based on remaining time
-		if (total_seconds > 0)
-		{
-			float ratio = static_cast<float>(seconds_remaining) / static_cast<float>(total_seconds);
-			int16_t fill_width = static_cast<int16_t>(gauge_width * ratio);
-
-			// Draw fill segments
-			for (int16_t x = 0; x < fill_width; x++)
-				timer_gauge_fill.draw(gauge_pos + Point<int16_t>(x, 0));
-		}
-
-		timer_gauge_cover.draw(gauge_pos);
-
-		// Draw countdown digits to the right of the gauge: MM:SS
-		int32_t mins = seconds_remaining / 60;
-		int32_t secs = seconds_remaining % 60;
-
-		auto digit_pos = pos + Point<int16_t>(gauge_width + 5, 22);
-		draw_timer_number(mins, 2, digit_pos);
-		// Simple colon using two dots would need a sprite; just use spacing
-		digit_pos = digit_pos + Point<int16_t>(2 * timer_digit_width + 2, 0);
-		draw_timer_number(secs, 2, digit_pos);
+		return soonest;
 	}
 
-	void UIEvent::draw_timer_number(int value, int digits, Point<int16_t> pos) const
+	void UIEvent::draw_countdown(Point<int16_t> centre, int32_t seconds) const
 	{
-		int divisor = 1;
-		for (int i = 1; i < digits; i++)
-			divisor *= 10;
+		if (seconds < 0)
+			seconds = 0;
 
-		int16_t x = pos.x();
+		int32_t hours = seconds / 3600;
+		int32_t mins = (seconds % 3600) / 60;
+		int32_t secs = seconds % 60;
 
-		for (int i = 0; i < digits; i++)
+		int8_t glyphs[10];
+		int count = 0;
+
+		auto push = [&](int32_t value, bool pad)
 		{
-			int d = (value / divisor) % 10;
-			timer_digit[d].draw(DrawArgument(Point<int16_t>(x, pos.y())));
-			x += timer_digit_width;
-			divisor /= 10;
+			if (pad || value >= 10)
+				glyphs[count++] = static_cast<int8_t>((value / 10) % 10);
+
+			glyphs[count++] = static_cast<int8_t>(value % 10);
+		};
+
+		if (hours > 0)
+		{
+			push(hours, false);
+			glyphs[count++] = SEPARATOR;
+		}
+
+		push(mins, true);
+		glyphs[count++] = SEPARATOR;
+		push(secs, true);
+
+		auto glyph = [&](int i) -> const Texture&
+		{
+			return (glyphs[i] == SEPARATOR) ? clock_colon : clock_digit[glyphs[i]];
+		};
+
+		int16_t total = 0;
+
+		for (int i = 0; i < count; i++)
+			total += glyph(i).get_dimensions().x();
+
+		int16_t x = centre.x() - total / 2;
+
+		for (int i = 0; i < count; i++)
+		{
+			const Texture& tex = glyph(i);
+			Point<int16_t> dim = tex.get_dimensions();
+
+			// these sprites carry centred origins, so offset by the origin to
+			// land the top-left where we want it
+			tex.draw(DrawArgument(Point<int16_t>(x, centre.y() - dim.y() / 2) + tex.get_origin()));
+			x += dim.x();
 		}
 	}
 
@@ -289,9 +267,6 @@ namespace ms
 					ev.seconds_remaining--;
 			}
 		}
-
-		// Update effect animation
-		timer_effect.update();
 
 		// Update displayed text
 		for (int16_t i = 0; i < MAX_VISIBLE; i++)
@@ -336,31 +311,30 @@ namespace ms
 
 	void UIEvent::set_events(std::vector<EventData> event_list)
 	{
-		// Set total_seconds for gauge on first receive
+		// EVENT_INFO carries only secondsRemaining, so the gauge denominator is
+		// the largest value we have ever seen for that event, kept across refreshes
 		for (auto& ev : event_list)
 		{
-			if (ev.total_seconds <= 0)
-				ev.total_seconds = ev.seconds_remaining;
+			int32_t seen = peak_duration[ev.name];
+
+			if (ev.seconds_remaining > seen)
+			{
+				seen = ev.seconds_remaining;
+				peak_duration[ev.name] = seen;
+			}
+
+			ev.total_seconds = seen;
 		}
 
 		events = std::move(event_list);
-		offset = 0;
-		selected_slot = 0;
+
+		if (offset > 0 && offset > static_cast<int16_t>(events.size()) - MAX_VISIBLE)
+			offset = std::max(0, static_cast<int16_t>(events.size()) - MAX_VISIBLE);
+
+		if (selected_slot >= static_cast<int16_t>(events.size()))
+			selected_slot = 0;
+
 		countdown_accumulator = 0;
-
-		// The soonest-ending live event drives the on-screen countdown
-		// clock — unless a real map clock/timer is already showing
-		int32_t soonest = 0;
-
-		for (const auto& ev : events)
-			if (ev.seconds_remaining > 0 && (soonest == 0 || ev.seconds_remaining < soonest))
-				soonest = ev.seconds_remaining;
-
-		if (soonest > 0 && !Stage::get().is_clock_active() && !Stage::get().is_countdown_active())
-		{
-			Stage::get().set_countdown(soonest);
-			UI::get().emplace<UIClock>();
-		}
 	}
 
 	void UIEvent::request_events()
@@ -391,13 +365,13 @@ namespace ms
 				const EventData& ev = events[actual_slot];
 				if (ev.has_item_rewards && !ev.rewards.empty())
 				{
-					int16_t ry = SLOT_START_Y + SLOT_SPACING * slot_idx + 58;
+					int16_t ry = SLOT_TOP + SLOT_SPACING * slot_idx + REWARD_Y;
 
 					if (cursoroffset.y() >= ry && cursoroffset.y() <= ry + 35)
 					{
-						for (size_t f = 0; f < ev.rewards.size() && f < 5; f++)
+						for (size_t f = 0; f < ev.rewards.size() && f < MAX_REWARDS; f++)
 						{
-							int16_t rx = SLOT_X + 8 + 38 * static_cast<int16_t>(f);
+							int16_t rx = SLOT_LEFT + TEXT_X + REWARD_PITCH * static_cast<int16_t>(f);
 							if (cursoroffset.x() >= rx && cursoroffset.x() <= rx + 35)
 							{
 								UI::get().show_item(Tooltip::Parent::EVENT, ev.rewards[f].first);
@@ -460,8 +434,8 @@ namespace ms
 	{
 		for (int16_t i = 0; i < MAX_VISIBLE; i++)
 		{
-			int16_t top = SLOT_START_Y + SLOT_SPACING * i;
-			if (y >= top && y < top + SLOT_SPACING)
+			int16_t top = SLOT_TOP + SLOT_SPACING * i;
+			if (y >= top && y < top + SLOT_HEIGHT)
 				return i;
 		}
 

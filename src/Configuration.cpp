@@ -35,6 +35,7 @@ namespace ms
 		settings.emplace<FontPathBold>();
 		settings.emplace<FontPathEmoji>();
 		settings.emplace<FontPathCJK>();
+		settings.emplace<FontPathHebrew>();
 		settings.emplace<BGMVolume>();
 		settings.emplace<SFXVolume>();
 		settings.emplace<SaveLogin>();
@@ -185,7 +186,7 @@ namespace ms
 			                   "AllowGuildChat", "AllowAllianceChat", "AllowFamilyInvite",
 			                   "AllowFriendChat", "AllowTradeRequest", "AllowExpeditionInvite",
 			                   "AllowGuildInvite", "AllowAllianceInvite", "AllowFollow" } },
-			{ "Fonts",       { "FontPathNormal", "FontPathBold", "FontPathCJK", "FontPathEmoji" } },
+			{ "Fonts",       { "FontPathNormal", "FontPathBold", "FontPathCJK", "FontPathHebrew", "FontPathEmoji" } },
 			{ "MiniMap",     { "MiniMapSimpleMode", "MiniMapType", "MiniMapDefaultHelpers" } },
 			{ "Misc",        { "ScreenshotFolder", "TrackedQuests" } },
 		};

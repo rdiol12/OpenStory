@@ -62,6 +62,10 @@ namespace ms
 
 		// Check whether this is a server-sided NPC
 		bool isscripted() const;
+		// The server can mark an NPC scriptable at runtime (SET_NPC_SCRIPTABLE),
+		// which is the only way custom NPCs with no `script` node in NX get a
+		// chat icon. NX data alone cannot know about them.
+		void set_scripted(bool s);
 		// Check if the NPC is in range of the cursor
 		bool inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const;
 

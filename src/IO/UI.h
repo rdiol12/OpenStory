@@ -60,6 +60,10 @@ namespace ms
 		void rightclick();
 		void doubleclick();
 		void send_key(int32_t keycode, bool pressed);
+		// One Unicode character produced by the OS keyboard layout / IME.
+		// This is the only route by which non-ASCII text (Hebrew, CJK) can be
+		// typed; send_key sees physical keys and cannot represent it.
+		void send_char(uint32_t codepoint);
 
 		void set_scrollnotice(const std::string& notice);
 		void focus_textfield(Textfield* textfield);

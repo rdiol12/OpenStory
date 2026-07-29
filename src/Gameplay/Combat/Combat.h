@@ -47,8 +47,16 @@ namespace ms
 		// Show a standalone damage number over a mob (server DAMAGE_MONSTER
 		// packet: DoT, mist, Body Pressure and other attacker-less damage).
 		void show_mob_damage(int32_t oid, int32_t damage);
-		// Show a buff effect
-		void show_buff(int32_t cid, int32_t skillid, int8_t level);
+		// Show a buff effect. `speed` and `direction` come from the packet: without
+		// them the cast plays at default speed and default facing, so a skill cast
+		// facing left renders facing right. Negative direction means "unspecified"
+		// and leaves the character's current facing alone.
+		void show_buff(int32_t cid, int32_t skillid, int8_t level,
+			uint8_t speed = 0, int8_t direction = -1);
+		// Teleport variants across the mage jobs and GM. These carry no authored
+		// use-effect, so anything rendering them has to substitute the standard
+		// BasicEff puff explicitly.
+		static bool is_teleport_skill(int32_t skillid);
 		// Show a buff effect
 		void show_player_buff(int32_t skillid);
 

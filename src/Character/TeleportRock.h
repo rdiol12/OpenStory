@@ -28,6 +28,12 @@ namespace ms
 		void addlocation(int32_t);
 		void addviplocation(int32_t);
 
+		// The server sends the WHOLE list back after an add or delete, so it
+		// has to replace rather than append -- appending would grow the list
+		// on every edit and duplicate every entry.
+		void set_locations(std::vector<int32_t> maps, bool vip);
+		const std::vector<int32_t>& get_locations(bool vip) const;
+
 	private:
 		std::vector<int32_t> locations;
 		std::vector<int32_t> viplocations;

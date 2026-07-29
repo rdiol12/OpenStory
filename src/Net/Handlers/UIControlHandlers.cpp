@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////////
+﻿//////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
 //																				//
@@ -30,6 +30,10 @@
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UIPartySearch.h"
 #include "../../IO/UITypes/UIComboCounter.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -127,11 +131,28 @@ namespace ms
 		}
 		else if (mode == 1)
 		{
+			// Mode 1 names a canned hint from UI.wz/tutorial rather than sending
+			// its text. Dropping both fields meant these never appeared at all.
 			int32_t hint_id = recv.read_int();
 			int32_t duration = recv.read_int();
 
-			(void)hint_id;
 			(void)duration;
+
+			nl::node hint = nl::nx::ui["tutorial.img"][std::to_string(hint_id)];
+
+			if (!hint)
+				hint = nl::nx::ui["UIWindow.img"]["tutorial"][std::to_string(hint_id)];
+
+			// Only the text form is surfaced; the authored hint art needs a
+			// tutorial-balloon UI that does not exist, and inventing one would
+			// place it wrongly. A named-but-missing hint still says something
+			// happened rather than silently doing nothing.
+			std::string text = hint ? hint["text"].get_string() : std::string();
+
+			chat::log(text.empty()
+				? "[Guide] Hint " + std::to_string(hint_id)
+				: "[Guide] " + text,
+				chat::LineType::YELLOW);
 		}
 	}
 

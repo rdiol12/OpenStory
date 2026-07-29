@@ -38,6 +38,14 @@ namespace ms
 		void change_text(const std::string& text);
 		void expire();
 
+		// Resolves an inline `#v/#i/#q/#s/#f/#e<id>#` macro to its sprite.
+		// Shared so the chat window, speech balloons and NPC dialogue cannot
+		// disagree about what a given macro renders as.
+		static Texture resolve_inline_image(Text::Layout::ImageKind kind, int32_t id);
+		// Draws every inline image of `label`, whose text was drawn at `origin`.
+		static void draw_inline_images(const Text& label, Point<int16_t> origin,
+			const Range<int16_t>& clip);
+
 	private:
 		// How long a line stays on screen
 		static constexpr int16_t DURATION = 4000; // 4 seconds

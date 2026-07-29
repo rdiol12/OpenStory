@@ -85,66 +85,75 @@ namespace ms
 		Point<int16_t> text_origin = position - Point<int16_t>(0, height + 4);
 		textlabel.draw(text_origin);
 
-		// Overlay inline icons reserved by #v/#i (item), #q (quest), #s (skill),
-		// #f (face) macros in the speak text. The Text layout already reserved a
-		// size x size slot at img.pos (relative to text_origin); resolve the sprite
-		// from the right NX source and stamp it centered in that slot. Mirrors the
-		// NPC dialog window's inline-icon path.
-		for (const auto& img : textlabel.images())
+		draw_inline_images(textlabel, text_origin, Range<int16_t>(0, 0));
+	}
+
+	Texture ChatBalloon::resolve_inline_image(Text::Layout::ImageKind kind, int32_t id)
+	{
+		switch (kind)
+		{
+		case Text::Layout::ImageKind::ITEM:
+			return ItemData::get(id).get_icon(true);
+		case Text::Layout::ImageKind::QUEST:
+		{
+			nl::node qnode = nl::nx::ui["UIWindow.img"]["QuestIcon"][std::to_string(id)];
+			return qnode ? Texture(qnode) : Texture();
+		}
+		case Text::Layout::ImageKind::SKILL:
+		{
+			std::string js = std::to_string(id / 10000);
+			while (js.size() < 3) js.insert(0, 1, '0');
+			nl::node snode = nl::nx::skill[js + ".img"]["skill"][std::to_string(id)]["icon"];
+			return snode ? Texture(snode) : Texture();
+		}
+		case Text::Layout::ImageKind::FACE:
+		{
+			std::string fid = std::to_string(id);
+			while (fid.size() < 5) fid.insert(0, 1, '0');
+			nl::node fnode = nl::nx::character["Face"][fid + ".img"]["default"]["face"];
+			return fnode ? Texture(fnode) : Texture();
+		}
+		case Text::Layout::ImageKind::EMOTE:
+		{
+			// Chat emoticons are the character face expressions. v83 has no
+			// UI.wz/Emote.img, which is what this used to look for -- so it
+			// never resolved anything.
+			nl::node enode = nl::nx::character["Face"]["00020000.img"]
+				[Text::emoticon_name(id)]["0"]["face"];
+			return enode ? Texture(enode) : Texture();
+		}
+		}
+
+		return Texture();
+	}
+
+	void ChatBalloon::draw_inline_images(const Text& label, Point<int16_t> origin,
+		const Range<int16_t>& clip)
+	{
+		// The layout already reserved a size x size slot at img.pos, relative to
+		// where the text itself was drawn; stamp the sprite centred in that slot.
+		for (const auto& img : label.images())
 		{
 			if (img.item_id <= 0)
 				continue;
 
-			Texture tex;
-			switch (img.kind)
-			{
-			case Text::Layout::ImageKind::ITEM:
-				tex = ItemData::get(img.item_id).get_icon(true);
-				break;
-			case Text::Layout::ImageKind::QUEST:
-			{
-				nl::node qnode = nl::nx::ui["UIWindow.img"]["QuestIcon"][std::to_string(img.item_id)];
-				if (qnode)
-					tex = Texture(qnode);
-				break;
-			}
-			case Text::Layout::ImageKind::SKILL:
-			{
-				int32_t job = img.item_id / 10000;
-				std::string js = std::to_string(job);
-				while (js.size() < 3) js.insert(0, 1, '0');
-				nl::node snode = nl::nx::skill[js + ".img"]["skill"][std::to_string(img.item_id)]["icon"];
-				if (snode)
-					tex = Texture(snode);
-				break;
-			}
-			case Text::Layout::ImageKind::FACE:
-			{
-				std::string fid = std::to_string(img.item_id);
-				while (fid.size() < 5) fid.insert(0, 1, '0');
-				nl::node fnode = nl::nx::character["Face"][fid + ".img"]["default"]["face"];
-				if (fnode)
-					tex = Texture(fnode);
-				break;
-			}
-			case Text::Layout::ImageKind::EMOTE:
-			{
-				// Emote/expression icons authored in UI.wz/Emote.img/<id>.
-				nl::node enode = nl::nx::ui["Emote.img"][std::to_string(img.item_id)];
-				if (enode)
-					tex = Texture(enode);
-				break;
-			}
-			}
+			Texture tex = resolve_inline_image(img.kind, img.item_id);
 
 			if (!tex.is_valid())
 				continue;
 
-			Point<int16_t> icon_dims = tex.get_dimensions();
-			Point<int16_t> slot_pos = text_origin + img.pos;
+			Point<int16_t> dims = tex.get_dimensions();
+			Point<int16_t> slot = origin + img.pos;
 			Point<int16_t> centered(
-				slot_pos.x() + (img.size - icon_dims.x()) / 2,
-				slot_pos.y() + (img.size - icon_dims.y()) / 2);
+				slot.x() + (img.size - dims.x()) / 2,
+				slot.y() + (img.size - dims.y()) / 2);
+
+			// A zero range means "no clipping"; rows in the chat window pass
+			// their visible band so icons cannot spill outside the box.
+			if (clip.first() != clip.second()
+				&& (centered.y() < clip.first() || centered.y() + dims.y() > clip.second()))
+				continue;
+
 			tex.draw(DrawArgument(centered));
 		}
 	}

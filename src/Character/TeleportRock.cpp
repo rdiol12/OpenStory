@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "TeleportRock.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	void TeleportRock::addlocation(int32_t mapid)
@@ -27,5 +29,22 @@ namespace ms
 	void TeleportRock::addviplocation(int32_t mapid)
 	{
 		viplocations.push_back(mapid);
+	}
+
+	void TeleportRock::set_locations(std::vector<int32_t> maps, bool vip)
+	{
+		// 999999999 is the server's empty-slot marker; keeping it would show
+		// phantom destinations in the UI.
+		maps.erase(std::remove(maps.begin(), maps.end(), 999999999), maps.end());
+
+		if (vip)
+			viplocations = std::move(maps);
+		else
+			locations = std::move(maps);
+	}
+
+	const std::vector<int32_t>& TeleportRock::get_locations(bool vip) const
+	{
+		return vip ? viplocations : locations;
 	}
 }

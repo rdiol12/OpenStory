@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////////
+﻿//////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
 //																				//
@@ -23,6 +23,10 @@
 #include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UIStatusBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
 
 namespace ms
 {
@@ -58,7 +62,16 @@ namespace ms
 			// Remove quest time limit
 			int16_t pos = recv.read_short();
 			int16_t questid = recv.read_short();
-			(void)questid;
+			(void)pos;
+
+			if (nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(questid)])
+			{
+				std::string qname = info["name"].get_string();
+
+				if (!qname.empty())
+					chat::log("[Quest] Time limit lifted: " + qname, chat::LineType::YELLOW);
+			}
+
 			break;
 		}
 		case 8:
@@ -77,9 +90,16 @@ namespace ms
 		{
 			// Quest error — requirements not met
 			int16_t questid = recv.read_short();
-			(void)questid;
 
-			chat::log("[Quest] You don't meet the requirements for this quest.", chat::LineType::RED);
+			std::string qname;
+
+			if (nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(questid)])
+				qname = info["name"].get_string();
+
+			chat::log(qname.empty()
+				? "[Quest] You don't meet the requirements for this quest."
+				: "[Quest] You don't meet the requirements for '" + qname + "'.",
+				chat::LineType::RED);
 
 			break;
 		}
@@ -134,7 +154,16 @@ namespace ms
 			return;
 
 		int16_t questid = recv.read_short();
-		(void)questid;
+
+		// Name the quest that completed. Without this every completion reads
+		// identically, which is useless when several are turned in at once.
+		if (nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(questid)])
+		{
+			std::string qname = info["name"].get_string();
+
+			if (!qname.empty())
+				chat::log("[Quest] Completed: " + qname, chat::LineType::YELLOW);
+		}
 
 		// Play quest clear effect on player (light pillar)
 		Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);

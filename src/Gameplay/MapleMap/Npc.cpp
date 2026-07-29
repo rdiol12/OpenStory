@@ -428,6 +428,11 @@ namespace ms
 		return scripted;
 	}
 
+	void Npc::set_scripted(bool s)
+	{
+		scripted = s;
+	}
+
 	bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
 	{
 		if (!active)

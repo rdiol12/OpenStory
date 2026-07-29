@@ -65,7 +65,7 @@ namespace ms
 				std::vector<uint8_t> decal_bgra;
 				Point<int16_t> decal_pos;
 
-				// Optional second material for sleeve parts (info/aiSkinArm) ג€”
+				// Optional second material for sleeve parts (info/aiSkinArm) —
 				// "leather coat, steel pauldrons" as two swatches
 				std::shared_ptr<Material> arm;
 			};
@@ -94,7 +94,7 @@ namespace ms
 				if (transparent * 20 > material.bgra.size() / 4)
 					std::cout << "[AiSkin] WARNING item " << itemid << ": material is not opaque ("
 						<< (transparent * 100 / (material.bgra.size() / 4))
-						<< "% translucent pixels) ג€” background may leak into the equip" << std::endl;
+						<< "% translucent pixels) — background may leak into the equip" << std::endl;
 			}
 
 			const Material& load_material(int32_t itemid, nl::node info)
@@ -474,7 +474,7 @@ namespace ms
 			if (!shell_pixels(itemid, info, viewnode, false, px, w, h))
 				return Texture();
 
-			// Rotate CCW so the collar ends up on the LEFT (lying, head left ג€”
+			// Rotate CCW so the collar ends up on the LEFT (lying, head left —
 			// the prone authoring convention)
 			int16_t out_w = h;
 			int16_t out_h = w;

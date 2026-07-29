@@ -45,6 +45,9 @@ namespace ms
 		void update(Point<int16_t> parentpos);
 		void send_key(KeyType::Id type, int32_t code, bool down);
 		void add_string(const std::string& str);
+		// Inserts one Unicode character as UTF-8. Non-ASCII text can only be
+		// entered through here (see UI::send_char).
+		void add_codepoint(uint32_t codepoint);
 
 		void set_state(State state);
 		void change_text(const std::string& text);
@@ -69,6 +72,12 @@ namespace ms
 	private:
 		void modifytext(const std::string& t);
 		bool belowlimit() const;
+		// Byte offsets of the character boundaries either side of `pos`.
+		// The caret and every edit must land on a boundary: a UTF-8 Hebrew
+		// character is two bytes, so byte-wise editing would split it and
+		// leave an invalid string behind.
+		size_t prev_boundary(size_t pos) const;
+		size_t next_boundary(size_t pos) const;
 		size_t index_at(int16_t cursor_x) const;
 		bool has_selection() const;
 		bool selectable() const;

@@ -21,6 +21,10 @@
 
 #include <cmath>
 
+#ifdef USE_NX
+#include <nlnx/nx.hpp>
+#endif
+
 namespace ms
 {
 	OtherChar::OtherChar(int32_t id, const CharLook& lk, uint8_t lvl, int16_t jb, const std::string& nm, int8_t st, Point<int16_t> pos) : Char(id, lk, nm)
@@ -71,6 +75,15 @@ namespace ms
 
 		const Movement& target = newmoves.back();
 
+		// A teleport is stated outright by the movement command, so it does not
+		// have to be inferred. The distance check below cannot tell a warp from
+		// a lag recovery; this can, which is what makes showing the effect safe.
+		bool warped = false;
+
+		for (const Movement& m : newmoves)
+			if (m.type == Movement::TELEPORT)
+				warped = true;
+
 		// Recover from big jumps (teleport, flash jump, or a position that
 		// drifted out of sync) by snapping straight to the server position
 		// instead of sliding the character across the map — otherwise a
@@ -79,12 +92,20 @@ namespace ms
 		double dx = target.xpos - phobj.crnt_x();
 		double dy = target.ypos - phobj.crnt_y();
 
-		if ((dx * dx + dy * dy) > (200.0 * 200.0))
+		if (warped || (dx * dx + dy * dy) > (200.0 * 200.0))
 		{
 			phobj.set_x(target.xpos);
 			phobj.set_y(target.ypos);
 			phobj.hspeed = 0.0;
 			phobj.vspeed = 0.0;
+		}
+
+		// The teleport skills carry no authored use-effect, so the standard
+		// BasicEff puff is substituted — same as the local player's own warp.
+		if (warped)
+		{
+			static Animation tp_effect(nl::nx::effect["BasicEff.img"]["Teleport"]);
+			show_attack_effect(tp_effect, 0);
 		}
 
 		lastmove = target;

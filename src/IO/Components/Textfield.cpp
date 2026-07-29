@@ -20,6 +20,7 @@
 #include "../UI.h"
 
 #include "../../Graphics/Geometry.h"
+#include "../../Graphics/Text.h"
 
 #include <sstream>
 
@@ -73,9 +74,18 @@ namespace ms
 			Point<int16_t> mpos;
 
 			if (wrap_width > 0)
+			{
 				mpos = absp + textlabel.endoffset() + Point<int16_t>(-1, 8) + marker_adjust;
+			}
 			else
-				mpos = absp + Point<int16_t>(textlabel.advance(markerpos) - 1, 8) + marker_adjust;
+			{
+				// markerpos is a byte offset into the LOGICAL string, but the
+				// layout was built from the visual one. In Hebrew those differ,
+				// so the caret has to be mapped across or it lands on the wrong
+				// side of the text entirely.
+				size_t vis = Text::logical_to_visual(text, markerpos);
+				mpos = absp + Point<int16_t>(textlabel.advance(vis) - 1, 8) + marker_adjust;
+			}
 
 			if (crypt > 0)
 				mpos.shift(1, -3);
@@ -158,8 +168,7 @@ namespace ms
 					{
 						clear_selection();
 
-						if (markerpos > 0)
-							markerpos--;
+						markerpos = prev_boundary(markerpos);
 
 						break;
 					}
@@ -167,8 +176,7 @@ namespace ms
 					{
 						clear_selection();
 
-						if (markerpos < text.size())
-							markerpos++;
+						markerpos = next_boundary(markerpos);
 
 						break;
 					}
@@ -180,9 +188,11 @@ namespace ms
 						}
 						else if (text.size() > 0 && markerpos > 0)
 						{
-							text.erase(markerpos - 1, 1);
+							size_t start = prev_boundary(markerpos);
 
-							markerpos--;
+							text.erase(start, markerpos - start);
+
+							markerpos = start;
 
 							modifytext(text);
 						}
@@ -219,7 +229,7 @@ namespace ms
 						}
 						else if (text.size() > 0 && markerpos < text.size())
 						{
-							text.erase(markerpos, 1);
+							text.erase(markerpos, next_boundary(markerpos) - markerpos);
 
 							modifytext(text);
 						}
@@ -254,6 +264,58 @@ namespace ms
 				add_string(ss.str());
 			}
 		}
+	}
+
+	size_t Textfield::prev_boundary(size_t pos) const
+	{
+		if (pos == 0)
+			return 0;
+
+		size_t i = pos - 1;
+
+		// Continuation bytes are 10xxxxxx; step back over them to the lead byte.
+		while (i > 0 && (static_cast<uint8_t>(text[i]) & 0xC0) == 0x80)
+			--i;
+
+		return i;
+	}
+
+	size_t Textfield::next_boundary(size_t pos) const
+	{
+		if (pos >= text.size())
+			return text.size();
+
+		size_t i = pos + 1;
+
+		while (i < text.size() && (static_cast<uint8_t>(text[i]) & 0xC0) == 0x80)
+			++i;
+
+		return i;
+	}
+
+	void Textfield::add_codepoint(uint32_t codepoint)
+	{
+		// Fields with a text callback (search boxes and the like) consume
+		// alphanumerics as a signal rather than inserting them.
+		if (ontext && codepoint < 0x80 && (isdigit(static_cast<int>(codepoint)) || isalpha(static_cast<int>(codepoint))))
+		{
+			ontext();
+			return;
+		}
+
+		if (has_selection())
+			erase_selection();
+
+		if (!belowlimit())
+			return;
+
+		std::string encoded;
+		Text::utf8_encode(codepoint, encoded);
+
+		text.insert(markerpos, encoded);
+		markerpos += encoded.size();
+
+		modifytext(text);
 	}
 
 	void Textfield::add_string(const std::string& str)

@@ -35,7 +35,7 @@ namespace ms
 			{
 				PHYSWIDTH = 1920;
 				PHYSHEIGHT = 1080;
-				UI_SCALE = 1.5f;
+				UI_SCALE = 2.0f;   // matches the 2x sprite textures: one texel per pixel
 			};
 
 			~Constants() {};
