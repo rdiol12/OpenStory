@@ -24,6 +24,8 @@
 
 #include "../Util/QuadTree.h"
 
+#include <vector>
+
 #ifdef PLATFORM_IOS
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
@@ -72,7 +74,7 @@ namespace ms
 		void setblend(bool additive);
 
 		// Create a layout for the text with the parameters specified
-		Text::Layout createlayout(const std::string& text, Text::Font font, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj);
+		Text::Layout createlayout(const std::string& text, Text::Font font, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj, bool rtl = false);
 		// Draw a text with the given parameters
 		void drawtext(const DrawArgument& args, const Range<int16_t>& vertical, const std::string& text, const Text::Layout& layout, Text::Font font, Color::Name color, Text::Background back);
 
@@ -125,6 +127,10 @@ namespace ms
 		const Offset& getoffset(size_t id, GLshort width, GLshort height, const void* data);
 		// Allocate atlas space and upload BGRA pixels (shared by both paths)
 		const Offset& upload(size_t id, GLshort width, GLshort height, const void* data);
+
+		static const int HD_SCALE = 2;
+		std::vector<uint32_t> hdbuffer;
+		const void* upscale(const void* data, GLshort w, GLshort h);
 
 		struct Leftover
 		{
@@ -256,7 +262,7 @@ namespace ms
 		class LayoutBuilder
 		{
 		public:
-			LayoutBuilder(const Font& font, Text::Font fontid, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj);
+			LayoutBuilder(const Font& font, Text::Font fontid, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj, bool rtl);
 
 			size_t add(const char* text, size_t prev, size_t first, size_t last);
 			Text::Layout finish(size_t first, size_t last);
@@ -272,6 +278,13 @@ namespace ms
 			Text::Font fontid;
 			Color::Name color;
 			int16_t maxwidth;
+			// The caller's original maxwidth (0 = unbounded). maxwidth itself
+			// gets rewritten to a default for wrapping, so it cannot answer
+			// "was a wrap width actually asked for?".
+			int16_t wrapwidth;
+			// Right-to-left paragraph: lines are flushed to the right edge of
+			// the wrap box, which is where Hebrew is read from.
+			bool rtl;
 			bool formatted;
 
 			int16_t ax;
@@ -342,11 +355,17 @@ namespace ms
 		Point<GLshort> fontborder;
 		GLshort fontymax;
 
+		// Opens a face from either a baked-in font (when `spec` names one, see
+		// EmbeddedFonts.h) or a file path. Baked-in fonts mean the client needs
+		// no font files at runtime and does not depend on C:/Windows/Fonts.
+		FT_Error open_face(const std::string& spec, FT_Face* out);
+
 		// Optional color emoji face (loaded once). Shared across all font sizes.
 		FT_Face emojiface = nullptr;
 		FT_UInt emoji_strike_size = 0;
 
-		// CJK fallback font path — used when primary font lacks a glyph
-		std::string cjk_fallback_path;
+		// Fallback faces, tried in order when the primary font lacks a glyph:
+		// Hebrew first (Roboto has no Hebrew at all), then CJK.
+		std::vector<std::string> fallback_faces;
 	};
 }

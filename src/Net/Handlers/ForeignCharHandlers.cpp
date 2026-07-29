@@ -47,19 +47,32 @@ namespace ms
 
 		int32_t damage = recv.read_int();
 
+		bool has_knockback = false;
+		int8_t direction = 0;
+
 		if (skill != -4 && recv.length() >= 5)
 		{
 			int32_t monsteridfrom = recv.read_int();
-			int8_t direction = recv.read_byte();
+			direction = recv.read_byte();
+			has_knockback = true;
 
 			(void)monsteridfrom;
-			(void)direction;
 		}
 
 		// Show damage number on the character
 		Optional<Char> character = Stage::get().get_character(cid);
 		if (character)
+		{
 			character->show_damage(damage);
+
+			// Knock the character back the way the server says they were hit.
+			// Player::damage encodes this as `fromleft ? 0 : 1` where the flag
+			// is true when the attacker is to the RIGHT, so 0 means knocked
+			// left. Matching it here is what makes a foreign player recoil the
+			// same way the local one does instead of absorbing hits in place.
+			if (has_knockback && damage > 0)
+				character->get_phobj().hspeed = (direction == 0) ? -1.5 : 1.5;
+		}
 	}
 
 	void FacialExpressionHandler::handle(InPacket& recv) const
@@ -277,12 +290,12 @@ namespace ms
 		int8_t speed = recv.read_byte();
 		int8_t direction = recv.read_byte();
 
+		// `flags` is the skill-specific display mask; nothing in the client reads
+		// it yet, so it stays unused rather than being guessed at.
 		(void)flags;
-		(void)speed;
-		(void)direction;
 
-		// Use Combat::show_buff which loads skill animation from NX and applies it
-		Stage::get().get_combat().show_buff(cid, skillid, level);
+		Stage::get().get_combat().show_buff(cid, skillid, level,
+			static_cast<uint8_t>(speed), direction);
 	}
 
 	void ThrowGrenadeHandler::handle(InPacket& recv) const
@@ -294,7 +307,24 @@ namespace ms
 		int32_t skill_id = recv.read_int();
 		int32_t skill_level = recv.read_int();
 
-		// Grenade visual — would need an animation system for projectiles
+		(void)key_down;
+
+		// Throw animation on the caster...
+		Stage::get().get_combat().show_buff(cid, skill_id,
+			static_cast<int8_t>(skill_level));
+
+		// ...then the blast where it lands. The skill's own `effect` node is the
+		// authored explosion; skills without one fall back to nothing rather than
+		// a placeholder, since a wrong effect reads worse than no effect.
+		std::string job = std::to_string(skill_id / 10000);
+		while (job.size() < 3)
+			job.insert(0, 1, '0');
+
+		nl::node blast = nl::nx::skill[job + ".img"]["skill"]
+			[std::to_string(skill_id)]["effect"];
+
+		Stage::get().get_point_effects().add(blast,
+			Point<int16_t>(static_cast<int16_t>(x), static_cast<int16_t>(y)));
 	}
 
 	void PetNameChangeHandler::handle(InPacket& recv) const

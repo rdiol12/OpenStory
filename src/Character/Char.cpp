@@ -140,6 +140,11 @@ namespace ms
 		look_preview.draw(position, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
 	}
 
+	const CharLook& Char::get_look_preview() const
+	{
+		return look_preview;
+	}
+
 	bool Char::update(const Physics& physics, float speed)
 	{
 		if (state == State::DIED)

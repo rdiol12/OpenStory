@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////////
+﻿//////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
 //																				//
@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UINpcTalk.h"
+
+#include "../Components/ChatBalloon.h"
 
 #include "../UI.h"
 
@@ -199,12 +201,9 @@ namespace ms
 					break;
 				}
 				case Text::Layout::ImageKind::EMOTE:
-				{
-					nl::node enode = nl::nx::ui["Emote.img"][std::to_string(img.item_id)];
-					if (enode)
-						tex = Texture(enode);
+					// Face expressions -- v83 has no UI.wz/Emote.img.
+					tex = ChatBalloon::resolve_inline_image(img.kind, img.item_id);
 					break;
-				}
 				}
 
 				if (!tex.is_valid()) continue;

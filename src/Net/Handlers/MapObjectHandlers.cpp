@@ -227,12 +227,27 @@ namespace ms
 			if (recv.length() >= 5)
 			{
 				int32_t skillid = recv.read_int();
-				recv.read_byte(); // direction
-				// Consume remaining bytes for this effect
+				int8_t direction = recv.read_byte();
+
+				// Cosmic sends two showBuffEffect layouts. The 4-arg one ends
+				// after `direction`; the 5-arg one (used by Monster Magnet) puts
+				// a zero byte, then the skill level, then direction. Detect it by
+				// the leading zero rather than guessing from the opcode.
+				int8_t level = 0;
+
+				if (direction == 0 && recv.available() >= 2)
+				{
+					level = recv.read_byte();
+					direction = recv.read_byte();
+				}
+
 				while (recv.available())
 					recv.read_byte();
 
-				Stage::get().get_combat().show_buff(cid, skillid, effect);
+				// `effect` is the effect id (1 = skill use, 2 = skill affected),
+				// not a skill level -- passing it as one recorded a bogus level
+				// for every foreign cast.
+				Stage::get().get_combat().show_buff(cid, skillid, level, 0, direction);
 			}
 			break;
 		}

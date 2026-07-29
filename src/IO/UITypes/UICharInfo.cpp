@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////////
+﻿//////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
 //																				//
@@ -96,7 +96,6 @@ namespace ms
 		charinfo_dim = backgrnd_dim;
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
-		target_character = Stage::get().get_character(cid).get();
 
 		// Bot inventory labels
 		bot_name_label = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE);
@@ -137,8 +136,11 @@ namespace ms
 		int16_t row_height = 18;
 		Point<int16_t> text_pos = position + Point<int16_t>(153, 65);
 
-		if (target_character)
-			target_character->draw_preview(position + Point<int16_t>(63, 129), inter);
+		// Drawn from the snapshot, not the live Char, so the portrait survives the
+		// target walking out of view or the map changing while this stays open.
+		if (has_preview)
+			preview_look.draw(position + Point<int16_t>(63, 129), false,
+				Stance::Id::STAND1, Expression::Id::DEFAULT);
 
 		name.draw(position + Point<int16_t>(59, 131));
 		level.draw(text_pos + Point<int16_t>(0, row_height * 0));
@@ -248,7 +250,16 @@ namespace ms
 		}
 	}
 
-	void UICharInfo::update() {}
+	void UICharInfo::update()
+	{
+		// Keep a copy of the look while the target is still on screen. Once they
+		// despawn their Char is gone, and this snapshot is all the portrait has.
+		if (Char* c = target())
+		{
+			preview_look = c->get_look_preview();
+			has_preview = true;
+		}
+	}
 
 	Button::State UICharInfo::button_pressed(uint16_t buttonid)
 	{
@@ -269,15 +280,15 @@ namespace ms
 		case Buttons::BtFamily:
 			break;
 		case Buttons::BtParty:
-			if (target_character)
-				InviteToPartyPacket(target_character->get_name()).dispatch();
+			if (target())
+				InviteToPartyPacket(target()->get_name()).dispatch();
 			deactivate();
 			return Button::State::NORMAL;
 		case Buttons::BtTrad:
-			if (target_character)
+			if (target())
 			{
 				TradeCreatePacket().dispatch();
-				TradeInvitePacket(target_character->get_oid()).dispatch();
+				TradeInvitePacket(target()->get_oid()).dispatch();
 			}
 			deactivate();
 			return Button::State::NORMAL;
@@ -291,10 +302,10 @@ namespace ms
 				return Button::State::NORMAL;
 			}
 
-			if (target_character)
+			if (target())
 			{
-				GuildInvitePacket(target_character->get_name()).dispatch();
-				chat::log("Sent a guild invite to " + target_character->get_name() + ".", chat::LineType::YELLOW);
+				GuildInvitePacket(target()->get_name()).dispatch();
+				chat::log("Sent a guild invite to " + target()->get_name() + ".", chat::LineType::YELLOW);
 			}
 			return Button::State::NORMAL;
 		}
@@ -330,9 +341,9 @@ namespace ms
 			{
 				chat::log("You must be at least Level 15 to raise or drop someone's fame.", chat::LineType::RED);
 			}
-			else if (target_character)
+			else if (target())
 			{
-				GiveFamePacket(target_character->get_oid(), buttonid == Buttons::BtPopUp).dispatch();
+				GiveFamePacket(target()->get_oid(), buttonid == Buttons::BtPopUp).dispatch();
 			}
 			else
 			{
@@ -418,8 +429,8 @@ namespace ms
 
 		Job character_job = Job(job_id);
 
-		if (target_character)
-			name.change_text(target_character->get_name());
+		if (target())
+			name.change_text(target()->get_name());
 
 		job.change_text(character_job.get_name());
 		level.change_text(std::to_string(lv));
@@ -429,7 +440,7 @@ namespace ms
 
 		if (buttons.count(Buttons::BtPet))
 		{
-			if (target_character && target_character->has_pet())
+			if (target() && target()->has_pet())
 				buttons[Buttons::BtPet]->set_state(Button::State::NORMAL);
 			else
 				buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
@@ -437,7 +448,7 @@ namespace ms
 
 		if (buttons.count(Buttons::BtRide))
 		{
-			if (target_character && target_character->has_mount())
+			if (target() && target()->has_mount())
 				buttons[Buttons::BtRide]->set_state(Button::State::NORMAL);
 			else
 				buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
@@ -466,6 +477,11 @@ namespace ms
 		if (buttons.count(Buttons::BtRide))
 			buttons[Buttons::BtRide]->set_state(has_mount
 				? Button::State::NORMAL : Button::State::DISABLED);
+	}
+
+	Char* UICharInfo::target() const
+	{
+		return Stage::get().get_character(target_char_id).get();
 	}
 
 	int32_t UICharInfo::get_char_id() const

@@ -92,6 +92,7 @@ namespace ms
 		drops.clear();
 		doors.clear();
 		mists.clear();
+		point_effects.clear();
 		reactors.clear();
 	}
 
@@ -159,6 +160,8 @@ namespace ms
 
 			if (gfx_quality > 25)
 				mists.draw(id, viewx, viewy, alpha);
+
+			point_effects.draw(id, viewx, viewy, alpha);
 		}
 
 		HiredMerchants::get().draw(viewpos, alpha);
@@ -258,6 +261,7 @@ namespace ms
 		drops.update(physics);
 		doors.update(physics);
 		mists.update(physics);
+		point_effects.update();
 		player.update(physics);
 
 		portals.update(player.get_position());
@@ -462,6 +466,11 @@ namespace ms
 	MapMists& Stage::get_mists()
 	{
 		return mists;
+	}
+
+	MapPointEffects& Stage::get_point_effects()
+	{
+		return point_effects;
 	}
 
 	MapSummons& Stage::get_summons()

@@ -29,7 +29,13 @@ namespace ms
 			ABSOLUTE,
 			RELATIVE,
 			CHAIR,
-			JUMPDOWN
+			JUMPDOWN,
+			// Instant reposition: teleport, rush, assaulter, assassinate.
+			// Positionally identical to ABSOLUTE, but kept distinct because it
+			// is the only signal that a character warped rather than walked --
+			// collapsing it into ABSOLUTE loses that, and distance heuristics
+			// cannot recover it (a lag recovery looks the same).
+			TELEPORT
 		};
 
 		Movement(Type t, uint8_t c, int16_t x, int16_t y, int16_t lx, int16_t ly, uint16_t f, uint8_t s, int16_t d) : type(t), command(c), xpos(x), ypos(y), lastx(lx), lasty(ly), fh(f), newstate(s), duration(d) {}

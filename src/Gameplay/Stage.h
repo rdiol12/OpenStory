@@ -83,6 +83,8 @@ namespace ms
 		MapDoors& get_doors();
 		// Returns a reference to the mists on the current map
 		MapMists& get_mists();
+		// One-shot animations anchored to map coordinates (skill blasts, impacts).
+		MapPointEffects& get_point_effects();
 		// Returns a reference to the summons on the current map
 		MapSummons& get_summons();
 		// Returns a reference to the dragons on the current map
@@ -173,6 +175,7 @@ namespace ms
 		MapDoors doors;
 		MapMists mists;
 		MapEffect effect;
+		MapPointEffects point_effects;
 		MapWeather weather;
 
 		Combat combat;

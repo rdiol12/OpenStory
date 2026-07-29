@@ -189,8 +189,21 @@ namespace ms
 		Text guild;
 		Text alliance;
 
-		Char* target_character;
+		// Resolved from the stage every time it is needed, never cached. The Char
+		// lives in the stage's character list and is destroyed when that player
+		// despawns or the map changes; a stored pointer outlives it and this
+		// window stays open across both, so caching one dangles and crashes on
+		// the next draw.
+		Char* target() const;
 		int32_t target_char_id;
+
+		// Snapshot of the target's look, refreshed while they are on screen.
+		// When they walk out of view or the map changes their Char is destroyed,
+		// and the window stays open -- this keeps the portrait showing the last
+		// pose instead of going blank. Safe to hold: CharLook's pointers all
+		// index static caches that are only inserted into, never erased.
+		CharLook preview_look;
+		bool has_preview = false;
 		Point<int16_t> charinfo_dim;
 
 		/// Bot Inventory

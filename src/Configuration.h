@@ -294,16 +294,25 @@ namespace ms
 		VSync() : BoolEntry("VSync", "true") {}
 	};
 
-	// The normal font which will be used
+	// The normal font which will be used.
+	// Names in EmbeddedFonts.h resolve to fonts compiled into the binary;
+	// anything else is treated as a file path.
 	struct FontPathNormal : public Configuration::StringEntry
 	{
-		FontPathNormal() : StringEntry("FontPathNormal", "fonts/Roboto/Roboto-Regular.ttf") {}
+		FontPathNormal() : StringEntry("FontPathNormal", "ROBOTO_REGULAR") {}
 	};
 
 	// The bold font which will be used
 	struct FontPathBold : public Configuration::StringEntry
 	{
-		FontPathBold() : StringEntry("FontPathBold", "fonts/Roboto/Roboto-Bold.ttf") {}
+		FontPathBold() : StringEntry("FontPathBold", "ROBOTO_BOLD") {}
+	};
+
+	// Hebrew fallback. Roboto contains no Hebrew glyphs, so without this
+	// Hebrew renders as missing-glyph boxes. Baked in, so it always works.
+	struct FontPathHebrew : public Configuration::StringEntry
+	{
+		FontPathHebrew() : StringEntry("FontPathHebrew", "NOTO_HEBREW") {}
 	};
 
 	// Optional color-emoji font for announcements/chat. Left empty to disable.

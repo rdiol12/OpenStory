@@ -18,6 +18,9 @@
 #pragma once
 
 #include "../../Graphics/Animation.h"
+#include "Layer.h"
+
+#include <vector>
 
 namespace ms
 {
@@ -34,5 +37,43 @@ namespace ms
 		bool active;
 		Animation effect;
 		Point<int16_t> position;
+	};
+
+	// One-shot animations anchored to map coordinates.
+	//
+	// MapEffect above is a single screen-space overlay -- its draw() takes no
+	// view offset, so it cannot follow the world. These do: they stack, scroll
+	// with the camera, and delete themselves when the animation finishes.
+	//
+	// This is what "something happens at a point" needs. The only projectile the
+	// client had, Bullet, homes on a mob oid and tracks that mob's head every
+	// frame, so it cannot express a blast at a bare coordinate -- which is why
+	// thrown grenades rendered nothing at all.
+	class MapPointEffects
+	{
+	public:
+		// Plays `src` (an NX animation node) once at a map position.
+		// Ignored when the node is missing, so a skill with no authored effect
+		// silently does nothing rather than drawing a placeholder.
+		void add(nl::node src, Point<int16_t> position,
+			int8_t layer = Layer::Id::SEVEN, bool flip = false);
+		// Same, resolved from an Effect.wz-style path (e.g. "BasicEff.img/hit").
+		void add(const std::string& path, Point<int16_t> position,
+			int8_t layer = Layer::Id::SEVEN, bool flip = false);
+
+		void draw(int8_t layer, double viewx, double viewy, float alpha) const;
+		void update();
+		void clear();
+
+	private:
+		struct Entry
+		{
+			Animation animation;
+			Point<int16_t> position;
+			int8_t layer;
+			bool flip;
+		};
+
+		std::vector<Entry> entries;
 	};
 }

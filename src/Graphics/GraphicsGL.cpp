@@ -17,7 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "GraphicsGL.h"
 
+#include <cstdlib>
+
 #include "../Configuration.h"
+#include "EmbeddedFonts.h"
 
 #include FT_BITMAP_H
 
@@ -276,8 +279,8 @@ namespace ms
 		glGenTextures(1, &atlas);
 		glBindTexture(GL_TEXTURE_2D, atlas);
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ATLASW, ATLASH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
 		fontborder.set_y(1);
@@ -312,13 +315,15 @@ namespace ms
 		fontymax += fontborder.y();
 
 #ifndef PLATFORM_IOS
-		const std::string FONT_CJK = Setting<FontPathCJK>().get().load();
-		cjk_fallback_path = FONT_CJK;
+		// Hebrew first: Roboto has no Hebrew glyphs at all, so without this every
+		// Hebrew character renders as a missing-glyph box.
+		fallback_faces.push_back(Setting<FontPathHebrew>().get().load());
+		fallback_faces.push_back(Setting<FontPathCJK>().get().load());
 
 		const std::string FONT_EMOJI = Setting<FontPathEmoji>().get().load();
 		if (!FONT_EMOJI.empty())
 		{
-			if (FT_New_Face(ftlibrary, FONT_EMOJI.c_str(), 0, &emojiface) == 0)
+			if (open_face(FONT_EMOJI, &emojiface) == 0)
 			{
 				if (emojiface->num_fixed_sizes > 0)
 				{
@@ -382,11 +387,20 @@ namespace ms
 		return Error::Code::NONE;
 	}
 
+	FT_Error GraphicsGL::open_face(const std::string& spec, FT_Face* out)
+	{
+		if (const EmbeddedFont* baked = find_embedded_font(spec.c_str()))
+			return FT_New_Memory_Face(ftlibrary, baked->data,
+				static_cast<FT_Long>(baked->size), 0, out);
+
+		return FT_New_Face(ftlibrary, spec.c_str(), 0, out);
+	}
+
 	bool GraphicsGL::addfont(const char* name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh)
 	{
 		FT_Face face;
 
-		if (FT_New_Face(ftlibrary, name, 0, &face))
+		if (open_face(name, &face))
 			return false;
 
 		if (FT_Set_Pixel_Sizes(face, pixelw, pixelh))
@@ -465,27 +479,32 @@ namespace ms
 
 		FT_Face face;
 		const char* loaded_path = font.path.c_str();
-		if (FT_New_Face(ftlibrary, font.path.c_str(), 0, &face))
+		if (open_face(font.path, &face))
 			return false;
 
-		// If the primary font has no glyph for this codepoint, try the CJK
-		// fallback face (e.g. malgun.ttf for Korean). This covers MapleStory
-		// v83 quest/NPC names which are often in Korean.
-		if (FT_Get_Char_Index(face, codepoint) == 0 && !cjk_fallback_path.empty())
+		// If the primary font has no glyph for this codepoint, walk the fallback
+		// chain. Hebrew comes first because Roboto contains no Hebrew whatsoever;
+		// CJK follows, covering v83 quest/NPC names which are often Korean.
+		if (FT_Get_Char_Index(face, codepoint) == 0)
 		{
-			FT_Face cjkface;
-			if (FT_New_Face(ftlibrary, cjk_fallback_path.c_str(), 0, &cjkface) == 0)
+			for (const std::string& spec : fallback_faces)
 			{
-				if (FT_Get_Char_Index(cjkface, codepoint) != 0)
+				if (spec.empty())
+					continue;
+
+				FT_Face alt;
+				if (open_face(spec, &alt))
+					continue;
+
+				if (FT_Get_Char_Index(alt, codepoint) != 0)
 				{
 					FT_Done_Face(face);
-					face = cjkface;
-					loaded_path = cjk_fallback_path.c_str();
+					face = alt;
+					loaded_path = spec.c_str();
+					break;
 				}
-				else
-				{
-					FT_Done_Face(cjkface);
-				}
+
+				FT_Done_Face(alt);
 			}
 		}
 
@@ -735,6 +754,67 @@ namespace ms
 		return upload(id, width, height, data);
 	}
 
+	// Edge-preserving 2x for pixel art (Eagle/HQ2x family). Each source pixel
+	// becomes 2x2; a corner only picks up a neighbour colour when both
+	// orthogonal neighbours agree and differ from the centre, which fills
+	// diagonal steps instead of doubling them into hard blocks. Outlines stay
+	// crisp because a lone dark pixel never satisfies the agreement test.
+	const void* GraphicsGL::upscale(const void* data, GLshort w, GLshort h)
+	{
+		static_assert(HD_SCALE == 2, "upscale() writes a fixed 2x2 block per source pixel");
+
+		const uint32_t* src = reinterpret_cast<const uint32_t*>(data);
+		const int W = w * HD_SCALE;
+		hdbuffer.assign(static_cast<size_t>(W) * h * HD_SCALE, 0);
+
+		auto at = [&](int x, int y) -> uint32_t
+		{
+			x = x < 0 ? 0 : (x >= w ? w - 1 : x);
+			y = y < 0 ? 0 : (y >= h ? h - 1 : y);
+			return src[static_cast<size_t>(y) * w + x];
+		};
+
+		auto close = [](uint32_t a, uint32_t b)
+		{
+			int d = 0;
+
+			for (int s = 0; s < 32; s += 8)
+				d += std::abs(static_cast<int>((a >> s) & 0xFF) - static_cast<int>((b >> s) & 0xFF));
+
+			return d < 40;
+		};
+
+		auto mix = [](uint32_t a, uint32_t b)
+		{
+			return ((a & 0xFEFEFEFE) >> 1) + ((b & 0xFEFEFEFE) >> 1);
+		};
+
+		for (int y = 0; y < h; y++)
+		{
+			for (int x = 0; x < w; x++)
+			{
+				const uint32_t c = at(x, y);
+				const uint32_t n = at(x, y - 1), s2 = at(x, y + 1);
+				const uint32_t we = at(x - 1, y), e = at(x + 1, y);
+
+				uint32_t tl = c, tr = c, bl = c, br = c;
+
+				if (close(n, we) && !close(n, c)) tl = mix(c, mix(n, we));
+				if (close(n, e)  && !close(n, c)) tr = mix(c, mix(n, e));
+				if (close(s2, we) && !close(s2, c)) bl = mix(c, mix(s2, we));
+				if (close(s2, e)  && !close(s2, c)) br = mix(c, mix(s2, e));
+
+				const size_t o = static_cast<size_t>(y * HD_SCALE) * W + x * HD_SCALE;
+				hdbuffer[o] = tl;
+				hdbuffer[o + 1] = tr;
+				hdbuffer[o + W] = bl;
+				hdbuffer[o + W + 1] = br;
+			}
+		}
+
+		return hdbuffer.data();
+	}
+
 	const GraphicsGL::Offset& GraphicsGL::upload(size_t id, GLshort width, GLshort height, const void* data)
 	{
 		GLshort x = 0;
@@ -742,6 +822,20 @@ namespace ms
 
 		if (width <= 0 || height <= 0)
 			return nulloffset;
+
+		const GLshort srcw = width;
+		const GLshort srch = height;
+		const void* pixels = data;
+
+		// Reserve — and fill — HD_SCALE x the space, so the atlas rect that the
+		// quad samples carries the upscaled sprite.
+		if (static_cast<int>(width) * HD_SCALE < ATLASW
+			&& static_cast<int>(height) * HD_SCALE < ATLASH)
+		{
+			pixels = upscale(data, srcw, srch);
+			width = static_cast<GLshort>(srcw * HD_SCALE);
+			height = static_cast<GLshort>(srch * HD_SCALE);
+		}
 
 		Leftover value = Leftover(x, y, width, height);
 
@@ -837,7 +931,7 @@ namespace ms
 			}
 		}
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, data);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 
 		return offsets.emplace(
 			std::piecewise_construct,
@@ -884,14 +978,14 @@ namespace ms
 		quads.emplace_back(rect.left(), rect.right(), rect.top() + vertical.first(), rect.bottom() - vertical.second(), offset, color, angle);
 	}
 
-	Text::Layout GraphicsGL::createlayout(const std::string& text, Text::Font id, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj)
+	Text::Layout GraphicsGL::createlayout(const std::string& text, Text::Font id, Text::Alignment alignment, int16_t maxwidth, bool formatted, int16_t line_adj, bool rtl)
 	{
 		size_t length = text.length();
 
 		if (length == 0)
 			return Text::Layout();
 
-		LayoutBuilder builder(fonts[id], id, alignment, maxwidth, formatted, line_adj);
+		LayoutBuilder builder(fonts[id], id, alignment, maxwidth, formatted, line_adj, rtl);
 
 		const char* p_text = text.c_str();
 
@@ -912,7 +1006,7 @@ namespace ms
 		return builder.finish(first, offset);
 	}
 
-	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font& f, Text::Font fid, Text::Alignment a, int16_t mw, bool fm, int16_t la) : font(f), base_fontid(fid), alignment(a), maxwidth(mw), formatted(fm), line_adj(la)
+	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font& f, Text::Font fid, Text::Alignment a, int16_t mw, bool fm, int16_t la, bool r) : font(f), base_fontid(fid), alignment(a), maxwidth(mw), wrapwidth(mw), rtl(r), formatted(fm), line_adj(la)
 	{
 		fontid = Text::Font::NUM_FONTS;
 		color = Color::Name::NUM_COLORS;
@@ -1205,6 +1299,14 @@ namespace ms
 				break;
 			case Text::Alignment::RIGHT:
 				line_x -= ax;
+				break;
+			default:
+				// Hebrew reads from the right edge, so a wrapped right-to-left
+				// paragraph flushes there instead of starting at the left.
+				// Only when the caller asked for a wrap width -- an unbounded
+				// single line has no right edge to flush against.
+				if (rtl && wrapwidth > 0)
+					line_x += wrapwidth - ax;
 				break;
 		}
 

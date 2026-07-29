@@ -73,7 +73,13 @@ namespace ms
 			case 9:  // rush
 			case 11: // chair
 				// Teleport-style — 9 bytes, absolute position, no duration.
-				fragment.type = Movement::ABSOLUTE;
+				// Only 3/4 (the mage warp itself) are typed TELEPORT; the rest
+				// keep ABSOLUTE so their existing handling is untouched. The
+				// command byte is the only thing distinguishing a warp from a
+				// walk, and it is how the original client renders another mage's
+				// teleport with no server support at all.
+				fragment.type = (fragment.command == 3 || fragment.command == 4)
+					? Movement::TELEPORT : Movement::ABSOLUTE;
 				fragment.xpos = recv.read_short();
 				fragment.ypos = recv.read_short();
 				fragment.lastx = recv.read_short();  // x wobble

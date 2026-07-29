@@ -1142,6 +1142,27 @@ namespace ms
 
 	void TrockResultHandler::handle(InPacket& recv) const
 	{
+		// Cosmic trockRefreshMapList: byte mode (2 = delete, 3 = add),
+		// byte vip, then the FULL list -- 5 slots normal, 10 vip.
+		// This was empty, so saved teleport-rock locations never updated after
+		// an add or remove and the UI showed a stale list until relog.
+		if (recv.length() < 2)
+			return;
+
+		int8_t mode = recv.read_byte();
+		bool vip = recv.read_byte() != 0;
+
+		if (mode != 2 && mode != 3)
+			return;
+
+		const int slots = vip ? 10 : 5;
+		std::vector<int32_t> maps;
+		maps.reserve(slots);
+
+		for (int i = 0; i < slots && recv.length() >= 4; i++)
+			maps.push_back(recv.read_int());
+
+		Stage::get().get_player().get_teleportrock().set_locations(std::move(maps), vip);
 	}
 
 	void LeftKnockBackHandler::handle(InPacket& recv) const

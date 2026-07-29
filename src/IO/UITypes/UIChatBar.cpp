@@ -21,6 +21,7 @@
 
 #include "../UI.h"
 #include "../Components/MapleButton.h"
+#include "../Components/ChatBalloon.h"
 #include "UIStatusBar.h"
 
 #include "../Notifications.h"
@@ -103,6 +104,15 @@ namespace ms
 		buttons[BT_SCROLLUP] = std::make_unique<MapleButton>(mainbar["scrollUp"]);
 		buttons[BT_SCROLLDOWN] = std::make_unique<MapleButton>(mainbar["scrollDown"]);
 		buttons[BT_CHATTARGETS] = std::make_unique<MapleButton>(mainbar["chatTarget"]["base"]);
+
+		// Emoticon picker, from v83's own social-chat assets.
+		nl::node social = nl::nx::ui["UIWindow2.img"]["socialChat"];
+		buttons[BT_IMOTICON] = std::make_unique<MapleButton>(social["BtImoticon"], Point<int16_t>(-30, -59));
+		emoticon_frame = Texture(social["ImoticonFrame"]["backgrnd1"]);
+
+		nl::node faces = nl::nx::character["Face"]["00020000.img"];
+		for (int32_t i = 0; i < Text::emoticon_count(); i++)
+			emoticon_icons.emplace_back(faces[Text::emoticon_name(i)]["0"]["face"]);
 
 		chatspace[0] = mainbar["chatSpace"];
 		chatspace[1] = mainbar["chatEnter"];
@@ -207,16 +217,94 @@ namespace ms
 		buttons[BT_CHATTARGETS]->set_active(open);
 		buttons[BT_SCROLLUP]->set_active(open);
 		buttons[BT_SCROLLDOWN]->set_active(open);
+		buttons[BT_IMOTICON]->set_active(open);
 
 		if (!open)
 		{
 			chatfieldopen = false;
+			emoticons_open = false;
 			chatfield.set_state(Textfield::State::DISABLED);
 		}
 		else
 		{
 			chatfield.set_state(Textfield::State::NORMAL);
 		}
+	}
+
+	Point<int16_t> UIChatBar::emoticon_origin() const
+	{
+		int16_t rows = (Text::emoticon_count() + EMOTE_COLS - 1) / EMOTE_COLS;
+		int16_t h = rows * EMOTE_CELL + EMOTE_PAD * 2;
+
+		// Sits directly above its own button so the panel never covers the
+		// chat input the user is typing into.
+		return position + Point<int16_t>(-30 - EMOTE_COLS * EMOTE_CELL / 2, -64 - h);
+	}
+
+	int32_t UIChatBar::emoticon_at(Point<int16_t> cursorpos) const
+	{
+		if (!emoticons_open)
+			return -1;
+
+		Point<int16_t> grid = emoticon_origin() + Point<int16_t>(EMOTE_PAD, EMOTE_PAD);
+		int16_t dx = cursorpos.x() - grid.x();
+		int16_t dy = cursorpos.y() - grid.y();
+
+		if (dx < 0 || dy < 0)
+			return -1;
+
+		int16_t col = dx / EMOTE_CELL;
+		int16_t row = dy / EMOTE_CELL;
+
+		if (col >= EMOTE_COLS)
+			return -1;
+
+		int32_t index = row * EMOTE_COLS + col;
+
+		return index < Text::emoticon_count() ? index : -1;
+	}
+
+	void UIChatBar::draw_emoticons(Point<int16_t> pos) const
+	{
+		if (!emoticons_open)
+			return;
+
+		int16_t rows = (Text::emoticon_count() + EMOTE_COLS - 1) / EMOTE_COLS;
+		int16_t w = EMOTE_COLS * EMOTE_CELL + EMOTE_PAD * 2;
+		int16_t h = rows * EMOTE_CELL + EMOTE_PAD * 2;
+
+		ColorBox(w, h, Color::Name::BLACK, 0.82f).draw(DrawArgument(pos));
+
+		Point<int16_t> grid = pos + Point<int16_t>(EMOTE_PAD, EMOTE_PAD);
+
+		for (int32_t i = 0; i < Text::emoticon_count(); i++)
+		{
+			int16_t col = i % EMOTE_COLS;
+			int16_t row = i / EMOTE_COLS;
+			Point<int16_t> cell = grid + Point<int16_t>(col * EMOTE_CELL, row * EMOTE_CELL);
+
+			if (i == emoticon_hover)
+				ColorBox(EMOTE_CELL - 2, EMOTE_CELL - 2, Color::Name::WHITE, 0.25f)
+					.draw(DrawArgument(cell));
+
+			if (i < static_cast<int32_t>(emoticon_icons.size()) && emoticon_icons[i].is_valid())
+			{
+				// Face sprites carry their own origin, which would scatter them
+				// across the grid -- place them on the cell centre instead.
+				Point<int16_t> dim = emoticon_icons[i].get_dimensions();
+				emoticon_icons[i].draw(DrawArgument(
+					cell + Point<int16_t>((EMOTE_CELL - dim.x()) / 2 + dim.x() / 2,
+					                      (EMOTE_CELL - dim.y()) / 2 + dim.y() / 2)));
+			}
+		}
+	}
+
+	void UIChatBar::toggle_emoticons()
+	{
+		emoticons_open = !emoticons_open;
+
+		if (emoticons_open)
+			focus_chatfield();
 	}
 
 	void UIChatBar::focus_chatfield()
@@ -234,6 +322,8 @@ namespace ms
 		chatenter.draw(position);
 
 		UIElement::draw_buttons(inter);
+
+		draw_emoticons(emoticon_origin());
 
 		if (chatopen)
 		{
@@ -318,11 +408,21 @@ namespace ms
 
 					mr.msgpart.draw(
 						DrawArgument(Point<int16_t>(x, msgy)), chatclip);
+
+					ChatBalloon::draw_inline_images(
+						mr.msgpart, Point<int16_t>(x, msgy), chatclip);
 				}
 				else
 				{
 					rowtexts.at(rowid).draw(
 						DrawArgument(Point<int16_t>(4, msgy)), chatclip);
+
+					// Text::draw paints glyphs only; inline #v/#i/#q/#s/#f/#e
+					// sprites are a separate overlay, which the chat window
+					// was never doing -- so emoticons showed in speech
+					// balloons but not in the chat log.
+					ChatBalloon::draw_inline_images(
+						rowtexts.at(rowid), Point<int16_t>(4, msgy), chatclip);
 				}
 
 				if (has_selection)
@@ -437,6 +537,9 @@ namespace ms
 		case BT_CHATTARGETS:
 			cycle_chat_target();
 			return Button::State::NORMAL;
+		case BT_IMOTICON:
+			toggle_emoticons();
+			return Button::State::NORMAL;
 		}
 
 		return Button::State::NORMAL;
@@ -444,6 +547,17 @@ namespace ms
 
 	bool UIChatBar::is_in_range(Point<int16_t> cursorpos) const
 	{
+		if (emoticons_open)
+		{
+			int16_t rows = (Text::emoticon_count() + EMOTE_COLS - 1) / EMOTE_COLS;
+			Point<int16_t> ep = emoticon_origin();
+			Point<int16_t> edim(EMOTE_COLS * EMOTE_CELL + EMOTE_PAD * 2,
+			                    rows * EMOTE_CELL + EMOTE_PAD * 2);
+
+			if (Rectangle<int16_t>(ep, ep + edim).contains(cursorpos))
+				return true;
+		}
+
 		Point<int16_t> absp(0, getchattop() - 16);
 		Point<int16_t> dim(500, chatrows * CHATROWHEIGHT + CHATYOFFSET + 16);
 		return Rectangle<int16_t>(absp, absp + dim).contains(cursorpos);
@@ -555,6 +669,28 @@ namespace ms
 
 	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
+		// The picker sits above the bar and must win over everything under it,
+		// including the chat-log selection drag.
+		if (emoticons_open)
+		{
+			int32_t hovered = emoticon_at(cursorpos);
+			emoticon_hover = hovered;
+
+			if (hovered >= 0)
+			{
+				if (clicking)
+				{
+					Sound(Sound::Name::BUTTONCLICK).play();
+					focus_chatfield();
+					chatfield.add_string("#e" + std::to_string(hovered) + "#");
+					emoticons_open = false;
+					emoticon_hover = -1;
+				}
+
+				return Cursor::State::CANCLICK;
+			}
+		}
+
 		// Custom button handling: break after a button press fires.
 		// UIElement::send_cursor iterates ALL buttons in one loop, so when
 		// BT_CLOSECHAT fires and activates BT_OPENCHAT, the loop immediately

@@ -216,6 +216,17 @@ namespace ms
 		state->doubleclick(pos);
 	}
 
+	void UI::send_char(uint32_t codepoint)
+	{
+		// Control characters (backspace, tab, escape, return) come through
+		// send_key as actions; GLFW does not emit them here, but guard anyway.
+		if (codepoint < 0x20 || codepoint == 0x7F)
+			return;
+
+		if (focusedtextfield && focusedtextfield->get_state() == Textfield::State::FOCUSED)
+			focusedtextfield->add_codepoint(codepoint);
+	}
+
 	void UI::send_key(int32_t keycode, bool pressed)
 	{
 		if ((is_key_down[GLFW_KEY_LEFT_ALT] || is_key_down[GLFW_KEY_RIGHT_ALT]) && (is_key_down[GLFW_KEY_ENTER] || is_key_down[GLFW_KEY_KP_ENTER]))
@@ -283,6 +294,13 @@ namespace ms
 			{
 				bool shift = is_key_down[keyboard.leftshiftcode()] || is_key_down[keyboard.rightshiftcode()] || caps_lock_enabled;
 				Keyboard::Mapping mapping = keyboard.get_text_mapping(keycode, shift);
+
+				// Printable characters arrive separately through send_char, which
+				// is the only path that respects the OS keyboard layout. Passing
+				// them here as well would insert every character twice.
+				if (mapping.type == KeyType::Id::TEXT)
+					return;
+
 				focusedtextfield->send_key(mapping.type, mapping.action, pressed);
 			}
 		}

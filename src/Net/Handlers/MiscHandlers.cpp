@@ -130,6 +130,11 @@ namespace ms
 
 		int8_t count = recv.read_byte();
 
+		// NPCs the server marks scriptable at runtime. NX data alone cannot know
+		// about custom NPCs with no `script` node, so without applying this they
+		// never get a chat icon and read as non-interactive.
+		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
+
 		for (int8_t i = 0; i < count && recv.available(); i++)
 		{
 			int32_t npcid = recv.read_int();
@@ -137,10 +142,19 @@ namespace ms
 			recv.read_int(); // start time (0)
 			recv.read_int(); // end time (MAX_INT)
 
-			(void)npcid;
 			(void)npc_name;
-			// NPCs marked as scriptable — in v83 this means they have a chat icon
-			// The NPC's scripted flag is already set from NX data in Npc constructor
+
+			if (npcs == nullptr)
+				continue;
+
+			// The packet carries the NPC *id*, not the map object id, so every
+			// spawned copy of that NPC on this map has to be marked.
+			for (auto& mmo : *npcs)
+			{
+				if (Npc* npc = static_cast<Npc*>(mmo.second.get()))
+					if (npc->get_npcid() == npcid)
+						npc->set_scripted(true);
+			}
 		}
 	}
 

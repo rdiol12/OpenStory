@@ -23,6 +23,7 @@
 #include "../../Graphics/SpecialText.h"
 #include "../../Graphics/Text.h"
 
+#include <unordered_map>
 #include <vector>
 
 namespace ms
@@ -64,17 +65,33 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
+		// Slot geometry comes from the art: event/normal is 316x78 with origin
+		// (-11,-126), and its inner sprites are authored relative to the slot.
 		static constexpr int16_t MAX_VISIBLE = 4;
-		static constexpr int16_t SLOT_X = 17;
-		static constexpr int16_t SLOT_START_Y = 38;
+		static constexpr int16_t SLOT_LEFT = 11;
+		static constexpr int16_t SLOT_TOP = 126;
 		static constexpr int16_t SLOT_HEIGHT = 78;
 		static constexpr int16_t SLOT_SPACING = 82;
+
+		static constexpr int16_t TEXT_X = 8;
+		static constexpr int16_t TITLE_X = 28;
+		static constexpr int16_t TITLE_Y = 6;
+		static constexpr int16_t DESC_Y = 27;
+		static constexpr int16_t GAUGE_Y = 60;
+		static constexpr int16_t REWARD_Y = 41;
+		static constexpr int16_t REWARD_PITCH = 38;
+		static constexpr size_t MAX_REWARDS = 5;
+		// backgrnd3 is the empty dark plaque at (11,88), 329x35, with BtCard parked
+		// at its right end — the countdown digits centre in the space before it.
+		static constexpr int16_t BAR_CENTER_X = 163;
+		static constexpr int16_t BAR_CENTER_Y = 105;
+		static constexpr int8_t SEPARATOR = -1;
 
 		void close();
 		void request_events();
 		int16_t slot_by_position(int16_t y);
-		void draw_timer(Point<int16_t> pos, int32_t seconds_remaining, int32_t total_seconds) const;
-		void draw_timer_number(int value, int digits, Point<int16_t> pos) const;
+		int32_t soonest_remaining() const;
+		void draw_countdown(Point<int16_t> centre, int32_t seconds) const;
 
 		enum Buttons : uint16_t
 		{
@@ -101,23 +118,16 @@ namespace ms
 		Text event_time[MAX_VISIBLE];
 
 		std::vector<EventData> events;
+		std::unordered_map<std::string, int32_t> peak_duration;
 		Text empty_text;
 
-		// TimeEvent timer widget (UIWindow4.img/TimeEvent)
-		Texture timer_bg;
-		Texture timer_bg2;
-		Texture timer_bg3;
+		Texture clock_digit[10];
+		Texture clock_colon;
 		Texture timer_gauge_bg;
 		Texture timer_gauge_cover;
 		Texture timer_gauge_fill;
-		Texture timer_digit[10];
-		Texture timer_state_timer;
-		Texture timer_state_end;
-		Texture timer_state_complete;
-		Texture timer_icon_frame;
-		Animation timer_effect;
-		int16_t timer_digit_width;
 		int16_t gauge_width;
+		Point<int16_t> gauge_offset;
 
 		// Local countdown
 		int64_t countdown_accumulator;

@@ -39,3 +39,16 @@ crash_debug.txt
 # python bytecode
 __pycache__/
 *.pyc
+
+# internal tooling - NX inspection, font baking, source audits.
+# Testing/maintenance helpers, not part of what the client ships.
+/tools/
+
+# AI-equipment showcase images - the feature is not in the README any more
+/docs/images/anothere.png
+/docs/images/armour.png
+/docs/images/crossbow.png
+/docs/images/hat-icons.png
+/docs/images/hat1.png
+/docs/images/onemore.png
+/docs/images/swordflame.png

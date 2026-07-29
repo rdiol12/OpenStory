@@ -149,8 +149,27 @@ namespace ms
 			BT_CLOSECHAT,
 			BT_SCROLLUP,
 			BT_SCROLLDOWN,
-			BT_CHATTARGETS
+			BT_CHATTARGETS,
+			BT_IMOTICON
 		};
+
+		// Emoticon picker. Sprites are v83's own: socialChat/BtImoticon for the
+		// button and socialChat/ImoticonFrame for the panel.
+		void toggle_emoticons();
+		void draw_emoticons(Point<int16_t> position) const;
+		// Grid cell under the cursor, or -1. Shared by hover and click so the
+		// highlight can never disagree with what a click inserts.
+		int32_t emoticon_at(Point<int16_t> cursorpos) const;
+		Point<int16_t> emoticon_origin() const;
+
+		static constexpr int16_t EMOTE_COLS = 6;
+		static constexpr int16_t EMOTE_CELL = 28;
+		static constexpr int16_t EMOTE_PAD = 8;
+
+		bool emoticons_open = false;
+		int32_t emoticon_hover = -1;
+		Texture emoticon_frame;
+		std::vector<Texture> emoticon_icons;
 
 		static constexpr int16_t CHATYOFFSET = 65;
 		static constexpr int16_t CHATROWHEIGHT = 16;

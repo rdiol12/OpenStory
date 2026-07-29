@@ -242,6 +242,21 @@ namespace ms
 		return targets;
 	}
 
+	bool Combat::is_teleport_skill(int32_t skillid)
+	{
+		switch (skillid)
+		{
+		case SkillId::Id::TELEPORT_FP:
+		case SkillId::Id::IL_TELEPORT:
+		case SkillId::Id::PRIEST_TELEPORT:
+		case SkillId::Id::GM_TELEPORT:
+		case SkillId::Id::SUPERGM_TELEPORT:
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	void Combat::apply_use_movement(const SpecialMove& move)
 	{
 		switch (move.get_id())
@@ -563,12 +578,32 @@ namespace ms
 		return numbers;
 	}
 
-	void Combat::show_buff(int32_t cid, int32_t skillid, int8_t level)
+	void Combat::show_buff(int32_t cid, int32_t skillid, int8_t level,
+		uint8_t speed, int8_t direction)
 	{
 		if (Optional<OtherChar> ouser = chars.get_char(cid))
 		{
 			OtherChar& user = *ouser;
 			user.update_skill(skillid, level);
+
+			// Mirrors what apply_attack already does for foreign attacks, so a
+			// cast and a swing from the same player animate consistently.
+			if (speed > 0)
+				user.update_speed(speed);
+
+			if (direction >= 0)
+				user.set_direction(direction != 0);
+
+			// Teleport carries no authored use-effect in the skill data, so
+			// apply_useeffects draws nothing for it. The local player's own
+			// teleport substitutes the standard BasicEff puff by hand; do the
+			// same here or another player's warp is a silent snap.
+			if (is_teleport_skill(skillid))
+			{
+				static Animation tp_effect(nl::nx::effect["BasicEff.img"]["Teleport"]);
+				user.show_attack_effect(tp_effect, 0);
+				return;
+			}
 
 			const SpecialMove& move = get_move(skillid);
 			move.apply_useeffects(user);

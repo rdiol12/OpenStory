@@ -140,6 +140,45 @@ namespace ms
 		// Empty when the text contains no item-icon macros.
 		const std::vector<Layout::Image>& images() const;
 
+		// Decodes one UTF-8 codepoint at text[i]. Sets consumed to the byte
+		// count (1-4), or 0 at the end. Falls back to the raw byte on
+		// malformed input so a bad byte can never stall a caller's loop.
+		static uint32_t utf8_decode(const char* text, size_t length, size_t i, size_t& consumed);
+		// Appends one codepoint to out as UTF-8.
+		static void utf8_encode(uint32_t codepoint, std::string& out);
+		// True for codepoints in the Hebrew blocks.
+		static bool is_rtl(uint32_t codepoint);
+		// True if the string contains any right-to-left character. Cheap
+		// guard so the pure-Latin case skips reordering entirely.
+		static bool has_rtl(const std::string& text);
+
+		// v83 ships 25 face expressions in Character.wz/Face/000<face>.img.
+		// Chat emoticons address them by index through the #e<n># macro.
+		// (That macro previously pointed at UI.wz/Emote.img, which does not
+		// exist in v83, so it could never render anything.)
+		static const char* emoticon_name(int32_t index);
+		static int32_t emoticon_count();
+
+		// Reorders logical-order text into visual (display) order per the
+		// Unicode bidi algorithm, restricted to levels 0-2 (which is all
+		// Hebrew needs -- no Arabic shaping).
+		//
+		// Everything downstream of layout draws strictly left-to-right and
+		// accumulates advances forward, so reordering here is what makes
+		// Hebrew display correctly without touching layout or drawing.
+		// Returns text unchanged when it contains no RTL characters.
+		static std::string visual_order(const std::string& text);
+
+		// Maps a byte offset in the logical string to the matching offset in the
+		// visual string. The caret is tracked logically (typing order) but drawn
+		// against the visual layout, so without this it lands nowhere near the
+		// character it belongs to in Hebrew.
+		//
+		// The caret sits on the trailing edge of the character before it, which
+		// for a right-to-left character is its LEFT side -- that is where the
+		// next keystroke will appear.
+		static size_t logical_to_visual(const std::string& text, size_t pos);
+
 	private:
 		void reset_layout();
 
@@ -150,7 +189,8 @@ namespace ms
 		Layout layout;
 		uint16_t maxwidth;
 		bool formatted;
-		std::string text;
+		std::string text;      // logical order, as supplied by the caller
+		std::string display;   // visual order -- what layout and draw consume
 		int16_t line_adj;
 	};
 }

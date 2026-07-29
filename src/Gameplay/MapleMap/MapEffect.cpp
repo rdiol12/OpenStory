@@ -56,4 +56,55 @@ namespace ms
 		if (!active)
 			active = effect.update(6);
 	}
+
+	void MapPointEffects::add(nl::node src, Point<int16_t> position, int8_t layer, bool flip)
+	{
+		if (!src)
+			return;
+
+		Entry e;
+		e.animation = Animation(src);
+		e.position = position;
+		e.layer = layer;
+		e.flip = flip;
+
+		entries.push_back(std::move(e));
+	}
+
+	void MapPointEffects::add(const std::string& path, Point<int16_t> position,
+		int8_t layer, bool flip)
+	{
+		add(nl::nx::effect.resolve(path), position, layer, flip);
+	}
+
+	void MapPointEffects::draw(int8_t layer, double viewx, double viewy, float alpha) const
+	{
+		for (const Entry& e : entries)
+		{
+			if (e.layer != layer)
+				continue;
+
+			Point<int16_t> absp(
+				static_cast<int16_t>(e.position.x() + viewx),
+				static_cast<int16_t>(e.position.y() + viewy));
+
+			e.animation.draw(DrawArgument(absp, e.flip), alpha);
+		}
+	}
+
+	void MapPointEffects::update()
+	{
+		// Animation::update() reports true on the frame the cycle completes, which
+		// is exactly when a one-shot is done.
+		for (size_t i = entries.size(); i-- > 0; )
+		{
+			if (entries[i].animation.update())
+				entries.erase(entries.begin() + i);
+		}
+	}
+
+	void MapPointEffects::clear()
+	{
+		entries.clear();
+	}
 }
