@@ -25,6 +25,7 @@
 #include "../../Gameplay/MiniRooms.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Mob.h"
+#include "../../Gameplay/MapleMap/Npc.h"
 #include "../../Gameplay/MapleMap/Summon.h"
 #include "../../Gameplay/MapleMap/Dragon.h"
 
@@ -209,6 +210,67 @@ namespace ms
 		LookEntry look = LoginParser::parse_look(recv);
 
 		Stage::get().get_chars().update_look(cid, look);
+	}
+
+	void SpawnPortalHandler::handle(InPacket& recv) const
+	{
+		// Cosmic MapId.NONE. Both ids set to it means "remove the town portal";
+		constexpr int32_t MAPID_NONE = 999999999;
+		constexpr int32_t TOWN_DOOR_OID = -777;
+
+		if (recv.length() < 8)
+			return;
+
+		int32_t town_id = recv.read_int();
+		int32_t target_id = recv.read_int();
+
+		if (town_id == MAPID_NONE && target_id == MAPID_NONE)
+		{
+			Stage::get().get_doors().remove(TOWN_DOOR_OID);
+			return;
+		}
+
+		if (recv.length() < 4)
+			return;
+
+		Point<int16_t> pos = recv.read_point();
+
+		Stage::get().get_doors().remove(TOWN_DOOR_OID);
+		Stage::get().get_doors().spawn({ TOWN_DOOR_OID, TOWN_DOOR_OID, pos, true });
+	}
+
+	void ImitatedNpcHandler::handle(InPacket& recv) const
+	{
+		if (!recv.available())
+			return;
+
+		int8_t mode = recv.read_byte();
+
+		if (mode == 0)
+		{
+			if (recv.length() >= 4)
+				Stage::get().get_npcs().remove(recv.read_int());
+
+			return;
+		}
+
+		if (mode != 1 || recv.length() < 4)
+			return;
+
+		int32_t scriptid = recv.read_int();
+		recv.read_string();
+
+		LookEntry look = LoginParser::parse_look(recv);
+
+		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
+
+		if (npcs == nullptr)
+			return;
+
+		for (auto& mmo : *npcs)
+			if (Npc* npc = static_cast<Npc*>(mmo.second.get()))
+				if (npc->get_npcid() == scriptid)
+					npc->set_player_look(look);
 	}
 
 	void ShowForeignEffectHandler::handle(InPacket& recv) const

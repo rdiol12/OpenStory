@@ -75,6 +75,11 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	class MemoResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Multichat (buddy/party/guild/alliance chat)
 	// Opcode: MULTICHAT(134)
 	class MultichatHandler : public PacketHandler

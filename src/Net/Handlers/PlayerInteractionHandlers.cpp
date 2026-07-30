@@ -123,6 +123,13 @@ namespace ms
 		}
 	}
 
+	void TradeMoneyLimitHandler::handle(InPacket& recv) const
+	{
+		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+			messenger->show_status(Color::Name::RED,
+				"Characters under level 15 have a meso limit on trades.");
+	}
+
 	void FameResponseHandler::handle(InPacket& recv) const
 	{
 		// v83: byte mode

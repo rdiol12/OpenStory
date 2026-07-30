@@ -100,7 +100,21 @@ namespace ms
 		PARTY_OPERATION = 62,   // 0x3E
 		BUDDY_LIST = 63,        // 0x3F
 		GUILD_OPERATION = 65,   // 0x41
-		GUILD_BBS = 67,         // 0x43
+		GUILD_BBS = 59,         // 0x3B
+
+		/// Cosmic's SendOpcode enum, not inferred.
+		MEMO_RESULT = 41,          // 0x29
+		IMITATED_NPC = 81,         // 0x51
+		SPAWN_PORTAL = 67,         // 0x43  (GUILD_BBS used to sit here by mistake)
+		TRADE_MONEY_LIMIT = 57,    // 0x39
+		INCUBATOR_RESULT = 69,     // 0x45
+		SESSION_VALUE = 90,        // 0x5A
+		CANCEL_NAME_CHANGE = 113,  // 0x71
+		CANCEL_WORLD_TRANSFER = 114, // 0x72
+		FIELD_OBSTACLE_ONE = 139,  // 0x8B  (single; 0x8C is the list form)
+		GMEVENT_INSTRUCTIONS = 146,// 0x92
+		MAPLELIFE_RESULT = 349,    // 0x15D
+		MAPLELIFE_ERROR = 350,     // 0x15E
 
 		/// Messaging
 		SERVER_MESSAGE = 68,    // 0x44
@@ -345,7 +359,8 @@ namespace ms
 		VEGA_SCROLL = 358,      // 0x166
 
 		/// Bot Inventory (custom)
-		BOT_INVENTORY = 359     // 0x167
+		// 0x175, matching Cosmic's BOT_EQUIP. The old 0x167 matched no server
+		BOT_INVENTORY = 373     // 0x175
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -493,6 +508,18 @@ namespace ms
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF, FieldObstacleOnOffHandler>();
+		emplace<FIELD_OBSTACLE_ONE, FieldObstacleOneHandler>();
+		emplace<MEMO_RESULT, MemoResultHandler>();
+		emplace<IMITATED_NPC, ImitatedNpcHandler>();
+		emplace<SPAWN_PORTAL, SpawnPortalHandler>();
+		emplace<TRADE_MONEY_LIMIT, TradeMoneyLimitHandler>();
+		emplace<INCUBATOR_RESULT, IncubatorResultHandler>();
+		emplace<SESSION_VALUE, SessionValueHandler>();
+		emplace<CANCEL_NAME_CHANGE, CancelNameChangeHandler>();
+		emplace<CANCEL_WORLD_TRANSFER, CancelWorldTransferHandler>();
+		emplace<GMEVENT_INSTRUCTIONS, GmEventInstructionsHandler>();
+		emplace<MAPLELIFE_RESULT, MapleLifeResultHandler>();
+		emplace<MAPLELIFE_ERROR, MapleLifeErrorHandler>();
 		emplace<SET_TRACTION, SetTractionHandler>();
 		emplace<OPEN_UI, OpenUIHandler>();
 		emplace<LOCK_UI, LockUIHandler>();

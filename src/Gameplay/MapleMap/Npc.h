@@ -19,6 +19,7 @@
 
 #include "MapObject.h"
 
+#include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Util/Randomizer.h"
@@ -62,6 +63,9 @@ namespace ms
 
 		// Check whether this is a server-sided NPC
 		bool isscripted() const;
+		// Player NPC: renders a character look instead of NX npc art
+		void set_player_look(const LookEntry& look);
+		bool has_player_look() const;
 		// The server can mark an NPC scriptable at runtime (SET_NPC_SCRIPTABLE),
 		// which is the only way custom NPCs with no `script` node in NX get a
 		// chat icon. NX data alone cannot know about them.
@@ -90,6 +94,8 @@ namespace ms
 		std::string func;
 		bool hidename;
 		bool scripted;
+		CharLook player_look;
+		bool player_look_set = false;
 		bool mouseonly;
 
 		int32_t npcid;

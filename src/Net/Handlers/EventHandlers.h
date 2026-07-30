@@ -165,6 +165,11 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	class GmEventInstructionsHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Remove MapleTV
 	class RemoveTVHandler : public PacketHandler
 	{

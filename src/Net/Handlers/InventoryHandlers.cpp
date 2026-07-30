@@ -28,6 +28,7 @@
 #include "../../IO/UITypes/UIShop.h"
 #include "../../IO/UITypes/UIStorage.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIQuestHelper.h"
 
 namespace ms
 {
@@ -190,6 +191,12 @@ namespace ms
 		}
 
 		Stage::get().get_player().recalc_stats(true);
+
+		// Item requirements are counted from the local inventory, so they go
+		// stale unless a bag change refreshes them
+		if (auto helper = UI::get().get_element<UIQuestHelper>())
+			helper->refresh_all();
+
 		UI::get().enable();
 	}
 

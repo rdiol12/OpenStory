@@ -230,7 +230,9 @@ namespace ms
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
-		if (animations.count(stance))
+		if (player_look_set)
+			player_look.draw(absp, flip, Stance::Id::STAND1, Expression::Id::DEFAULT);
+		else if (animations.count(stance))
 			animations.at(stance).draw(DrawArgument(absp, flip), alpha);
 
 		// Draw quest mark above NPC
@@ -431,6 +433,17 @@ namespace ms
 	void Npc::set_scripted(bool s)
 	{
 		scripted = s;
+	}
+
+	void Npc::set_player_look(const LookEntry& look)
+	{
+		player_look = CharLook(look);
+		player_look_set = true;
+	}
+
+	bool Npc::has_player_look() const
+	{
+		return player_look_set;
 	}
 
 	bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const

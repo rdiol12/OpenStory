@@ -139,6 +139,12 @@ namespace ms
 		Gauge hpbar;
 		Gauge mpbar;
 
+		// UIWindow.img/EnergyBar
+		Texture energy_bar_c;
+		Texture energy_bar_e;
+		Texture energy_fill;
+		Animation energy_full_effect;
+
 		// Extra gauges
 		Gauge barrier_bar;
 		Gauge df_bar;

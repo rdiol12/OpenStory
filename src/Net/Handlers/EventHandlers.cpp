@@ -269,6 +269,12 @@ namespace ms
 		chat::log("[Dojo] Warping to next floor!", chat::LineType::YELLOW);
 	}
 
+	void GmEventInstructionsHandler::handle(InPacket& recv) const
+	{
+		chat::log("[Event] A GM event is starting - follow the instructions.",
+			chat::LineType::YELLOW);
+	}
+
 	void SendTVHandler::handle(InPacket& recv) const
 	{
 		// v83 layout: byte has_partner (1 = solo, 3 = with partner); byte type

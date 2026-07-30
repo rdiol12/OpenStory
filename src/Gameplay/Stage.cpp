@@ -618,4 +618,19 @@ namespace ms
 		return combo_count > 0;
 	}
 
+	void Stage::set_energy(int32_t amount)
+	{
+		energy_amount = std::min(std::max(amount, 0), 10000);
+	}
+
+	int32_t Stage::get_energy() const
+	{
+		return energy_amount;
+	}
+
+	bool Stage::is_energy_active() const
+	{
+		return energy_amount > 0;
+	}
+
 }

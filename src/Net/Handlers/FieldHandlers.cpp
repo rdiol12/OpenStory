@@ -207,6 +207,18 @@ namespace ms
 		}
 	}
 
+	void FieldObstacleOneHandler::handle(InPacket& recv) const
+	{
+		// Single obstacle toggle: string env, int mode (0 = stop/reset, 1 = move).
+		if (!recv.available())
+			return;
+
+		std::string env_name = recv.read_string();
+		int32_t mode = recv.read_int();
+
+		Stage::get().toggle_environment(env_name, mode);
+	}
+
 	void ForcedMapEquipHandler::handle(InPacket& recv) const
 	{
 		// v83: Empty packet body — server tells client to re-equip based on map restrictions

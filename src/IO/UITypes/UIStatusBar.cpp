@@ -201,6 +201,15 @@ namespace ms
 		// === Extra gauges ===
 		nl::node gauge_node = mainbar["gauge"];
 
+		nl::node energy_node = nl::nx::ui["UIWindow.img"]["EnergyBar"];
+
+		energy_bar_c = energy_node["c"];
+		energy_bar_e = energy_node["e"];
+		energy_fill = energy_node["Gage"]["1"]["0"];
+
+		if (energy_node["effect"])
+			energy_full_effect = Animation(energy_node["effect"]);
+
 		barrier_bar = Gauge(
 			Gauge::Type::GAME,
 			gauge_node.resolve("barrier/0"),
@@ -464,6 +473,31 @@ namespace ms
 			Point<int16_t> boss_pos(
 				static_cast<int16_t>((vwidth - boss_gage.width()) / 2), 18);
 			boss_gage.draw(boss_pos, boss_hp_percent);
+		}
+
+		if (Stage::get().is_energy_active() && energy_bar_c.is_valid())
+		{
+			constexpr int16_t ENERGY_MAX = 10000;
+			constexpr int16_t ENERGY_WIDTH = 100;
+
+			int32_t amount = Stage::get().get_energy();
+			int16_t filled = static_cast<int16_t>(
+				static_cast<int64_t>(amount) * ENERGY_WIDTH / ENERGY_MAX);
+
+			Point<int16_t> ep((vwidth - ENERGY_WIDTH) / 2, position.y() - 62);
+
+			for (int16_t x = 0; x < ENERGY_WIDTH; x++)
+				energy_bar_c.draw(DrawArgument(ep + Point<int16_t>(x, 0)));
+
+			energy_bar_e.draw(DrawArgument(ep + Point<int16_t>(-energy_bar_e.width(), 0)));
+			energy_bar_e.draw(DrawArgument(ep + Point<int16_t>(ENERGY_WIDTH, 0)));
+
+			if (energy_fill.is_valid())
+				for (int16_t x = 0; x < filled; x++)
+					energy_fill.draw(DrawArgument(ep + Point<int16_t>(x, 2)));
+
+			if (amount >= ENERGY_MAX)
+				energy_full_effect.draw(DrawArgument(ep + Point<int16_t>(ENERGY_WIDTH / 2, 0)), alpha);
 		}
 
 		// Quickslot panel — drawn FIRST so the status bar renders on

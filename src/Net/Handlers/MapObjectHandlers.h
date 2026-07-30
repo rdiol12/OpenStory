@@ -63,6 +63,21 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// 0x43 — the TOWN side of a mystic door. Dual purpose:
+	//   int townId, int targetId, short x, short y   -> place the town portal
+	//   int NONE,   int NONE                          -> remove it (no position)
+	//
+	class SpawnPortalHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// 0x51: byte 1 = set look (int scriptid, string name, look), byte 0 = remove (int oid)
+	class ImitatedNpcHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Spawn a mob on the stage
 	// Opcode: SPAWN_MOB(236)
 	class SpawnMobHandler : public PacketHandler
