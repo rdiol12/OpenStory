@@ -122,11 +122,11 @@ namespace ms
 		};
 
 		// Add a bitmap to the available resources
-		const Offset& getoffset(const nl::bitmap& bmp);
+		Offset getoffset(const nl::bitmap& bmp);
 		// Atlas slot for a raw pixel buffer, keyed by caller-provided id
-		const Offset& getoffset(size_t id, GLshort width, GLshort height, const void* data);
+		Offset getoffset(size_t id, GLshort width, GLshort height, const void* data);
 		// Allocate atlas space and upload BGRA pixels (shared by both paths)
-		const Offset& upload(size_t id, GLshort width, GLshort height, const void* data);
+		Offset upload(size_t id, GLshort width, GLshort height, const void* data);
 
 		static const int HD_SCALE = 2;
 		std::vector<uint32_t> hdbuffer;

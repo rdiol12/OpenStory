@@ -297,8 +297,12 @@ namespace ms
 
 				// Printable characters arrive separately through send_char, which
 				// is the only path that respects the OS keyboard layout. Passing
-				// them here as well would insert every character twice.
-				if (mapping.type == KeyType::Id::TEXT)
+				// them here as well would insert every character twice. Space is printable
+				// too but lives in textactions, so it arrives typed as ACTION and needs
+				// naming explicitly or it lands twice.
+				if (mapping.type == KeyType::Id::TEXT
+					|| (mapping.type == KeyType::Id::ACTION
+						&& mapping.action == KeyAction::Id::SPACE))
 					return;
 
 				focusedtextfield->send_key(mapping.type, mapping.action, pressed);

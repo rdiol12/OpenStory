@@ -51,6 +51,38 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// 0x5A: string label, string value
+	class SessionValueHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class IncubatorResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// 0x71 / 0x72: bool success, then a reason byte ONLY on failure
+	class CancelNameChangeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class CancelWorldTransferHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class MapleLifeResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	class MapleLifeErrorHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class AutoMpPotHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;

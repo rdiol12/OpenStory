@@ -158,6 +158,90 @@ namespace ms
 		}
 	}
 
+	void SessionValueHandler::handle(InPacket& recv) const
+	{
+		if (!recv.available())
+			return;
+
+		std::string label = recv.read_string();
+		std::string value = recv.available() ? recv.read_string() : std::string();
+
+		if (label == "energy")
+		{
+			int32_t amount = 0;
+
+			// value is a decimal string
+			try { amount = std::stoi(value); }
+			catch (...) { return; }
+
+			Stage::get().set_energy(amount);
+			return;
+		}
+
+		chat::log("[" + label + "] " + value, chat::LineType::YELLOW);
+	}
+
+	void IncubatorResultHandler::handle(InPacket& recv) const
+	{
+		chat::log("[Incubator] The incubator finished.", chat::LineType::YELLOW);
+	}
+
+	namespace
+	{
+		void handle_cancel_result(InPacket& recv, const char* what)
+		{
+			if (!recv.available())
+				return;
+
+			bool success = recv.read_bool();
+
+			if (success)
+			{
+				chat::log(std::string("[") + what + "] Your request was cancelled.",
+					chat::LineType::YELLOW);
+				return;
+			}
+
+			int8_t reason = recv.available() ? recv.read_byte() : 0;
+
+			chat::log(std::string("[") + what + "] The cancellation failed"
+				+ (reason ? " (reason " + std::to_string(static_cast<int>(reason)) + ")" : "")
+				+ ".", chat::LineType::RED);
+		}
+	}
+
+	void CancelNameChangeHandler::handle(InPacket& recv) const
+	{
+		handle_cancel_result(recv, "Name Change");
+	}
+
+	void CancelWorldTransferHandler::handle(InPacket& recv) const
+	{
+		handle_cancel_result(recv, "World Transfer");
+	}
+
+	void MapleLifeResultHandler::handle(InPacket& recv) const
+	{
+		if (recv.length() < 4)
+			return;
+
+		int32_t mode = recv.read_int();
+
+		if (mode == 2)
+			chat::log("[MapleLife] That name cannot be used.", chat::LineType::RED);
+	}
+
+	void MapleLifeErrorHandler::handle(InPacket& recv) const
+	{
+		if (recv.length() < 5)
+			return;
+
+		recv.read_byte();
+		int32_t code = recv.read_int();
+
+		chat::log("[MapleLife] Error " + std::to_string(code) + ".", chat::LineType::RED);
+	}
+
 	void AutoHpPotHandler::handle(InPacket& recv) const
 	{
 		// Auto HP potion — server tells client which potion to auto-use

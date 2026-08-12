@@ -185,6 +185,10 @@ namespace ms
 			/// Event
 			REQUEST_EVENT_INFO = 241, // 0xF1
 
+			/// Custom (docs/PROTOCOL_MONSTER.md) — no canonical v83 opcode exists
+			MLIFE_OP = 1024,        // 0x400
+			MBATTLE_OP = 1025,      // 0x401
+
 			/// Wedding — Cosmic reads wedding ops on RecvOpcode 0x8A (138).
 			WEDDING_ACTION = 138,
 

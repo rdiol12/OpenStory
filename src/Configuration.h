@@ -611,6 +611,18 @@ namespace ms
 		PosMONSTERBOOK() : PointEntry("PosMONSTERBOOK", "(100, 50)") {}
 	};
 
+	// The default position of UIMonsterBattle
+	struct PosMONSTERBATTLE : public Configuration::PointEntry
+	{
+		PosMONSTERBATTLE() : PointEntry("PosMONSTERBATTLE", "(120, 60)") {}
+	};
+
+	// The default position of UIMonsterLife
+	struct PosMONSTERLIFE : public Configuration::PointEntry
+	{
+		PosMONSTERLIFE() : PointEntry("PosMONSTERLIFE", "(140, 40)") {}
+	};
+
 	// The default position of UIPartySearch
 	struct PosPARTYSEARCH : public Configuration::PointEntry
 	{

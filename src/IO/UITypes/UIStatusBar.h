@@ -119,6 +119,9 @@ namespace ms
 			BT_MENU_EVENT,
 			BT_MENU_RANK,
 			BT_MENU_EPISODBOOK,
+			BT_MENU_MSN,
+			BT_MENU_MONSTERBATTLE,
+			BT_MENU_MONSTERLIFE,
 			// System sub-panel (v83: 5 buttons — Channel, JoyPad, KeySetting, Option, Quit)
 			BT_SYS_CHANNEL,
 			BT_SYS_GAMEQUIT,
@@ -138,6 +141,12 @@ namespace ms
 		Gauge expbar;
 		Gauge hpbar;
 		Gauge mpbar;
+
+		// UIWindow.img/EnergyBar
+		Texture energy_bar_c;
+		Texture energy_bar_e;
+		Texture energy_fill;
+		Animation energy_full_effect;
 
 		// Extra gauges
 		Gauge barrier_bar;

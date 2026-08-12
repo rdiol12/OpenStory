@@ -84,6 +84,8 @@ namespace ms
 		settings.emplace<PosHIREDMERCHANT>();
 		settings.emplace<PosMINIGAME>();
 		settings.emplace<PosMONSTERBOOK>();
+		settings.emplace<PosMONSTERBATTLE>();
+		settings.emplace<PosMONSTERLIFE>();
 		settings.emplace<PosPARTYSEARCH>();
 		settings.emplace<PosRANKING>();
 		settings.emplace<PosSKILLMACRO>();

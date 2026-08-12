@@ -313,6 +313,11 @@ namespace ms
 				if (heal_hp < 0) heal_hp = 0;
 				if (heal_mp < 0) heal_mp = 0;
 
+				// Cosmic drops any MP heal >= 1000 outright and autobans an HP heal
+				// above 77 * map recovery * 1.5, so stay inside both bounds.
+				heal_hp = std::min<int16_t>(heal_hp, 100);
+				heal_mp = std::min<int16_t>(heal_mp, 999);
+
 				if (heal_hp > 0 || heal_mp > 0)
 					HealOverTimePacket(heal_hp, heal_mp).dispatch();
 			}

@@ -312,7 +312,6 @@ namespace ms
 		addfont(FONT_BOLD_STR, Text::Font::A15B, 0, 15);
 		addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18);
 
-		fontymax += fontborder.y();
 
 #ifndef PLATFORM_IOS
 		// Hebrew first: Roboto has no Hebrew glyphs at all, so without this every
@@ -429,7 +428,6 @@ namespace ms
 		{
 			fontborder.set_x(0);
 			fontborder.set_y(fontymax);
-			fontymax = 0;
 		}
 
 		GLshort x = fontborder.x();
@@ -437,8 +435,10 @@ namespace ms
 
 		fontborder.shift_x(width);
 
-		if (height > fontymax)
-			fontymax = height;
+		// fontymax is the absolute bottom of the font region, not the current row
+		// height: the shader treats every texel above it as a monochrome glyph.
+		if (fontborder.y() + height > fontymax)
+			fontymax = fontborder.y() + height;
 
 		fonts[id] = Font(width, height);
 		fonts[id].path = name;
@@ -529,7 +529,6 @@ namespace ms
 		{
 			fontborder.set_x(0);
 			fontborder.set_y(fontymax);
-			fontymax = 0;
 		}
 
 		GLshort ox = fontborder.x();
@@ -537,7 +536,7 @@ namespace ms
 
 		fontborder.shift_x(w > 0 ? w : 1);
 
-		if (h > fontymax) fontymax = h;
+		if (fontborder.y() + h > fontymax) fontymax = fontborder.y() + h;
 
 		if (w > 0 && h > 0)
 			glTexSubImage2D(GL_TEXTURE_2D, 0, ox, oy, w, h, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
@@ -724,7 +723,7 @@ namespace ms
 		size_t used = ATLASW * border.y() + border.x() * yrange.second();
 		double usedpercent = static_cast<double>(used) / (ATLASW * ATLASH);
 
-		if (usedpercent > 80.0)
+		if (usedpercent > 0.8)
 			clearinternal();
 	}
 
@@ -733,7 +732,7 @@ namespace ms
 		getoffset(bmp);
 	}
 
-	const GraphicsGL::Offset& GraphicsGL::getoffset(const nl::bitmap& bmp)
+	GraphicsGL::Offset GraphicsGL::getoffset(const nl::bitmap& bmp)
 	{
 		size_t id = bmp.id();
 		auto offiter = offsets.find(id);
@@ -744,7 +743,7 @@ namespace ms
 		return upload(id, bmp.width(), bmp.height(), bmp.data());
 	}
 
-	const GraphicsGL::Offset& GraphicsGL::getoffset(size_t id, GLshort width, GLshort height, const void* data)
+	GraphicsGL::Offset GraphicsGL::getoffset(size_t id, GLshort width, GLshort height, const void* data)
 	{
 		auto offiter = offsets.find(id);
 
@@ -815,7 +814,7 @@ namespace ms
 		return hdbuffer.data();
 	}
 
-	const GraphicsGL::Offset& GraphicsGL::upload(size_t id, GLshort width, GLshort height, const void* data)
+	GraphicsGL::Offset GraphicsGL::upload(size_t id, GLshort width, GLshort height, const void* data)
 	{
 		GLshort x = 0;
 		GLshort y = 0;
@@ -1328,6 +1327,8 @@ namespace ms
 
 		GLshort x = args.getpos().x();
 		GLshort y = args.getpos().y();
+		const float sx = args.get_xscale();
+		const float sy = args.get_yscale();
 		GLshort w = layout.width();
 		GLshort h = layout.height();
 		GLshort minheight = vertical.first() > 0 ? vertical.first() : SCREEN.top();
@@ -1381,10 +1382,10 @@ namespace ms
 					if (consumed == 0) break;
 					Font::Char ch = ensure_glyph(id, cp);
 
-					GLshort char_x = x + ax + ch.bl;
-					GLshort char_y = y + ay - ch.bt;
-					GLshort char_width = ch.bw;
-					GLshort char_height = ch.bh;
+					GLshort char_x = x + static_cast<GLshort>((ax + ch.bl) * sx);
+					GLshort char_y = y + static_cast<GLshort>((ay - ch.bt) * sy);
+					GLshort char_width = static_cast<GLshort>(ch.bw * sx);
+					GLshort char_height = static_cast<GLshort>(ch.bh * sy);
 					GLshort char_bottom = char_y + char_height;
 
 					Offset offset = ch.offset;
@@ -1392,10 +1393,10 @@ namespace ms
 					if (ch.color)
 					{
 						// Color emoji strikes: scale the full bitmap to ax x ax.
-						char_width = ch.ax;
-						char_height = ch.ax;
-						char_y = y + ay - ch.ax;
-						char_bottom = y + ay;
+						char_width = static_cast<GLshort>(ch.ax * sx);
+						char_height = static_cast<GLshort>(ch.ax * sy);
+						char_y = y + static_cast<GLshort>((ay - ch.ax) * sy);
+						char_bottom = y + static_cast<GLshort>(ay * sy);
 					}
 
 					if (char_bottom > maxheight)

@@ -41,6 +41,11 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	class FieldObstacleOneHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class ForcedMapEquipHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;

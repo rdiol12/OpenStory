@@ -197,6 +197,7 @@ namespace ms
 							modifytext(text);
 						}
 
+
 						break;
 					}
 					case KeyAction::Id::RETURN:

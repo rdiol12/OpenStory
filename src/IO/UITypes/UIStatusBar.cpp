@@ -28,6 +28,9 @@
 #include "UIChannel.h"
 #include "UIEquipInventory.h"
 #include "UIEvent.h"
+#include "UIMessenger.h"
+#include "UIMonsterBattle.h"
+#include "UIMonsterLife.h"
 #include "UIStatusMessenger.h"
 #include "UIItemInventory.h"
 #include "UIJoypad.h"
@@ -201,6 +204,15 @@ namespace ms
 		// === Extra gauges ===
 		nl::node gauge_node = mainbar["gauge"];
 
+		nl::node energy_node = nl::nx::ui["UIWindow.img"]["EnergyBar"];
+
+		energy_bar_c = energy_node["c"];
+		energy_bar_e = energy_node["e"];
+		energy_fill = energy_node["Gage"]["1"]["0"];
+
+		if (energy_node["effect"])
+			energy_full_effect = Animation(energy_node["effect"]);
+
 		barrier_bar = Gauge(
 			Gauge::Type::GAME,
 			gauge_node.resolve("barrier/0"),
@@ -345,9 +357,9 @@ namespace ms
 
 		// Menu buttons stack top-to-bottom above the bar.
 		// Bar top is at -84 relative to position. Panel sits just above that.
-		// v83-visible: Stat, Skill, Quest, Item, Equip, Community, Event, Rank, EpisodBook (9 buttons)
+		// v83-visible: Stat, Skill, Quest, Item, Equip, Community, Event, Rank, EpisodBook, MSN
 		constexpr int16_t MENU_STEP = 26;
-		constexpr int16_t MENU_VISIBLE = 9;
+		constexpr int16_t MENU_VISIBLE = 12;
 		constexpr int16_t MENU_PANEL_H = MENU_VISIBLE * MENU_STEP + 8;
 
 		int16_t menu_x = 188;
@@ -365,12 +377,14 @@ namespace ms
 		buttons[BT_MENU_EVENT]         = std::make_unique<MapleButton>(menu_node["BtEvent"],     Point<int16_t>(menu_x, menu_y + MENU_STEP * 6));
 		buttons[BT_MENU_RANK]          = std::make_unique<MapleButton>(menu_node["BtRank"],      Point<int16_t>(menu_x, menu_y + MENU_STEP * 7));
 		buttons[BT_MENU_EPISODBOOK]    = std::make_unique<MapleButton>(menu_node["BtEpisodBook"],    Point<int16_t>(menu_x, menu_y + MENU_STEP * 8));
+		buttons[BT_MENU_MSN]           = std::make_unique<MapleButton>(menu_node["BtMSN"],       Point<int16_t>(menu_x, menu_y + MENU_STEP * 9));
+		buttons[BT_MENU_MONSTERBATTLE] = std::make_unique<MapleButton>(menu_node["BtMonsterBattle"], Point<int16_t>(menu_x, menu_y + MENU_STEP * 10));
+		buttons[BT_MENU_MONSTERLIFE]   = std::make_unique<MapleButton>(menu_node["BtMonsterLife"], Point<int16_t>(menu_x, menu_y + MENU_STEP * 11));
 
-		// Post-BB rows (Monster Battle / Monster Life / MSN / AfreecaTV)
-		// have no Cosmic counterpart and are not created at all.
+		// Monster Battle / Monster Life / AfreecaTV have no Cosmic counterpart.
 
 		// All menu buttons hidden until menu is toggled
-		for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_EPISODBOOK; i++)
+		for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_MONSTERLIFE; i++)
 			buttons[i]->set_active(false);
 
 		// Menu background sized to cover visible buttons
@@ -464,6 +478,31 @@ namespace ms
 			Point<int16_t> boss_pos(
 				static_cast<int16_t>((vwidth - boss_gage.width()) / 2), 18);
 			boss_gage.draw(boss_pos, boss_hp_percent);
+		}
+
+		if (Stage::get().is_energy_active() && energy_bar_c.is_valid())
+		{
+			constexpr int16_t ENERGY_MAX = 10000;
+			constexpr int16_t ENERGY_WIDTH = 100;
+
+			int32_t amount = Stage::get().get_energy();
+			int16_t filled = static_cast<int16_t>(
+				static_cast<int64_t>(amount) * ENERGY_WIDTH / ENERGY_MAX);
+
+			Point<int16_t> ep((vwidth - ENERGY_WIDTH) / 2, position.y() - 62);
+
+			for (int16_t x = 0; x < ENERGY_WIDTH; x++)
+				energy_bar_c.draw(DrawArgument(ep + Point<int16_t>(x, 0)));
+
+			energy_bar_e.draw(DrawArgument(ep + Point<int16_t>(-energy_bar_e.width(), 0)));
+			energy_bar_e.draw(DrawArgument(ep + Point<int16_t>(ENERGY_WIDTH, 0)));
+
+			if (energy_fill.is_valid())
+				for (int16_t x = 0; x < filled; x++)
+					energy_fill.draw(DrawArgument(ep + Point<int16_t>(x, 2)));
+
+			if (amount >= ENERGY_MAX)
+				energy_full_effect.draw(DrawArgument(ep + Point<int16_t>(ENERGY_WIDTH / 2, 0)), alpha);
 		}
 
 		// Quickslot panel — drawn FIRST so the status bar renders on
@@ -756,13 +795,12 @@ namespace ms
 
 		if (menu_fade > 0.0f)
 		{
-			// Bottom reference is the last v83-visible entry (EpisodBook).
 			draw_subpanel(*buttons.at(BT_MENU_STAT),
-			              *buttons.at(BT_MENU_EPISODBOOK),
+			              *buttons.at(BT_MENU_MONSTERLIFE),
 			              menu_bg_top, menu_bg_mid, menu_bg_bot, menu_fade);
 			// Fade the buttons alongside the backdrop (alpha overload
 			// ignores the `active` flag so the visual fade is smooth).
-			for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_EPISODBOOK; i++)
+			for (uint16_t i = BT_MENU_STAT; i <= BT_MENU_MONSTERLIFE; i++)
 				static_cast<MapleButton*>(buttons.at(i).get())->draw(position, menu_fade);
 		}
 
@@ -851,6 +889,9 @@ namespace ms
 		buttons[BT_MENU_EVENT]     ->set_active(menu_live);
 		buttons[BT_MENU_RANK]      ->set_active(menu_live);
 		buttons[BT_MENU_EPISODBOOK]->set_active(menu_live);
+		buttons[BT_MENU_MSN]       ->set_active(menu_live);
+		buttons[BT_MENU_MONSTERBATTLE]->set_active(menu_live);
+		buttons[BT_MENU_MONSTERLIFE]->set_active(menu_live);
 
 		bool sys_live = (sys_fade >= 1.0f);
 		buttons[BT_SYS_CHANNEL]   ->set_active(sys_live);
@@ -900,11 +941,8 @@ namespace ms
 		if (has_notification)
 			notice_pulse_tick++;
 
-		// Keep the notice button visually static — no hover swap. The
-		// button is purely a notification indicator; the state transition
-		// would only flash the same bitmap back and forth.
-		if (buttons.count(BT_NOTICE))
-			buttons[BT_NOTICE]->set_state(Button::State::NORMAL);
+		// Forcing NORMAL here re-armed the NORMAL->MOUSEOVER transition every frame,
+		// which replayed the hover sound continuously.
 	}
 
 	Button::State UIStatusBar::button_pressed(uint16_t id)
@@ -1093,6 +1131,21 @@ namespace ms
 
 		case BT_MENU_EPISODBOOK:
 			UI::get().emplace<UIMonsterBook>();
+			remove_menus();
+			return Button::State::NORMAL;
+
+		case BT_MENU_MSN:
+			UI::get().emplace<UIMessenger>();
+			remove_menus();
+			return Button::State::NORMAL;
+
+		case BT_MENU_MONSTERBATTLE:
+			UI::get().emplace<UIMonsterBattle>();
+			remove_menus();
+			return Button::State::NORMAL;
+
+		case BT_MENU_MONSTERLIFE:
+			UI::get().emplace<UIMonsterLife>();
 			remove_menus();
 			return Button::State::NORMAL;
 

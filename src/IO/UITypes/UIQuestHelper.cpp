@@ -294,10 +294,20 @@ namespace ms
 		// X button (BtDelete sprite) right after quest name
 		if (close_btn_normal.is_valid())
 		{
-			int16_t name_w = tq.name.width();
-			Point<int16_t> x_btn_pos = pos + Point<int16_t>(name_w + 4, y);
 			bool hovered = (tq.questid == hovered_close_questid);
 			const Texture& btn_tex = hovered ? close_btn_mouseover : close_btn_normal;
+
+			int16_t name_w = tq.name.width();
+			int16_t name_h = tq.name.height();
+			Point<int16_t> btn_dim = btn_tex.get_dimensions();
+
+			int16_t btn_y = y + (name_h - btn_dim.y()) / 2;
+			Point<int16_t> x_btn_pos = pos + Point<int16_t>(name_w + 4, btn_y);
+
+			if (btn_dim.x() > 0 && btn_dim.y() > 0)
+				ColorBox(btn_dim.x(), btn_dim.y(), Color::Name::WHITE, 1.0f)
+					.draw(DrawArgument(x_btn_pos));
+
 			btn_tex.draw(DrawArgument(x_btn_pos));
 		}
 		y += 18;
@@ -403,9 +413,10 @@ namespace ms
 				int16_t btn_h = close_btn_normal.is_valid() ? close_btn_normal.get_dimensions().y() : 14;
 				int16_t name_w = tq.name.width();
 				int16_t x_btn_x = name_w + 4;
+				int16_t x_btn_y = (tq.name.height() - btn_h) / 2;
 				hit.close_btn = Rectangle<int16_t>(
-					entry_pos + Point<int16_t>(x_btn_x, 0),
-					entry_pos + Point<int16_t>(x_btn_x + btn_w, btn_h)
+					entry_pos + Point<int16_t>(x_btn_x, x_btn_y),
+					entry_pos + Point<int16_t>(x_btn_x + btn_w, x_btn_y + btn_h)
 				);
 				// Header area for collapse toggle: quest name
 				hit.header_area = Rectangle<int16_t>(
@@ -676,6 +687,13 @@ namespace ms
 		if (questid <= 0)
 			return;
 
+		// Cosmic stores internal state in quest slots; those have no QuestInfo
+		// entry and are not player-visible quests
+		nl::node qinfo = nl::nx::quest["QuestInfo.img"][std::to_string(questid)];
+
+		if (!qinfo || qinfo["name"].get_string().empty())
+			return;
+
 		// Don't track duplicates
 		for (auto& tq : tracked_quests)
 			if (tq.questid == questid)
@@ -796,6 +814,9 @@ namespace ms
 		std::string name;
 		if (qnode)
 			name = qnode["name"].get_string();
+
+		// Reached only for ids restored from saved settings; track_quest filters
+		// state-flag records out up front
 		if (name.empty())
 			name = "Quest " + qid_str;
 

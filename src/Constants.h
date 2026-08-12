@@ -35,7 +35,9 @@ namespace ms
 			{
 				PHYSWIDTH = 1920;
 				PHYSHEIGHT = 1080;
-				UI_SCALE = 2.0f;   // matches the 2x sprite textures: one texel per pixel
+				// 2.0 gives a 960x540 logical view, which cannot fit the 800x600 login,
+				// world-select and char-select art -- it crops and reads as zoomed in.
+				UI_SCALE = 1.5f;   // 1280x720 logical
 			};
 
 			~Constants() {};

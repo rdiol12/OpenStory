@@ -32,4 +32,9 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	class TradeMoneyLimitHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

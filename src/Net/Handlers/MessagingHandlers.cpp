@@ -615,6 +615,31 @@ namespace ms
 		}
 	}
 
+	void MemoResultHandler::handle(InPacket& recv) const
+	{
+		if (!recv.available())
+			return;
+
+		int8_t mode = recv.read_byte();
+
+		if (mode == 4)
+		{
+			chat::log("[Memo] Your note was sent.", chat::LineType::YELLOW);
+			return;
+		}
+
+		if (mode == 5)
+		{
+			int8_t error = recv.available() ? recv.read_byte() : 0;
+
+			chat::log(error == 2
+				? "[Memo] That character does not exist."
+				: "[Memo] Your note could not be sent (error "
+					+ std::to_string(static_cast<int>(error)) + ").",
+				chat::LineType::RED);
+		}
+	}
+
 	void WhisperHandler::handle(InPacket& recv) const
 	{
 		// Per chat.txt:

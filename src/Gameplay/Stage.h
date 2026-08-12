@@ -125,6 +125,11 @@ namespace ms
 		int32_t get_combo() const;
 		bool is_combo_active() const;
 
+		// Energy Charge, 0..10000 (server-driven via SESSION_VALUE)
+		void set_energy(int32_t amount);
+		int32_t get_energy() const;
+		bool is_energy_active() const;
+
 
 		// Get the total up time of the client
 		int64_t get_uptime();
@@ -194,6 +199,8 @@ namespace ms
 
 		// Combo counter
 		int32_t combo_count = 0;
+
+		int32_t energy_amount = 0;
 
 	};
 }

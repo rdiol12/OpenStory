@@ -62,11 +62,13 @@ namespace ms
 			Color::Name::WHITE, "", static_cast<uint16_t>(bg_dimensions.x() - 20));
 
 		// Five single-line input fields stacked in the form area.
+		// Rows measured off the backgrnd art: dotted separators at y=127/143/159/175,
+		// box bottom at 197.
 		constexpr int16_t FIELD_LEFT = 14;
-		constexpr int16_t FIELD_TOP = 120;
+		constexpr int16_t FIELD_TOP = 111;
 		constexpr int16_t FIELD_WIDTH = 184;
-		constexpr int16_t FIELD_HEIGHT = 18;
-		constexpr int16_t FIELD_STEP = 22;
+		constexpr int16_t FIELD_HEIGHT = 16;
+		constexpr int16_t FIELD_STEP = 16;
 		for (int i = 0; i < 5; i++)
 		{
 			int16_t y = FIELD_TOP + FIELD_STEP * i;
@@ -84,8 +86,8 @@ namespace ms
 		victim_field = Textfield(
 			Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK,
 			Rectangle<int16_t>(
-				Point<int16_t>(FIELD_LEFT, bg_dimensions.y() - 110),
-				Point<int16_t>(FIELD_LEFT + FIELD_WIDTH, bg_dimensions.y() - 90)),
+				Point<int16_t>(FIELD_LEFT, 213),
+				Point<int16_t>(FIELD_LEFT + FIELD_WIDTH, 233)),
 			12
 		);
 
@@ -99,10 +101,9 @@ namespace ms
 		for (auto& f : lines) f.change_text("");
 		victim_field.change_text("");
 
-		// Heart TV is 5075001 in v83 (the romantic variant that lets you
-		// display a message with a chosen partner). Only then do we expose
-		// the "To:" picker and victim field.
-		is_heart_tv = (itemid == 5075001);
+		// Per the item tooltips: Star is announcement-only (no partner), Heart is
+		// dedication-only (partner required), plain allows either.
+		is_heart_tv = (itemid != 5075001 && itemid != 5075004);
 		buttons[Buttons::BT_TO]->set_active(is_heart_tv);
 		victim_label.change_text(is_heart_tv ? "To:" : "");
 
@@ -138,24 +139,8 @@ namespace ms
 
 		if (is_heart_tv)
 		{
-			victim_label.draw(position + Point<int16_t>(14, dimension.y() - 126));
+			victim_label.draw(position + Point<int16_t>(14, 214));
 			victim_field.draw(position);
-		}
-
-		// Draw a faint white rectangle under each input field so users can
-		// see where to click even when the field is empty / unfocused. The
-		// backgrnd sprite already has the TV form art but without visible
-		// cutouts where the text lines go.
-		constexpr int16_t FIELD_LEFT = 14;
-		constexpr int16_t FIELD_TOP = 120;
-		constexpr int16_t FIELD_WIDTH = 184;
-		constexpr int16_t FIELD_HEIGHT = 18;
-		constexpr int16_t FIELD_STEP = 22;
-		for (int i = 0; i < 5; i++)
-		{
-			int16_t y = FIELD_TOP + FIELD_STEP * i;
-			ColorBox bg(FIELD_WIDTH, FIELD_HEIGHT, Color::Name::WHITE, 0.85f);
-			bg.draw(DrawArgument(position + Point<int16_t>(FIELD_LEFT, y)));
 		}
 
 		for (const auto& f : lines)
@@ -264,7 +249,9 @@ namespace ms
 				+ " id=" + std::to_string(item_id) + " lines=" + std::to_string(payload.size()),
 				UIChatBar::LineType::YELLOW);
 
-		UseMapleTVPacket(item_slot, item_id, victim, payload, false).dispatch();
+		bool megassenger = (item_id >= 5075003 && item_id <= 5075005);
+
+		UseMapleTVPacket(item_slot, item_id, victim, payload, megassenger).dispatch();
 		deactivate();
 	}
 }

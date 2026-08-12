@@ -668,8 +668,10 @@ namespace ms
 			if (has_cjk(name))
 				continue;
 
+			// Unnamed = a server state-flag record, not a quest (same rule the
+			// in-progress tab applies)
 			if (name.empty())
-				name = "Quest " + std::to_string(qid);
+				continue;
 
 			// Search filter
 			if (!search_lower.empty())
@@ -1539,9 +1541,12 @@ namespace ms
 					std::string pname;
 					nl::node pnode = quest_info[std::to_string(prereq_id)];
 					if (pnode)
-						pname = pnode["name"].get_string();
-					if (pname.empty())
-						pname = "Quest " + std::to_string(prereq_id);
+						pname = strip_quest_codes(pnode["name"].get_string());
+
+					// Server state-flag records are listed as prerequisites but
+					// have no name; showing their raw id is meaningless
+					if (pname.empty() || has_cjk(pname))
+						continue;
 
 					detail_prereq_quests.push_back(
 						Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, pname, 220, false)
