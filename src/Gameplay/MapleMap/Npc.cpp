@@ -273,8 +273,6 @@ namespace ms
 		const bool is_tv = is_mapletv_npc(npcid);
 		if (is_tv)
 		{
-			auto& b = MapleTVBroadcast::get();
-
 			// The NPC's info node exposes MapleTVmsgX / MapleTVmsgY — the
 			// exact pixel offset (relative to the NPC's feet) where the
 			// broadcast message should be anchored. Values are packed as
@@ -302,10 +300,6 @@ namespace ms
 			int16_t msg_y = -350;
 #endif
 
-			int16_t screen_cx = absp.x() + msg_x + 120;
-			int16_t screen_top_y = absp.y() + msg_y + 8;
-			int16_t screen_w = 210;
-
 			// TV screens: show screen at the msg anchor, ad reel at the
 			// ad anchor. NPCs without one (the reporter half) draw nothing.
 			if (has_screen)
@@ -314,25 +308,6 @@ namespace ms
 					Point<int16_t>(absp.x() + msg_x, absp.y() + msg_y), alpha);
 
 
-			if (b.active())
-			{
-				int16_t y = screen_top_y;
-				if (!b.sender_name().empty())
-				{
-					Text hdr(Text::Font::A12B, Text::Alignment::CENTER,
-						Color::Name::WHITE, b.sender_name(), static_cast<uint16_t>(screen_w));
-					hdr.draw(Point<int16_t>(screen_cx, y));
-					y += 14;
-				}
-				for (const std::string& ln : b.lines())
-				{
-					if (ln.empty()) continue;
-					Text t(Text::Font::A11M, Text::Alignment::CENTER,
-						Color::Name::WHITE, ln, static_cast<uint16_t>(screen_w));
-					t.draw(Point<int16_t>(screen_cx, y));
-					y += 12;
-				}
-			}
 		}
 	}
 

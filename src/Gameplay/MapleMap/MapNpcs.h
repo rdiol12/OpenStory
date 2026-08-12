@@ -32,7 +32,7 @@ namespace ms
 	public:
 		// Draw all NPCs on a layer
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
-		void draw_names(double viewx, double viewy, float alpha) const;
+		void draw_names(Layer::Id layer, double viewx, double viewy, float alpha) const;
 		// Update all NPCs
 		void update(const Physics& physics);
 

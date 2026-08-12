@@ -23,6 +23,7 @@
 #include "../Graphics/Animation.h"
 #include "../Graphics/Texture.h"
 #include "../Net/Login.h"
+#include "../Character/Look/CharLook.h"
 
 #include <string>
 #include <vector>
@@ -51,7 +52,9 @@ namespace ms
 		// and the ad reel at the ad anchor
 		void draw_screen(Point<int16_t> ad_anchor, Point<int16_t> msg_anchor, float alpha) const;
 
-		void set_look(const LookEntry& entry) { sender_look_ = entry; has_look_ = true; }
+		void set_type(int8_t t) { type_ = t; }
+		void set_look(const LookEntry& entry);
+		void set_partner_look(const LookEntry& entry);
 		bool has_look() const { return has_look_; }
 		const LookEntry& get_look() const { return sender_look_; }
 		int32_t serial() const { return serial_; }
@@ -66,6 +69,10 @@ namespace ms
 		bool active_ = false;
 		LookEntry sender_look_;
 		bool has_look_ = false;
+		mutable CharLook sender_avatar_;
+		mutable CharLook partner_avatar_;
+		bool has_partner_look_ = false;
+		int8_t type_ = 0;
 		int32_t serial_ = 0;
 		mutable Animation tv_ads_[3];
 		mutable int ad_index_ = 0;

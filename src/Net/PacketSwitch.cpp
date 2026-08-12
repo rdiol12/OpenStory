@@ -24,6 +24,7 @@
 #include "Handlers/LoginHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/MessagingHandlers.h"
+#include "Handlers/MonsterHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/PlayerHandlers.h"
 #include "Handlers/PlayerInteractionHandlers.h"
@@ -350,6 +351,10 @@ namespace ms
 		REMOVE_TV = 342,        // 0x156
 		ENABLE_TV = 343,        // 0x157
 
+		/// Custom (docs/PROTOCOL_MONSTER.md) — no canonical v83 opcode exists
+		MLIFE_UPDATE = 400,     // 0x190
+		MBATTLE_UPDATE = 401,   // 0x191
+
 		/// MTS (Maple Trading System)
 		MTS_OPERATION = 348,    // 0x15C
 		MTS_OPERATION2 = 347,   // 0x15B
@@ -602,6 +607,10 @@ namespace ms
 		// Wedding
 		emplace<WEDDING_PROGRESS, WeddingProgressHandler>();
 		emplace<WEDDING_CEREMONY_END, WeddingCeremonyEndHandler>();
+
+		// Monster Life / Monster Battle (custom, docs/PROTOCOL_MONSTER.md)
+		emplace<MLIFE_UPDATE, MonsterLifeUpdateHandler>();
+		emplace<MBATTLE_UPDATE, MonsterBattleUpdateHandler>();
 
 		// MapleTV
 		emplace<SEND_TV, SendTVHandler>();

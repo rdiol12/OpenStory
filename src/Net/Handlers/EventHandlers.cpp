@@ -283,7 +283,6 @@ namespace ms
 		// then 5 message strings; then int remaining-ms.
 		int8_t has_partner = recv.read_byte();
 		int8_t type = recv.read_byte();
-		(void)type;
 
 		// We don't render the avatars yet — skip their CharLook bytes but
 		// remember whether a partner/victim was sent so the TV header can
@@ -291,8 +290,9 @@ namespace ms
 		// CharLook payload in v83, so the header just notes partnered).
 		LookEntry sender_look = LoginParser::parse_look(recv);
 		bool has_victim = (has_partner == 3);
+		LookEntry partner_look;
 		if (has_victim)
-			LoginParser::parse_look(recv);
+			partner_look = LoginParser::parse_look(recv);
 
 		std::vector<std::string> lines;
 		for (int i = 0; i < 5 && recv.available(); i++)
@@ -308,9 +308,21 @@ namespace ms
 		// for received broadcasts (UIMapleTV is compose-only).
 		MapleTVBroadcast::get().start("", lines,
 			has_victim ? "partner" : "", remaining_ms);
+		MapleTVBroadcast::get().set_type(type);
 		MapleTVBroadcast::get().set_look(sender_look);
 
-		chat::log("[MapleTV] Broadcast received.", chat::LineType::YELLOW);
+		if (has_victim)
+			MapleTVBroadcast::get().set_partner_look(partner_look);
+
+		std::string diag = "[MapleTV] recv partner=" + std::to_string((int)has_partner)
+			+ " type=" + std::to_string((int)type)
+			+ " lines=" + std::to_string(lines.size())
+			+ " ms=" + std::to_string(remaining_ms) + " |";
+
+		for (const std::string& l : lines)
+			diag += " [" + l + "]";
+
+		chat::log(diag, chat::LineType::YELLOW);
 	}
 
 	void RemoveTVHandler::handle(InPacket& recv) const

@@ -30,13 +30,13 @@ namespace ms
 		npcs.draw(layer, viewx, viewy, alpha);
 	}
 
-	void MapNpcs::draw_names(double viewx, double viewy, float alpha) const
+	void MapNpcs::draw_names(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
 		for (auto it = npcs.begin(); it != npcs.end(); ++it)
 		{
 			auto* npc = static_cast<const Npc*>(it->second.get());
 
-			if (npc && npc->is_active())
+			if (npc && npc->is_active() && npc->get_layer() == layer)
 				npc->draw_name(viewx, viewy, alpha);
 		}
 	}

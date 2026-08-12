@@ -131,30 +131,49 @@ namespace ms
 		Cursor::State ret = down ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		auto drawpos = get_draw_position();
 
+		// Only the first button under the cursor reacts. Overlapping bounds used to
+		// fire every match, which double-played the sound and ran button_pressed twice.
+		Button* hit = nullptr;
+		uint16_t hitid = 0;
+
 		for (auto& btit : buttons)
 		{
 			if (btit.second->is_active() && btit.second->bounds(drawpos).contains(pos))
 			{
-				if (down)
-				{
-					Sound(Sound::Name::BUTTONCLICK).play();
-
-					btit.second->set_state(button_pressed(btit.first));
-
-					ret = Cursor::State::IDLE;
-				}
-				else
-				{
-					if (btit.second->get_state() == Button::State::NORMAL)
-						Sound(Sound::Name::BUTTONOVER).play();
-
-					btit.second->set_state(Button::State::MOUSEOVER);
-					ret = Cursor::State::CANCLICK;
-				}
+				hit = btit.second.get();
+				hitid = btit.first;
+				break;
 			}
-			else if (btit.second->get_state() == Button::State::MOUSEOVER)
-			{
+		}
+
+		for (auto& btit : buttons)
+		{
+			if (btit.second.get() != hit && btit.second->get_state() == Button::State::MOUSEOVER)
 				btit.second->set_state(Button::State::NORMAL);
+		}
+
+		if (hit)
+		{
+			if (down)
+			{
+				Sound(Sound::Name::BUTTONCLICK).play();
+
+				Button::State after = button_pressed(hitid);
+
+				// The cursor is still over the button, so land on MOUSEOVER rather than
+				// NORMAL -- otherwise the matching release re-fires the hover sound.
+				hit->set_state(after == Button::State::NORMAL
+					? Button::State::MOUSEOVER : after);
+
+				ret = Cursor::State::IDLE;
+			}
+			else
+			{
+				if (hit->get_state() == Button::State::NORMAL)
+					Sound(Sound::Name::BUTTONOVER).play();
+
+				hit->set_state(Button::State::MOUSEOVER);
+				ret = Cursor::State::CANCLICK;
 			}
 		}
 

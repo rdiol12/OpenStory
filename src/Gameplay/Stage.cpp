@@ -138,20 +138,13 @@ namespace ms
 
 		backgrounds.drawbackgrounds(viewx, viewy, alpha);
 
-		// Pass 1 — the static map (tiles + objects) as a solid background,
-		// across every layer. Drawing it all first means map art can never
-		// cover a player, another character, a mob, or an NPC's name tag;
-		// previously a higher-layer map object drawn later in the same
-		// interleaved loop would paint over lower-layer characters/names.
-		for (auto id : Layer::IDs)
-			tilesobjs.draw(id, viewpos, alpha);
-
-		// Pass 2 — world dynamic entities (NPCs, mobs, drops, ...), ordered
-		// by layer among themselves, on top of the map.
 		for (auto id : Layer::IDs)
 		{
+			tilesobjs.draw(id, viewpos, alpha);
+
 			reactors.draw(id, viewx, viewy, alpha);
 			npcs.draw(id, viewx, viewy, alpha);
+			npcs.draw_names(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
 			summons.draw(id, viewx, viewy, alpha);
 			dragons.draw(id, viewx, viewy, alpha);
@@ -162,28 +155,14 @@ namespace ms
 				mists.draw(id, viewx, viewy, alpha);
 
 			point_effects.draw(id, viewx, viewy, alpha);
-		}
 
-		HiredMerchants::get().draw(viewpos, alpha);
-
-		// Pass 3 — players (self + other characters) and their name tags,
-		// drawn after EVERYTHING else regardless of layer. This keeps a
-		// character and their name visible even when standing on top of a
-		// higher-layer NPC or mob; layer-ordering them in pass 2 let a
-		// higher-layer NPC paint over a player walking across it.
-		for (auto id : Layer::IDs)
-		{
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
 		}
 
-		// Portals are part of the map's foreground: a character walking into
-		// one is covered by its glow, not painted over it.
-		portals.draw(viewpos, alpha);
+		HiredMerchants::get().draw(viewpos, alpha);
 
-		// Only NPC name/function labels ride above everything — their sprites
-		// stayed down in pass 2 so a player can walk in front of them.
-		npcs.draw_names(viewx, viewy, alpha);
+		portals.draw(viewpos, alpha);
 
 		combat.draw(viewx, viewy, alpha);
 
