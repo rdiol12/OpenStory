@@ -105,7 +105,14 @@ namespace ms
 
 			T& second()
 			{
-				if (!this)
+				// Was `if (!this)`, which is undefined behaviour: a member
+				// function's `this` is never null in a defined program, so
+				// clang (-Wundefined-bool-conversion) folds the test away and
+				// the bounds check never fired. The intent was the iterator's
+				// own validity test -- `explicit operator bool()` above, which
+				// range-checks `index` -- so call that instead, plus a guard
+				// for a default/moved-from iterator with no storage.
+				if (value == nullptr || !static_cast<bool>(*this))
 					throw std::out_of_range("iterator out of range");
 				else
 					return *(value + index);

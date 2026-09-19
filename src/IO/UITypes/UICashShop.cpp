@@ -565,16 +565,25 @@ namespace ms
 	void UICashShop::exit_cashshop()
 	{
 		UI& ui = UI::get();
-		ui.change_state(UI::State::GAME);
 
 		// Restore UI scale + physical window size that were overridden in
 		// SetCashShopHandler::transition(). Without this the game world would
 		// remain confined to the 1024x768 cash-shop window at scale 1.0.
+		//
+		// This has to happen *before* change_state: UIStateGame and every
+		// window it builds lay themselves out against the logical viewport
+		// that is live at construction time (UIChatBar's baseline, UIStatusBar's
+		// right-edge buttons, and the reference viewport UIDragElement records
+		// for the positions it loads from the config). Constructing them while
+		// the cash shop's 1024x768 was still in force left the whole HUD
+		// anchored to a viewport that vanished a frame later.
 		uint16_t width = Setting<Width>::get().load();
 		uint16_t height = Setting<Height>::get().load();
 		Constants::Constants::get().set_ui_scale(get_pre_cashshop_ui_scale());
 		Constants::Constants::get().set_viewwidth(width);
 		Constants::Constants::get().set_viewheight(height);
+
+		ui.change_state(UI::State::GAME);
 
 		Stage& stage = Stage::get();
 		Player& player = stage.get_player();

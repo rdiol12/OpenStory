@@ -97,13 +97,23 @@ namespace ms
 			lpos.shift_x(textures[state][0].width());
 
 			int16_t middle_width = textures[state][1].width();
-			int16_t current_width = middle_width;
 
-			while (current_width < rwidth)
+			// Identical hazard to Slider::draw: the node path is assembled at
+			// runtime ("ComboBox" + type), so a pack without that variant --
+			// or without the per-state child -- yields a null node, a zeroed
+			// texture, and a width of 0. The stride would then never advance
+			// and this spins forever, freezing the window at full CPU with no
+			// error of any kind.
+			if (middle_width > 0)
 			{
-				textures[state][1].draw(lpos);
-				lpos.shift_x(middle_width);
-				current_width += middle_width;
+				int32_t current_width = middle_width;
+
+				while (current_width < rwidth)
+				{
+					textures[state][1].draw(lpos);
+					lpos.shift_x(middle_width);
+					current_width += middle_width;
+				}
 			}
 
 			textures[state][2].draw(lpos);

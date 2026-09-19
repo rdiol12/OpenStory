@@ -1466,6 +1466,18 @@ namespace ms
 		dimension = Point<int16_t>(top.width(), height + 120);
 	}
 
+	// The dialogue is always centred in the view, so re-derive it from the new
+	// viewport rather than leaving it where the previous one put it. dimension
+	// is (top.width(), height + 120), which is how change_text sized it.
+	void UINpcTalk::update_screen(int16_t new_width, int16_t new_height)
+	{
+		int16_t height = dimension.y() - 120;
+
+		position = Point<int16_t>(
+			new_width / 2 - dimension.x() / 2,
+			new_height / 2 - height / 2);
+	}
+
 	void UINpcTalk::set_number_bounds(int32_t def, int32_t lo, int32_t hi)
 	{
 		num_default = def;

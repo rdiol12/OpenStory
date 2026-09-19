@@ -95,6 +95,14 @@ namespace ms
 		T read()
 		{
 			size_t count = sizeof(T) / sizeof(int8_t);
+
+			// Check the whole read up front. skip() alone is too late: the
+			// byte at `pos` is loaded *before* skip() gets to reject it, so a
+			// truncated packet read one byte past the end of the receive
+			// buffer on its way to throwing.
+			if (count > length())
+				throw PacketError("Stack underflow at " + std::to_string(pos));
+
 			T all = 0;
 
 			for (size_t i = 0; i < count; i++)

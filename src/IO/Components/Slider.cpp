@@ -125,14 +125,23 @@ namespace ms
 		Point<int16_t> fill = Point<int16_t>(0, vertical.length() + buttonheight - 2);
 		DrawArgument base_arg = DrawArgument(Point<int16_t>(base_pos.x(), base_pos.y() + 1), fill);
 
+		// A zero-height base texture would never advance maxheight and would spin
+		// here forever, hanging the client with no error. That is reachable in
+		// practice: the slider's node is named at runtime ("VScr" + type), so an
+		// asset pack missing one variant yields a null texture rather than a
+		// load failure, and height() is then 0.
 		int16_t height = dbase.height();
-		int16_t maxheight = vertical.first() + height;
 
-		while (maxheight < vertical.second())
+		if (height > 0)
 		{
-			dbase.draw(position + Point<int16_t>(start.x(), maxheight));
+			int16_t maxheight = vertical.first() + height;
 
-			maxheight += height;
+			while (maxheight < vertical.second())
+			{
+				dbase.draw(position + Point<int16_t>(start.x(), maxheight));
+
+				maxheight += height;
+			}
 		}
 
 		if (enabled)
@@ -288,8 +297,15 @@ namespace ms
 			next.set_state(Button::State::NORMAL);
 		}
 
-		if (cursor.y() < vertical.second())
+		if (cursor.y() < vertical.second() && rowheight > 0)
 		{
+			// rowheight is 0 whenever there is nothing to scroll (rowmax <= 0)
+			// and also when the track is shorter than the row count, since it
+			// is an integer division by rowmax. Dividing by it produced inf (or
+			// NaN for a click exactly on the first row), and converting a
+			// non-finite double to int16_t is undefined behaviour -- the
+			// resulting row index is whatever the hardware happens to saturate
+			// to. Nothing to page towards in that state anyway.
 			if (pressed)
 			{
 				auto yoffset = static_cast<double>(relative.y() - buttonheight * 2);

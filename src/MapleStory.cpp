@@ -34,8 +34,203 @@
 #include "Util/WzFiles.h"
 #endif
 
+// macOS (not iOS) only: everything below is compiled away on Windows, Linux
+// and the iOS port, which keep their existing behaviour byte for byte.
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if !TARGET_OS_IPHONE
+#define MS_MACOS_DATA_RESOLVER 1
+
+#include <CoreFoundation/CoreFoundation.h>
+#include <mach-o/dyld.h>
+
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <climits>
+#include <cstdlib>
+#include <fstream>
+#include <string>
+#include <vector>
+#endif
+#endif
+
 namespace ms
 {
+#ifdef MS_MACOS_DATA_RESOLVER
+	// Filled in when the data directory could not be resolved, so the startup
+	// error can name every path that was tried instead of just "Missing a game
+	// file: Base.nx".
+	std::string startup_diagnostic;
+
+	namespace
+	{
+		// A directory qualifies if it holds the first file NxFiles wants.
+		bool is_data_directory(const std::string& dir)
+		{
+			if (dir.empty())
+				return false;
+
+			struct stat st;
+
+			return stat((dir + "/Base.nx").c_str(), &st) == 0 && S_ISREG(st.st_mode);
+		}
+
+		std::string parent_of(const std::string& path)
+		{
+			size_t slash = path.find_last_of('/');
+
+			if (slash == std::string::npos)
+				return "";
+
+			return slash == 0 ? "/" : path.substr(0, slash);
+		}
+
+		// Directory holding the running executable, resolved through symlinks.
+		std::string executable_directory()
+		{
+			char raw[PATH_MAX];
+			uint32_t size = sizeof(raw);
+
+			if (_NSGetExecutablePath(raw, &size) != 0)
+				return "";
+
+			char resolved[PATH_MAX];
+
+			return parent_of(realpath(raw, resolved) != nullptr ? resolved : raw);
+		}
+
+		std::string current_directory()
+		{
+			char buffer[PATH_MAX];
+
+			return getcwd(buffer, sizeof(buffer)) != nullptr ? std::string(buffer) : std::string();
+		}
+
+		// First non-empty line of a text file, trimmed.
+		std::string read_path_file(const std::string& path)
+		{
+			std::ifstream file(path);
+			std::string line;
+
+			while (std::getline(file, line))
+			{
+				size_t end = line.find_last_not_of(" \t\r\n");
+
+				if (end != std::string::npos)
+					return line.substr(0, end + 1);
+			}
+
+			return "";
+		}
+	}
+
+	// The client resolves every runtime path against the working directory -
+	// the .nx assets, the "Settings" file, "buddymemo.txt", "screenshots/" and
+	// the crash log. From a terminal the developer supplies that by cd'ing into
+	// wz/, but a double-clicked .app is started in "/" instead and there is no
+	// Info.plist key for "start me in this folder". So pick the directory here
+	// and move into it before anything else touches the filesystem.
+	//
+	// Search order (first directory containing Base.nx wins) - keep this in
+	// step with resource/macos/README.md:
+	//   1. $OPENSTORY_DATA_DIR
+	//   2. the current working directory  (every existing terminal workflow
+	//      keeps working unchanged: if the cwd is already right, this is a
+	//      no-op and nothing below is even considered)
+	//   3. the directory holding the executable
+	//   -- inside an .app bundle only:
+	//   4. the path written in Contents/Resources/DataDirectory
+	//   5. Contents/Resources/data
+	//   6. ~/Library/Application Support/OpenStory
+	//   7. the folder containing the .app
+	void chdir_to_data_directory()
+	{
+		std::vector<std::string> candidates;
+
+		if (const char* env = std::getenv("OPENSTORY_DATA_DIR"))
+			if (env[0] != '\0')
+				candidates.emplace_back(env);
+
+		candidates.push_back(current_directory());
+
+		const std::string exe_dir = executable_directory();
+
+		if (!exe_dir.empty())
+		{
+			candidates.push_back(exe_dir);
+
+			// .../OpenStory.app/Contents/MacOS -> .../OpenStory.app/Contents
+			const std::string contents = parent_of(exe_dir);
+			const bool bundled = exe_dir.size() > 15
+				&& exe_dir.compare(exe_dir.size() - 15, 15, "/Contents/MacOS") == 0;
+
+			if (bundled)
+			{
+				const std::string recorded = read_path_file(contents + "/Resources/DataDirectory");
+
+				if (!recorded.empty())
+					candidates.push_back(recorded);
+
+				candidates.push_back(contents + "/Resources/data");
+			}
+
+			if (const char* home = std::getenv("HOME"))
+				if (home[0] != '\0')
+					candidates.push_back(std::string(home) + "/Library/Application Support/OpenStory");
+
+			// .../OpenStory.app/Contents -> the folder holding OpenStory.app
+			if (bundled)
+				candidates.push_back(parent_of(parent_of(contents)));
+		}
+
+		for (const std::string& candidate : candidates)
+		{
+			if (!is_data_directory(candidate))
+				continue;
+
+			// Canonical path: the client writes back into this directory, and
+			// relative paths (screenshots/, crashlog.txt) should be stable.
+			char resolved[PATH_MAX];
+			const std::string target = realpath(candidate.c_str(), resolved) != nullptr
+				? std::string(resolved) : candidate;
+
+			if (chdir(target.c_str()) == 0)
+				return;
+		}
+
+		// Nothing found. Leave the working directory alone - NxFiles::init()
+		// reports the missing file - but record where we looked so the failure
+		// is not a mystery.
+		startup_diagnostic = "No game data found. Looked in:\n";
+
+		for (const std::string& candidate : candidates)
+			startup_diagnostic += "  - " + candidate + "\n";
+
+		startup_diagnostic += "\nSet OPENSTORY_DATA_DIR to the folder holding Base.nx"
+			" and the other .nx files.";
+	}
+
+	// Startup errors have nowhere to go when the app is launched from Finder:
+	// there is no console, and the retry prompt below reads std::cin, which is
+	// immediately at EOF. Put the message on screen instead.
+	void show_startup_alert(const std::string& text)
+	{
+		CFStringRef message = CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
+
+		if (message == nullptr)
+			return;
+
+		// Bounded timeout rather than 0 (= wait forever): without a window
+		// server to draw the alert this must not hang.
+		CFUserNotificationDisplayAlert(120.0, kCFUserNotificationStopAlertLevel,
+			nullptr, nullptr, nullptr, CFSTR("OpenStory could not start"), message,
+			CFSTR("Quit"), nullptr, nullptr, nullptr);
+
+		CFRelease(message);
+	}
+#endif
+
 	Error init()
 	{
 		std::cout << "[Init] Connecting to server..." << std::endl;
@@ -190,6 +385,26 @@ namespace ms
 		{
 			std::cerr << "[Error] " << error.get_message() << error.get_args() << std::endl;
 
+#ifdef MS_MACOS_DATA_RESOLVER
+			if (!startup_diagnostic.empty())
+				std::cerr << startup_diagnostic << std::endl;
+
+			// No console to prompt on (launched from Finder, or stdin piped):
+			// offering an interactive retry would just read EOF and exit
+			// without ever telling the user what went wrong.
+			if (!isatty(STDIN_FILENO))
+			{
+				std::string message = std::string(error.get_message()) + error.get_args();
+
+				if (!startup_diagnostic.empty())
+					message += "\n\n" + startup_diagnostic;
+
+				show_startup_alert(message);
+
+				return;
+			}
+#endif
+
 			bool can_retry = error.can_retry();
 
 			if (can_retry)
@@ -216,6 +431,13 @@ namespace ms
 
 int main()
 {
+#ifdef MS_MACOS_DATA_RESOLVER
+	// Has to be the very first thing that runs: Configuration is a lazily
+	// constructed singleton that reads "Settings" out of the working
+	// directory, and install_crash_logger() below writes crashlog.txt there.
+	ms::chdir_to_data_directory();
+#endif
+
 	ms::install_crash_logger();
 	ms::HardwareInfo();
 	ms::ScreenResolution();

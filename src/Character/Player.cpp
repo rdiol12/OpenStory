@@ -94,8 +94,11 @@ namespace ms
 		keysdown.clear();
 		attacking = false;
 		ladder = nullptr;
-		chair_itemid = 0;
-		chair_anim = Animation();
+		// Go through set_chair(0) rather than zeroing chair_itemid by hand:
+		// it also clears chair_anim_front and, crucially, sit_offset. Char::draw
+		// adds sit_offset unconditionally, so leaving it set after leaving a
+		// chair via a portal drew the body offset for the rest of the session.
+		set_chair(0);
 		nullstate.update_state(*this);
 	}
 
@@ -244,6 +247,7 @@ namespace ms
 		}
 
 		climb_cooldown.update();
+		update_cooldowns();
 
 		if (chair_itemid > 0)
 		{
@@ -629,6 +633,36 @@ namespace ms
 			return false;
 
 		return iter->second > 0;
+	}
+
+	// Cooldowns arrive from the server in whole seconds, both from ADD_COOLDOWN
+	// and from the character data at login. Nothing counted them down, so any
+	// skill the server reported as cooling stayed blocked for the rest of the
+	// session and printed "You cannot use this skill as it is on cooldown" on
+	// every press.
+	void Player::update_cooldowns()
+	{
+		if (cooldowns.empty())
+			return;
+
+		cooldown_elapsed += Constants::TIMESTEP;
+
+		if (cooldown_elapsed < 1000)
+			return;
+
+		int32_t seconds = cooldown_elapsed / 1000;
+		cooldown_elapsed %= 1000;
+
+		for (auto iter = cooldowns.begin(); iter != cooldowns.end(); )
+		{
+			if (iter->second <= seconds)
+				iter = cooldowns.erase(iter);
+			else
+			{
+				iter->second -= seconds;
+				++iter;
+			}
+		}
 	}
 
 	void Player::change_level(uint16_t level)

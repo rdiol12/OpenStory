@@ -92,6 +92,7 @@ namespace ms
 
 		void draw(float inter) const override;
 		void update() override;
+		void update_screen(int16_t new_width, int16_t new_height) override;
 		void set_position(Point<int16_t> pos);
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;

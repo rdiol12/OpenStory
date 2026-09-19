@@ -90,7 +90,14 @@ namespace ms
 		constexpr uint16_t MAX_NAME_WIDTH = 97;
 		size_t overhang = 3;
 
-		while (name_text.width() > MAX_NAME_WIDTH)
+		// Each pass removes (overhang - 2) characters while overhang itself
+		// grows, so the length falls away faster than the cut does: 20 chars
+		// goes 20, 19, 17, 14, 10, 5 against an overhang of 3, 4, 5, 6, 7, 8.
+		// Once overhang passes the remaining length, end() - overhang is an
+		// iterator before begin() and replace() corrupts the heap. Only the
+		// width test stopped that, and it stops late for any name whose glyphs
+		// are wider than Latin -- which this fork can now render.
+		while (name_text.width() > MAX_NAME_WIDTH && overhang < namestr.size())
 		{
 			namestr.replace(namestr.end() - overhang, namestr.end(), "..");
 			overhang += 1;
@@ -706,7 +713,25 @@ namespace ms
 
 	void UISkillBook::update_skills(int32_t skill_id)
 	{
+		// change_tab() rebuilds the list and deliberately scrolls back to the
+		// top, which is right when the player actually switches tab. Spending a
+		// skill point is not a tab change -- it comes through here with the tab
+		// unchanged -- so restore the scroll position afterwards, otherwise the
+		// list jumps to the first row on every point spent.
+		uint16_t previous = offset;
+
 		change_tab(tab);
+
+		uint16_t maxoffset = skillcount > ROWS ? skillcount - ROWS : 0;
+
+		if (previous > maxoffset)
+			previous = maxoffset;
+
+		if (previous != offset)
+		{
+			change_offset(previous);
+			slider.setrows(previous, ROWS, skillcount);
+		}
 	}
 
 	void UISkillBook::change_job(uint16_t id)

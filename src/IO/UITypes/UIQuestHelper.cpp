@@ -24,9 +24,11 @@
 #include "../../Graphics/Geometry.h"
 #include "../../Audio/Audio.h"
 #include "../../Configuration.h"
+#include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 
+#include <algorithm>
 #include <sstream>
 
 #ifdef USE_NX
@@ -239,6 +241,23 @@ namespace ms
 
 		expanded_dimension = dimension;
 		dragarea = Point<int16_t>(dimension.x(), 15);
+
+		// PosQUESTHELPER's stock default of (560,100) is an 800x600-era
+		// coordinate: at 1280x720 it drops the helper right into the middle of
+		// the play area. Configuration entries are static strings and cannot
+		// express anything resolution-relative, so treat the untouched default
+		// as "unset" and anchor to the top right instead. A position the user
+		// has actually dragged (anything other than the stock value) wins.
+		{
+			static const Point<int16_t> STOCK_DEFAULT(560, 100);
+
+			if (position == STOCK_DEFAULT)
+			{
+				int16_t vw = Constants::Constants::get().get_viewwidth();
+				position = Point<int16_t>(
+					std::max<int16_t>(0, vw - dimension.x() - 16), 90);
+			}
+		}
 
 		// Button positions
 		Point<int16_t> bg_origin = bg_min.is_valid() ? bg_min.get_origin() : Point<int16_t>();
@@ -633,7 +652,7 @@ namespace ms
 			else
 			{
 				dragged = false;
-				Setting<PosQUESTHELPER>::get().save(position);
+				save_drag_position();
 			}
 		}
 		else if (clicking)

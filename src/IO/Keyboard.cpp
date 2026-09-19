@@ -15,7 +15,13 @@
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
+// PLATFORM_MACOS / PLATFORM_IOS are decided here; this has to come before the
+// checks below or every platform looks like a desktop GLFW build.
+#include "../../platform/shared/PlatformConfig.h"
+
 #include "Keyboard.h"
+
+#include "KeyConfig.h"
 
 #ifdef PLATFORM_IOS
 #include "KeyCodes.h"
@@ -23,8 +29,27 @@
 #include <glfw3.h>
 #endif
 
+// Optional input instrumentation, gated by OPENSTORY_KEYDEBUG. See
+// key_debug_enabled() below and the comment on its declaration in Keyboard.h.
+#include <cstdlib>
+#include <iostream>
+
 namespace ms
 {
+	bool key_debug_enabled()
+	{
+		// Read once: get_mapping() is on the per-keypress path.
+		static const bool enabled = []()
+		{
+			const char* flag = std::getenv("OPENSTORY_KEYDEBUG");
+
+			// Anything except unset, empty and "0" turns the traces on.
+			return flag != nullptr && flag[0] != '\0' && !(flag[0] == '0' && flag[1] == '\0');
+		}();
+
+		return enabled;
+	}
+
 	constexpr int32_t Keytable[90] =
 	{
 		0, 0, // 1
@@ -76,15 +101,76 @@ namespace ms
 		123,124,125,  0,  0,126					 // 96
 	};
 
+	// MapleStory's key config models Ctrl, Shift and Alt as a single key each --
+	// UIKeyConfig binds and clears the left and right halves together -- but the
+	// server's key layout only ever names one half (29 LCtrl, 42 LShift, 56 LAlt
+	// in the default v83 layout). GLFW reports the two halves as different
+	// keycodes, so a binding has to be installed on both or the right-hand key
+	// silently does nothing.
+	//
+	// On macOS this is what makes the difference between jumping and not. A PC
+	// keyboard has Alt immediately left of the space bar, which is where every
+	// v83 player's thumb goes for JUMP. On Mac hardware that physical position
+	// is the Command key, and GLFW reports it as GLFW_KEY_LEFT_SUPER/RIGHT_SUPER
+	// -- a keycode that appears nowhere in Keytable, so it resolves to no
+	// mapping at all. Option, one key further out, is the key GLFW reports as
+	// GLFW_KEY_LEFT_ALT. Aliasing Command onto the Alt binding makes both the
+	// key that is labelled Alt and the key that sits where Alt sits work.
+
+	// The maple keycode of the other half of a paired modifier, or 0.
+	static uint8_t paired_maple_key(uint8_t key)
+	{
+		switch (key)
+		{
+		case KeyConfig::Key::LEFT_CONTROL:	return KeyConfig::Key::RIGHT_CONTROL;
+		case KeyConfig::Key::RIGHT_CONTROL:	return KeyConfig::Key::LEFT_CONTROL;
+		case KeyConfig::Key::LEFT_SHIFT:	return KeyConfig::Key::RIGHT_SHIFT;
+		case KeyConfig::Key::RIGHT_SHIFT:	return KeyConfig::Key::LEFT_SHIFT;
+		case KeyConfig::Key::LEFT_ALT:		return KeyConfig::Key::RIGHT_ALT;
+		case KeyConfig::Key::RIGHT_ALT:		return KeyConfig::Key::LEFT_ALT;
+		default:							return 0;
+		}
+	}
+
+	// Writes 'mapping' to every GLFW keycode that should answer for maple key
+	// 'key': the key itself, the other half of the pair when the server left it
+	// unbound, and on macOS the Command keys when 'key' is an Alt.
+	void Keyboard::apply_to_aliases(uint8_t key, const Mapping& mapping)
+	{
+		// A maple keycode is a byte, but Keytable only defines 90 entries. The
+		// KEYMAP handler happens to loop 0..89, but the quickslot layout does
+		// not: MiscHandlers reads eight raw bytes off the wire into
+		// set_quickslot_keys(), and UIStatusBar::clear_quickslot() feeds one of
+		// them straight back here when the player clears a quickslot. A server
+		// sending anything >= 90 in that packet reads past the end of the
+		// table and binds whatever it finds there.
+		if (key >= std::size(Keytable))
+			return;
+
+		keymap[Keytable[key]] = mapping;
+
+		if (uint8_t pair = paired_maple_key(key))
+		{
+			// Only when the server has not bound that half itself -- its own
+			// binding is authoritative and must not be overwritten here.
+			if (!maplekeys.count(pair))
+				keymap[Keytable[pair]] = mapping;
+		}
+
+#ifdef PLATFORM_MACOS
+		if (key == KeyConfig::Key::LEFT_ALT || key == KeyConfig::Key::RIGHT_ALT)
+		{
+			// Nothing in Keytable ever produces these, so they are free to use.
+			keymap[GLFW_KEY_LEFT_SUPER] = mapping;
+			keymap[GLFW_KEY_RIGHT_SUPER] = mapping;
+		}
+#endif
+	}
+
 	Keyboard::Keyboard()
 	{
-		keymap[GLFW_KEY_LEFT] = Mapping(KeyType::Id::ACTION, KeyAction::Id::LEFT);
-		keymap[GLFW_KEY_RIGHT] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RIGHT);
-		keymap[GLFW_KEY_UP] = Mapping(KeyType::Id::ACTION, KeyAction::Id::UP);
-		keymap[GLFW_KEY_DOWN] = Mapping(KeyType::Id::ACTION, KeyAction::Id::DOWN);
-		keymap[GLFW_KEY_ENTER] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RETURN);
-		keymap[GLFW_KEY_KP_ENTER] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RETURN);
-		keymap[GLFW_KEY_TAB] = Mapping(KeyType::Id::ACTION, KeyAction::Id::TAB);
+		init_client_keys();
+		init_default_bindings();
 
 		textactions[GLFW_KEY_BACKSPACE] = KeyAction::Id::BACK;
 		textactions[GLFW_KEY_ENTER] = KeyAction::Id::RETURN;
@@ -100,6 +186,42 @@ namespace ms
 		// Cosmic's QuickslotBinding::DEFAULT_QUICKSLOTS:
 		// LShift, Insert, Home, PgUp / LCtrl, Delete, End, PgDn
 		quickslotkeys = { 42, 82, 71, 73, 29, 83, 79, 81 };
+	}
+
+	void Keyboard::init_client_keys()
+	{
+		keymap[GLFW_KEY_LEFT] = Mapping(KeyType::Id::ACTION, KeyAction::Id::LEFT);
+		keymap[GLFW_KEY_RIGHT] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RIGHT);
+		keymap[GLFW_KEY_UP] = Mapping(KeyType::Id::ACTION, KeyAction::Id::UP);
+		keymap[GLFW_KEY_DOWN] = Mapping(KeyType::Id::ACTION, KeyAction::Id::DOWN);
+		keymap[GLFW_KEY_ENTER] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RETURN);
+		keymap[GLFW_KEY_KP_ENTER] = Mapping(KeyType::Id::ACTION, KeyAction::Id::RETURN);
+		keymap[GLFW_KEY_TAB] = Mapping(KeyType::Id::ACTION, KeyAction::Id::TAB);
+	}
+
+	// Journey seeded only the arrow keys and left everything else to the
+	// server's KEYMAP packet, so a character whose layout never arrives -- or
+	// whose layout leaves a slot unbound -- has no jump and no attack at all.
+	// v83 ships a default layout for exactly this case; these are its action
+	// keys, and they match UIKeyConfig's own default table. A KEYMAP packet
+	// clears them (see Keyboard::clear_bindings) before installing the
+	// character's real layout, so a server-supplied layout still wins outright
+	// and behaviour with a server that sends one is unchanged.
+	void Keyboard::init_default_bindings()
+	{
+		assign(KeyConfig::Key::LEFT_CONTROL, KeyType::Id::ACTION, KeyAction::Id::ATTACK);
+		assign(KeyConfig::Key::LEFT_ALT, KeyType::Id::ACTION, KeyAction::Id::JUMP);
+		assign(KeyConfig::Key::RIGHT_ALT, KeyType::Id::ACTION, KeyAction::Id::JUMP);
+		assign(KeyConfig::Key::Z, KeyType::Id::ACTION, KeyAction::Id::PICKUP);
+		assign(KeyConfig::Key::X, KeyType::Id::ACTION, KeyAction::Id::SIT);
+	}
+
+	void Keyboard::clear_bindings()
+	{
+		keymap.clear();
+		maplekeys.clear();
+
+		init_client_keys();
 	}
 
 	void Keyboard::set_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys)
@@ -163,7 +285,11 @@ namespace ms
 		{
 			Mapping mapping = Mapping(type, action);
 
-			keymap[Keytable[key]] = mapping;
+			apply_to_aliases(key, mapping);
+
+			// maplekeys stays exactly as the server sent it: it is what
+			// UIKeyConfig displays and what gets saved back, so the aliases
+			// above must not show up there as bindings nobody asked for.
 			maplekeys[key] = mapping;
 		}
 	}
@@ -172,7 +298,8 @@ namespace ms
 	{
 		Mapping mapping = Mapping(KeyType::Id::NONE, 0);
 
-		keymap[Keytable[key]] = mapping;
+		apply_to_aliases(key, mapping);
+
 		maplekeys[key] = mapping;
 	}
 
@@ -216,7 +343,21 @@ namespace ms
 		auto iter = keymap.find(keycode);
 
 		if (iter == keymap.end())
+		{
+			// Raw GLFW keycode that resolved to no binding at all.
+			if (key_debug_enabled())
+				std::cout << "[KEYPROBE] glfw=" << keycode << " -> NO MAPPING" << std::endl;
+
 			return Mapping(KeyType::Id::NONE, 0);
+		}
+
+		// Raw GLFW keycode -> type/action actually resolved.
+		if (key_debug_enabled())
+			std::cout << "[KEYPROBE] glfw=" << keycode
+				<< " -> type=" << static_cast<int32_t>(iter->second.type)
+				<< " action=" << iter->second.action
+				<< (iter->second.action == KeyAction::Id::JUMP && iter->second.type == KeyType::Id::ACTION ? "  (JUMP)" : "")
+				<< std::endl;
 
 		return iter->second;
 	}

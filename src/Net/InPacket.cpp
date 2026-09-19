@@ -88,7 +88,9 @@ namespace ms
 	{
 		std::string ret;
 
-		for (int16_t i = 0; i < count; i++)
+		// The counter must be unsigned: `count` is a uint16_t straight off the
+		// wire, so a length above 32767 overflowed a signed counter.
+		for (uint16_t i = 0; i < count; i++)
 		{
 			char letter = read_byte();
 

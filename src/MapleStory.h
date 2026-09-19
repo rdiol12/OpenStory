@@ -18,7 +18,11 @@
 #pragma once
 
 // If defined use Asio for networking, otherwise use Winsock.
-//#define USE_ASIO
+// Winsock only exists on Windows, so every other platform needs Asio.
+// PlatformConfig.h may have defined this already; don't redefine it.
+#if !defined(_WIN32) && !defined(USE_ASIO)
+#define USE_ASIO
+#endif
 
 // Use cryptography for communication with the server
 #define USE_CRYPTO

@@ -96,6 +96,13 @@ namespace ms
 	void MapMobs::clear()
 	{
 		mobs.clear();
+
+		// A queued spawn (or a kill still waiting for its cancelling spawn)
+		// belongs to the map it arrived on. clear() runs on the map change
+		// before the new map loads, so anything still pending here is stale —
+		// left in place, an old map's mob materialised on the new one.
+		spawns = {};
+		pending_kills.clear();
 	}
 
 	void MapMobs::set_control(int32_t oid, bool control)

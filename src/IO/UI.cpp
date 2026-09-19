@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UI.h"
 
+#include <vector>
+
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
@@ -109,6 +111,21 @@ namespace ms
 
 	void UI::change_state(State id)
 	{
+		// Replacing the state destroys every element it owns, and with them any
+		// Textfield they contain. focusedtextfield is a bare pointer into one of
+		// those, and nothing in the destruction path unfocuses it -- only
+		// Textfield::set_state(DISABLED) does, which is never reached here. Left
+		// dangling it is dereferenced by the very next key event
+		// (send_key -> focusedtextfield->get_state()).
+		//
+		// Reachable on every transition that can happen with a field focused:
+		// the PIC/PIN box at character select when SetField arrives
+		// (SetFieldHandlers.cpp:161), the chat input on a return to login
+		// (UIStateGame.cpp), and leaving the cash shop (UICashShop.cpp:586).
+		// Cleared before the new state is built so that a constructor which
+		// focuses a field of its own is not clobbered.
+		focusedtextfield = {};
+
 		switch (id)
 		{
 			case State::LOGIN:
@@ -156,7 +173,45 @@ namespace ms
 			// The window lost input focus
 			Sound::set_sfxvolume(0);
 			Music::set_bgmvolume(0);
+
+			// The OS delivers no key-up for a key that was still held when
+			// focus went away, so without this every such key stays latched
+			// "down" for the rest of the session. That silently breaks the
+			// combos read out of `is_key_down`: a stuck ENTER makes every
+			// later ALT press match the Alt+Enter fullscreen branch in
+			// send_key() and return before reaching the keymap, which reads
+			// as "movement works but jump does nothing". Held movement keys
+			// likewise keep the character walking.
+			//
+			// Not macOS-specific — Alt+Tab does the same on Windows — but
+			// Cmd+Tab and Mission Control make it constant here.
+			release_held_keys();
 		}
+	}
+
+	void UI::release_held_keys()
+	{
+		// Snapshot, then clear BEFORE dispatching: send_key() reads
+		// `is_key_down` for its Alt+Enter and caps-lock branches, and an
+		// alt+enter pair latched at focus-loss would otherwise toggle
+		// fullscreen on the way out.
+		std::vector<int32_t> held;
+
+		for (const auto& entry : is_key_down)
+			if (entry.second)
+				held.push_back(entry.first);
+
+		is_key_down.clear();
+
+		// Route a real release for each one so downstream state unlatches
+		// too — player movement, textfield repeat, and anything else that
+		// pairs a press with a release.
+		for (int32_t keycode : held)
+			send_key(keycode, false);
+
+		// A button still down when focus was lost never gets its mouse-up
+		// either, which otherwise leaves a drag stuck to the cursor.
+		mouse_held = false;
 	}
 
 	void UI::send_scroll(double yoffset)

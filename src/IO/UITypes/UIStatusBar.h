@@ -49,6 +49,7 @@ namespace ms
 
 		void draw(float alpha) const override;
 		void update() override;
+		void update_screen(int16_t new_width, int16_t new_height) override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
@@ -309,5 +310,62 @@ namespace ms
 		void draw_tiled_panel(Point<int16_t> tl, int16_t panel_w, int16_t panel_h,
 			const Texture& top, const Texture& mid, const Texture& bot,
 			float fade_alpha) const;
+
+		// ============================================================
+		// Stock-v83 (StatusBar.img) layout
+		// ============================================================
+		// Which artwork generation this NX build ships decides the whole
+		// layout. `StatusBar2.img/mainBar` is the post-Big-Bang toolbar
+		// (Cosmic's customised UI.nx ships it); stock v83 UI.wz only has
+		// `StatusBar.img`. NoLifeNx returns a null node for a missing
+		// path instead of throwing, so every StatusBar2 lookup silently
+		// yielded an empty Texture and the bar rendered as nothing but
+		// its text labels. The flag is decided by probing for the node,
+		// never by hardcoding a version, so the same binary still picks
+		// the richer layout if later-version art is supplied.
+		bool v83_layout = false;
+
+		void build_v83();
+		// Recomputes every width-dependent v83 position. Cheap, and re-run
+		// from update() whenever the logical view width changes, so an
+		// in-game resolution change re-anchors the bar instead of leaving
+		// right-edge elements where the old viewport put them.
+		void layout_v83();
+		void draw_v83(float alpha) const;
+		// Text-row replacement for the Menu / System pop-ups: stock v83
+		// ships no artwork for them, so the rows are AreaButtons drawn as
+		// labels over a flat backdrop.
+		void draw_v83_list(const uint16_t* ids, size_t count,
+			const char* const* labels, Point<int16_t> topleft, float fade) const;
+		// Shared between both layouts: icons + key captions on the open
+		// quickslot panel.
+		void draw_quickslot_cells() const;
+
+		// Bar-local (x, y) -> offset from `position`, for the 800x71 v83 bar
+		// anchored to the bottom-left corner of the view.
+		Point<int16_t> v83_at(int16_t lx, int16_t ly) const;
+
+		Texture v83_backgrnd;      // base/backgrnd, stretched to view width
+		Texture v83_gauge_track;   // gauge/graduation - the three empty tracks
+		Texture v83_gauge_labels;  // top strip of gauge/bar - HP / MP / EXP captions
+		Texture v83_notice_box;    // base/box - frame for the notice indicator
+		Texture v83_icon_memo;     // base/iconMemo - idle notice indicator
+		Texture v83_icon_red;      // base/iconRed - pending notice indicator
+		Animation v83_hp_flash;    // gauge/hpFlash
+		Animation v83_mp_flash;    // gauge/mpFlash
+		Animation v83_stat_ani;    // StatKey/ani - blinks while AP is unspent
+		Animation v83_skill_ani;   // SkillKey/ani - blinks while SP is unspent
+		mutable Text v83_menu_label;
+
+		// View width the current v83 positions were computed for (-1 = never).
+		int16_t v83_laid_out_width = -1;
+		// Bar-local anchors filled in by layout_v83().
+		Point<int16_t> v83_gauge_pos;
+		Point<int16_t> v83_statkey_pos;
+		Point<int16_t> v83_skillkey_pos;
+		Point<int16_t> v83_notice_pos;
+		Point<int16_t> v83_quickslot_pos;
+		Point<int16_t> v83_menu_list_pos;
+		Point<int16_t> v83_sys_list_pos;
 	};
 }

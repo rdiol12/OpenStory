@@ -52,3 +52,10 @@ __pycache__/
 /docs/images/hat1.png
 /docs/images/onemore.png
 /docs/images/swordflame.png
+
+# macOS build tree
+/build-macos
+
+# ...but the .app bundle's build inputs are source, not build output
+# (the blanket *.cmake rule above would otherwise swallow this one).
+!resource/macos/make_icns.cmake

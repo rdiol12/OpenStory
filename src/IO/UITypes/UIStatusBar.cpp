@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <vector>
 
 #include "../../Configuration.h"
@@ -63,6 +64,7 @@
 
 #include "../UI.h"
 
+#include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Character/ExpTable.h"
@@ -97,6 +99,119 @@ namespace ms
 	static constexpr int16_t QS_CELL_H   = 28;
 	static constexpr int16_t QS_COL_STEP = 33;
 	static constexpr int16_t QS_ROW_STEP = 33;
+
+	// === Stock-v83 (StatusBar.img) geometry ===============================
+	// All offsets are "bar-local": measured from the top-left corner of the
+	// 800x71 `base/backgrnd` strip, which is anchored to the bottom-left of
+	// the view. The art splits into a white chat row (y 3..29) above a
+	// blue-grey instrument row (y 34..70), so the two button sizes v83 ships
+	// (28x20 icons and 54x34 plates) each have a row that fits them.
+	static constexpr int16_t V83_BAR_H      = 71;
+	static constexpr int16_t V83_CHATROW_Y  = 5;   // top of the 19/20px chat-row controls
+	static constexpr int16_t V83_BAND_Y     = 34;  // top of the instrument row
+	static constexpr int16_t V83_EDGE_PAD   = 8;
+
+	// `gauge/bar` is one 340x31 sheet: rows 0..14 hold the HP / MP / EXP
+	// captions and rows 15..30 the three coloured fills, side by side. The
+	// x/width pairs below were measured off the sheet's alpha runs.
+	static constexpr int16_t V83_GAUGE_W    = 340;
+	static constexpr int16_t V83_GAUGE_H    = 31;
+	static constexpr int16_t V83_FILL_Y     = 15;
+	static constexpr int16_t V83_FILL_H     = 16;
+	static constexpr int16_t V83_HP_X       = 2,   V83_HP_W  = 105;
+	static constexpr int16_t V83_MP_X       = 110, V83_MP_W  = 105;
+	static constexpr int16_t V83_EXP_X      = 223, V83_EXP_W = 115;
+
+	// Where the gauge sheet sits inside the bar (left of it: level, name, job).
+	static constexpr int16_t V83_GAUGE_BX   = 156;
+	static constexpr int16_t V83_GAUGE_BY   = 37;
+	static constexpr int16_t V83_TEXT_X     = 10;
+	static constexpr int16_t V83_NAME_Y     = 34;
+	static constexpr int16_t V83_JOB_Y      = 50;
+
+	static constexpr int16_t V83_BIG_W      = 54, V83_BIG_H   = 34, V83_BIG_STEP   = 56;
+	static constexpr int16_t V83_SMALL_W    = 28, V83_SMALL_H = 20, V83_SMALL_STEP = 30;
+	static constexpr int16_t V83_SMALL_N    = 6;  // Stat, Inven, Equip, Skill, KeySet, QuickSlot
+
+	// Quickslot cube grid, measured off `base/quickSlot` (151x80): the frame
+	// rules sit at x 6/40/75/110/144 and y 7/40/72, leaving 32x30 interiors.
+	static constexpr int16_t QS83_CELL_OFFSET_X = 7;
+	static constexpr int16_t QS83_CELL_OFFSET_Y = 8;
+	static constexpr int16_t QS83_CELL_W   = 32;
+	static constexpr int16_t QS83_CELL_H   = 30;
+	static constexpr int16_t QS83_COL_STEP = 35;
+	static constexpr int16_t QS83_ROW_STEP = 34;
+	static constexpr int16_t QS83_PANEL_W  = 151;
+	static constexpr int16_t QS83_PANEL_H  = 80;
+
+	// Text-row pop-up metrics (stock v83 ships no Menu/System panel art).
+	static constexpr int16_t V83_ROW_H    = 18;
+	static constexpr int16_t V83_LIST_W   = 118;
+	static constexpr int16_t V83_LIST_PAD = 4;
+
+	// `StatusBar.img/number` names its punctuation glyphs "Lbracket",
+	// "Rbracket", "slash" and "percent"; Charset keys every glyph by the
+	// FIRST character of its node name, so it can only look them up as
+	// 'L', 'R', 's' and 'p'. Rewriting the display string is enough - the
+	// digits keep their own names and nothing collides.
+	static std::string v83_numstr(const std::string& text)
+	{
+		std::string out;
+		out.reserve(text.size());
+
+		for (char c : text)
+		{
+			switch (c)
+			{
+			case '[': out.push_back('L'); break;
+			case ']': out.push_back('R'); break;
+			case '/': out.push_back('s'); break;
+			case '%': out.push_back('p'); break;
+			default:  out.push_back(c);   break;
+			}
+		}
+
+		return out;
+	}
+
+	// Copies a sub-rectangle out of an NX bitmap into a standalone Texture.
+	// Needed because v83 packs the three gauge fills into one sheet, while
+	// the shared Gauge component wants one texture per gauge. `key` names the
+	// atlas slot, so repeated construction of the status bar reuses it.
+	static Texture v83_crop(nl::node src, const std::string& key,
+		int16_t x, int16_t y, int16_t w, int16_t h)
+	{
+		if (src.data_type() != nl::node::type::bitmap)
+			return Texture();
+
+		nl::bitmap bmp = src.get_bitmap();
+
+		if (!bmp)
+			return Texture();
+
+		auto sw = static_cast<int32_t>(bmp.width());
+		auto sh = static_cast<int32_t>(bmp.height());
+
+		if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > sw || y + h > sh)
+			return Texture();
+
+		// data() decompresses on the fly and invalidates any pointer handed
+		// out earlier, so the copy has to finish before the next call.
+		const auto* pixels = static_cast<const uint8_t*>(bmp.data());
+
+		if (!pixels)
+			return Texture();
+
+		std::vector<uint8_t> out(static_cast<size_t>(w) * h * 4);
+
+		for (int16_t row = 0; row < h; row++)
+			std::memcpy(
+				out.data() + static_cast<size_t>(row) * w * 4,
+				pixels + (static_cast<size_t>(y + row) * sw + x) * 4,
+				static_cast<size_t>(w) * 4);
+
+		return Texture::from_pixels(key, w, h, std::move(out), Point<int16_t>(0, 0));
+	}
 
 	// Short display name for a maple/DIK quickslot keycode (drawn on each cube).
 	static std::string qs_keyname(uint8_t code)
@@ -148,6 +263,13 @@ namespace ms
 		nl::node mainbar = nl::nx::ui["StatusBar2.img"]["mainBar"];
 		nl::node chat = nl::nx::ui["StatusBar2.img"]["chat"];
 
+		// Node probe, not a version check: stock v83 UI.wz has no
+		// StatusBar2.img at all, and NoLifeNx answers a missing path with a
+		// null node rather than an error, so every lookup below would quietly
+		// produce an empty Texture. Falling back to StatusBar.img keeps the
+		// bar drawn on v83 assets while later-version art still wins here.
+		v83_layout = !mainbar || mainbar.size() == 0;
+
 		has_notification = false;
 		notice_pulse_tick = 0;
 
@@ -159,6 +281,26 @@ namespace ms
 		hp_flash_ticks = 0;
 		mp_flash_ticks = 0;
 		exp_flash_ticks = 0;
+
+		// === Labels ===
+		// Shared by both layouts: the fonts are compiled into the binary, so
+		// these keep working whatever the NX build ships.
+		joblabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW);
+		namelabel = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE);
+		// Bold white key label drawn in each quickslot cube's corner.
+		qs_key_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE);
+		v83_menu_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
+
+		// The quickslot key caps live in StatusBar.img in every build.
+		nl::node keynames = nl::nx::ui["StatusBar.img"]["key"];
+		for (int i = 0; i < 8; i++)
+			qs_key_sprites[i] = keynames[std::to_string(i)];
+
+		if (v83_layout)
+		{
+			build_v83();
+			return;
+		}
 
 		// === Background ===
 		bar_backgrnd = Texture(mainbar["backgrnd"]);
@@ -245,16 +387,6 @@ namespace ms
 		// === Charsets ===
 		statset = Charset(gauge_node["number"], Charset::Alignment::RIGHT);
 		levelset = Charset(mainbar["lvNumber"], Charset::Alignment::LEFT);
-
-		// === Labels ===
-		joblabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW);
-		namelabel = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE);
-		// Bold white key label drawn in each quickslot cube's corner.
-		qs_key_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE);
-
-		nl::node keynames = nl::nx::ui["StatusBar.img"]["key"];
-		for (int i = 0; i < 8; i++)
-			qs_key_sprites[i] = keynames[std::to_string(i)];
 
 		// === Gauge animations ===
 		ani_hp_gauge = Animation(mainbar["aniHPGauge"]);
@@ -452,6 +584,359 @@ namespace ms
 		}
 	}
 
+	// =====================================================================
+	// Stock-v83 layout (UI.wz/StatusBar.img)
+	// =====================================================================
+
+	namespace
+	{
+		// Pop-up row captions, in draw order. The ids they pair with are the
+		// existing BT_MENU_* / BT_SYS_* buttons, so button_pressed() already
+		// knows what each row opens; only the artwork changes.
+		const char* const V83_MENU_LABELS[] = {
+			"Stats", "Skills", "Quests", "Inventory", "Equipment",
+			"Buddy List", "Event", "Ranking", "Monster Book", "Messenger",
+			"Monster Battle", "Monster Life"
+		};
+
+		const char* const V83_SYS_LABELS[] = {
+			"Change Channel", "Joypad", "Keyboard Setting", "Options", "Quit Game"
+		};
+	}
+
+	Point<int16_t> UIStatusBar::v83_at(int16_t lx, int16_t ly) const
+	{
+		// `position` is (512, VHEIGHT); the v83 bar's top-left corner is the
+		// bottom-left corner of the view, V83_BAR_H above the baseline.
+		return Point<int16_t>(static_cast<int16_t>(lx - 512),
+		                      static_cast<int16_t>(ly - V83_BAR_H));
+	}
+
+	void UIStatusBar::build_v83()
+	{
+		nl::node sb = nl::nx::ui["StatusBar.img"];
+		nl::node base = sb["base"];
+		nl::node gauge = sb["gauge"];
+
+		v83_backgrnd     = Texture(base["backgrnd"]);
+		v83_gauge_track  = Texture(gauge["graduation"]);
+		v83_notice_box   = Texture(base["box"]);
+		v83_icon_memo    = Texture(base["iconMemo"]);
+		v83_icon_red     = Texture(base["iconRed"]);
+
+		// Split the single 340x31 `gauge/bar` sheet into the caption strip
+		// plus one fill texture per gauge, then hand each fill to the shared
+		// Gauge component (single-texture ctor stretches it to the percentage).
+		nl::node barnode = gauge["bar"];
+
+		v83_gauge_labels = v83_crop(barnode, "sb83/labels", 0, 0, V83_GAUGE_W, V83_FILL_Y);
+
+		hpbar = Gauge(Gauge::Type::GAME,
+			v83_crop(barnode, "sb83/hp", V83_HP_X, V83_FILL_Y, V83_HP_W, V83_FILL_H),
+			V83_HP_W, 0.0f);
+		mpbar = Gauge(Gauge::Type::GAME,
+			v83_crop(barnode, "sb83/mp", V83_MP_X, V83_FILL_Y, V83_MP_W, V83_FILL_H),
+			V83_MP_W, 0.0f);
+		expbar = Gauge(Gauge::Type::GAME,
+			v83_crop(barnode, "sb83/exp", V83_EXP_X, V83_FILL_Y, V83_EXP_W, V83_FILL_H),
+			V83_EXP_W, 0.0f);
+
+		v83_hp_flash = Animation(gauge["hpFlash"]);
+		v83_mp_flash = Animation(gauge["mpFlash"]);
+
+		// RIGHT alignment so the readouts end flush with each gauge's tip.
+		statset = Charset(sb["number"], Charset::Alignment::RIGHT);
+
+		// The quickslot frame with the key captions baked in.
+		quickslot_bg = Texture(base["quickSlot"]);
+		quickslot_bg_v83 = true;
+
+		// --- chat-row icon buttons -------------------------------------
+		buttons[BT_STATS]      = std::make_unique<MapleButton>(sb["StatKey"]);
+		buttons[BT_INVENTORY]  = std::make_unique<MapleButton>(sb["InvenKey"]);
+		buttons[BT_EQUIPS]     = std::make_unique<MapleButton>(sb["EquipKey"]);
+		buttons[BT_SKILL]      = std::make_unique<MapleButton>(sb["SkillKey"]);
+		buttons[BT_KEYSETTING] = std::make_unique<MapleButton>(sb["KeySet"]);
+		buttons[BT_QS_OPEN]    = std::make_unique<MapleButton>(sb["QuickSlot"]);
+		buttons[BT_QS_CLOSE]   = std::make_unique<MapleButton>(sb["QuickSlotD"]);
+		buttons[BT_QS_CLOSE]->set_active(false);
+
+		buttons[BT_CALLGM]  = std::make_unique<MapleButton>(sb["BtClaim"]);
+		buttons[BT_WHISPER] = std::make_unique<MapleButton>(sb["BtWhisper"]);
+
+		// AP / SP blink overlays; v83 ships them as the buttons' `ani` state.
+		v83_stat_ani  = Animation(sb["StatKey"]["ani"]);
+		v83_skill_ani = Animation(sb["SkillKey"]["ani"]);
+
+		// --- instrument-row plates -------------------------------------
+		// MENU and SHORTCUT open the two text pop-ups; SHOP and TRADE map
+		// straight onto the cash shop and MTS, matching their captions.
+		buttons[BT_MENU]     = std::make_unique<MapleButton>(sb["BtMenu"]);
+		buttons[BT_CASHSHOP] = std::make_unique<MapleButton>(sb["BtShop"]);
+		buttons[BT_OPTIONS]  = std::make_unique<MapleButton>(sb["BtShort"]);
+		buttons[BT_TRADE]    = std::make_unique<MapleButton>(sb["BtNPT"]);
+
+		// --- notice indicator ------------------------------------------
+		// `base/box` is a 42x19 two-cell frame; the left cell doubles as the
+		// notification drawer's button.
+		buttons[BT_NOTICE] = std::make_unique<AreaButton>(
+			Point<int16_t>(0, 0), Point<int16_t>(21, 19));
+
+		// --- pop-up rows -----------------------------------------------
+		// Stock v83 has no Menu/System panel artwork, so the rows are
+		// hit-boxes drawn as text by draw_v83_list().
+		for (uint16_t id = BT_MENU_STAT; id <= BT_MENU_MONSTERLIFE; id++)
+		{
+			buttons[id] = std::make_unique<AreaButton>(
+				Point<int16_t>(0, 0), Point<int16_t>(V83_LIST_W, V83_ROW_H));
+			buttons[id]->set_active(false);
+		}
+
+		for (uint16_t id : { BT_SYS_CHANNEL, BT_SYS_JOYPAD, BT_SYS_KEYSETTING,
+			BT_SYS_OPTION, BT_SYS_GAMEQUIT })
+		{
+			buttons[id] = std::make_unique<AreaButton>(
+				Point<int16_t>(0, 0), Point<int16_t>(V83_LIST_W, V83_ROW_H));
+			buttons[id]->set_active(false);
+		}
+
+		layout_v83();
+	}
+
+	void UIStatusBar::layout_v83()
+	{
+		int16_t vwidth = Constants::Constants::get().get_viewwidth();
+		v83_laid_out_width = vwidth;
+
+		// The four 54x34 plates hug the right edge of the instrument row.
+		int16_t big_x = static_cast<int16_t>(
+			vwidth - V83_EDGE_PAD - (4 * V83_BIG_W + 3 * (V83_BIG_STEP - V83_BIG_W)));
+		int16_t big_y = V83_BAND_Y + 1;
+
+		buttons[BT_MENU]    ->set_position(v83_at(big_x,                    big_y));
+		buttons[BT_CASHSHOP]->set_position(v83_at(big_x + V83_BIG_STEP,     big_y));
+		buttons[BT_OPTIONS] ->set_position(v83_at(big_x + V83_BIG_STEP * 2, big_y));
+		buttons[BT_TRADE]   ->set_position(v83_at(big_x + V83_BIG_STEP * 3, big_y));
+
+		// The six 28x20 icons sit on the chat row, right-aligned above them.
+		int16_t small_x = static_cast<int16_t>(
+			vwidth - V83_EDGE_PAD
+			- (V83_SMALL_N * V83_SMALL_W + (V83_SMALL_N - 1) * (V83_SMALL_STEP - V83_SMALL_W)));
+
+		const uint16_t icon_order[V83_SMALL_N] = {
+			BT_STATS, BT_INVENTORY, BT_EQUIPS, BT_SKILL, BT_KEYSETTING, BT_QS_OPEN
+		};
+
+		for (int16_t i = 0; i < V83_SMALL_N; i++)
+			buttons[icon_order[i]]->set_position(
+				v83_at(static_cast<int16_t>(small_x + i * V83_SMALL_STEP), V83_CHATROW_Y));
+
+		// The close arrow replaces the open arrow in the same cell.
+		buttons[BT_QS_CLOSE]->set_position(
+			v83_at(static_cast<int16_t>(small_x + (V83_SMALL_N - 1) * V83_SMALL_STEP), V83_CHATROW_Y));
+
+		v83_statkey_pos  = v83_at(small_x, V83_CHATROW_Y);
+		v83_skillkey_pos = v83_at(static_cast<int16_t>(small_x + 3 * V83_SMALL_STEP), V83_CHATROW_Y);
+
+		int16_t claim_x   = static_cast<int16_t>(small_x - 8 - 20);
+		int16_t whisper_x = static_cast<int16_t>(claim_x - 3 - 12);
+		int16_t box_x     = static_cast<int16_t>(whisper_x - 6 - 42);
+
+		buttons[BT_CALLGM] ->set_position(v83_at(claim_x,   V83_CHATROW_Y));
+		buttons[BT_WHISPER]->set_position(v83_at(whisper_x, V83_CHATROW_Y));
+		buttons[BT_NOTICE] ->set_position(v83_at(box_x,     V83_CHATROW_Y));
+		v83_notice_pos = v83_at(box_x, V83_CHATROW_Y);
+
+		v83_gauge_pos = v83_at(V83_GAUGE_BX, V83_GAUGE_BY);
+
+		// Quickslot panel floats just above the bar, under its toggle button.
+		v83_quickslot_pos = v83_at(
+			static_cast<int16_t>(vwidth - V83_EDGE_PAD - QS83_PANEL_W),
+			static_cast<int16_t>(-QS83_PANEL_H - 2));
+
+		// Pop-up columns grow upward from the top edge of the bar.
+		constexpr size_t MENU_ROWS = BT_MENU_MONSTERLIFE - BT_MENU_STAT + 1;
+		constexpr size_t SYS_ROWS = 5;
+
+		int16_t menu_top = static_cast<int16_t>(
+			-(static_cast<int16_t>(MENU_ROWS) * V83_ROW_H) - V83_LIST_PAD * 2 - 2);
+		int16_t sys_top = static_cast<int16_t>(
+			-(static_cast<int16_t>(SYS_ROWS) * V83_ROW_H) - V83_LIST_PAD * 2 - 2);
+
+		// Each column hangs under the plate that opens it, pulled back inside
+		// the right edge when that would overflow the view.
+		constexpr int16_t LIST_TOTAL_W = V83_LIST_W + V83_LIST_PAD * 2;
+		auto clamp_list_x = [&](int16_t x)
+		{
+			return std::min<int16_t>(x, static_cast<int16_t>(vwidth - V83_EDGE_PAD - LIST_TOTAL_W));
+		};
+
+		v83_menu_list_pos = v83_at(clamp_list_x(big_x), menu_top);
+		v83_sys_list_pos = v83_at(
+			clamp_list_x(static_cast<int16_t>(big_x + V83_BIG_STEP * 2)), sys_top);
+
+		for (size_t i = 0; i < MENU_ROWS; i++)
+			buttons[static_cast<uint16_t>(BT_MENU_STAT + i)]->set_position(
+				v83_menu_list_pos
+				+ Point<int16_t>(V83_LIST_PAD,
+					static_cast<int16_t>(V83_LIST_PAD + i * V83_ROW_H)));
+
+		const uint16_t sys_order[SYS_ROWS] = {
+			BT_SYS_CHANNEL, BT_SYS_JOYPAD, BT_SYS_KEYSETTING, BT_SYS_OPTION, BT_SYS_GAMEQUIT
+		};
+
+		for (size_t i = 0; i < SYS_ROWS; i++)
+			buttons[sys_order[i]]->set_position(
+				v83_sys_list_pos
+				+ Point<int16_t>(V83_LIST_PAD,
+					static_cast<int16_t>(V83_LIST_PAD + i * V83_ROW_H)));
+	}
+
+	void UIStatusBar::draw_v83_list(const uint16_t* ids, size_t count,
+		const char* const* labels, Point<int16_t> topleft, float fade) const
+	{
+		if (fade <= 0.0f || count == 0)
+			return;
+
+		Point<int16_t> tl = position + topleft;
+		auto panel_h = static_cast<int16_t>(count * V83_ROW_H + V83_LIST_PAD * 2);
+
+		ColorBox backdrop(static_cast<int16_t>(V83_LIST_W + V83_LIST_PAD * 2), panel_h,
+			Color::Name::BLACK, 0.82f * fade);
+		backdrop.draw(DrawArgument(tl));
+
+		for (size_t i = 0; i < count; i++)
+		{
+			auto row_tl = tl + Point<int16_t>(V83_LIST_PAD,
+				static_cast<int16_t>(V83_LIST_PAD + i * V83_ROW_H));
+
+			auto iter = buttons.find(ids[i]);
+
+			if (iter != buttons.end() && iter->second
+				&& iter->second->get_state() == Button::State::MOUSEOVER)
+			{
+				ColorBox hover(V83_LIST_W, V83_ROW_H, Color::Name::WHITE, 0.22f * fade);
+				hover.draw(DrawArgument(row_tl));
+			}
+
+			v83_menu_label.change_text(labels[i]);
+			v83_menu_label.draw(DrawArgument(row_tl + Point<int16_t>(5, 1), fade));
+		}
+	}
+
+	void UIStatusBar::draw_v83(float alpha) const
+	{
+		int16_t vwidth = Constants::Constants::get().get_viewwidth();
+
+		// Quickslot panel first so the bar composites over anything that
+		// bleeds into it.
+		if (show_quickslot && quickslot_bg.is_valid())
+			quickslot_bg.draw(DrawArgument(position + v83_quickslot_pos));
+
+		if (show_quickslot)
+			draw_quickslot_cells();
+
+		// The 800x71 strip is a plain horizontal gradient, so stretching it
+		// across a wider view is seamless.
+		if (v83_backgrnd.is_valid())
+			v83_backgrnd.draw(DrawArgument(
+				position + v83_at(0, 0), Point<int16_t>(vwidth, V83_BAR_H)));
+
+		Point<int16_t> gauge_tl = position + v83_gauge_pos;
+
+		if (v83_gauge_track.is_valid())
+			v83_gauge_track.draw(DrawArgument(gauge_tl));
+
+		if (v83_gauge_labels.is_valid())
+			v83_gauge_labels.draw(DrawArgument(gauge_tl));
+
+		Point<int16_t> hp_tl = gauge_tl + Point<int16_t>(V83_HP_X, V83_FILL_Y);
+		Point<int16_t> mp_tl = gauge_tl + Point<int16_t>(V83_MP_X, V83_FILL_Y);
+		Point<int16_t> exp_tl = gauge_tl + Point<int16_t>(V83_EXP_X, V83_FILL_Y);
+
+		hpbar.draw(hp_tl);
+		mpbar.draw(mp_tl);
+		expbar.draw(exp_tl);
+
+		// Low-HP / low-MP blink, thresholds from System -> Options.
+		float hp_warn = Setting<HPWarning>::get().load() / 100.0f;
+		float mp_warn = Setting<MPWarning>::get().load() / 100.0f;
+
+		if (gethppercent() < hp_warn || hp_flash_ticks > 0)
+			v83_hp_flash.draw(DrawArgument(hp_tl - Point<int16_t>(2, 1)), alpha);
+
+		if (getmppercent() < mp_warn || mp_flash_ticks > 0)
+			v83_mp_flash.draw(DrawArgument(mp_tl - Point<int16_t>(2, 1)), alpha);
+
+		// Readouts, right-aligned inside each gauge.
+		int32_t hp = stats.get_stat(MapleStat::Id::HP);
+		int32_t mp = stats.get_stat(MapleStat::Id::MP);
+		int32_t maxhp = stats.get_total(EquipStat::Id::HP);
+		int32_t maxmp = stats.get_total(EquipStat::Id::MP);
+		int64_t exp = stats.get_exp();
+
+		constexpr int16_t NUM_INSET = 3;
+		constexpr int16_t NUM_Y = 5;
+
+		statset.draw(
+			v83_numstr("[" + std::to_string(hp) + "/" + std::to_string(maxhp) + "]"),
+			hp_tl + Point<int16_t>(V83_HP_W - NUM_INSET, NUM_Y));
+		statset.draw(
+			v83_numstr("[" + std::to_string(mp) + "/" + std::to_string(maxmp) + "]"),
+			mp_tl + Point<int16_t>(V83_MP_W - NUM_INSET, NUM_Y));
+
+		std::string expstring = std::to_string(100 * getexppercent());
+		statset.draw(
+			v83_numstr(std::to_string(exp) + "["
+				+ expstring.substr(0, expstring.find('.') + 3) + "%]"),
+			exp_tl + Point<int16_t>(V83_EXP_W - NUM_INSET, NUM_Y));
+
+		// Name and "Lv.N Job" fill the empty space left of the gauges.
+		namelabel.draw(position + v83_at(V83_TEXT_X, V83_NAME_Y));
+		joblabel.draw(position + v83_at(V83_TEXT_X, V83_JOB_Y));
+
+		UIElement::draw_buttons(alpha);
+
+		// The notice frame sits behind its (art-less) AreaButton.
+		if (v83_notice_box.is_valid())
+			v83_notice_box.draw(DrawArgument(position + v83_notice_pos));
+
+		const Texture& notice_icon = has_notification ? v83_icon_red : v83_icon_memo;
+
+		if (notice_icon.is_valid())
+			notice_icon.draw(DrawArgument(position + v83_notice_pos
+				+ Point<int16_t>(4, static_cast<int16_t>((19 - notice_icon.height()) / 2))));
+
+		// v83 blinks the Stat / Skill shortcut icons while points are unspent.
+		if (stats.get_stat(MapleStat::Id::AP) > 0)
+			v83_stat_ani.draw(DrawArgument(position + v83_statkey_pos), alpha);
+
+		if (stats.get_stat(MapleStat::Id::SP) > 0)
+			v83_skill_ani.draw(DrawArgument(position + v83_skillkey_pos), alpha);
+
+		// Pop-ups last so they sit over everything else in the bar.
+		constexpr size_t MENU_ROWS = BT_MENU_MONSTERLIFE - BT_MENU_STAT + 1;
+		uint16_t menu_ids[MENU_ROWS];
+
+		for (size_t i = 0; i < MENU_ROWS; i++)
+			menu_ids[i] = static_cast<uint16_t>(BT_MENU_STAT + i);
+
+		draw_v83_list(menu_ids, MENU_ROWS, V83_MENU_LABELS,
+			v83_menu_list_pos, menu_fade);
+
+		static const uint16_t sys_ids[] = {
+			BT_SYS_CHANNEL, BT_SYS_JOYPAD, BT_SYS_KEYSETTING, BT_SYS_OPTION, BT_SYS_GAMEQUIT
+		};
+
+		draw_v83_list(sys_ids, 5, V83_SYS_LABELS, v83_sys_list_pos, sys_fade);
+	}
+
+	void UIStatusBar::update_screen(int16_t, int16_t)
+	{
+		if (v83_layout)
+			layout_v83();
+	}
+
 	void UIStatusBar::update_boss_hp(const std::string& name, int8_t percent)
 	{
 		// 0% (or below) means the boss died / the tag cleared — hide the gauge.
@@ -478,6 +963,14 @@ namespace ms
 			Point<int16_t> boss_pos(
 				static_cast<int16_t>((vwidth - boss_gage.width()) / 2), 18);
 			boss_gage.draw(boss_pos, boss_hp_percent);
+		}
+
+		// Stock v83 assets need their own layout; everything below this point
+		// reads StatusBar2/StatusBar3 nodes that such a build does not ship.
+		if (v83_layout)
+		{
+			draw_v83(alpha);
+			return;
 		}
 
 		if (Stage::get().is_energy_active() && energy_bar_c.is_valid())
@@ -526,62 +1019,7 @@ namespace ms
 				quickslot_bg.draw(DrawArgument(bgpos));
 			}
 
-			const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
-			const auto& quickslot_keys = UI::get().get_keyboard().get_quickslot_keys();
-			constexpr int16_t CELL = 28; // visible cube size (see QS_CELL_W)
-			for (int16_t i = 0; i < static_cast<int16_t>(quickslot_keys.size()); ++i)
-			{
-				int32_t keycode = quickslot_keys[i];
-				Point<int16_t> tl = quickslot_slot_pos(i);
-
-				auto it = maplekeys.find(keycode);
-				bool bound = it != maplekeys.end()
-					&& it->second.type != KeyType::Id::NONE && it->second.action != 0;
-
-				if (bound)
-				{
-					Texture icon = get_quickslot_icon(it->second.type, it->second.action);
-					if (icon.is_valid())
-					{
-						// Fit the (32px) icon into the ~28px cube and centre it — its
-						// origin is already normalised to top-left by get_quickslot_icon.
-						Point<int16_t> dims = icon.get_dimensions();
-						float scale = 1.0f;
-						int16_t maxdim = std::max(dims.x(), dims.y());
-						if (maxdim > CELL)
-							scale = static_cast<float>(CELL) / static_cast<float>(maxdim);
-
-						int16_t dw = static_cast<int16_t>(dims.x() * scale);
-						int16_t dh = static_cast<int16_t>(dims.y() * scale);
-						Point<int16_t> pos(
-							static_cast<int16_t>(tl.x() + (CELL - dw) / 2),
-							static_cast<int16_t>(tl.y() + (CELL - dh) / 2 + QS_ICON_NUDGE_Y));
-						icon.draw(DrawArgument(pos, scale, scale, 1.0f));
-					}
-				}
-
-				// Key label for EVERY cube (even empty ones), so the player always
-				// knows which key fires each slot. Drawn from the real binding, so it
-				// stays correct after rebinding and on the blank panel. Bottom-left
-				// corner keeps it clear of the centred icon.
-				static const uint8_t defcodes[8] = { 42, 82, 71, 73, 29, 83, 79, 81 };
-				bool default_key = i < 8 && (static_cast<uint8_t>(keycode) == defcodes[i]
-					|| (i == 0 && keycode == 54) || (i == 4 && keycode == 157));
-
-				if (default_key && qs_key_sprites[i].is_valid())
-				{
-					qs_key_sprites[i].draw(tl + Point<int16_t>(1, CELL - 12 + QS_LABEL_NUDGE_Y));
-				}
-				else
-				{
-					qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
-
-					ColorBox label_bg(qs_key_label.width() + 4, 12, Color::Name::BLACK, 0.65f);
-					label_bg.draw(DrawArgument(tl + Point<int16_t>(0, CELL - 11 + QS_LABEL_NUDGE_Y)));
-
-					qs_key_label.draw(tl + Point<int16_t>(1, CELL - 13 + QS_LABEL_NUDGE_Y));
-				}
-			}
+			draw_quickslot_cells();
 		}
 
 		// Draw bar background at its natural anchor (position), extending
@@ -848,7 +1286,16 @@ namespace ms
 		int16_t VWIDTH = Constants::Constants::get().get_viewwidth();
 		int16_t VHEIGHT = Constants::Constants::get().get_viewheight();
 		position = Point<int16_t>(512, VHEIGHT);
-		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH), 84);
+		dimension = Point<int16_t>(std::max<int16_t>(1366, VWIDTH),
+			v83_layout ? V83_BAR_H : 84);
+
+		// Right-anchored v83 elements are positioned against the logical view
+		// width, so re-derive them whenever that changes. An in-game
+		// resolution change (Settings-driven on map entry, or the options
+		// menu) otherwise leaves every right-edge button where the previous
+		// viewport put it.
+		if (v83_layout && v83_laid_out_width != VWIDTH)
+			layout_v83();
 
 		UIElement::update();
 
@@ -927,7 +1374,14 @@ namespace ms
 		mpbar.update(cur_mp);
 
 		namelabel.change_text(stats.get_name());
-		joblabel.change_text(stats.get_jobname());
+
+		if (v83_layout)
+			// The v83 bar has no level plate, so the level rides along with
+			// the job on the second text row.
+			joblabel.change_text("Lv." + std::to_string(stats.get_stat(MapleStat::Id::LEVEL))
+				+ "  " + stats.get_jobname());
+		else
+			joblabel.change_text(stats.get_jobname());
 
 		// Update animations
 		ani_hp_gauge.update();
@@ -936,6 +1390,10 @@ namespace ms
 		sp_notify.update();
 		noncombat_notify.update();
 		alarm_anim.update();
+		v83_hp_flash.update();
+		v83_mp_flash.update();
+		v83_stat_ani.update();
+		v83_skill_ani.update();
 
 		// Pulse counter for notice sprite (only advances when active)
 		if (has_notification)
@@ -1160,9 +1618,10 @@ namespace ms
 
 		// Extend upward when menu, system sub-panel, or quick slot is open
 		int16_t extra_height = (show_menu || show_system || show_quickslot) ? 300 : 0;
+		int16_t bar_height = v83_layout ? V83_BAR_H : 84;
 
 		Rectangle<int16_t> bounds(
-			Point<int16_t>(0, position.y() - 84 - extra_height),
+			Point<int16_t>(0, position.y() - bar_height - extra_height),
 			Point<int16_t>(vwidth, position.y())
 		);
 
@@ -1290,8 +1749,79 @@ namespace ms
 
 	// === Quickslot drop / render ===
 
+	void UIStatusBar::draw_quickslot_cells() const
+	{
+		const auto& maplekeys = UI::get().get_keyboard().get_maplekeys();
+		const auto& quickslot_keys = UI::get().get_keyboard().get_quickslot_keys();
+
+		// Cube metrics and the nudges that centre art inside them differ per
+		// panel: the StatusBar2 frame has 28px cubes, the v83 one 32x30.
+		const int16_t cell_w = v83_layout ? QS83_CELL_W : QS_CELL_W;
+		const int16_t cell_h = v83_layout ? QS83_CELL_H : QS_CELL_H;
+		const int16_t icon_nudge = v83_layout ? 0 : QS_ICON_NUDGE_Y;
+		const int16_t label_nudge = v83_layout ? 0 : QS_LABEL_NUDGE_Y;
+
+		for (int16_t i = 0; i < static_cast<int16_t>(quickslot_keys.size()); ++i)
+		{
+			int32_t keycode = quickslot_keys[i];
+			Point<int16_t> tl = quickslot_slot_pos(i);
+
+			auto it = maplekeys.find(keycode);
+			bool bound = it != maplekeys.end()
+				&& it->second.type != KeyType::Id::NONE && it->second.action != 0;
+
+			if (bound)
+			{
+				Texture icon = get_quickslot_icon(it->second.type, it->second.action);
+				if (icon.is_valid())
+				{
+					// Fit the (32px) icon into the cube and centre it — its
+					// origin is already normalised to top-left by get_quickslot_icon.
+					Point<int16_t> dims = icon.get_dimensions();
+					float scale = 1.0f;
+					int16_t maxdim = std::max(dims.x(), dims.y());
+					int16_t fit = std::min(cell_w, cell_h);
+					if (maxdim > fit)
+						scale = static_cast<float>(fit) / static_cast<float>(maxdim);
+
+					int16_t dw = static_cast<int16_t>(dims.x() * scale);
+					int16_t dh = static_cast<int16_t>(dims.y() * scale);
+					Point<int16_t> pos(
+						static_cast<int16_t>(tl.x() + (cell_w - dw) / 2),
+						static_cast<int16_t>(tl.y() + (cell_h - dh) / 2 + icon_nudge));
+					icon.draw(DrawArgument(pos, scale, scale, 1.0f));
+				}
+			}
+
+			// Key label for EVERY cube (even empty ones), so the player always
+			// knows which key fires each slot. Drawn from the real binding, so it
+			// stays correct after rebinding and on the blank panel. Bottom-left
+			// corner keeps it clear of the centred icon.
+			static const uint8_t defcodes[8] = { 42, 82, 71, 73, 29, 83, 79, 81 };
+			bool default_key = i < 8 && (static_cast<uint8_t>(keycode) == defcodes[i]
+				|| (i == 0 && keycode == 54) || (i == 4 && keycode == 157));
+
+			if (default_key && qs_key_sprites[i].is_valid())
+			{
+				qs_key_sprites[i].draw(tl + Point<int16_t>(1, cell_h - 12 + label_nudge));
+			}
+			else
+			{
+				qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
+
+				ColorBox label_bg(qs_key_label.width() + 4, 12, Color::Name::BLACK, 0.65f);
+				label_bg.draw(DrawArgument(tl + Point<int16_t>(0, cell_h - 11 + label_nudge)));
+
+				qs_key_label.draw(tl + Point<int16_t>(1, cell_h - 13 + label_nudge));
+			}
+		}
+	}
+
 	Point<int16_t> UIStatusBar::quickslot_panel_pos() const
 	{
+		if (v83_layout)
+			return position + v83_quickslot_pos;
+
 		return position + Point<int16_t>(QS_PANEL_OFFSET_X, QS_PANEL_OFFSET_Y - QS_LIFT);
 	}
 
@@ -1299,6 +1829,11 @@ namespace ms
 	{
 		int16_t col = slot % 4;
 		int16_t row = slot / 4;
+
+		if (v83_layout)
+			return quickslot_panel_pos() + Point<int16_t>(QS83_CELL_OFFSET_X + col * QS83_COL_STEP,
+			                                              QS83_CELL_OFFSET_Y + row * QS83_ROW_STEP);
+
 		return quickslot_panel_pos() + Point<int16_t>(QS_CELL_OFFSET_X + col * QS_COL_STEP,
 		                                               QS_CELL_OFFSET_Y + row * QS_ROW_STEP);
 	}
@@ -1308,10 +1843,14 @@ namespace ms
 		if (!show_quickslot)
 			return -1;
 
+		Point<int16_t> cell = v83_layout
+			? Point<int16_t>(QS83_CELL_W, QS83_CELL_H)
+			: Point<int16_t>(QS_CELL_W, QS_CELL_H);
+
 		for (int16_t i = 0; i < 8; i++)
 		{
 			Point<int16_t> tl = quickslot_slot_pos(i);
-			Rectangle<int16_t> rect(tl, tl + Point<int16_t>(QS_CELL_W, QS_CELL_H));
+			Rectangle<int16_t> rect(tl, tl + cell);
 			if (rect.contains(cursorpos))
 				return i;
 		}

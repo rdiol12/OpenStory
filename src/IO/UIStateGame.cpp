@@ -21,6 +21,11 @@
 #include "UI.h"
 #include "../Constants.h"
 
+// Key-input tracing, off unless OPENSTORY_KEYDEBUG is set. See Keyboard.h.
+#include "Keyboard.h"
+
+#include <iostream>
+
 #include "UITypes/UIBuddyList.h"
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIClock.h"
@@ -217,10 +222,22 @@ namespace ms
 
 	void UIStateGame::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
+		// What reached the game state, and where it goes from here.
+		if (key_debug_enabled())
+			std::cout << "[KEYPROBE] UIStateGame::send_key type=" << static_cast<int32_t>(type)
+				<< " action=" << action
+				<< " pressed=" << pressed
+				<< " focused=" << static_cast<int32_t>(focused)
+				<< std::endl;
+
 		if (UIElement* focusedelement = get(focused))
 		{
 			if (focusedelement->is_active())
 			{
+				// Swallowed by a focused UI element, never reaches Stage.
+				if (key_debug_enabled())
+					std::cout << "[KEYPROBE]   -> swallowed by focused element" << std::endl;
+
 				return focusedelement->send_key(action, pressed, escape);
 			}
 			else
@@ -534,6 +551,11 @@ namespace ms
 							break;
 						}
 					}
+
+					// The path a JUMP has to take to reach the player.
+					if (key_debug_enabled())
+						std::cout << "[KEYPROBE]   -> Stage::send_key(ACTION, " << action
+							<< ", " << pressed << ")" << std::endl;
 
 					Stage::get().send_key(type, action, pressed);
 					break;
@@ -904,6 +926,17 @@ namespace ms
 
 		if (auto& element = elements[type])
 		{
+			// Same hazard for the window-drag pointer: `dragged` is a raw
+			// UIElement* that survives across frames for as long as the mouse
+			// button is held (send_cursor only clears it once the button comes
+			// up). Closing the window mid-drag -- ESC on an inventory the
+			// player is still holding, a server-driven close, or the status bar
+			// being rebuilt on a resolution change -- parks the element in the
+			// graveyard, update() frees it next tick, and the following cursor
+			// move calls dragged->send_cursor() on freed memory.
+			if (dragged == element.get())
+				dragged = nullptr;
+
 			element->deactivate();
 
 			// Park instead of deleting in place — remove() can be reached

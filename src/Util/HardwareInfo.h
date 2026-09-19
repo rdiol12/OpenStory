@@ -19,14 +19,28 @@
 
 #include "../Configuration.h"
 
+#ifdef _WIN32
 #include <Windows.h>
 #include <IPHlpApi.h>
+#else
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <cstring>
+#include <cstdint>
+#endif
 
 namespace ms
 {
 	class HardwareInfo
 	{
 	public:
+#ifdef _WIN32
 		HardwareInfo()
 		{
 			size_t size = 18;
@@ -120,5 +134,140 @@ namespace ms
 			free(hwid);
 			free(macs);
 		}
+#else
+		// macOS / POSIX. Produces exactly the same string formats the Windows
+		// path puts on the wire, because the v83 login packet carries them:
+		//   hwid   "%02X%02X%02X%02X%02X%02X"   (6 MAC bytes, no separator)
+		//   macs   "%02X-%02X-%02X-%02X-%02X-%02X"
+		//   serial 8 uppercase hex digits (Configuration::set_hwid slices it
+		//          into four 2-char parts, so it must be at least 8 long)
+		HardwareInfo()
+		{
+			uint8_t mac[6] = { 0, 0, 0, 0, 0, 0 };
+
+			if (!primary_mac(mac))
+			{
+				// Never hand the server an empty MAC — it is used for ban
+				// tracking and an empty value may be rejected. Fall back to a
+				// stable synthetic address in the locally-administered range
+				// (0x02 prefix) derived from the host identifier.
+				uint32_t h = host_hash();
+
+				mac[0] = 0x02;
+				mac[1] = 0x00;
+				mac[2] = static_cast<uint8_t>((h >> 24) & 0xFF);
+				mac[3] = static_cast<uint8_t>((h >> 16) & 0xFF);
+				mac[4] = static_cast<uint8_t>((h >> 8) & 0xFF);
+				mac[5] = static_cast<uint8_t>(h & 0xFF);
+			}
+
+			char hwid[18];
+			snprintf(hwid, sizeof(hwid), "%02X%02X%02X%02X%02X%02X",
+				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+			char macs[18];
+			snprintf(macs, sizeof(macs), "%02X-%02X-%02X-%02X-%02X-%02X",
+				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+			// Stand-in for the Windows volume serial: a stable 32-bit machine
+			// identifier rendered as 8 hex digits.
+			uint32_t serial = machine_serial(mac);
+
+			char volumeSerialNumber[9];
+			snprintf(volumeSerialNumber, sizeof(volumeSerialNumber), "%08X", serial);
+
+			Configuration::get().set_hwid(hwid, volumeSerialNumber);
+			Configuration::get().set_macs(macs);
+		}
+
+	private:
+		// FNV-1a, 32 bit.
+		static uint32_t fnv1a(const void* data, size_t len, uint32_t hash = 2166136261u)
+		{
+			const uint8_t* bytes = static_cast<const uint8_t*>(data);
+
+			for (size_t i = 0; i < len; i++)
+			{
+				hash ^= bytes[i];
+				hash *= 16777619u;
+			}
+
+			return hash;
+		}
+
+		// Host UUID is assigned by the OS and survives reboots. It can fail
+		// (EPERM under a sandbox), in which case the caller falls back to the
+		// MAC, which is also stable.
+		static uint32_t host_hash()
+		{
+			unsigned char uuid[16] = { 0 };
+			struct timespec wait = { 0, 0 };
+
+			if (gethostuuid(uuid, &wait) == 0)
+				return fnv1a(uuid, sizeof(uuid));
+
+			return 0;
+		}
+
+		static uint32_t machine_serial(const uint8_t (&mac)[6])
+		{
+			uint32_t h = host_hash();
+
+			if (h != 0)
+				return h;
+
+			return fnv1a(mac, 6);
+		}
+
+		// Picks the MAC of the primary interface: prefers en0 (the built-in
+		// Ethernet/Wi-Fi port on every Mac), otherwise the first non-loopback
+		// link-layer address with a 6-byte, non-zero hardware address.
+		static bool primary_mac(uint8_t (&out)[6])
+		{
+			struct ifaddrs* ifaddr = nullptr;
+
+			if (getifaddrs(&ifaddr) != 0 || ifaddr == nullptr)
+				return false;
+
+			bool found = false;
+
+			for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+			{
+				if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_LINK)
+					continue;
+
+				if (ifa->ifa_flags & IFF_LOOPBACK)
+					continue;
+
+				const struct sockaddr_dl* sdl =
+					reinterpret_cast<const struct sockaddr_dl*>(ifa->ifa_addr);
+
+				if (sdl->sdl_alen != 6)
+					continue;
+
+				const uint8_t* addr =
+					reinterpret_cast<const uint8_t*>(LLADDR(const_cast<struct sockaddr_dl*>(sdl)));
+
+				if (addr[0] == 0 && addr[1] == 0 && addr[2] == 0
+					&& addr[3] == 0 && addr[4] == 0 && addr[5] == 0)
+					continue;
+
+				bool is_en0 = ifa->ifa_name != nullptr && strcmp(ifa->ifa_name, "en0") == 0;
+
+				if (!found || is_en0)
+				{
+					memcpy(out, addr, 6);
+					found = true;
+				}
+
+				if (is_en0)
+					break;
+			}
+
+			freeifaddrs(ifaddr);
+
+			return found;
+		}
+#endif
 	};
 }

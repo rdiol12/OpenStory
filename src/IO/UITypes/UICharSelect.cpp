@@ -755,7 +755,14 @@ namespace ms
 
 		update_buttons();
 
-		if (characters_count > 1)
+		// The characters_count == 1 case used to call this unguarded. The
+		// constructor's own call is wrapped in exactly this check, and it is
+		// needed here too: an account that started with zero characters never
+		// reaches the corrective block there, so a DefaultCharacter left over
+		// from a different account is still in selected_character when the
+		// first character is created -- and update_selected_character()
+		// indexes charlooks/nametags/characters with it.
+		if (characters_count > 1 || selected_character >= characters_count)
 			select_last_slot();
 		else
 			update_selected_character();
@@ -814,7 +821,11 @@ namespace ms
 		{
 			case Buttons::CHARACTER_SELECT:
 			{
-				if (characters.size() > 0)
+				// A non-empty list is not the same as selected_character being a
+				// valid index into it: the index is seeded from the persisted
+				// DefaultCharacter setting and is also left behind by the slot
+				// buttons when the chosen slot turns out to be empty.
+				if (selected_character < characters.size())
 				{
 					Setting<DefaultCharacter>::get().save(selected_character);
 					int32_t id = characters[selected_character].id;
@@ -867,6 +878,9 @@ namespace ms
 			}
 			case Buttons::CHARACTER_DELETE:
 			{
+				if (selected_character >= characters.size())
+					break;
+
 				int32_t id = characters[selected_character].id;
 
 				switch (require_pic)

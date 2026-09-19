@@ -103,6 +103,8 @@ namespace ms
 		void add_cooldown(int32_t skill_id, int32_t time);
 		// Check if a skill is on cooldown
 		bool has_cooldown(int32_t skill_id) const;
+		// Count active cooldowns down; called once per timestep from update().
+		void update_cooldowns();
 
 		// Change the player's level, display the "level up" effect.
 		void change_level(uint16_t level);
@@ -176,7 +178,11 @@ namespace ms
 		ActiveBuffs active_buffs;
 		PassiveBuffs passive_buffs;
 
+		// Skill id -> remaining cooldown in whole seconds, as the server reports
+		// it. Counted down by update_cooldowns().
 		std::unordered_map<int32_t, int32_t> cooldowns;
+		// Milliseconds accumulated towards the next one-second tick.
+		int32_t cooldown_elapsed = 0;
 
 		std::map<KeyAction::Id, bool> keysdown;
 

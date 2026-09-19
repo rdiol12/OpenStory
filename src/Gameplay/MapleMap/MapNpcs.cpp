@@ -86,6 +86,11 @@ namespace ms
 	void MapNpcs::clear()
 	{
 		npcs.clear();
+
+		// A queued spawn belongs to the map it arrived on. clear() runs on the
+		// map change *before* the new map loads, so anything still queued here
+		// is stale -- left in place it materialised on the next map.
+		spawns = {};
 	}
 
 	MapObjects * MapNpcs::get_npcs()

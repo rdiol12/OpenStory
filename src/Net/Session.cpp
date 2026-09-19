@@ -74,11 +74,28 @@ namespace ms
 	{
 		if (pos == 0)
 		{
+			if (available < HEADER_LENGTH)
+				return;
+
 			// Position is zero, meaning this is the start of a new packet. Start by determining length.
 			length = cryptography.check_length(bytes);
 			// Reading the length means we processed the header. Move forward by the header length.
 			bytes = bytes + HEADER_LENGTH;
 			available -= HEADER_LENGTH;
+
+			// check_length sign-extends a 16-bit value through int16_t, so a
+			// corrupt or desynced header yields either 0 or (for anything with
+			// the high bit set) a huge size_t. A huge length makes the memcpy
+			// below accumulate past the end of `buffer`; a zero length makes
+			// process() recurse without consuming anything. Drop the rest of
+			// this read instead of doing either.
+			if (length == 0 || length > MAX_PACKET_LENGTH)
+			{
+				length = 0;
+				pos = 0;
+
+				return;
+			}
 		}
 
 		// Determine how much we can write. Write data into the buffer.
