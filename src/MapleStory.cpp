@@ -18,6 +18,7 @@
 #include <iostream>
 #include <thread>
 
+#include "Configuration.h"
 #include "Constants.h"
 #include "Gameplay/Stage.h"
 #include "Graphics/Text.h"
@@ -432,10 +433,19 @@ namespace ms
 int main()
 {
 #ifdef MS_MACOS_DATA_RESOLVER
-	// Has to be the very first thing that runs: Configuration is a lazily
-	// constructed singleton that reads "Settings" out of the working
-	// directory, and install_crash_logger() below writes crashlog.txt there.
+	// Has to be the very first thing that runs: install_crash_logger() below
+	// writes crashlog.txt into the working directory.
 	ms::chdir_to_data_directory();
+
+	// Configuration is NOT lazily constructed. Singleton keeps `instance` as a
+	// static data member (Template/Singleton.h), so it has static storage
+	// duration and its constructor -- which calls load() and reads "Settings"
+	// out of the working directory -- has already run before main() is
+	// entered. The chdir above is therefore always too late for it, and
+	// without this reload the client keeps the built-in defaults: launched
+	// from anywhere but the data directory it would sit forever trying to
+	// reach the default ServerIP. load() is documented as re-loadable.
+	ms::Configuration::get().load();
 #endif
 
 	ms::install_crash_logger();
