@@ -77,9 +77,7 @@ Supply your own local values for the placeholders. Keep them out of commits.
 
 ## Prepare assets and settings
 
-Supply compatible v83 NX data. Required names are listed in
-`src/Util/NxFiles.h`. Stage the v83 UI file as **`UI.nx`** and exclude the
-separate `UI_83.nx` file. Use separate source and staging directories.
+
 
 Prepare the packaging representation in a new output directory:
 
