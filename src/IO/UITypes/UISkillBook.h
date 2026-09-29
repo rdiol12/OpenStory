@@ -52,6 +52,7 @@ namespace ms
 		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
 
 		void update_stat(MapleStat::Id stat, int16_t value);
 		void update_skills(int32_t skill_id);

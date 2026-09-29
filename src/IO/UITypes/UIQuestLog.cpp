@@ -2619,6 +2619,53 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UIQuestLog::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		result.push_back({search.get_bounds()});
+		if (show_detail && selected_entry >= 0) {
+			auto anchor = position + Point<int16_t>(dimension.x()-3, 0);
+			if (detail_backgrnd.is_valid()) anchor -= detail_backgrnd.get_origin();
+			for (auto& target : result) switch (target.button) {
+			case Buttons::BT_DETAIL_CLOSE: case Buttons::BT_ACCEPT: case Buttons::BT_FINISH:
+			case Buttons::GIVEUP: case Buttons::MARK_NPC: case Buttons::BT_DELIVERY_ACCEPT: case Buttons::BT_DELIVERY_COMPLETE:
+				target.bounds = buttons.at(target.button)->bounds(anchor); break;
+			default: break;
+			}
+		}
+		int16_t y = LIST_Y;
+		if (tab == Buttons::TAB0) {
+			for (int i = 0; i < ROWS && offset+i < get_available_row_count(); ++i) {
+				int16_t entry;
+				auto type = get_row_type(offset+i, entry);
+				int16_t h = ROW_HEIGHT;
+				if (type == RowType::RECOMMEND_ENTRY && entry >= 0 && size_t(entry) < recommended_entries.size()) h = row_height_for(recommended_entries[entry]);
+				if (type == RowType::AVAILABLE_ENTRY && entry >= 0 && size_t(entry) < available_entries.size()) h = row_height_for(available_entries[entry]);
+				result.push_back({{position + Point<int16_t>(10,y), position + Point<int16_t>(260,y+h)}});
+				y += h;
+			}
+		} else {
+			const auto& entries = tab == Buttons::TAB1 ? active_entries : tab == Buttons::TAB3 ? weekly_entries : completed_entries;
+			const auto& layout = tab == Buttons::TAB1 ? active_row_layout : tab == Buttons::TAB3 ? weekly_row_layout : completed_row_layout;
+			for (size_t i = offset; i < layout.size() && y < LIST_Y+ROWS*ROW_HEIGHT; ++i) {
+				const int entry = layout[i];
+				if (entry < 0) { y += 8; continue; }
+				const int16_t h = size_t(entry) < entries.size() ? row_height_for(entries[entry]) : ROW_HEIGHT;
+				result.push_back({{position + Point<int16_t>(10,y), position + Point<int16_t>(260,y+h)}});
+				y += h;
+			}
+		}
+		return result;
+	}
+
+	void UIQuestLog::controller_activate(const ControllerTarget& target)
+	{
+		const Point<int16_t> center((target.bounds.left()+target.bounds.right())/2,
+			(target.bounds.top()+target.bounds.bottom())/2);
+		if (target.button < 0 && search.get_bounds().contains(center)) search.set_state(Textfield::FOCUSED);
+		else UIElement::controller_activate(target);
+	}
+
 	Cursor::State UIQuestLog::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
 		last_cursor_pos = cursorpos;

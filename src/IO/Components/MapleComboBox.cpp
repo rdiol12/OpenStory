@@ -36,6 +36,12 @@ namespace ms
 
 		nl::node src = nl::nx::ui["Basic.img"][combobox];
 
+		if (!src)
+		{
+			src = nl::nx::ui["Basic.img"]["ComboBox"];
+			type = Type::DEFAULT;
+		}
+
 		textures[Button::State::PRESSED][0] = src["pressed"][0];
 		textures[Button::State::PRESSED][1] = src["pressed"][1];
 		textures[Button::State::PRESSED][2] = src["pressed"][2];
@@ -97,9 +103,9 @@ namespace ms
 			lpos.shift_x(textures[state][0].width());
 
 			int16_t middle_width = textures[state][1].width();
-			int16_t current_width = middle_width;
+			int64_t current_width = middle_width;
 
-			while (current_width < rwidth)
+			while (middle_width > 0 && current_width < rwidth)
 			{
 				textures[state][1].draw(lpos);
 				lpos.shift_x(middle_width);

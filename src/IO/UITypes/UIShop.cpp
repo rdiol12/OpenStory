@@ -519,6 +519,30 @@ namespace ms
 			exit_shop();
 	}
 
+	std::vector<UIElement::ControllerTarget> UIShop::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (int row = 0; row < 9; ++row) {
+			const int16_t y = position.y() + 124 + row * 42;
+			if (row + buystate.offset < buystate.lastslot)
+				result.push_back({{int16_t(position.x()+buy_x), int16_t(position.x()+buy_width), y, int16_t(y+36)}});
+			if (row + sellstate.offset < sellstate.lastslot)
+				result.push_back({{int16_t(position.x()+sell_x), int16_t(position.x()+sell_x+sell_width), y, int16_t(y+36)}});
+		}
+		return result;
+	}
+
+	void UIShop::controller_activate(const ControllerTarget& target)
+	{
+		if (target.button >= 0) { UIElement::controller_activate(target); return; }
+		const auto center = Point<int16_t>((target.bounds.left()+target.bounds.right())/2,
+			(target.bounds.top()+target.bounds.bottom())/2) - position;
+		const auto row = slot_by_position(center.y());
+		if (row < 0 || row > 8) return;
+		if (center.x() < sell_x) { buystate.selection = row + buystate.offset; sellstate.selection = -1; }
+		else { sellstate.selection = row + sellstate.offset; buystate.selection = -1; }
+	}
+
 	UIElement::Type UIShop::get_type() const
 	{
 		return TYPE;

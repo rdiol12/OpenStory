@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include <stddef.h>
 
 #include <array>
 #include <stdint.h>

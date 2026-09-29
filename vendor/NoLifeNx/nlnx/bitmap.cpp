@@ -21,10 +21,19 @@
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <climits>
+#ifdef NLNX_STREAMING
+#include "file_impl.hpp"
+#endif
 
 namespace nl {
+#ifdef NLNX_STREAMING
+    bitmap::bitmap(void const * d, uint16_t w, uint16_t h, _file_data const* f) :
+        m_file(f), m_data(d), m_width(w), m_height(h) {}
+#else
     bitmap::bitmap(void const * d, uint16_t w, uint16_t h) :
         m_data(d), m_width(w), m_height(h) {}
+#endif
     bool bitmap::operator<(bitmap const & o) const {
         return m_data < o.m_data;
     }
@@ -38,6 +47,7 @@ namespace nl {
     void const * bitmap::data() const {
         if (!m_data)
             return nullptr;
+        if (uint64_t(m_width) * m_height * 4 > INT_MAX) return nullptr;
         auto const l = length();
         if (l + 0x20 > bitmap_buf.size())
             bitmap_buf.resize(l + 0x20);
@@ -48,9 +58,22 @@ namespace nl {
         // the compressed blob when it's wrong). On error we zero the buffer so a
         // bad bitmap draws blank instead of taking down the client.
         uint32_t clen;
+#ifdef NLNX_STREAMING
+        const uint64_t offset = *static_cast<uint64_t const*>(m_data);
+        if (!m_file->read(offset, &clen, sizeof(clen)) || clen > INT_MAX ||
+            clen > static_cast<uint32_t>(LZ4_compressBound(static_cast<int>(l))) ||
+            offset > m_file->size - 4 || clen > m_file->size - offset - 4) return nullptr;
+        // One reusable compressed buffer, matching the existing decompressed-buffer lifetime.
+        static std::vector<char> compressed;
+        compressed.resize(clen);
+        if (!m_file->read(offset + 4, compressed.data(), clen)) return nullptr;
+        const char* input = compressed.data();
+#else
         std::memcpy(&clen, m_data, sizeof(clen));
+        const char* input = 4 + reinterpret_cast<char const *>(m_data);
+#endif
         int const got = ::LZ4_decompress_safe(
-            4 + reinterpret_cast<char const *>(m_data),
+            input,
             bitmap_buf.data(),
             static_cast<int>(clen),
             static_cast<int>(l));

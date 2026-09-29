@@ -259,6 +259,20 @@ namespace ms
 	};
 
 	// IP Address which the client will connect to
+	struct OfflinePreview : public Configuration::BoolEntry
+	{
+#ifdef PLATFORM_PS5
+		OfflinePreview() : BoolEntry("OfflinePreview", "true") {}
+#else
+		OfflinePreview() : BoolEntry("OfflinePreview", "false") {}
+#endif
+	};
+
+	struct ServerConfigured : public Configuration::BoolEntry
+	{
+		ServerConfigured() : BoolEntry("ServerConfigured", "false") {}
+	};
+
 	struct ServerIP : public Configuration::StringEntry
 	{
 		ServerIP() : StringEntry("ServerIP", "127.0.0.1") {}

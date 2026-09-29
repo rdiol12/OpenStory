@@ -18,6 +18,7 @@
 #include "Gamepad.h"
 
 #include "UI.h"
+#include <algorithm>
 
 namespace ms
 {
@@ -69,228 +70,54 @@ namespace ms
 
 	void Gamepad::poll()
 	{
-		// Check connection
-		bool now_connected = glfwJoystickPresent(joystick_id) == GLFW_TRUE;
-
-		if (!now_connected)
-		{
-			if (connected)
-			{
-				connected = false;
-				name = "";
-			}
-
-			return;
+		const bool present = glfwJoystickPresent(joystick_id) == GLFW_TRUE;
+		connected = present;
+		const char* label = present ? glfwGetJoystickName(joystick_id) : nullptr;
+		name = label ? label : "";
+		GLFWgamepadstate state{};
+		if (present && !(glfwJoystickIsGamepad(joystick_id) && glfwGetGamepadState(joystick_id, &state))) {
+			int count = 0;
+			if (auto* raw = glfwGetJoystickButtons(joystick_id, &count))
+				for (int i = 0; i < std::min(count, 15); ++i) state.buttons[i] = raw[i];
+			if (auto* raw = glfwGetJoystickAxes(joystick_id, &count))
+				for (int i = 0; i < std::min(count, 2); ++i) state.axes[i] = raw[i];
 		}
-
-		if (!connected)
-		{
-			connected = true;
-			const char* jname = glfwGetJoystickName(joystick_id);
-			name = jname ? jname : "Gamepad";
-		}
-
-		// Try gamepad API first (standardized button layout)
-		GLFWgamepadstate state;
-
-		if (glfwJoystickIsGamepad(joystick_id) && glfwGetGamepadState(joystick_id, &state))
-		{
-			// Process buttons
-			for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++)
-			{
-				bool pressed = state.buttons[i] == GLFW_PRESS;
-				bool was_pressed = prev_state[i];
-
-				if (pressed && !was_pressed)
-				{
-					last_pressed = i;
-
-					auto it = button_map.find(static_cast<Button>(i));
-
-					if (it != button_map.end())
-					{
-						KeyAction::Id action = it->second;
-
-						// For movement keys, simulate GLFW key codes directly
-						if (action == KeyAction::Id::LEFT)
-							UI::get().send_key(GLFW_KEY_LEFT, true);
-						else if (action == KeyAction::Id::RIGHT)
-							UI::get().send_key(GLFW_KEY_RIGHT, true);
-						else if (action == KeyAction::Id::UP)
-							UI::get().send_key(GLFW_KEY_UP, true);
-						else if (action == KeyAction::Id::DOWN)
-							UI::get().send_key(GLFW_KEY_DOWN, true);
-						else if (action == KeyAction::Id::JUMP)
-							UI::get().send_key(GLFW_KEY_LEFT_ALT, true);
-						else if (action == KeyAction::Id::ATTACK)
-							UI::get().send_key(GLFW_KEY_LEFT_CONTROL, true);
-						else if (action == KeyAction::Id::ESCAPE)
-							UI::get().send_key(GLFW_KEY_ESCAPE, true);
-						else
-						{
-							// Find the keyboard key that maps to this action and simulate it
-							auto& kb = UI::get().get_keyboard();
-							auto maplekeys = kb.get_maplekeys();
-
-							for (auto& pair : maplekeys)
-							{
-								if (pair.second.action == action)
-								{
-									UI::get().send_key(pair.first, true);
-									break;
-								}
-							}
-						}
-					}
-				}
-				else if (!pressed && was_pressed)
-				{
-					auto it = button_map.find(static_cast<Button>(i));
-
-					if (it != button_map.end())
-					{
-						KeyAction::Id action = it->second;
-
-						if (action == KeyAction::Id::LEFT)
-							UI::get().send_key(GLFW_KEY_LEFT, false);
-						else if (action == KeyAction::Id::RIGHT)
-							UI::get().send_key(GLFW_KEY_RIGHT, false);
-						else if (action == KeyAction::Id::UP)
-							UI::get().send_key(GLFW_KEY_UP, false);
-						else if (action == KeyAction::Id::DOWN)
-							UI::get().send_key(GLFW_KEY_DOWN, false);
-						else if (action == KeyAction::Id::JUMP)
-							UI::get().send_key(GLFW_KEY_LEFT_ALT, false);
-						else if (action == KeyAction::Id::ATTACK)
-							UI::get().send_key(GLFW_KEY_LEFT_CONTROL, false);
-						else if (action == KeyAction::Id::ESCAPE)
-							UI::get().send_key(GLFW_KEY_ESCAPE, false);
-						else
-						{
-							auto& kb = UI::get().get_keyboard();
-							auto maplekeys = kb.get_maplekeys();
-
-							for (auto& pair : maplekeys)
-							{
-								if (pair.second.action == action)
-								{
-									UI::get().send_key(pair.first, false);
-									break;
-								}
-							}
-						}
-					}
-				}
-
-				prev_state[i] = pressed;
+		auto key_for = [&](KeyAction::Id action) {
+			switch (action) {
+			case KeyAction::LEFT: return GLFW_KEY_LEFT;
+			case KeyAction::RIGHT: return GLFW_KEY_RIGHT;
+			case KeyAction::UP: return GLFW_KEY_UP;
+			case KeyAction::DOWN: return GLFW_KEY_DOWN;
+			case KeyAction::ESCAPE: return GLFW_KEY_ESCAPE;
+			default: break;
 			}
-
-			// Left stick as D-pad
-			bool axis_left  = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] < -AXIS_THRESHOLD;
-			bool axis_right = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] > AXIS_THRESHOLD;
-			bool axis_up    = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] < -AXIS_THRESHOLD;
-			bool axis_down  = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] > AXIS_THRESHOLD;
-
-			if (axis_left != prev_axis_left)
-				UI::get().send_key(GLFW_KEY_LEFT, axis_left);
-
-			if (axis_right != prev_axis_right)
-				UI::get().send_key(GLFW_KEY_RIGHT, axis_right);
-
-			if (axis_up != prev_axis_up)
-				UI::get().send_key(GLFW_KEY_UP, axis_up);
-
-			if (axis_down != prev_axis_down)
-				UI::get().send_key(GLFW_KEY_DOWN, axis_down);
-
-			prev_axis_left = axis_left;
-			prev_axis_right = axis_right;
-			prev_axis_up = axis_up;
-			prev_axis_down = axis_down;
-		}
-		else
-		{
-			// Fallback: raw joystick API
-			int button_count = 0;
-			const unsigned char* buttons = glfwGetJoystickButtons(joystick_id, &button_count);
-
-			if (buttons)
-			{
-				int count = button_count < 15 ? button_count : 15;
-
-				for (int i = 0; i < count; i++)
-				{
-					bool pressed = buttons[i] == GLFW_PRESS;
-					bool was_pressed = prev_state[i];
-
-					if (pressed && !was_pressed)
-					{
-						last_pressed = i;
-
-						auto it = button_map.find(static_cast<Button>(i));
-
-						if (it != button_map.end())
-						{
-							KeyAction::Id action = it->second;
-
-							if (action == KeyAction::Id::JUMP)
-								UI::get().send_key(GLFW_KEY_LEFT_ALT, true);
-							else if (action == KeyAction::Id::ATTACK)
-								UI::get().send_key(GLFW_KEY_LEFT_CONTROL, true);
-							else if (action == KeyAction::Id::ESCAPE)
-								UI::get().send_key(GLFW_KEY_ESCAPE, true);
-						}
-					}
-					else if (!pressed && was_pressed)
-					{
-						auto it = button_map.find(static_cast<Button>(i));
-
-						if (it != button_map.end())
-						{
-							KeyAction::Id action = it->second;
-
-							if (action == KeyAction::Id::JUMP)
-								UI::get().send_key(GLFW_KEY_LEFT_ALT, false);
-							else if (action == KeyAction::Id::ATTACK)
-								UI::get().send_key(GLFW_KEY_LEFT_CONTROL, false);
-							else if (action == KeyAction::Id::ESCAPE)
-								UI::get().send_key(GLFW_KEY_ESCAPE, false);
-						}
-					}
-
-					prev_state[i] = pressed;
-				}
+			// The wire key-map uses Maple indices, not GLFW key codes.
+			for (int key = GLFW_KEY_SPACE; key <= GLFW_KEY_LAST; ++key) {
+				const auto mapping = UI::get().get_keyboard().get_mapping(key);
+				if (mapping.action == action && (mapping.type == KeyType::ACTION || mapping.type == KeyType::MENU))
+					return key;
 			}
-
-			// Raw joystick axes for movement
-			int axis_count = 0;
-			const float* axes = glfwGetJoystickAxes(joystick_id, &axis_count);
-
-			if (axes && axis_count >= 2)
-			{
-				bool axis_left  = axes[0] < -AXIS_THRESHOLD;
-				bool axis_right = axes[0] > AXIS_THRESHOLD;
-				bool axis_up    = axes[1] < -AXIS_THRESHOLD;
-				bool axis_down  = axes[1] > AXIS_THRESHOLD;
-
-				if (axis_left != prev_axis_left)
-					UI::get().send_key(GLFW_KEY_LEFT, axis_left);
-
-				if (axis_right != prev_axis_right)
-					UI::get().send_key(GLFW_KEY_RIGHT, axis_right);
-
-				if (axis_up != prev_axis_up)
-					UI::get().send_key(GLFW_KEY_UP, axis_up);
-
-				if (axis_down != prev_axis_down)
-					UI::get().send_key(GLFW_KEY_DOWN, axis_down);
-
-				prev_axis_left = axis_left;
-				prev_axis_right = axis_right;
-				prev_axis_up = axis_up;
-				prev_axis_down = axis_down;
+			return GLFW_KEY_UNKNOWN;
+		};
+		std::set<int> next;
+		for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; ++i) {
+			const bool down = state.buttons[i] == GLFW_PRESS;
+			if (down && !prev_state[i]) last_pressed = i;
+			prev_state[i] = down;
+			const auto it = button_map.find(static_cast<Button>(i));
+			if (down && it != button_map.end()) {
+				const int key = key_for(it->second);
+				if (key != GLFW_KEY_UNKNOWN) next.insert(key);
 			}
 		}
+		if (state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] < -AXIS_THRESHOLD) next.insert(GLFW_KEY_LEFT);
+		if (state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] > AXIS_THRESHOLD) next.insert(GLFW_KEY_RIGHT);
+		if (state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] < -AXIS_THRESHOLD) next.insert(GLFW_KEY_UP);
+		if (state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] > AXIS_THRESHOLD) next.insert(GLFW_KEY_DOWN);
+		// Union all sources before releasing a key: stick and D-pad may overlap.
+		for (int key : held_keys) if (!next.count(key)) UI::get().send_key(key, false);
+		for (int key : next) if (!held_keys.count(key)) UI::get().send_key(key, true);
+		held_keys = std::move(next);
 	}
 
 	bool Gamepad::is_connected() const

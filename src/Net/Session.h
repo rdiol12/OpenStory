@@ -25,7 +25,9 @@
 
 #include "../Template/Singleton.h"
 
-#ifdef USE_ASIO
+#if defined(PLATFORM_PS5)
+#include "SocketPS5.h"
+#elif defined(USE_ASIO)
 #include "SocketAsio.h"
 #else
 #include "SocketWinsock.h"
@@ -64,7 +66,9 @@ namespace ms
 		size_t pos;
 		bool connected;
 
-#ifdef USE_ASIO
+#if defined(PLATFORM_PS5)
+		SocketPS5 socket;
+#elif defined(USE_ASIO)
 		SocketAsio socket;
 #else
 		SocketWinsock socket;

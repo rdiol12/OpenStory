@@ -1,0 +1,41 @@
+--- a/make/autoconf/jdk-options.m4
++++ b/make/autoconf/jdk-options.m4
+@@ -585,7 +585,8 @@
+       CHECKING_MSG: [if static build is enabled],
+       CHECK_AVAILABLE: [
+         AC_MSG_CHECKING([if static build is available])
+-        if test "x$OPENJDK_TARGET_OS" = "xmacosx"; then
++        if test "x$OPENJDK_TARGET_OS" = "xmacosx" || \
++            test "x$OPENJDK_TARGET_OS" = "xbsd"; then
+           AC_MSG_RESULT([yes])
+         else
+           AC_MSG_RESULT([no])
+--- a/make/modules/java.base/Lib.gmk
++++ b/make/modules/java.base/Lib.gmk
+@@ -180,7 +180,7 @@
+       $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/$(LIBRARY_PREFIX)verify.symbols \
+       $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/$(LIBRARY_PREFIX)zip.symbols \
+       $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/$(LIBRARY_PREFIX)jimage.symbols \
+-      $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/server/$(LIBRARY_PREFIX)jvm.symbols \
++      $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/$(JVM_VARIANT_MAIN)/$(LIBRARY_PREFIX)jvm.symbols \
+       #
+ 
+   JAVA_BASE_EXPORT_SYMBOL_FILE := $(SUPPORT_OUTPUTDIR)/modules_libs/java.base/java.base.symbols
+--- a/make/common/NativeCompilation.gmk
++++ b/make/common/NativeCompilation.gmk
+@@ -62,6 +62,15 @@
+   fi
+ endef
+ 
++# The Darwin symbol printer above does not describe ELF archives.
++ifeq ($(call isTargetOs, bsd), true)
++define GetSymbols
++  $(NM) $(NMFLAGS) --defined-only --extern-only --format=posix $$($1_TARGET) | \
++      $(AWK) '$$$$2 ~ /^[TW]$$$$/ {print $$$$1}' > \
++      $$(@D)/$$(basename $$(@F)).symbols
++endef
++endif
++
+ ################################################################################
+ # Creates a recipe that creates a compile_commands.json fragment. Remove any
+ # occurrences of FIXPATH programs from the command to show the actual invocation.

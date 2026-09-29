@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Configuration.h"
+#include "Util/Paths.h"
 
 #include <algorithm>
 #include <fstream>
@@ -26,7 +27,9 @@ namespace ms
 	Configuration::Configuration()
 	{
 		settings.emplace<ServerIP>();
+		settings.emplace<ServerConfigured>();
 		settings.emplace<ServerPort>();
+		settings.emplace<OfflinePreview>();
 		settings.emplace<Fullscreen>();
 		settings.emplace<Width>();
 		settings.emplace<Height>();
@@ -135,7 +138,7 @@ namespace ms
 	void Configuration::load()
 	{
 		std::unordered_map<std::string, std::string> rawsettings;
-		std::ifstream file(FILENAME);
+		std::ifstream file(data_path(FILENAME));
 
 		if (file.is_open())
 		{
@@ -144,6 +147,7 @@ namespace ms
 
 			while (getline(file, line))
 			{
+				if (!line.empty() && line.back() == '\r') line.pop_back();
 				// If the setting is not empty, load the value.
 				size_t split = line.find('=');
 
@@ -169,7 +173,7 @@ namespace ms
 
 	void Configuration::save() const
 	{
-		std::ofstream config(FILENAME);
+		std::ofstream config(data_path(FILENAME));
 
 		if (!config.is_open())
 			return;
@@ -177,7 +181,7 @@ namespace ms
 		// Section -> ordered key list. Anything not listed falls into Window
 		// Positions (if it starts with "Pos") or Other (alphabetical).
 		static const std::vector<std::pair<const char*, std::vector<const char*>>> sections = {
-			{ "Connection",  { "ServerIP", "ServerPort", "SaveLogin", "Account", "Password",
+			{ "Connection",  { "ServerIP", "ServerPort", "OfflinePreview", "SaveLogin", "Account", "Password",
 			                   "World", "Channel", "Character", "Region" } },
 			{ "Display",     { "Width", "Height", "Fullscreen", "VSync" } },
 			{ "Audio",       { "BGMVolume", "SFXVolume" } },

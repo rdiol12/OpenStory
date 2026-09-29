@@ -18,8 +18,25 @@
 #include "Audio.h"
 
 #include "../Configuration.h"
+#include "../Util/CrashLog.h"
 
+#ifdef OPENSTORY_SDL
+#include <SDL.h>
+#include <SDL_mixer.h>
+#include <algorithm>
+#include <climits>
+#include <cstring>
+#include <new>
+namespace
+{
+	Mix_Music* music = nullptr;
+	std::string music_path;
+	SDL_RWops* audio_stream(nl::audio audio);
+	void play_music(const std::string& path, int loops);
+}
+#else
 #include <bass.h>
+#endif
 
 #include <cmath>
 
@@ -108,8 +125,19 @@ namespace ms
 
 	Error Sound::init()
 	{
+#ifdef OPENSTORY_SDL
+		if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0 || !(Mix_Init(MIX_INIT_MP3) & MIX_INIT_MP3)
+			|| Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 1024) < 0)
+		{
+			Mix_CloseAudio();
+			Mix_Quit();
+			return Error::AUDIO;
+		}
+		Mix_AllocateChannels(32);
+#else
 		if (!BASS_Init(-1, 44100, 0, nullptr, 0))
 			return Error::Code::AUDIO;
+#endif
 
 		nl::node uisrc = nl::nx::sound["UI.img"];
 
@@ -158,21 +186,49 @@ namespace ms
 
 	void Sound::close()
 	{
+#ifdef OPENSTORY_SDL
+		openstory_diagnostics_checkpoint("audio-halt-music");
+		Mix_HaltMusic();
+		openstory_diagnostics_checkpoint("audio-halt-channels");
+		Mix_HaltChannel(-1);
+		openstory_diagnostics_checkpoint("audio-free-music");
+		if (music) Mix_FreeMusic(music);
+		music = nullptr;
+		music_path.clear();
+		openstory_diagnostics_checkpoint("audio-free-samples");
+		for (auto sample : samples) Mix_FreeChunk(reinterpret_cast<Mix_Chunk*>(sample.second));
+		samples.clear();
+		openstory_diagnostics_checkpoint("audio-close-device");
+		Mix_CloseAudio();
+		openstory_diagnostics_checkpoint("audio-quit-mixer");
+		Mix_Quit();
+		openstory_diagnostics_checkpoint("audio-closed");
+#else
 		BASS_Free();
+#endif
 	}
 
 	bool Sound::set_sfxvolume(uint8_t vol)
 	{
+#ifdef OPENSTORY_SDL
+		Mix_MasterVolume(std::min<int>(vol, 100) * MIX_MAX_VOLUME / 100);
+		return true;
+#else
 		return BASS_SetConfig(BASS_CONFIG_GVOL_SAMPLE, vol * 100) == TRUE;
+#endif
 	}
 
 	void Sound::play(size_t id)
 	{
+#ifdef OPENSTORY_SDL
+		play(id, 1, 0);
+#else
 		if (!samples.count(id))
 			return;
 
 		HCHANNEL channel = BASS_SampleGetChannel((HSAMPLE)samples.at(id), false);
 		BASS_ChannelPlay(channel, true);
+#endif
 	}
 
 	void Sound::play(size_t id, float volume, float pan)
@@ -180,28 +236,46 @@ namespace ms
 		if (!samples.count(id))
 			return;
 
+#ifdef OPENSTORY_SDL
+		// Set channel properties before starting playback, including reused channels.
+		int channel = -1;
+		for (int i = 0; i < Mix_AllocateChannels(-1); ++i)
+			if (!Mix_Playing(i)) { channel = i; break; }
+		if (channel < 0) return;
+		pan = std::clamp(pan, -1.f, 1.f);
+		Mix_Volume(channel, int(std::clamp(volume, 0.f, 1.f) * MIX_MAX_VOLUME));
+		Mix_SetPanning(channel, Uint8(255 * (pan > 0 ? 1 - pan : 1)), Uint8(255 * (pan < 0 ? 1 + pan : 1)));
+		Mix_PlayChannel(channel, reinterpret_cast<Mix_Chunk*>(samples.at(id)), 0);
+#else
 		HCHANNEL channel = BASS_SampleGetChannel((HSAMPLE)samples.at(id), false);
 		// Per-channel volume multiplies with the global SFX volume, so the
 		// user's volume setting is still respected.
 		BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, volume);
 		BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, pan);
 		BASS_ChannelPlay(channel, true);
+#endif
 	}
 
 	size_t Sound::add_sound(nl::node src)
 	{
 		nl::audio ad = src;
-
-		auto data = reinterpret_cast<const void*>(ad.data());
-
-		if (data)
+		if (ad)
 		{
 			size_t id = ad.id();
 
 			if (samples.find(id) != samples.end())
 				return id;
 
+#ifdef OPENSTORY_SDL
+			auto* stream = audio_stream(ad);
+			auto* chunk = stream ? Mix_LoadWAV_RW(stream, 1) : nullptr;
+			if (!chunk) return 0;
+			samples[id] = reinterpret_cast<uint64_t>(chunk);
+#else
+			auto data = ad.data();
+			if (!data) return 0;
 			samples[id] = BASS_SampleLoad(true, data, 82, (DWORD)ad.length(), 4, BASS_SAMPLE_OVER_POS);
+#endif
 
 			return id;
 		}
@@ -253,6 +327,9 @@ namespace ms
 
 	void Music::play() const
 	{
+#ifdef OPENSTORY_SDL
+		play_music(path, -1);
+#else
 		static HSTREAM stream = 0;
 		static std::string bgmpath = "";
 
@@ -275,10 +352,14 @@ namespace ms
 
 			bgmpath = path;
 		}
+#endif
 	}
 
 	void Music::play_once() const
 	{
+#ifdef OPENSTORY_SDL
+		play_music(path, 0);
+#else
 		static HSTREAM stream = 0;
 		static std::string bgmpath = "";
 
@@ -301,6 +382,7 @@ namespace ms
 
 			bgmpath = path;
 		}
+#endif
 	}
 
 	Error Music::init()
@@ -315,6 +397,107 @@ namespace ms
 
 	bool Music::set_bgmvolume(uint8_t vol)
 	{
+#ifdef OPENSTORY_SDL
+		Mix_VolumeMusic(std::min<int>(vol, 100) * MIX_MAX_VOLUME / 100);
+		return true;
+#else
 		return BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, vol * 100) == TRUE;
+#endif
 	}
 }
+
+#ifdef OPENSTORY_SDL
+namespace
+{
+	SDL_RWops* audio_stream(nl::audio audio)
+	{
+#ifdef NLNX_STREAMING
+		if (!audio || audio.length() <= 82 || audio.length() > INT_MAX) return nullptr;
+		struct Cursor { nl::audio source; Sint64 position = 0; };
+		auto* stream = SDL_AllocRW();
+		if (!stream) return nullptr;
+		auto* cursor = new (std::nothrow) Cursor{audio};
+		if (!cursor) { SDL_FreeRW(stream); return nullptr; }
+		stream->type = SDL_RWOPS_UNKNOWN;
+		stream->hidden.unknown.data1 = cursor;
+		stream->size = [](SDL_RWops* rw) -> Sint64 {
+			return static_cast<Cursor*>(rw->hidden.unknown.data1)->source.length() - 82;
+		};
+		stream->seek = [](SDL_RWops* rw, Sint64 offset, int whence) -> Sint64 {
+			auto* c = static_cast<Cursor*>(rw->hidden.unknown.data1);
+			const Sint64 length = c->source.length() - 82;
+			Sint64 start;
+			switch (whence) {
+			case RW_SEEK_SET: start = 0; break;
+			case RW_SEEK_CUR: start = c->position; break;
+			case RW_SEEK_END: start = length; break;
+			default: return -1;
+			}
+			if (offset < -start || offset > length - start) return -1;
+			return c->position = start + offset;
+		};
+		stream->read = [](SDL_RWops* rw, void* output, size_t size, size_t count) -> size_t {
+			auto* c = static_cast<Cursor*>(rw->hidden.unknown.data1);
+			if (!size) return 0;
+			const size_t remaining = c->source.length() - 82 - c->position;
+			count = std::min(count, remaining / size);
+			const size_t bytes = size * count;
+			if (!c->source.read(output, size_t(c->position) + 82, bytes)) return 0;
+			c->position += bytes;
+			return count;
+		};
+		stream->write = [](SDL_RWops*, const void*, size_t, size_t) -> size_t { return 0; };
+		stream->close = [](SDL_RWops* rw) -> int {
+			delete static_cast<Cursor*>(rw->hidden.unknown.data1);
+			SDL_FreeRW(rw);
+			return 0;
+		};
+		return stream;
+#else
+		if (!audio.data() || audio.length() <= 82 || audio.length() > INT_MAX) return nullptr;
+		return SDL_RWFromConstMem(static_cast<const char*>(audio.data()) + 82, int(audio.length() - 82));
+#endif
+	}
+	void play_music(const std::string& path, int loops)
+	{
+		if (path == music_path && Mix_PlayingMusic()) return;
+		auto* stream = audio_stream(nl::nx::sound.resolve(path));
+		auto* next = stream ? Mix_LoadMUS_RW(stream, 1) : nullptr;
+		if (!next) return;
+		Mix_HaltMusic();
+		if (music) Mix_FreeMusic(music);
+		music = next;
+		music_path = path;
+		Mix_PlayMusic(music, loops);
+	}
+}
+bool check_sdl_audio()
+{
+#ifdef NLNX_STREAMING
+	nl::audio source = nl::nx::sound.resolve("BgmUI.img/Title");
+	auto* input = audio_stream(source);
+	if (!input) { SDL_Log("NX audio stream could not be opened"); return false; }
+	char actual[128], expected[128];
+	const Sint64 length = SDL_RWsize(input);
+	bool stream_ok = length == source.length() - 82 &&
+		SDL_RWseek(input, 32, RW_SEEK_SET) == 32 &&
+		SDL_RWread(input, actual, 1, sizeof(actual)) == sizeof(actual) &&
+		source.read(expected, 82 + 32, sizeof(expected)) &&
+		std::memcmp(actual, expected, sizeof(actual)) == 0 &&
+		SDL_RWseek(input, -1, RW_SEEK_END) == length - 1 &&
+		SDL_RWread(input, actual, 1, sizeof(actual)) == 1 &&
+		SDL_RWread(input, actual, 1, 1) == 0 &&
+		SDL_RWseek(input, -1, RW_SEEK_SET) == -1 &&
+		SDL_RWseek(input, 1, RW_SEEK_END) == -1;
+	SDL_RWclose(input);
+	if (!stream_ok) { SDL_Log("NX audio stream read/seek check failed"); return false; }
+#endif
+	ms::Sound(ms::Sound::Name::BUTTONCLICK).play();
+	bool sample_playing = Mix_Playing(-1) > 0;
+	play_music("BgmUI.img/Title", -1);
+	if (!sample_playing || !music || !Mix_PlayingMusic())
+		SDL_Log("NX playback check: sample=%d music=%d: %s", sample_playing,
+			music && Mix_PlayingMusic(), Mix_GetError());
+	return sample_playing && music && Mix_PlayingMusic();
+}
+#endif

@@ -53,7 +53,7 @@ namespace ms
 			"Sound.nx",		// From latest
 			"String.nx",
 			"TamingMob.nx",
-			"UI.nx"			// From latest
+			"UI.nx"
 		};
 
 		// Initialize NX

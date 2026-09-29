@@ -315,6 +315,33 @@ namespace ms
 		return TYPE;
 	}
 
+	std::vector<UIElement::ControllerTarget> UIOptionMenu::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (int i = 0; i < NUM_SLIDERS; ++i) {
+			const auto p = position + Point<int16_t>(slider_x[i], slider_y[i]-8);
+			result.push_back({{p, p + Point<int16_t>(slider_w[i], 16)}});
+		}
+		for (auto p : check_positions) {
+			p += position;
+			result.push_back({{p, p + Point<int16_t>(CHECK_HIT_SIZE, CHECK_HIT_SIZE)}});
+		}
+		return result;
+	}
+
+	void UIOptionMenu::controller_activate(const ControllerTarget& target)
+	{
+		if (target.button >= 0) { UIElement::controller_activate(target); return; }
+		Point<int16_t> p((target.bounds.left()+target.bounds.right())/2, (target.bounds.top()+target.bounds.bottom())/2);
+		for (int i = 0; i < NUM_SLIDERS; ++i) if (p.y() == position.y()+slider_y[i]) {
+			const int value = slider_val[i] >= 100 ? 0 : std::min(100, int(slider_val[i])+10);
+			p.shift_x(position.x()+slider_x[i]+slider_w[i]*value/100-p.x());
+			break;
+		}
+		send_cursor(true, p);
+		send_cursor(false, p);
+	}
+
 	void UIOptionMenu::load_settings()
 	{
 		slider_val[SL_BGM] = Setting<BGMVolume>::get().load();

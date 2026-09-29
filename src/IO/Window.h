@@ -21,7 +21,9 @@
 
 #include "../Template/Singleton.h"
 
-#ifdef PLATFORM_IOS
+#ifdef OPENSTORY_SDL
+	#include "../../platform/shared/GLCompat.h"
+#elif defined(PLATFORM_IOS)
 	#include <OpenGLES/ES3/gl.h>
 #else
 	#define GLEW_STATIC
@@ -49,6 +51,9 @@ namespace ms
 		void end() const;
 		void fadeout(float step, std::function<void()> fadeprocedure);
 		void check_events();
+#ifdef OPENSTORY_SDL
+		void show_keyboard();
+#endif
 
 		void setclipboard(const std::string& text) const;
 		std::string getclipboard() const;
@@ -68,7 +73,9 @@ namespace ms
 	private:
 		void updateopc();
 
-#ifndef PLATFORM_IOS
+#if defined(OPENSTORY_SDL)
+		bool closed;
+#elif !defined(PLATFORM_IOS)
 		GLFWwindow* glwnd;
 		GLFWwindow* context;
 #else

@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "BuddyMemoStore.h"
+#include "../Util/Paths.h"
 
 #include <fstream>
 
@@ -121,7 +122,7 @@ namespace ms
 	void BuddyMemoStore::load()
 	{
 		memos.clear();
-		std::ifstream ifs(MEMO_PATH);
+		std::ifstream ifs(data_path(MEMO_PATH));
 		if (!ifs) return;
 
 		std::string line;
@@ -174,7 +175,7 @@ namespace ms
 
 	void BuddyMemoStore::save() const
 	{
-		std::ofstream ofs(MEMO_PATH);
+		std::ofstream ofs(data_path(MEMO_PATH));
 		if (!ofs) return;
 		for (const auto& kv : memos)
 			ofs << kv.first << "|" << kv.second.nickname

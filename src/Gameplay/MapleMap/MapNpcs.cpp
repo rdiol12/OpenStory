@@ -25,6 +25,32 @@
 
 namespace ms
 {
+	static void talk_to_npc(Npc& npc)
+	{
+		if (!NpcResponseTracker::get().can_click_now()) return;
+		NpcResponseTracker::get().mark_clicked_now();
+		NpcResponseTracker::get().mark_pending(npc.get_npcid());
+		TalkToNPCPacket(npc.get_oid()).dispatch();
+	}
+
+	void MapNpcs::interact(Point<int16_t> player)
+	{
+		Npc* nearest = nullptr;
+		int best = 0;
+		for (auto& entry : npcs) {
+			auto* npc = static_cast<Npc*>(entry.second.get());
+			if (!npc || !npc->is_active()) continue;
+			const auto pos = npc->get_position();
+			const int dx = int(pos.x()) - int(player.x()), dy = int(pos.y()) - int(player.y());
+			if (std::abs(dx) > 150 || std::abs(dy) > 80) continue;
+			const int distance = dx*dx + dy*dy;
+			if (!nearest || distance < best || (distance == best && npc->get_oid() < nearest->get_oid())) {
+				nearest = npc;
+				best = distance;
+			}
+		}
+		if (nearest) talk_to_npc(*nearest);
+	}
 	void MapNpcs::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
 		npcs.draw(layer, viewx, viewy, alpha);
@@ -126,12 +152,7 @@ namespace ms
 					// that check would block every click after the first
 					// dialog closed. The server's own conversation lock
 					// handles the genuine "still talking" case.
-					if (!NpcResponseTracker::get().can_click_now())
-						return Cursor::State::IDLE;
-
-					NpcResponseTracker::get().mark_clicked_now();
-					NpcResponseTracker::get().mark_pending(npc->get_npcid());
-					TalkToNPCPacket(npc->get_oid()).dispatch();
+					talk_to_npc(*npc);
 
 					return Cursor::State::IDLE;
 				}

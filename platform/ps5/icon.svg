@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#123e34"/>
+  <polygon fill="#f3a52e" points="256,70 283,137 323,119 311,168 367,170 336,213 370,237 294,264 283,303 265,295 265,339 247,339 247,295 229,303 218,264 142,237 176,213 145,170 201,168 189,119 229,137"/>
+  <text x="256" y="422" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="52" font-weight="700" fill="#fff4df">OpenStory</text>
+</svg>

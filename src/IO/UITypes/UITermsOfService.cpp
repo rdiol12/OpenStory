@@ -1096,6 +1096,11 @@ namespace ms
 		slider.draw(position);
 	}
 
+	void UITermsOfService::send_scroll(double yoffset)
+	{
+		slider.send_scroll(yoffset);
+	}
+
 	Cursor::State UITermsOfService::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursoroffset = cursorpos - position;

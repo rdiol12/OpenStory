@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICharSelect.h"
+#include <algorithm>
 
 #include "UILoginNotice.h"
 #include "UIRaceSelect.h"

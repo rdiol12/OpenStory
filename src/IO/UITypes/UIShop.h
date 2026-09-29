@@ -45,6 +45,8 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
+		void controller_activate(const ControllerTarget& target) override;
 
 		void reset(int32_t npcid);
 		// Build the buy-side category tabs — call after the server's

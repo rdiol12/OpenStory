@@ -1,4 +1,5 @@
 #include "MapWeather.h"
+#include <algorithm>
 
 #include "../../Graphics/DrawArgument.h"
 

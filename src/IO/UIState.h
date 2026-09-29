@@ -60,6 +60,8 @@ namespace ms
 		virtual UIElement* get(UIElement::Type type) = 0;
 		virtual UIElement* get_front(std::list<UIElement::Type> types) = 0;
 		virtual UIElement* get_front(Point<int16_t> pos) = 0;
+		virtual std::vector<UIElement*> controller_windows();
+		virtual void controller_raise(UIElement::Type) {}
 	};
 
 	class UIStateNull : public UIState

@@ -68,6 +68,8 @@ namespace ms
 		const std::string& get_text() const;
 		std::string get_selected_text() const;
 		bool can_copy_paste() const;
+		size_t get_limit() const { return limit; }
+		bool is_password() const { return crypt != 0; }
 
 	private:
 		void modifytext(const std::string& t);

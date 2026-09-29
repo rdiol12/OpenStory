@@ -13,6 +13,7 @@
 //	GNU Affero General Public License for more details.							//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIRaceSelect.h"
+#include <algorithm>
 
 
 #include "UIAranCreation.h"

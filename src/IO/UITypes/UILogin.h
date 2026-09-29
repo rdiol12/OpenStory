@@ -41,6 +41,9 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursor_pos) override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
+		void controller_activate(const ControllerTarget& target) override;
+		void controller_hover(const ControllerTarget& target) override;
 
 	protected:
 		Button::State button_pressed(uint16_t id) override;

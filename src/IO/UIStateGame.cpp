@@ -121,6 +121,19 @@ namespace ms
 			draggedicon->dragdraw(cursor);
 	}
 
+	void UIStateGame::controller_raise(UIElement::Type type)
+	{
+		elementorder.remove(type);
+		elementorder.push_back(type);
+	}
+
+	std::vector<UIElement*> UIStateGame::controller_windows()
+	{
+		if (auto* modal = get(focused))
+			if (modal->is_active()) return {modal};
+		return UIState::controller_windows();
+	}
+
 	void UIStateGame::update()
 	{
 		// Safe point: no element code is on the stack here, so removed
@@ -274,6 +287,9 @@ namespace ms
 					{
 						switch (action)
 						{
+							case KeyAction::Id::INTERACT_HARVEST:
+								Stage::get().get_npcs().interact(Stage::get().get_player().get_position());
+								break;
 							case KeyAction::Id::EQUIPMENT:
 							{
 								emplace<UIEquipInventory>(

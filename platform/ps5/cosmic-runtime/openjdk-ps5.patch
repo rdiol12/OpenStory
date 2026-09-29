@@ -1,0 +1,56 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -1383,7 +1383,11 @@
+ #endif
+ 
+ int os::get_loaded_modules_info(os::LoadedModulesCallbackFunc callback, void *param) {
+-#ifdef __FreeBSD__
++#ifdef __PROSPERO__
++  // ponytail: crash-report module enumeration is unavailable until a native
++  // module enumerator is ported. Preserve the caller's explicit error path.
++  return 1;
++#elif defined(__FreeBSD__)
+   struct loaded_modules_info_param callback_param = {callback, param};
+   return dl_iterate_phdr(&dl_iterate_callback, &callback_param);
+ #elif defined(RTLD_DI_LINKMAP)
+--- a/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
++++ b/src/java.base/unix/native/libjava/ProcessHandleImpl_unix.c
+@@ -252,6 +252,11 @@
+             return status;
+         }
+      } else {
++#ifdef __PROSPERO__
++        /* Use ProcessHandleImpl's existing liveness-polling fallback when
++         * waitid(WNOWAIT) is unavailable. Do not consume the child's exit status. */
++        return java_lang_ProcessHandleImpl_NOT_A_CHILD;
++#else
+         /*
+          * Wait for the child process to exit without reaping the exitValue.
+          * waitid() is standard on all POSIX platforms.
+@@ -283,6 +288,7 @@
+               */
+              return siginfo.si_status;
+         }
++#endif
+     }
+ }
+ 
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -507,6 +507,8 @@
+     }
+ }
+ 
++#ifndef __PROSPERO__
++/* This mount-table sizing helper is used only by LinuxFileSystem. */
+ /**
+  * This function returns line length without NUL terminator or -1 on EOF.
+  */
+@@ -537,6 +539,7 @@
+ 
+     return (jint)res;
+ }
++#endif
+ 
+ JNIEXPORT jint JNICALL
+ Java_sun_nio_fs_UnixNativeDispatcher_open0(JNIEnv* env, jclass this,

@@ -18,6 +18,7 @@
 #pragma once
 
 #include "UIState.h"
+#include "ControllerNavigation.h"
 
 #include "Components/ScrollingNotice.h"
 #include "Components/Textfield.h"
@@ -64,6 +65,15 @@ namespace ms
 		// This is the only route by which non-ASCII text (Hebrew, CJK) can be
 		// typed; send_key sees physical keys and cannot represent it.
 		void send_char(uint32_t codepoint);
+		bool controller_menu();
+		void controller_input(int key, uint32_t now);
+		void controller_cycle_window();
+		void controller_open(KeyAction::Id action);
+		bool has_textfield() const { return bool(focusedtextfield); }
+		void update_controller_focus();
+		struct TextInput { std::string text; size_t limit; bool password; uint64_t revision; };
+		bool text_input(TextInput& input) const;
+		void text_input_result(uint64_t revision, const std::string& text);
 
 		void set_scrollnotice(const std::string& notice);
 		void focus_textfield(Textfield* textfield);
@@ -86,6 +96,11 @@ namespace ms
 		template <class T, typename...Args>
 		Optional<T> emplace(Args&& ...args)
 		{
+			if (T::FOCUSED || state->get(T::TYPE)) remove_textfield();
+			if (state->get(T::TYPE) == controller_selected || state->get(T::TYPE) == controller_front) {
+				controller_front = controller_selected = nullptr;
+				controller_navigation.enter(0, 0);
+			}
 			if (auto iter = state->pre_add(T::TYPE, T::TOGGLED, T::FOCUSED))
 			{
 				(*iter).second = std::make_unique<T>(
@@ -108,12 +123,17 @@ namespace ms
 		void remove(UIElement::Type type);
 
 	private:
+		UIElement* controller_window();
+		UIElement* controller_front = nullptr;
+		UIElement* controller_selected = nullptr;
+		ControllerNavigation controller_navigation;
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;
 		Cursor cursor;
 		ScrollingNotice scrollingnotice;
 
 		Optional<Textfield> focusedtextfield;
+		uint64_t textfield_revision = 0;
 		std::unordered_map<int32_t, bool> is_key_down;
 
 		bool enabled;

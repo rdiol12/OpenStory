@@ -47,33 +47,35 @@ namespace nl
 
 		node base, character, effect, etc, item, map, mapPretty, mapLatest, map001, mob, morph, npc, quest, reactor, skill, sound, string, tamingmob, ui;
 
-		void load_all()
+		void load_all(std::string directory)
 		{
-			if (exists("Base.nx"))
+			if (!directory.empty() && directory.back() != '/') directory += '/';
+			const auto load = [&](const char* name) { return add_file(directory + name); };
+			if (exists(directory + "Base.nx"))
 			{
-				base = add_file("Base.nx");
-				character = add_file("Character.nx");
-				effect = add_file("Effect.nx");
-				etc = add_file("Etc.nx");
-				item = add_file("Item.nx");
-				map = add_file("Map.nx");
-				mapPretty = add_file("MapPretty.nx");
-				mapLatest = add_file("MapLatest.nx");
-				map001 = add_file("Map001.nx");
-				mob = add_file("Mob.nx");
-				morph = add_file("Morph.nx");
-				npc = add_file("Npc.nx");
-				quest = add_file("Quest.nx");
-				reactor = add_file("Reactor.nx");
-				skill = add_file("Skill.nx");
-				sound = add_file("Sound.nx");
-				string = add_file("String.nx");
-				tamingmob = add_file("TamingMob.nx");
-				ui = add_file("UI.nx");
+				base = load("Base.nx");
+				character = load("Character.nx");
+				effect = load("Effect.nx");
+				etc = load("Etc.nx");
+				item = load("Item.nx");
+				map = load("Map.nx");
+				mapPretty = load("MapPretty.nx");
+				mapLatest = load("MapLatest.nx");
+				map001 = load("Map001.nx");
+				mob = load("Mob.nx");
+				morph = load("Morph.nx");
+				npc = load("Npc.nx");
+				quest = load("Quest.nx");
+				reactor = load("Reactor.nx");
+				skill = load("Skill.nx");
+				sound = load("Sound.nx");
+				string = load("String.nx");
+				tamingmob = load("TamingMob.nx");
+				ui = load("UI.nx");
 			}
-			else if (exists("Data.nx"))
+			else if (exists(directory + "Data.nx"))
 			{
-				base = add_file("Data.nx");
+				base = load("Data.nx");
 				character = base["Character"];
 				effect = base["Effect"];
 				etc = base["Etc"];

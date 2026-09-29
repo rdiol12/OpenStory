@@ -84,6 +84,50 @@ namespace ms
 				button->update();
 	}
 
+	std::vector<UIElement::ControllerTarget> UIElement::controller_targets() const
+	{
+		std::vector<ControllerTarget> result;
+		for (const auto& entry : buttons) {
+			const auto* button = entry.second.get();
+			if (button && button->is_active() && button->get_state() != Button::DISABLED) {
+				const auto bounds = button->bounds(get_draw_position());
+				if (bounds.width() && bounds.height()) result.push_back({bounds, false, entry.first});
+			}
+		}
+		return result;
+	}
+
+	void UIElement::controller_hover(const ControllerTarget& target)
+	{
+		if (target.button < 0) {
+			const auto& b = target.bounds;
+			send_cursor(false, {(int16_t)((b.left()+b.right())/2), (int16_t)((b.top()+b.bottom())/2)});
+			return;
+		}
+		for (auto& entry : buttons) {
+			auto* button = entry.second.get();
+			if (!button || !button->is_active() || button->get_state() == Button::DISABLED) continue;
+			if (entry.first == target.button) {
+				if (button->get_state() != Button::MOUSEOVER) Sound(Sound::Name::BUTTONOVER).play();
+				button->set_state(Button::MOUSEOVER);
+			} else if (button->get_state() == Button::MOUSEOVER) button->set_state(Button::NORMAL);
+		}
+	}
+
+	void UIElement::controller_activate(const ControllerTarget& target)
+	{
+		if (target.button >= 0) {
+			auto found = buttons.find(static_cast<uint16_t>(target.button));
+			if (found != buttons.end() && found->second && found->second->is_active() &&
+				found->second->get_state() != Button::DISABLED) button_pressed(target.button);
+			return;
+		}
+		const auto point = Point<int16_t>((target.bounds.left() + target.bounds.right()) / 2,
+			(target.bounds.top() + target.bounds.bottom()) / 2);
+		if (target.double_click) doubleclick(point);
+		else send_cursor(true, point);
+	}
+
 	void UIElement::makeactive()
 	{
 		active = true;

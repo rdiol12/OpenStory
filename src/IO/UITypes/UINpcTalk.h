@@ -62,6 +62,8 @@ namespace ms
 		static constexpr bool TOGGLED = false;
 
 		UINpcTalk();
+		std::vector<ControllerTarget> controller_targets() const override;
+		void controller_activate(const ControllerTarget& target) override;
 
 		void draw(float inter) const override;
 		void update() override;

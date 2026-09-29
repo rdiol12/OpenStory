@@ -3,6 +3,12 @@ project(OpenStory)
 
 set(CMAKE_CXX_STANDARD 17)
 
+option(OPENSTORY_SDL "Build the SDL/Core renderer platform (PS5 or host)" OFF)
+if(OPENSTORY_SDL)
+    add_subdirectory(platform/sdl)
+    return()
+endif()
+
 file(GLOB_RECURSE SOURCE_FILES
             "src/*.h"
             "src/*.cpp"

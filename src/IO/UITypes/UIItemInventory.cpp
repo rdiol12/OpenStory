@@ -715,6 +715,17 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UIItemInventory::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (int16_t slot = 1; slot <= inventory.get_slotmax(tab); ++slot) {
+			if (!is_visible(slot)) continue;
+			auto pos = position + (full_enabled ? get_full_slotpos(slot) : get_slotpos(slot));
+			result.push_back({{pos, pos + Point<int16_t>(32, 32)}, true});
+		}
+		return result;
+	}
+
 	UIElement::Type UIItemInventory::get_type() const
 	{
 		return TYPE;

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "nxfwd.hpp"
+#include <string>
 
 namespace nl
 {
@@ -28,6 +29,6 @@ namespace nl
 
 		// Loads the pre-defined nodes from a standard setup of nx files for MapleStory
 		// Only call this function once
-		void load_all();
+		void load_all(std::string directory = {});
 	}
 }

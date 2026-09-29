@@ -686,6 +686,16 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UISkillBook::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (size_t i = 0; i < ROWS && offset + i < skills.size(); ++i) {
+			auto pos = position + SKILL_OFFSET + ICON_OFFSET + Point<int16_t>(0, i * ROW_HEIGHT);
+			result.push_back({{pos, pos + Point<int16_t>(32, 32)}, true});
+		}
+		return result;
+	}
+
 	UIElement::Type UISkillBook::get_type() const
 	{
 		return TYPE;

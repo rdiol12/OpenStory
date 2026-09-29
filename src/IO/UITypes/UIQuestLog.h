@@ -48,6 +48,8 @@ namespace ms
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
+		void controller_activate(const ControllerTarget& target) override;
 
 		void load_quests();
 

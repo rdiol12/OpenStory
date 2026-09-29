@@ -223,6 +223,16 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UIEquipInventory::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (const auto& entry : iconpositions) {
+			auto pos = position + entry.second;
+			result.push_back({{pos, pos + Point<int16_t>(32, 32)}, true});
+		}
+		return result;
+	}
+
 	UIElement::Type UIEquipInventory::get_type() const
 	{
 		return TYPE;

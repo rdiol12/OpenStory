@@ -807,6 +807,39 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UINpcTalk::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		if (type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER) {
+			auto bounds = input_field.get_bounds();
+			result.insert(result.begin(), {bounds});
+		}
+		for (const auto& hit : quest_banner_hits) result.push_back({hit.rect});
+		if (type == TalkType::SENDSIMPLE) for (const auto& selection : selections) {
+			std::string prefix;
+			for (char c : selection.prefix) prefix += c == '\n' ? "\\n" : std::string(1, c);
+			Text text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, Text::NONE, prefix, 320, true);
+			const int16_t x = position.x() + (show_slider ? 162 : 166);
+			const int16_t baseline = position.y() + (show_slider ? 19 - offset * SCROLL_STEP : 48) + text.height();
+			int16_t top_edge = baseline - 20, bottom_edge = baseline + 4;
+			if (show_slider) {
+				top_edge = std::max<int16_t>(top_edge, position.y() + top.height() - 1);
+				bottom_edge = std::min<int16_t>(bottom_edge, position.y() + top.height() - 1 + height - 18);
+			}
+			if (bottom_edge > top_edge) result.push_back({{x, int16_t(x + 320), top_edge, bottom_edge}});
+		}
+		return result;
+	}
+
+	void UINpcTalk::controller_activate(const ControllerTarget& target)
+	{
+		const Point<int16_t> center((target.bounds.left()+target.bounds.right())/2,
+			(target.bounds.top()+target.bounds.bottom())/2);
+		if ((type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER) && input_field.get_bounds().contains(center))
+			input_field.set_state(Textfield::FOCUSED);
+		else UIElement::controller_activate(target);
+	}
+
 	void UINpcTalk::send_scroll(double yoffset)
 	{
 		if (show_slider)

@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "PacketSwitch.h"
+#include "../Util/Paths.h"
 
 #include "Handlers/AttackHandlers.h"
 #include "Handlers/CashShopHandlers.h"
@@ -714,7 +715,7 @@ namespace ms
 		std::cout << "Opcode [" << opcode << "] Error: " << message << std::endl;
 
 		// Also write to log file for debugging
-		static FILE* logfile = fopen("unhandled_packets.txt", "a");
+		static FILE* logfile = fopen(data_path("unhandled_packets.txt").c_str(), "a");
 		if (logfile)
 		{
 			fprintf(logfile, "Opcode [%zu]: %s\n", opcode, message.c_str());

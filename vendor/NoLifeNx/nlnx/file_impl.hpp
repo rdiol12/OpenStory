@@ -19,6 +19,11 @@
 #pragma once
 #include "file.hpp"
 #include "node_impl.hpp"
+#ifdef NLNX_STREAMING
+#include <map>
+#include <mutex>
+#include <vector>
+#endif
 
 namespace nl {
 #pragma pack(push, 1)
@@ -35,6 +40,13 @@ namespace nl {
     };
 #pragma pack(pop)
     struct _file_data {
+#ifdef NLNX_STREAMING
+        bool read(uint64_t offset, void* output, size_t length) const noexcept;
+        mutable std::mutex read_mutex;
+        bool wrapped = false;
+        size_t metadata_size = 0;
+        mutable std::map<std::pair<uint64_t, uint32_t>, std::vector<char>> audio_cache;
+#endif
         void const * base = nullptr;
         node::data const * node_table = nullptr;
         uint64_t const * string_table = nullptr;
@@ -45,7 +57,7 @@ namespace nl {
         void * file_handle = nullptr;
         void * map = nullptr;
 #else
-        int file_handle = 0;
+        int file_handle = -1;
         size_t size = 0;
 #endif
     };

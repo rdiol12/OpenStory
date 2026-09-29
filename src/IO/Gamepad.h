@@ -22,11 +22,11 @@
 #include "../Template/Singleton.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <cstdint>
 
-#define GLEW_STATIC
-#include <glew.h>
+#define GLFW_INCLUDE_NONE
 #include <glfw3.h>
 
 namespace ms
@@ -77,6 +77,7 @@ namespace ms
 		std::string name;
 		std::map<Button, KeyAction::Id> button_map;
 		bool prev_state[15];
+		std::set<int> held_keys;
 		int32_t last_pressed;
 
 		// Axis-to-dpad thresholds

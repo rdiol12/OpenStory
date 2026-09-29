@@ -9,6 +9,12 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#ifdef OPENSTORY_LAN_LOG
+extern "C" void openstory_diagnostics_checkpoint(const char *phase, unsigned frame = 0);
+#else
+inline void openstory_diagnostics_checkpoint(const char *, unsigned = 0) {}
+#endif
+
 namespace ms
 {
 	// Install the crash handlers. Call once, as early as possible in main().

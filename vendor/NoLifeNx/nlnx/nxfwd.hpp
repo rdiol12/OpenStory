@@ -18,7 +18,12 @@
 
 #pragma once
 
+#if defined(PLATFORM_PS5) && !defined(NLNX_STREAMING)
+#define NLNX_STREAMING
+#endif
+
 namespace nl {
+    struct _file_data;
     class node;
     class file;
     class bitmap;

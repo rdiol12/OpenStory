@@ -1,0 +1,16 @@
+diff --git a/src/LibProsperoPkg/PFS/ProsperoPs5InnerMetadata.cs b/src/LibProsperoPkg/PFS/ProsperoPs5InnerMetadata.cs
+index 596cafc..2c81304 100644
+--- a/src/LibProsperoPkg/PFS/ProsperoPs5InnerMetadata.cs
++++ b/src/LibProsperoPkg/PFS/ProsperoPs5InnerMetadata.cs
+@@ -97,9 +97,8 @@ public sealed class ProsperoPs5InnerMetadata
+         for (int t = 0; t < 4; t++) BinaryPrimitives.WriteInt64LittleEndian(dst[(0x18 + t * 8)..], _timeSec);
+         for (int t = 0; t < 4; t++) BinaryPrimitives.WriteUInt32LittleEndian(dst[(0x38 + t * 4)..], _timeNsec);
+         BinaryPrimitives.WriteUInt64LittleEndian(dst[0x60..], n.LogicalOffset);
+-        // db[0] = 0; for the super-root and its direct children (ParentInode == -1) db[1..3] = -1;
+-        // otherwise db[1] = afid (files) / -1 (dirs), db[2] = parent inode, db[3] = dirent offset in parent.
+-        BinaryPrimitives.WriteInt32LittleEndian(dst[0x64..], 0);
++        // The full 0x60..0x67 field is the logical offset, including its high 32 bits.
++        // The following words hold afid, parent inode and the parent dirent offset.
+         int db1 = n.ParentInode < 0 ? -1 : (n.IsDirectory ? -1 : (int)n.Afid);
+         BinaryPrimitives.WriteInt32LittleEndian(dst[0x68..], db1);
+         BinaryPrimitives.WriteInt32LittleEndian(dst[0x6c..], n.ParentInode);

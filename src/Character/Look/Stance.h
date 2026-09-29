@@ -20,6 +20,7 @@
 #include "../../Template/EnumMap.h"
 
 #include <string>
+#include <cstdint>
 
 namespace ms
 {

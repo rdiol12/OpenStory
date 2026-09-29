@@ -48,6 +48,7 @@ namespace ms
 
 		// Refresh quest marks on all NPCs (call when quest state changes)
 		void refresh_quest_marks();
+		void interact(Point<int16_t> player);
 
 		// Send mouse input to clickable NPCs
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);

@@ -32,6 +32,8 @@ namespace ms
 		static constexpr bool TOGGLED = false;
 
 		UIOptionMenu();
+		std::vector<ControllerTarget> controller_targets() const override;
+		void controller_activate(const ControllerTarget& target) override;
 
 		void draw(float inter) const override;
 

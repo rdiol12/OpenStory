@@ -26,7 +26,9 @@
 
 #include <vector>
 
-#ifdef PLATFORM_IOS
+#ifdef PLATFORM_PS5
+#include "../../platform/shared/GLCompat.h"
+#elif defined(PLATFORM_IOS)
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
 #else
@@ -309,14 +311,25 @@ namespace ms
 		int16_t VHEIGHT;
 		Rectangle<int16_t> SCREEN;
 
+#if defined(PLATFORM_PS5) || defined(NLNX_STREAMING)
+		// 64 MiB leaves room for resident NX indices in memory-constrained builds.
+		static const GLshort ATLASW = 4096;
+		static const GLshort ATLASH = 4096;
+#else
 		static const GLshort ATLASW = 8192;
 		static const GLshort ATLASH = 8192;
+#endif
 		static const GLshort MINLOSIZE = 32;
 
 		bool locked;
 
 		std::vector<Quad> quads;
 		GLuint VBO;
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		GLuint VAO;
+		GLuint EBO;
+		std::vector<GLuint> indices;
+#endif
 		GLuint atlas;
 
 		GLint shaderProgram;

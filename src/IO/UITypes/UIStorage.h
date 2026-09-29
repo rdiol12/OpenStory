@@ -56,6 +56,7 @@ namespace ms
 		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
 
 		// Called by handler
 		void open(int32_t npcid, uint8_t slots, int32_t meso);

@@ -47,6 +47,13 @@ namespace ms
 			src = nl::nx::ui["Basic.img"][VScr];
 		}
 
+		if (!src)
+		{
+			// v83 has the original scrollbar, but not every newer style.
+			src = nl::nx::ui["Basic.img"]["VScr"];
+			base_str = "base";
+		}
+
 		nl::node dsrc = src["disabled"];
 
 		dbase = dsrc[base_str];
@@ -126,9 +133,9 @@ namespace ms
 		DrawArgument base_arg = DrawArgument(Point<int16_t>(base_pos.x(), base_pos.y() + 1), fill);
 
 		int16_t height = dbase.height();
-		int16_t maxheight = vertical.first() + height;
+		int32_t maxheight = vertical.first() + height;
 
-		while (maxheight < vertical.second())
+		while (height > 0 && maxheight < vertical.second())
 		{
 			dbase.draw(position + Point<int16_t>(start.x(), maxheight));
 

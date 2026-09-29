@@ -116,7 +116,11 @@ namespace ms
 		time_t unix_s = static_cast<time_t>((timestamp - FT_UT_OFFSET) / 10000 / 1000);
 
 		struct tm timeinfo;
+#ifdef _WIN32
 		if (localtime_s(&timeinfo, &unix_s) != 0)
+#else
+		if (!localtime_r(&unix_s, &timeinfo))
+#endif
 			return "";
 
 		char buf[16];

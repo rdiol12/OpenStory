@@ -132,6 +132,8 @@ namespace ms
 			PARTYMEMBERMENU,
 			PARTYSEARCHSTART,
 			PARTYHELPER,
+			SERVERSELECT,
+			CONTROLLERMENU,
 			NUM_TYPES
 		};
 
@@ -156,6 +158,16 @@ namespace ms
 		virtual Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos);
 		virtual void send_scroll(double yoffset) {}
 		virtual void send_key(int32_t keycode, bool pressed, bool escape) {}
+
+		struct ControllerTarget
+		{
+			Rectangle<int16_t> bounds;
+			bool double_click = false;
+			int button = -1;
+		};
+		virtual std::vector<ControllerTarget> controller_targets() const;
+		virtual void controller_activate(const ControllerTarget& target);
+		virtual void controller_hover(const ControllerTarget& target);
 
 		virtual UIElement::Type get_type() const = 0;
 

@@ -18,6 +18,7 @@
 #include "Texture.h"
 
 #include "GraphicsGL.h"
+#include "../Util/Paths.h"
 
 #include <unordered_map>
 
@@ -63,7 +64,7 @@ namespace ms
 			int width = 0;
 			int height = 0;
 			int channels = 0;
-			stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+			stbi_uc* data = stbi_load(data_path(path).c_str(), &width, &height, &channels, 4);
 
 			if (!data)
 				return nullptr;

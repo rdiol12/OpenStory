@@ -42,6 +42,7 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
+		std::vector<ControllerTarget> controller_targets() const override;
 
 		void modify(int16_t pos, int8_t mode, int16_t arg);
 

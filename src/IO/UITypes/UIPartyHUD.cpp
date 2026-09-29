@@ -13,6 +13,7 @@
 //	GNU Affero General Public License for more details.							//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIPartyHUD.h"
+#include <algorithm>
 
 #include "UINotice.h"
 

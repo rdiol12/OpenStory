@@ -16,6 +16,11 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UI.h"
+#include <cstdio>
+#include <cstdint>
+#ifdef OPENSTORY_LAN_LOG
+extern "C" void openstory_diagnostics_phase(const char*, std::uintptr_t);
+#endif
 
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
@@ -43,6 +48,8 @@
 #include "UITypes/UIWhisper.h"
 #include "UITypes/UIReport.h"
 #include "UITypes/UILogin.h"
+#include "Gamepad.h"
+#include "../Gameplay/Stage.h"
 #include "../Net/Packets/LoginPackets.h"
 
 namespace ms
@@ -85,11 +92,21 @@ namespace ms
 			if (banner->is_active())
 				banner->draw(alpha);
 
+#ifdef OPENSTORY_SDL
+		if (!Gamepad::get().is_connected())
+#endif
+#ifndef PLATFORM_PS5
 		cursor.draw(alpha);
+#else
+		{} // Console navigation uses each widget's hover state.
+#endif
 	}
 
 	void UI::update()
 	{
+#ifdef OPENSTORY_SDL
+		if (Gamepad::get().is_connected()) update_controller_focus();
+#endif
 		state->update();
 
 		scrollingnotice.update();
@@ -109,6 +126,10 @@ namespace ms
 
 	void UI::change_state(State id)
 	{
+		remove_textfield();
+		controller_front = nullptr;
+		controller_selected = nullptr;
+		controller_navigation.enter(0, 0);
 		switch (id)
 		{
 			case State::LOGIN:
@@ -125,6 +146,12 @@ namespace ms
 
 	void UI::quit()
 	{
+#ifdef OPENSTORY_LAN_LOG
+		openstory_diagnostics_phase("ui-quit-caller", reinterpret_cast<std::uintptr_t>(__builtin_return_address(0)));
+#endif
+#ifdef PLATFORM_PS5
+		std::fprintf(stderr, "[UI] quit requested caller=%p\n", __builtin_return_address(0));
+#endif
 		quitted = true;
 	}
 
@@ -189,9 +216,13 @@ namespace ms
 			{
 				case Cursor::State::IDLE:
 					focusedtextfield = {};
+					++textfield_revision;
 					break;
 			}
 		}
+#ifdef OPENSTORY_SDL
+		if (pressed && enabled && focusedtextfield) Window::get().show_keyboard();
+#endif
 	}
 
 	void UI::send_cursor(Point<int16_t> pos)
@@ -229,6 +260,18 @@ namespace ms
 
 	void UI::send_key(int32_t keycode, bool pressed)
 	{
+		// Opening a menu/text field must not swallow the release of a held game action.
+		if (!pressed) {
+			const auto mapping = keyboard.get_mapping(keycode);
+			if (mapping.type == KeyType::ACTION) switch (mapping.action) {
+			case KeyAction::LEFT: case KeyAction::RIGHT: case KeyAction::UP: case KeyAction::DOWN:
+			case KeyAction::JUMP: case KeyAction::ATTACK:
+				Stage::get().send_key(mapping.type, mapping.action, false);
+				is_key_down[keycode] = false;
+				return;
+			default: break;
+			}
+		}
 		if ((is_key_down[GLFW_KEY_LEFT_ALT] || is_key_down[GLFW_KEY_RIGHT_ALT]) && (is_key_down[GLFW_KEY_ENTER] || is_key_down[GLFW_KEY_KP_ENTER]))
 		{
 			Window::get().toggle_fullscreen();
@@ -496,6 +539,7 @@ namespace ms
 
 	void UI::focus_textfield(Textfield* tofocus)
 	{
+		++textfield_revision;
 		// Guard against refocusing the same field: unfocusing it here would
 		// leave it NORMAL (no caret) while still receiving keyboard input
 		if (focusedtextfield && focusedtextfield.get() != tofocus)
@@ -506,10 +550,27 @@ namespace ms
 
 	void UI::remove_textfield()
 	{
+		++textfield_revision;
 		if (focusedtextfield)
 			focusedtextfield->set_state(Textfield::State::NORMAL);
 
 		focusedtextfield = {};
+	}
+
+	bool UI::text_input(TextInput& input) const
+	{
+		if (!focusedtextfield || focusedtextfield->get_state() != Textfield::FOCUSED) return false;
+		input = {focusedtextfield->get_text(), focusedtextfield->get_limit(),
+			focusedtextfield->is_password(), textfield_revision};
+		return true;
+	}
+
+	void UI::text_input_result(uint64_t revision, const std::string& value)
+	{
+		if (!focusedtextfield || focusedtextfield->get_state() != Textfield::FOCUSED || revision != textfield_revision) return;
+		size_t size = std::min(value.size(), focusedtextfield->get_limit());
+		while (size < value.size() && size && (static_cast<unsigned char>(value[size]) & 0xc0) == 0x80) --size;
+		focusedtextfield->change_text(value.substr(0, size));
 	}
 
 	void UI::drag_icon(Icon* icon)
@@ -564,8 +625,11 @@ namespace ms
 
 	void UI::remove(UIElement::Type type)
 	{
-		focusedtextfield = {};
-
+		if (state->get(type) == controller_selected || state->get(type) == controller_front) {
+			controller_front = controller_selected = nullptr;
+			controller_navigation.enter(0, 0);
+		}
+		remove_textfield();
 		state->remove(type);
 	}
 }

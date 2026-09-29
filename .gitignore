@@ -18,6 +18,7 @@ CMakeCache.txt
 !resources/nx/*.nx
 *.wz
 Settings
+ClientID.txt
 
 /includes/WzLib
 

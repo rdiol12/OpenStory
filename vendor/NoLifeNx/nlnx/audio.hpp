@@ -36,11 +36,18 @@ namespace nl {
         //Do not free the pointer returned by this method
         //The pointer remains valid until the file this audio is part of is destroyed
         void const * data() const;
+        // Read a bounded portion without retaining the entire audio clip.
+        bool read(void* output, size_t offset, size_t count) const;
         uint32_t length() const;
         //Returns a unique id, useful for keeping track of what audio you loaded
         size_t id() const;
     private:
+#ifdef NLNX_STREAMING
+        audio(void const *, uint32_t, _file_data const* = nullptr);
+        _file_data const* m_file = nullptr;
+#else
         audio(void const *, uint32_t);
+#endif
         void const * m_data = nullptr;
         uint32_t m_length = 0;
         friend node;

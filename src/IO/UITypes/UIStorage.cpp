@@ -581,6 +581,20 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement::ControllerTarget> UIStorage::controller_targets() const
+	{
+		auto result = UIElement::controller_targets();
+		for (size_t i = 0; i < storage_slot_map.size(); ++i) {
+			auto pos = position + storage_icon_pos(i);
+			result.push_back({{pos, pos + Point<int16_t>(32, 32)}, true});
+		}
+		if (inventory_cols > 0) for (size_t i = 0; i < inventory_slot_map.size(); ++i) {
+			auto pos = position + inventory_icon_pos(i);
+			result.push_back({{pos, pos + Point<int16_t>(32, 32)}, true});
+		}
+		return result;
+	}
+
 	UIElement::Type UIStorage::get_type() const
 	{
 		return TYPE;

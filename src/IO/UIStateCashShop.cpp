@@ -51,6 +51,13 @@ namespace ms
 		}
 	}
 
+	std::vector<UIElement*> UIStateCashShop::controller_windows()
+	{
+		if (auto* modal = get(focused)) if (modal->is_active()) return {modal};
+		if (auto* front = get_front()) return {front};
+		return {};
+	}
+
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)
 	{
 		bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;

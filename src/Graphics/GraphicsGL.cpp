@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "GraphicsGL.h"
+#include "../Util/Paths.h"
 
 #include <cstdlib>
 
@@ -26,6 +27,25 @@
 
 namespace
 {
+	void upload_bgra(GLint x, GLint y, GLsizei width, GLsizei height, const void* pixels)
+	{
+		if (!pixels || width <= 0 || height <= 0) return;
+#ifdef PLATFORM_PS5
+		// This PS5 upload path treats BGRA artwork as RGBA; normalize at the atlas boundary.
+		const auto* bgra = static_cast<const uint8_t*>(pixels);
+		std::vector<uint8_t> rgba(static_cast<size_t>(width) * height * 4);
+		for (size_t i = 0; i < rgba.size(); i += 4) {
+			rgba[i] = bgra[i + 2];
+			rgba[i + 1] = bgra[i + 1];
+			rgba[i + 2] = bgra[i];
+			rgba[i + 3] = bgra[i + 3];
+		}
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+#else
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+#endif
+	}
+
 	// Decodes one UTF-8 codepoint starting at `text[i]`. Sets `consumed` to
 	// the byte count (1-4). Falls back to the raw byte on malformed input.
 	inline uint32_t utf8_decode(const char* text, size_t length, size_t i, size_t& consumed)
@@ -90,10 +110,14 @@ namespace ms
 
 	Error GraphicsGL::init()
 	{
-#ifdef PLATFORM_IOS
-		// OpenGL ES 3.0 shaders
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		// ES and desktop Core share the renderer; only the shader preamble differs.
 		const char* vertexShaderSource =
+#ifdef OPENSTORY_GL_CORE
+			"#version 330 core\n"
+#else
 			"#version 300 es\n"
+#endif
 			"in vec4 coord;\n"
 			"in vec4 color;\n"
 			"out vec2 texpos;\n"
@@ -111,8 +135,12 @@ namespace ms
 			"}\n";
 
 		const char* fragmentShaderSource =
+#ifdef OPENSTORY_GL_CORE
+			"#version 330 core\n"
+#else
 			"#version 300 es\n"
 			"precision mediump float;\n"
+#endif
 			"in vec2 texpos;\n"
 			"in vec4 colormod;\n"
 			"out vec4 fragColor;\n"
@@ -188,9 +216,16 @@ namespace ms
 		GLint success;
 		GLchar infoLog[bufSize];
 
-#ifndef PLATFORM_IOS
+#if !defined(PLATFORM_IOS) && !defined(PLATFORM_PS5)
+#ifdef OPENSTORY_GL_CORE
+		glewExperimental = GL_TRUE;
+#endif
 		if (GLenum error = glewInit())
 			return Error(Error::Code::GLEW, (const char*)glewGetErrorString(error));
+#ifdef OPENSTORY_GL_CORE
+		// GLEW 2.1 probes GL_EXTENSIONS, which is invalid in a Core context.
+		glGetError();
+#endif
 #endif
 
 		if (FT_Init_FreeType(&ftlibrary))
@@ -266,11 +301,10 @@ namespace ms
 		if (attribute_coord == -1 || attribute_color == -1 || uniform_texture == -1 || uniform_atlassize == -1 || uniform_screensize == -1 || uniform_yoffset == -1)
 			return Error::Code::SHADER_VARS;
 
-#ifdef PLATFORM_IOS
-		// VAO required by OpenGL ES 3.0
-		GLuint VAO;
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
 		glGenVertexArrays(1, &VAO);
 		glBindVertexArray(VAO);
+		glGenBuffers(1, &EBO);
 #endif
 
 		// Vertex Buffer Object
@@ -392,7 +426,7 @@ namespace ms
 			return FT_New_Memory_Face(ftlibrary, baked->data,
 				static_cast<FT_Long>(baked->size), 0, out);
 
-		return FT_New_Face(ftlibrary, spec.c_str(), 0, out);
+		return FT_New_Face(ftlibrary, data_path(spec).c_str(), 0, out);
 	}
 
 	bool GraphicsGL::addfont(const char* name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh)
@@ -625,9 +659,9 @@ namespace ms
 			{
 				border.set_x(0);
 				border.shift_y(yrange.second());
-				if (border.y() + strike_h > ATLASH) return false;
 				yrange = Range<GLshort>();
 			}
+			if (strike_w > ATLASW || border.y() + strike_h > ATLASH) return false;
 			gx = border.x();
 			gy = border.y();
 			border.shift_x(strike_w);
@@ -635,7 +669,7 @@ namespace ms
 				yrange = Range<int16_t>(gy + strike_h, strike_h);
 		}
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, gx, gy, strike_w, strike_h, GL_BGRA, GL_UNSIGNED_BYTE, src_pixels);
+		upload_bgra(gx, gy, strike_w, strike_h, src_pixels);
 
 		Font::Char ch;
 		ch.ax = target;
@@ -819,7 +853,7 @@ namespace ms
 		GLshort x = 0;
 		GLshort y = 0;
 
-		if (width <= 0 || height <= 0)
+		if (!data || width <= 0 || height <= 0 || width > ATLASW || height > ATLASH - fontymax)
 			return nulloffset;
 
 		const GLshort srcw = width;
@@ -829,7 +863,7 @@ namespace ms
 		// Reserve — and fill — HD_SCALE x the space, so the atlas rect that the
 		// quad samples carries the upscaled sprite.
 		if (static_cast<int>(width) * HD_SCALE < ATLASW
-			&& static_cast<int>(height) * HD_SCALE < ATLASH)
+			&& static_cast<int>(height) * HD_SCALE < ATLASH - fontymax)
 		{
 			pixels = upscale(data, srcw, srch);
 			width = static_cast<GLshort>(srcw * HD_SCALE);
@@ -894,12 +928,11 @@ namespace ms
 			{
 				border.set_x(0);
 				border.shift_y(yrange.second());
-
-				if (border.y() + height > ATLASH)
-					clearinternal();
-				else
-					yrange = Range<GLshort>();
+				yrange = Range<GLshort>();
 			}
+			// A taller image can exhaust the row vertically even when its width fits.
+			if (border.y() + height > ATLASH)
+				clearinternal();
 
 			x = border.x();
 			y = border.y();
@@ -930,7 +963,7 @@ namespace ms
 			}
 		}
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+		upload_bgra(x, y, width, height, pixels);
 
 		return offsets.emplace(
 			std::piecewise_construct,
@@ -1503,10 +1536,9 @@ namespace ms
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		GLsizeiptr csize = quads.size() * sizeof(Quad);
-		GLsizeiptr fsize = quads.size() * Quad::LENGTH;
 
-#ifdef PLATFORM_IOS
-		// iOS/GLKit may reset GL state between frames — re-establish it
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		glBindVertexArray(VAO);
 		glUseProgram(shaderProgram);
 		glUniform1i(uniform_fontregion, fontymax);
 		glUniform2f(uniform_atlassize, ATLASW, ATLASH);
@@ -1524,30 +1556,33 @@ namespace ms
 		glVertexAttribPointer(attribute_coord, 4, GL_SHORT, GL_FALSE, sizeof(Quad::Vertex), 0);
 		glVertexAttribPointer(attribute_color, 4, GL_FLOAT, GL_FALSE, sizeof(Quad::Vertex), (const void*)8);
 
-#ifdef PLATFORM_IOS
-		// OpenGL ES 3.0 does not support GL_QUADS — draw as indexed triangles
-		size_t quad_count = quads.size();
-		std::vector<GLushort> indices;
-		indices.reserve(quad_count * 6);
-
-		for (size_t i = 0; i < quad_count; i++)
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		if (indices.size() < quads.size() * 6)
 		{
-			GLushort base = static_cast<GLushort>(i * Quad::LENGTH);
-			indices.push_back(base + 0);
-			indices.push_back(base + 1);
-			indices.push_back(base + 2);
-			indices.push_back(base + 0);
-			indices.push_back(base + 2);
-			indices.push_back(base + 3);
+			for (size_t i = indices.size() / 6; i < quads.size(); ++i)
+			{
+				GLuint base = static_cast<GLuint>(i * Quad::LENGTH);
+				indices.insert(indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+			}
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 		}
-
-		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_SHORT, indices.data());
+		auto draw_quads = [](size_t first, size_t count)
+		{
+			glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count * 6), GL_UNSIGNED_INT,
+				reinterpret_cast<const void*>(first * 6 * sizeof(GLuint)));
+		};
 #else
+		auto draw_quads = [](size_t first, size_t count)
+		{
+			glDrawArrays(GL_QUADS, static_cast<GLint>(first * Quad::LENGTH), static_cast<GLsizei>(count * Quad::LENGTH));
+		};
+#endif
 		// Segment the draw around additive ranges (glow effects); the common
 		// no-additive frame stays a single call
 		if (additive_ranges.empty() && !additive_active)
 		{
-			glDrawArrays(GL_QUADS, 0, fsize);
+			draw_quads(0, quads.size());
 		}
 		else
 		{
@@ -1562,19 +1597,18 @@ namespace ms
 			for (const auto& range : ranges)
 			{
 				if (range.first > cursor)
-					glDrawArrays(GL_QUADS, GLint(cursor * Quad::LENGTH), GLsizei((range.first - cursor) * Quad::LENGTH));
+					draw_quads(cursor, range.first - cursor);
 
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-				glDrawArrays(GL_QUADS, GLint(range.first * Quad::LENGTH), GLsizei((range.second - range.first) * Quad::LENGTH));
+				draw_quads(range.first, range.second - range.first);
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 				cursor = range.second;
 			}
 
 			if (quads.size() > cursor)
-				glDrawArrays(GL_QUADS, GLint(cursor * Quad::LENGTH), GLsizei((quads.size() - cursor) * Quad::LENGTH));
+				draw_quads(cursor, quads.size() - cursor);
 		}
-#endif
 
 		glDisableVertexAttribArray(attribute_coord);
 		glDisableVertexAttribArray(attribute_color);

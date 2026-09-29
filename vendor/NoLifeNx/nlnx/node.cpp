@@ -304,14 +304,26 @@ namespace nl {
         return {m_data->vector[0], m_data->vector[1]};
     }
     bitmap node::to_bitmap() const {
+#ifdef NLNX_STREAMING
+        // Some NX exports omit image blobs; keep metadata and out-of-file data unreadable.
+        const uint64_t offset = m_file->bitmap_table[m_data->bitmap.index];
+        if (offset < m_file->metadata_size || offset > m_file->size - 4) return {};
+        return {m_file->bitmap_table + m_data->bitmap.index,
+            m_data->bitmap.width, m_data->bitmap.height, m_file};
+#else
         return {reinterpret_cast<char const *>(m_file->base)
             + m_file->bitmap_table[m_data->bitmap.index],
             m_data->bitmap.width, m_data->bitmap.height};
+#endif
     }
     audio node::to_audio() const {
+#ifdef NLNX_STREAMING
+        return {m_file->audio_table + m_data->audio.index, m_data->audio.length, m_file};
+#else
         return {reinterpret_cast<char const *>(m_file->base)
             + m_file->audio_table[m_data->audio.index],
             m_data->audio.length};
+#endif
     }
     node node::root() const {
         return {m_file->node_table, m_file};

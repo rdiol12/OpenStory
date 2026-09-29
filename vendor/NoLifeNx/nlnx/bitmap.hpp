@@ -43,7 +43,12 @@ namespace nl {
         //Returns a unique id, useful for keeping track of what bitmaps you loaded
         size_t id() const;
     private:
+#ifdef NLNX_STREAMING
+        bitmap(void const *, uint16_t, uint16_t, _file_data const* = nullptr);
+        _file_data const* m_file = nullptr;
+#else
         bitmap(void const *, uint16_t, uint16_t);
+#endif
         void const * m_data = nullptr;
         uint16_t m_width = 0;
         uint16_t m_height = 0;

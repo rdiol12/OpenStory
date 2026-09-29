@@ -1,0 +1,77 @@
+--- a/src/hotspot/os/bsd/os_bsd.cpp
++++ b/src/hotspot/os/bsd/os_bsd.cpp
+@@ -407,6 +407,18 @@
+ 
+   // sysclasspath, java_home, dll_dir
+   {
++#if defined(__PROSPERO__) && defined(STATIC_BUILD)
++    const char* home = ::getenv("JAVA_HOME");
++    if (home == nullptr || os::Posix::realpath(home, buf, bufsize) == nullptr) {
++      vm_exit_during_initialization("JAVA_HOME must name the packaged Java runtime", nullptr);
++    }
++    Arguments::set_java_home(buf);
++    size_t home_len = strlen(buf);
++    if (jio_snprintf(buf + home_len, bufsize - home_len, "/lib") == -1) {
++      vm_exit_during_initialization("JAVA_HOME path is too long", nullptr);
++    }
++    Arguments::set_dll_dir(buf);
++#else
+     char *pslash;
+     os::jvm_path(buf, bufsize);
+ 
+@@ -429,6 +441,7 @@
+       }
+     }
+     Arguments::set_java_home(buf);
++#endif
+     if (!set_boot_path('/', ':')) {
+       vm_exit_during_initialization("Failed setting boot class path.", nullptr);
+     }
+@@ -1123,7 +1136,16 @@
+ #else
+ void * os::dll_load(const char *filename, char *ebuf, int ebuflen) {
+ #ifdef STATIC_BUILD
++#ifdef __PROSPERO__
++  void* result = ::dlopen(filename, RTLD_LAZY);
++  if (result == nullptr && ebuf != nullptr && ebuflen > 0) {
++    const char* error = ::dlerror();
++    jio_snprintf(ebuf, ebuflen, "%s", error ? error : "Static native library unavailable");
++  }
++  return result;
++#else
+   return os::get_default_process_handle();
++#endif
+ #else
+   log_info(os)("attempting shared library load of %s", filename);
+   void * result = os::Bsd::dlopen_helper(filename, RTLD_LAZY);
+--- a/src/hotspot/share/runtime/os.cpp
++++ b/src/hotspot/share/runtime/os.cpp
+@@ -301,8 +301,20 @@
+       FREE_C_HEAP_ARRAY(char*, a);
+ }
+ 
++#if defined(__PROSPERO__) && defined(STATIC_BUILD)
++#include <dlfcn.h>
++#endif
++
+ bool os::dll_locate_lib(char *buffer, size_t buflen,
+                         const char* pname, const char* fname) {
++#if defined(__PROSPERO__) && defined(STATIC_BUILD)
++  // Embedded libraries have no separate file. Resolve only actual builtins.
++  if (!dll_build_name(buffer, buflen, fname)) return false;
++  void* library = ::dlopen(buffer, RTLD_LAZY);
++  if (library == nullptr) return false;
++  ::dlclose(library);
++  return true;
++#else
+   bool retval = false;
+ 
+   size_t fullfnamelen = strlen(JNI_LIB_PREFIX) + strlen(fname) + strlen(JNI_LIB_SUFFIX);
+@@ -347,6 +359,7 @@
+ 
+   FREE_C_HEAP_ARRAY(char*, fullfname);
+   return retval;
++#endif
+ }
+ 
+ // --------------------- sun.misc.Signal (optional) ---------------------

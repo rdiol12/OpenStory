@@ -16,9 +16,20 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "NxFiles.h"
+#include "Paths.h"
 
 #ifdef USE_NX
 #include <fstream>
+#include <cstdint>
+#ifdef OPENSTORY_LAN_LOG
+extern "C" void openstory_diagnostics_phase(const char*, std::uintptr_t);
+static void nx_phase(const char* label) { openstory_diagnostics_phase(label, 0); }
+#else
+static void nx_phase(const char*) {}
+#endif
+#ifdef PLATFORM_PS5
+#include <filesystem>
+#endif
 
 #include <nlnx/node.hpp>
 #include <nlnx/nx.hpp>
@@ -66,6 +77,13 @@ namespace ms
 	{
 		Error init()
 		{
+			nx_phase("nx-init");
+			std::string nx_directory;
+#ifdef PLATFORM_PS5
+			// Keep writable settings in download0; bundled NX files are read-only.
+			nx_phase("nx-directory-probe");
+			nx_directory = std::filesystem::exists(data_path("Base.nx")) ? data_path("") : "/app0/wz/";
+#endif
 #ifdef PLATFORM_IOS
 			std::string nx_dir = get_ios_nx_directory();
 
@@ -75,13 +93,19 @@ namespace ms
 			chdir(nx_dir.c_str());
 #endif
 
+			nx_phase("nx-required-files");
 			for (auto filename : filenames)
-				if (std::ifstream{ filename }.good() == false)
+			{
+				nx_phase(filename);
+				if (std::ifstream{ nx_directory + filename }.good() == false)
 					return Error(Error::Code::MISSING_FILE, filename);
+			}
 
 			try
 			{
-				nl::nx::load_all();
+				nx_phase("nx-map-all");
+				nl::nx::load_all(nx_directory);
+				nx_phase("nx-ready");
 			}
 			catch (const std::exception& ex)
 			{

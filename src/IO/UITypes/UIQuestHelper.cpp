@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestHelper.h"
+#include <algorithm>
 #include "UIQuestLog.h"
 
 #include "../Components/MapleButton.h"

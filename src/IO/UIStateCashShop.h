@@ -28,6 +28,7 @@ namespace ms
 
 		void draw(float inter, Point<int16_t> cursor) const override;
 		void update() override;
+		std::vector<UIElement*> controller_windows() override;
 
 		void doubleclick(Point<int16_t> pos) override {}
 		void rightclick(Point<int16_t> pos) override {}

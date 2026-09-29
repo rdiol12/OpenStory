@@ -52,6 +52,13 @@ namespace ms
 			tooltip->draw(cursor + Point<int16_t>(0, 22));
 	}
 
+	std::vector<UIElement*> UIStateLogin::controller_windows()
+	{
+		if (auto* modal = get(focused))
+			if (modal->is_active()) return {modal};
+		return UIState::controller_windows();
+	}
+
 	void UIStateLogin::update()
 	{
 		// Safe point: no element code is on the stack here, so removed

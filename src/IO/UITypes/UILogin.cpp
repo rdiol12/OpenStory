@@ -206,6 +206,7 @@ namespace ms
 
 	void UILogin::login()
 	{
+		if (Setting<OfflinePreview>::get().load()) return;
 		account.set_state(Textfield::State::DISABLED);
 		password.set_state(Textfield::State::DISABLED);
 
@@ -344,6 +345,34 @@ namespace ms
 			return new_state;
 
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UILogin::controller_hover(const ControllerTarget& target)
+	{
+		if (target.button == -2 || target.button == -3) {
+			remove_cursor();
+			auto& field = target.button == -2 ? account : password;
+			if (!UI::get().has_textfield()) field.set_state(Textfield::FOCUSED);
+		} else UIElement::controller_hover(target);
+	}
+
+	std::vector<UIElement::ControllerTarget> UILogin::controller_targets() const
+	{
+		auto field_bounds = [](const Textfield& field) {
+			auto b = field.get_bounds();
+			return Rectangle<int16_t>(b.left(), b.right(), b.top(), b.top()+25);
+		};
+		std::vector<ControllerTarget> result{{field_bounds(account), false, -2}, {field_bounds(password), false, -3}};
+		auto controls = UIElement::controller_targets();
+		result.insert(result.end(), controls.begin(), controls.end());
+		return result;
+	}
+
+	void UILogin::controller_activate(const ControllerTarget& target)
+	{
+		if (target.button == -2) account.set_state(Textfield::FOCUSED);
+		else if (target.button == -3) password.set_state(Textfield::FOCUSED);
+		else UIElement::controller_activate(target);
 	}
 
 	UIElement::Type UILogin::get_type() const
