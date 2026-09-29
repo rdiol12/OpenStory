@@ -54,15 +54,8 @@ namespace ms
 		// Resolve a '/'-separated node path, falling back to a case-insensitive
 		// scan of a level's children whenever the exact name is not there.
 		//
-		// NoLifeNx looks children up with a bytewise binary search, so node
-		// names are case-sensitive, and a few vanilla Map.wz "info/bgm" strings
-		// do not match the real node names in Sound.wz. The known one in GMS
-		// v83 is "BGM06.img/FinalFight" (22 maps), which Nexon mis-cased: the
-		// track really lives at "Bgm06.img/FinalFight". Without this fallback
-		// the lookup silently returns a null node and those maps play nothing.
-		//
-		// The exact lookup is tried first, so normal names cost nothing extra;
-		// the linear rescan only runs on the miss path.
+		// For example, Map.nx names BGM06.img/FinalFight while Sound.nx
+		// stores Bgm06.img/FinalFight. Scan siblings only after an exact miss.
 		nl::node resolve_relaxed(nl::node root, const std::string& path)
 		{
 			nl::node exact = root.resolve(path);

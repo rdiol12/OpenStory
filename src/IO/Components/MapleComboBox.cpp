@@ -106,7 +106,7 @@ namespace ms
 			// error of any kind.
 			if (middle_width > 0)
 			{
-				int32_t current_width = middle_width;
+				int64_t current_width = middle_width;
 
 				while (current_width < rwidth)
 				{

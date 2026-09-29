@@ -134,7 +134,7 @@ namespace ms
 
 		if (height > 0)
 		{
-			int16_t maxheight = vertical.first() + height;
+			int32_t maxheight = vertical.first() + height;
 
 			while (maxheight < vertical.second())
 			{

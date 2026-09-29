@@ -137,13 +137,7 @@ namespace ms
 	// unbound, and on macOS the Command keys when 'key' is an Alt.
 	void Keyboard::apply_to_aliases(uint8_t key, const Mapping& mapping)
 	{
-		// A maple keycode is a byte, but Keytable only defines 90 entries. The
-		// KEYMAP handler happens to loop 0..89, but the quickslot layout does
-		// not: MiscHandlers reads eight raw bytes off the wire into
-		// set_quickslot_keys(), and UIStatusBar::clear_quickslot() feeds one of
-		// them straight back here when the player clears a quickslot. A server
-		// sending anything >= 90 in that packet reads past the end of the
-		// table and binds whatever it finds there.
+		// Keep table bounds local, even though network quickslot input is validated.
 		if (key >= std::size(Keytable))
 			return;
 

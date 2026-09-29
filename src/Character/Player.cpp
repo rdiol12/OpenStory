@@ -247,7 +247,6 @@ namespace ms
 		}
 
 		climb_cooldown.update();
-		update_cooldowns();
 
 		if (chair_itemid > 0)
 		{
@@ -622,47 +621,16 @@ namespace ms
 
 	void Player::add_cooldown(int32_t skill_id, int32_t cooltime)
 	{
-		cooldowns[skill_id] = cooltime;
+		if (cooltime <= 0)
+			cooldowns.erase(skill_id);
+		else
+			cooldowns[skill_id] = std::chrono::steady_clock::now() + std::chrono::seconds(cooltime);
 	}
 
 	bool Player::has_cooldown(int32_t skill_id) const
 	{
 		auto iter = cooldowns.find(skill_id);
-
-		if (iter == cooldowns.end())
-			return false;
-
-		return iter->second > 0;
-	}
-
-	// Cooldowns arrive from the server in whole seconds, both from ADD_COOLDOWN
-	// and from the character data at login. Nothing counted them down, so any
-	// skill the server reported as cooling stayed blocked for the rest of the
-	// session and printed "You cannot use this skill as it is on cooldown" on
-	// every press.
-	void Player::update_cooldowns()
-	{
-		if (cooldowns.empty())
-			return;
-
-		cooldown_elapsed += Constants::TIMESTEP;
-
-		if (cooldown_elapsed < 1000)
-			return;
-
-		int32_t seconds = cooldown_elapsed / 1000;
-		cooldown_elapsed %= 1000;
-
-		for (auto iter = cooldowns.begin(); iter != cooldowns.end(); )
-		{
-			if (iter->second <= seconds)
-				iter = cooldowns.erase(iter);
-			else
-			{
-				iter->second -= seconds;
-				++iter;
-			}
-		}
+		return iter != cooldowns.end() && std::chrono::steady_clock::now() < iter->second;
 	}
 
 	void Player::change_level(uint16_t level)

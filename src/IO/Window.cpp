@@ -136,7 +136,7 @@ namespace ms
 		// Mirror SetFieldHandler's formula exactly so the logical view it
 		// computes on a map load matches the one used here.
 		float ui_scale = phys_w / 1280.0f;
-		ui_scale = std::max(1.0f, std::min(ui_scale, 4.0f));
+		ui_scale = std::clamp(ui_scale, 1.0f, 4.0f);
 
 		Constants::Constants::get().set_ui_scale(ui_scale);
 		Constants::Constants::get().set_viewwidth(static_cast<int16_t>(phys_w));

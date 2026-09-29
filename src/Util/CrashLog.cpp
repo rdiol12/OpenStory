@@ -209,20 +209,9 @@ namespace ms
 // they had. Widening this to Linux is a one-line change once someone can build it.
 #elif defined(PLATFORM_MACOS)
 
-// POSIX counterpart of the Windows logger above. Deliberately minimal: a
-// signal handler that writes a raw backtrace to crashlog.txt (same filename and
-// same cwd as the Windows path) and to stderr, then lets the default action
-// run so the OS still produces its own report / core file.
-//
-// Everything in the handler is restricted to async-signal-safe calls: a
-// pre-opened file descriptor, write(), and backtrace_symbols_fd() -- which,
-// unlike backtrace_symbols(), writes straight to an fd instead of allocating.
-// backtrace() itself can lazily initialize on first use, so install() warms it
-// up while the process is still healthy.
-//
-// Symbol names come from the dynamic symbol table, so file/line resolution
-// needs `atos -o OpenStory <addr>`; the addresses in the
-// log are enough for that.
+// Fatal signals record the signal/address with async-signal-safe writes, then
+// restore the default action so macOS produces the authoritative stack report.
+// Uncaught exceptions can also capture a best-effort backtrace outside a signal.
 
 #include <execinfo.h>
 #include <fcntl.h>
@@ -290,19 +279,12 @@ namespace ms
 
 		void write_report(int fd, const char* label, int sig, void* addr)
 		{
+			if (fd < 0)
+				return;
 			write_str(fd, "\n=== ");
 			write_str(fd, label);
 			write_str(fd, " ===\nsignal: ");
 			write_int(fd, sig);
-
-			const char* name = (sig > 0 && sig < NSIG) ? ::strsignal(sig) : nullptr;
-
-			if (name)
-			{
-				write_str(fd, " (");
-				write_str(fd, name);
-				write_str(fd, ")");
-			}
 
 			// Printed for every signal report, including a null address: a
 			// null fault address is the single most informative value there is.
@@ -324,13 +306,14 @@ namespace ms
 				write_str(fd, hex);
 			}
 
-			write_str(fd, "\n--- stack ---\n");
-
-			void* frames[MAX_FRAMES];
-			int captured = ::backtrace(frames, MAX_FRAMES);
-
-			if (captured > 0)
-				::backtrace_symbols_fd(frames, captured, fd);
+			if (sig == 0)
+			{
+				write_str(fd, "\n--- stack ---\n");
+				void* frames[MAX_FRAMES];
+				int captured = ::backtrace(frames, MAX_FRAMES);
+				if (captured > 0)
+					::backtrace_symbols_fd(frames, captured, fd);
+			}
 
 			write_str(fd, "\n");
 		}
@@ -371,6 +354,7 @@ namespace ms
 				write_str(STDERR_FILENO, "[CrashLog] captured to crashlog.txt\n");
 			}
 
+			::signal(SIGABRT, SIG_DFL);
 			std::abort();
 		}
 	}

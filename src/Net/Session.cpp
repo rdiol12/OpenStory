@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Session.h"
 
+#include <algorithm>
+#include <cstring>
+
 #include "../Configuration.h"
 
 namespace ms
@@ -36,7 +39,9 @@ namespace ms
 
 	bool Session::init(const char* host, const char* port)
 	{
-		// Connect to the server
+		// A new stream cannot continue a packet from the previous connection.
+		length = pos = header_pos = 0;
+		++connection_id;
 		connected = socket.open(host, port);
 
 		if (connected)
@@ -72,72 +77,55 @@ namespace ms
 
 	void Session::process(const int8_t* bytes, size_t available)
 	{
-		if (pos == 0)
+		const auto stream = connection_id;
+		while (available > 0 && connected && stream == connection_id)
 		{
-			if (available < HEADER_LENGTH)
-				return;
-
-			// Position is zero, meaning this is the start of a new packet. Start by determining length.
-			length = cryptography.check_length(bytes);
-			// Reading the length means we processed the header. Move forward by the header length.
-			bytes = bytes + HEADER_LENGTH;
-			available -= HEADER_LENGTH;
-
-			// check_length sign-extends a 16-bit value through int16_t, so a
-			// corrupt or desynced header yields either 0 or (for anything with
-			// the high bit set) a huge size_t. A huge length makes the memcpy
-			// below accumulate past the end of `buffer`; a zero length makes
-			// process() recurse without consuming anything. Drop the rest of
-			// this read instead of doing either.
-			if (length == 0 || length > MAX_PACKET_LENGTH)
+			if (length == 0)
 			{
-				length = 0;
-				pos = 0;
+				const auto count = std::min(HEADER_LENGTH - header_pos, available);
+				std::memcpy(header + header_pos, bytes, count);
+				header_pos += count;
+				bytes += count;
+				available -= count;
+				if (header_pos < HEADER_LENGTH)
+					return;
 
-				return;
+				length = cryptography.check_length(header);
+				header_pos = 0;
+				// Every body must contain an opcode and fit the receive buffer.
+				if (length < MIN_PACKET_LENGTH - HEADER_LENGTH || length > sizeof(buffer))
+				{
+					socket.close();
+					connected = false;
+					length = pos = 0;
+					return;
+				}
 			}
-		}
 
-		// Determine how much we can write. Write data into the buffer.
-		size_t towrite = length - pos;
+			const auto count = std::min(length - pos, available);
+			std::memcpy(buffer + pos, bytes, count);
+			pos += count;
+			bytes += count;
+			available -= count;
+			if (pos < length)
+				return;
 
-		if (towrite > available)
-			towrite = available;
-
-		memcpy(buffer + pos, bytes, towrite);
-		pos += towrite;
-
-		// Check if the current packet has been fully processed
-		if (pos >= length)
-		{
-			cryptography.decrypt(buffer, length);
-
+			const auto packet_length = length;
+			cryptography.decrypt(buffer, packet_length);
+			length = pos = 0;
 			try
 			{
-				packetswitch.forward(buffer, length);
+				packetswitch.forward(buffer, packet_length);
 			}
 			catch (const PacketError&)
 			{
 			}
 			catch (const std::exception&)
 			{
-				// A handler hit an unexpected error (e.g. std::out_of_range
-				// from an unguarded container access). Swallow it so one bad
-				// packet degrades gracefully instead of terminating the
-				// whole client.
+				// Keep existing handler error isolation.
 			}
-
-			pos = 0;
-			length = 0;
-
-			// Check if there is more available
-			size_t remaining = available - towrite;
-
-			if (remaining >= MIN_PACKET_LENGTH)
-			{
-				// More packets are available, so we start over.
-				process(bytes + towrite, remaining);
-			}
+			// A handler can reconnect (e.g. channel change). Never feed the old
+			// stream's remaining bytes into that connection's fresh crypto state.
 		}
 	}
 
@@ -156,10 +144,10 @@ namespace ms
 
 	void Session::read()
 	{
-		// Check if a packet has arrived. Handle if data is sufficient: 4 bytes (header) + 2 bytes (opcode) = 6 bytes.
+		// TCP reads may split either the header or the body at any byte.
 		size_t result = socket.receive(&connected);
 
-		if (result >= MIN_PACKET_LENGTH || length > 0)
+		if (result > 0)
 		{
 			// Retrieve buffer from the socket and process it
 			const int8_t* bytes = socket.get_buffer();

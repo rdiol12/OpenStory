@@ -60,6 +60,9 @@ namespace ms
 		PacketSwitch packetswitch;
 
 		int8_t buffer[MAX_PACKET_LENGTH];
+		int8_t header[HEADER_LENGTH];
+		size_t header_pos = 0;
+		size_t connection_id = 0;
 		size_t length;
 		size_t pos;
 		bool connected;
