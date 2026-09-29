@@ -1,4 +1,4 @@
-# OpenStory
+# OpenStory for jailbroken ps5 must have fpkg support
 
 ## PS5 port
 
