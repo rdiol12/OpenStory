@@ -429,6 +429,18 @@ namespace ms
 
 		for (size_t i = 0; i <= text.size(); i++)
 		{
+			// Only codepoint boundaries are candidates. The result becomes
+			// markerpos / sel_anchor / sel_end, and every one of those is used
+			// as a raw byte offset for insert() and erase(); landing on a
+			// continuation byte (0b10xxxxxx) splits a multi-byte character in
+			// half. With the Hebrew support added in this fork that is one
+			// click away: click into a Hebrew word in chat, type, and the
+			// stored string is no longer valid UTF-8 from that point on --
+			// mojibake for the rest of the line, and a truncated sequence on
+			// the clipboard if it is then copied.
+			if (i < text.size() && (static_cast<uint8_t>(text[i]) & 0xC0) == 0x80)
+				continue;
+
 			int16_t dist = std::abs(textlabel.advance(i) - relx);
 
 			if (dist < bestdist)

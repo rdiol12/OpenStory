@@ -17,16 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#ifdef PLATFORM_IOS
-	#include <OpenGLES/ES3/gl.h>
-	#include <OpenGLES/ES3/glext.h>
-	#ifndef GL_BGRA
-		#define GL_BGRA GL_BGRA_EXT
-	#endif
-#else
-	#define GLEW_STATIC
-	#include <glew.h>
-#endif
+// This used to be a second, hand-copied version of the GLCompat.h block below,
+// which meant it never learned about macOS: with PLATFORM_IOS undefined it fell
+// into the Windows/Linux branch and pulled in <glew.h> with GLEW_STATIC and
+// without GLEW_NO_GLU, so whichever of the two headers a translation unit
+// happened to include first decided how GLEW was configured for that TU.
+// Route it through the single shared header instead -- its Windows/Linux and
+// iOS branches are the same two lines this replaced, so neither platform
+// changes.
+#include "../../platform/shared/GLCompat.h"
 
 #include <array>
 #include <stdint.h>

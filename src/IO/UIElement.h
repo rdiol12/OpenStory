@@ -141,7 +141,11 @@ namespace ms
 		virtual void update();
 		virtual void update_screen(int16_t new_width, int16_t new_height) {}
 
-		void makeactive();
+		// Virtual so subclasses can catch up on a viewport change that happened
+		// while they were closed: update_screen() is only dispatched to active
+		// elements, so a hidden window would otherwise reappear laid out for a
+		// viewport that no longer exists.
+		virtual void makeactive();
 		void deactivate();
 		bool is_active() const;
 

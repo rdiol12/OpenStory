@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <chrono>
+
 #include "ActiveBuffs.h"
 #include "BuddyList.h"
 #include "MonsterBook.h"
@@ -176,7 +178,8 @@ namespace ms
 		ActiveBuffs active_buffs;
 		PassiveBuffs passive_buffs;
 
-		std::unordered_map<int32_t, int32_t> cooldowns;
+		// Deadlines keep server durations independent of frame timing and map loads.
+		std::unordered_map<int32_t, std::chrono::steady_clock::time_point> cooldowns;
 
 		std::map<KeyAction::Id, bool> keysdown;
 

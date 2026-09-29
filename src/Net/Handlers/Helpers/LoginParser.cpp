@@ -148,7 +148,10 @@ namespace ms
 		for (size_t i = 0; i < 3; i++)
 			statsentry.petids.push_back(recv.read_long());
 
-		statsentry.stats[MapleStat::Id::LEVEL] = recv.read_byte(); // v83 uses byte for level (max 200)
+		// v83 uses a byte for level (max 200). read_byte() returns int8_t, so
+		// levels above 127 came through negative and wrapped when stored in
+		// the unsigned stat — cast to uint8_t first.
+		statsentry.stats[MapleStat::Id::LEVEL] = static_cast<uint8_t>(recv.read_byte());
 
 		auto job = recv.read_short();
 

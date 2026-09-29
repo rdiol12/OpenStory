@@ -31,6 +31,10 @@ namespace ms
 		void draw(double viewx, double viewy, float alpha) const;
 		void update();
 
+		// OPENSTORY_GFXDEBUG only (see gfx_debug_enabled in GraphicsGL.h).
+		bool debug_interesting(float alpha) const;
+		void debug_report(size_t index, double viewx, double viewy, float alpha) const;
+
 	private:
 		enum Type
 		{
@@ -69,6 +73,8 @@ namespace ms
 		int16_t vtile;
 		float opacity;
 		bool flipped;
+		// Art node carried `blend: 1`: draw additively (light rays / glows).
+		bool blend = false;
 
 		MovingObject moveobj;
 	};

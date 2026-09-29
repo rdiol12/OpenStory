@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "FootholdTree.h"
 
+#include "../MapleMap/Layer.h"
+
 namespace ms
 {
 	FootholdTree::FootholdTree(nl::node src)
@@ -38,6 +40,12 @@ namespace ms
 			{
 				continue;
 			}
+
+			// The layer ends up indexing MapObjects::layers, a fixed
+			// std::array<..., Layer::Id::LENGTH>. A group named outside 0..7
+			// would index it out of bounds, so pin it to the last layer.
+			if (layer >= Layer::Id::LENGTH)
+				layer = Layer::Id::LENGTH - 1;
 
 			for (auto midf : basef)
 			{

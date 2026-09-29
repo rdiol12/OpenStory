@@ -55,6 +55,10 @@ namespace ms
 		// the wheel routes to the UI under the cursor).
 		Point<int16_t> get_cursor_position() const;
 		void send_focus(int focused);
+		// Dispatches a key-up for everything currently latched down and
+		// clears the held-key table. Called on focus loss, where the OS
+		// never delivers the real releases.
+		void release_held_keys();
 		void send_scroll(double yoffset);
 		void send_close();
 		void rightclick();

@@ -56,6 +56,11 @@ namespace ms
 	void MapDragons::clear()
 	{
 		dragons.clear();
+
+		// A queued spawn belongs to the map it arrived on. clear() runs on the
+		// map change *before* the new map loads, so anything still queued here
+		// is stale -- left in place it materialised on the next map.
+		spawns = {};
 	}
 
 	void MapDragons::send_movement(int32_t owner_id, const std::vector<Movement>& movements)
