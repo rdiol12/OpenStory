@@ -31,6 +31,12 @@ Settings
 /vendor/freetype.bak-*
 /launcher/node_modules
 /launcher/dist
+/launcher/bin/
+/launcher/obj/
+/launcher/config.ini
+.env
+.env.*
+!.env.example
 crash_debug.txt
 
 # local deploy scripts (never publish - contain server/ssh details)

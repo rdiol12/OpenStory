@@ -16,7 +16,7 @@ public sealed class LauncherConfig
     public string ClientManifestUrl { get; set; } = "https://updates.example/updates/client/manifest.json";
     public string FeedUrl { get; set; } = "https://updates.example/updates/feed.json"; // GenAI live feed
     public int FeedRefreshSeconds { get; set; } = 45;
-    public string NewsUrl { get; set; } = "https://server.example/api/launcher/news"; // live GM activity (dashboard)
+    public string NewsUrl { get; set; } = "https://updates.example/api/launcher/news"; // live GM activity (dashboard)
     public string LauncherManifestUrl { get; set; } = "https://updates.example/updates/launcher.json"; // self-update
     // Live game-server status probe (login port). Host defaults to the client's
     // configured ServerIP; GameHost here is only the fallback.
