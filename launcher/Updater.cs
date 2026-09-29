@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Net.Security;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -60,12 +59,10 @@ public sealed class PendingFile : INotifyPropertyChanged
 }
 
 /// <summary>
-/// Syncs the two manifests (game-data + client-build). Self-signed TLS is
-/// trusted only for host 127.0.0.1.
+/// Syncs the game-data and client-build manifests using standard TLS validation.
 /// </summary>
 public sealed class Updater
 {
-    private const string TrustedHost = "127.0.0.1";
     private const int MaxAttempts = 3;
 
     private readonly LauncherConfig _cfg;
@@ -81,15 +78,6 @@ public sealed class Updater
 
         var handler = new SocketsHttpHandler
         {
-            SslOptions = new SslClientAuthenticationOptions
-            {
-                RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
-                {
-                    string host = (sender as SslStream)?.TargetHostName ?? "";
-                    
-                    return errors == SslPolicyErrors.None;
-                }
-            },
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         };
         _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };

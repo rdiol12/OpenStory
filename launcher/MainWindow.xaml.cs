@@ -356,7 +356,7 @@ public partial class MainWindow : Window
             StatusText.Text = "Updating launcher…";
             string url = !string.IsNullOrWhiteSpace(rel.Url)
                 ? rel.Url
-                : "https://updates.example/updates/client/GenMs.exe";
+                : _cfg.UpdateOrigin + "/updates/client/GenMs.exe";
             string newExe = await _updater.DownloadLauncherAsync(rel, url, _cts.Token);
 
             if (SelfUpdater.ApplyAndRelaunch(newExe))
