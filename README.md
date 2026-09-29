@@ -72,10 +72,10 @@ ServerPort = 8484
 SaveLogin = false
 ```
 
-Use `127.0.0.1` only when the server runs on the same computer. Start the server,
+Start the server,
 open the client, then log in with an account created on that server. On PS5,
 enter the address on the server selection screen. Display preferences such as
-`VSync` and `Fullscreen` can also be changed in `Settings`.
+
 
 ## Quest Helper
 
