@@ -1,6 +1,6 @@
 # OpenStory
 
-## PS5 port llok at ps5 branch
+## PS5 port look at ps5 branch
 
 The experimental native PS5 port provides controller navigation, native keyboard entry, server selection and streamed NX loading. See the [PS5 build and play guide](https://github.com/rdiol12/OpenStory/blob/ps5/platform/ps5/README.md).
 
