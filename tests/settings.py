@@ -11,10 +11,11 @@ with tempfile.TemporaryDirectory(prefix='openstory-settings-') as directory:
     source.write_text(r'''
 #include "Configuration.h"
 #include <cassert>
-int main() {
+int main(int argc, char**) {
     ms::Configuration::get().load();
     assert(ms::Setting<ms::ServerIP>::get().load() == "127.0.0.1");
     assert(ms::Setting<ms::ServerPort>::get().load() == "8484");
+    if (argc > 1) return 0;
     assert(ms::Setting<ms::SaveLogin>::get().load());
     assert(ms::Setting<ms::DefaultAccount>::get().load() == "test account  ");
 }
@@ -24,6 +25,7 @@ int main() {
                     '-fdata-sections', '-Wl,--gc-sections', '-I/usr/include/GL',
                     '-I' + str(root / 'src'), '-I' + str(root / 'vendor/NoLifeNx'),
                     str(source), str(root / 'src/Configuration.cpp'), '-o', str(binary)], check=True)
+    subprocess.run([binary, '--defaults'], cwd=work, check=True)
     lines = ['# Connection', '', 'ServerIP = 127.0.0.1', 'ServerPort = 8484',
              'SaveLogin = true', 'Account = test account  ', '']
     for newline in ('\n', '\r\n'):
