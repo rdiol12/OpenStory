@@ -80,7 +80,7 @@ namespace ms
 		for (size_t i = 0; i < 4; i++)
 			headermask |= static_cast<uint8_t>(bytes[i]) << (8 * i);
 
-		return static_cast<int16_t>((headermask >> 16) ^ (headermask & 0xFFFF));
+		return static_cast<uint16_t>((headermask >> 16) ^ (headermask & 0xFFFF));
 #else
 		size_t length = 0;
 

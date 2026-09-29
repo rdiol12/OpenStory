@@ -1,13 +1,17 @@
 #include "Audio/Audio.h"
 #include "Configuration.h"
+#include "Gameplay/Stage.h"
 #include "IO/UI.h"
+#include "IO/UITypes/UIStatusBar.h"
 #include "IO/Components/MapleComboBox.h"
 #include "IO/Components/Slider.h"
 #include <nlnx/nx.hpp>
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace ms { Error init(bool offline); }
 
@@ -41,6 +45,30 @@ int main(int argc, char** argv) {
             ms::UI::get().change_state(ms::UI::GAME);
             ms::UI::get().update();
             ms::UI::get().draw(1.0f);
+            const auto statusbar = ms::UI::get().get_element<ms::UIStatusBar>();
+            assert(statusbar && !statusbar->controller_targets().empty());
+        } else if (test == "cooldown") {
+            auto& player = ms::Stage::get().get_player();
+            auto check = [](bool condition, const char* message) {
+                if (!condition) throw std::runtime_error(message);
+            };
+            player.add_cooldown(1000, 1);
+            check(player.has_cooldown(1000), "new cooldown starts active");
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            player.add_cooldown(1001, 1);
+            player.add_cooldown(1002, 10);
+            player.add_cooldown(1002, 0);
+            check(!player.has_cooldown(1002), "server zero cancels an existing cooldown");
+            player.add_cooldown(1003, 10);
+            player.add_cooldown(1003, 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(850));
+            // No Player::update during these waits: map/loading pauses must not extend server cooldowns.
+            check(!player.has_cooldown(1000), "cooldown must expire after elapsed time without player updates");
+            check(player.has_cooldown(1001), "staggered cooldown must keep its own full second");
+            check(player.has_cooldown(1003), "replacement cooldown starts from the server update");
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            check(!player.has_cooldown(1001), "staggered cooldown must eventually expire");
+            check(!player.has_cooldown(1003), "server replacement duration must replace the old deadline");
         } else {
             throw std::runtime_error("unknown test");
         }

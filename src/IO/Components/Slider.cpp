@@ -295,7 +295,7 @@ namespace ms
 			next.set_state(Button::State::NORMAL);
 		}
 
-		if (cursor.y() < vertical.second())
+		if (cursor.y() < vertical.second() && rowheight > 0)
 		{
 			if (pressed)
 			{

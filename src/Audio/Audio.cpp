@@ -38,7 +38,9 @@ namespace
 #include <bass.h>
 #endif
 
+#include <cctype>
 #include <cmath>
+#include <string>
 
 #ifdef USE_NX
 #include <nlnx/audio.hpp>
@@ -47,6 +49,80 @@ namespace
 
 namespace ms
 {
+	namespace
+	{
+		bool name_iequals(const std::string& a, const std::string& b)
+		{
+			if (a.size() != b.size())
+				return false;
+
+			for (size_t i = 0; i < a.size(); i++)
+			{
+				auto left = std::tolower(static_cast<unsigned char>(a[i]));
+				auto right = std::tolower(static_cast<unsigned char>(b[i]));
+
+				if (left != right)
+					return false;
+			}
+
+			return true;
+		}
+
+		// Resolve a '/'-separated node path, falling back to a case-insensitive
+		// scan of a level's children whenever the exact name is not there.
+		//
+		// For example, Map.nx names BGM06.img/FinalFight while Sound.nx
+		// stores Bgm06.img/FinalFight. Scan siblings only after an exact miss.
+		nl::node resolve_relaxed(nl::node root, const std::string& path)
+		{
+			nl::node exact = root.resolve(path);
+
+			if (exact)
+				return exact;
+
+			nl::node current = root;
+
+			for (size_t pos = 0; pos < path.size(); )
+			{
+				size_t slash = path.find('/', pos);
+				size_t len = (slash == std::string::npos) ? path.size() - pos : slash - pos;
+				std::string segment = path.substr(pos, len);
+
+				pos = (slash == std::string::npos) ? path.size() : slash + 1;
+
+				if (segment.empty())
+					continue;
+
+				nl::node child = current[segment];
+
+				if (!child)
+				{
+					for (nl::node candidate : current)
+					{
+						if (name_iequals(candidate.name(), segment))
+						{
+							child = candidate;
+							break;
+						}
+					}
+				}
+
+				// Still nothing: the path genuinely is not in this NX file.
+				// GMS v83 Sound.nx has no "Bgm20.img/Subway" and no "BgmTH.img"
+				// at all, and both are referenced by Map.nx. Returning the null
+				// node is deliberate -- node/audio conversions on a null node
+				// yield audio{nullptr, 0}, so the callers below see a null data
+				// pointer and simply keep the current track. No crash, no log.
+				if (!child)
+					return nl::node();
+
+				current = child;
+			}
+
+			return current;
+		}
+	}
+
 	Sound::Sound(Name name)
 	{
 		id = soundids[name];
@@ -336,7 +412,7 @@ namespace ms
 		if (path == bgmpath)
 			return;
 
-		nl::audio ad = nl::nx::sound.resolve(path);
+		nl::audio ad = resolve_relaxed(nl::nx::sound, path);
 		auto data = reinterpret_cast<const void*>(ad.data());
 
 		if (data)
@@ -366,7 +442,7 @@ namespace ms
 		if (path == bgmpath)
 			return;
 
-		nl::audio ad = nl::nx::sound.resolve(path);
+		nl::audio ad = resolve_relaxed(nl::nx::sound, path);
 		auto data = reinterpret_cast<const void*>(ad.data());
 
 		if (data)
@@ -461,7 +537,7 @@ namespace
 	void play_music(const std::string& path, int loops)
 	{
 		if (path == music_path && Mix_PlayingMusic()) return;
-		auto* stream = audio_stream(nl::nx::sound.resolve(path));
+		auto* stream = audio_stream(ms::resolve_relaxed(nl::nx::sound, path));
 		auto* next = stream ? Mix_LoadMUS_RW(stream, 1) : nullptr;
 		if (!next) return;
 		Mix_HaltMusic();

@@ -19,6 +19,8 @@
 
 #include "../../Graphics/GraphicsGL.h"
 
+#include <iostream>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -35,8 +37,19 @@ namespace ms
 		nl::node backsrc = nl::nx::map["Back"];
 
 		animated = src["ani"].get_bool();
-		animation = backsrc[src["bS"] + ".img"][animated ? "ani" : "back"][src["no"]];
+
+		nl::node artsrc = backsrc[src["bS"] + ".img"][animated ? "ani" : "back"][src["no"]];
+
+		animation = artsrc;
 		opacity = src["a"];
+
+		// `blend: 1` on the ART node (not on the map's back entry) marks a
+		// light/glow layer that accumulates instead of covering: MapleStory's
+		// god-rays, e.g. Back/shineWood.img/back/16-20 in the Ellinia maps.
+		// Alpha-blended they read as flat grey haze over the foliage; additive
+		// is what makes them look like light. Same flag CharAuras already
+		// routes through GraphicsGL::setblend.
+		blend = artsrc["blend"].get_bool() || artsrc["0"]["blend"].get_bool();
 		flipped = src["f"].get_bool();
 		cx = src["cx"];
 		cy = src["cy"];
@@ -147,9 +160,17 @@ namespace ms
 		int16_t tw = cx * htile;
 		int16_t th = cy * vtile;
 
+		// Opened and closed around the whole tile loop with nothing between
+		// that can return early, so the additive range is always closed.
+		if (blend)
+			GraphicsGL::get().setblend(true);
+
 		for (int16_t tx = 0; tx < tw; tx += cx)
 			for (int16_t ty = 0; ty < th; ty += cy)
 				animation.draw(DrawArgument(Point<int16_t>(ix + tx, iy + ty), flipped, opacity / 255), alpha);
+
+		if (blend)
+			GraphicsGL::get().setblend(false);
 	}
 
 	void Background::update()
@@ -181,6 +202,38 @@ namespace ms
 
 	MapBackgrounds::MapBackgrounds() {}
 
+	// OPENSTORY_GFXDEBUG: one line per layer per second, for the layers that
+	// matter (blend/glow layers always; everything else only in the first
+	// sweep after a map load). Shows the computed screen position, the tile
+	// count the layer emits, and the frame alpha actually being applied -- a
+	// moving alpha on a one-frame layer is the a0/a1 sawtooth.
+	bool Background::debug_interesting(float alpha) const
+	{
+		return blend || animation.get_opacity(alpha) != 255.0f || opacity != 255.0f;
+	}
+
+	void Background::debug_report(size_t index, double viewx, double viewy, float alpha) const
+	{
+		double x = moveobj.hmobile()
+			? moveobj.get_absolute_x(viewx, alpha)
+			: moveobj.get_absolute_x(rx * (WOFFSET - viewx) / 100 + WOFFSET, alpha);
+		double y = moveobj.vmobile()
+			? moveobj.get_absolute_y(viewy, alpha)
+			: moveobj.get_absolute_y(ry * (HOFFSET - viewy) / 100 + HOFFSET, alpha);
+
+		int tiles = (htile > 1 ? htile : 1) * (vtile > 1 ? vtile : 1);
+
+		std::cout << "[GFXPROBE] back[" << index << "]"
+			<< " blend=" << (blend ? 1 : 0)
+			<< " ani=" << (animated ? 1 : 0)
+			<< " cx=" << cx << " cy=" << cy
+			<< " tiles=" << tiles
+			<< " x=" << x << " y=" << y
+			<< " layer_a=" << opacity
+			<< " frame_a=" << animation.get_opacity(alpha)
+			<< std::endl;
+	}
+
 	void MapBackgrounds::drawbackgrounds(double viewx, double viewy, float alpha) const
 	{
 		if (black)
@@ -188,6 +241,16 @@ namespace ms
 
 		for (auto& background : backgrounds)
 			background.draw(viewx, viewy, alpha);
+
+		if (gfx_debug_enabled())
+		{
+			static size_t tick = 0;
+
+			if (tick++ % 60 == 0)
+				for (size_t i = 0; i < backgrounds.size(); i++)
+					if (backgrounds[i].debug_interesting(alpha))
+						backgrounds[i].debug_report(i, viewx, viewy, alpha);
+		}
 	}
 
 	void MapBackgrounds::drawforegrounds(double viewx, double viewy, float alpha) const

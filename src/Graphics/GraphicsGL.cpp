@@ -19,6 +19,7 @@
 #include "../Util/Paths.h"
 
 #include <cstdlib>
+#include <iostream>
 
 #include "../Configuration.h"
 #include "EmbeddedFonts.h"
@@ -108,12 +109,55 @@ namespace ms
 		SCREEN = Rectangle<int16_t>(0, VWIDTH, 0, VHEIGHT);
 	}
 
+	bool gfx_debug_enabled()
+	{
+		// Read once: this is tested on the per-bitmap upload path.
+		static const bool enabled = []()
+		{
+			const char* flag = std::getenv("OPENSTORY_GFXDEBUG");
+
+			// Anything except unset, empty and "0" turns the traces on.
+			return flag != nullptr && flag[0] != '\0' && !(flag[0] == '0' && flag[1] == '\0');
+		}();
+
+		return enabled;
+	}
+
+	// Fraction of the atlas the shelf packer has handed out so far. Same figure
+	// clear() tests against its 80% threshold.
+	double GraphicsGL::dbg_used_percent() const
+	{
+		size_t used = static_cast<size_t>(ATLASW) * border.y() + static_cast<size_t>(border.x()) * yrange.second();
+
+		return 100.0 * static_cast<double>(used) / (static_cast<double>(ATLASW) * ATLASH);
+	}
+
+	void GraphicsGL::dbg_log_reset(ResetCause cause, GLshort w, GLshort h)
+	{
+		if (!gfx_debug_enabled())
+			return;
+
+		dbg_resets++;
+		dbg_resets_window++;
+
+		std::cout << "[GFXPROBE] RESET #" << dbg_resets
+			<< " frame=" << dbg_frame
+			<< " cause=" << (cause == ResetCause::HEURISTIC ? "map-change-heuristic" : "ATLAS-FULL")
+			<< " used=" << dbg_used_percent() << "%"
+			<< " wasted=" << wasted
+			<< " offsets=" << offsets.size()
+			<< " trigger=" << w << "x" << h
+			<< std::endl;
+	}
+
 	Error GraphicsGL::init()
 	{
 #if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
 		// ES and desktop Core share the renderer; only the shader preamble differs.
 		const char* vertexShaderSource =
-#ifdef OPENSTORY_GL_CORE
+#ifdef PLATFORM_MACOS
+			"#version 410 core\n"
+#elif defined(OPENSTORY_GL_CORE)
 			"#version 330 core\n"
 #else
 			"#version 300 es\n"
@@ -135,7 +179,9 @@ namespace ms
 			"}\n";
 
 		const char* fragmentShaderSource =
-#ifdef OPENSTORY_GL_CORE
+#ifdef PLATFORM_MACOS
+			"#version 410 core\n"
+#elif defined(OPENSTORY_GL_CORE)
 			"#version 330 core\n"
 #else
 			"#version 300 es\n"
@@ -164,8 +210,12 @@ namespace ms
 			"	}\n"
 			"}\n";
 
+
+		// `texture` is a reserved builtin in modern GLSL, so the sampler is
+		// named `tex` in both of the shaders above.
 		const char* uniformTexName = "tex";
 #else
+		// Windows / Linux: unchanged legacy GLSL 120 pair.
 		const char* vertexShaderSource =
 			"#version 120\n"
 			"attribute vec4 coord;"
@@ -237,6 +287,20 @@ namespace ms
 
 		FT_Library_Version(ftlibrary, &ftmajor, &ftminor, &ftpatch);
 
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		// VAO required by OpenGL ES 3.0 and by the desktop core profile, which
+		// has no default vertex array object: every glVertexAttribPointer and
+		// every draw call needs a non-zero VAO bound. This has to happen before
+		// glValidateProgram below — with no VAO bound, validation fails on a
+		// core profile with "Validation Failed: No vertex array object bound."
+		// Nothing ever unbinds it, but init() runs against the hidden 1x1
+		// context, and VAO names do not carry over to the window's context --
+		// see bind_context_vao(), which Window::initwindow calls once the real
+		// context is current.
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+#endif
+
 		// Vertex Shader
 		GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 		glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -302,13 +366,12 @@ namespace ms
 			return Error::Code::SHADER_VARS;
 
 #if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
-		glGenVertexArrays(1, &VAO);
-		glBindVertexArray(VAO);
 		glGenBuffers(1, &EBO);
 #endif
 
 		// Vertex Buffer Object
 		glGenBuffers(1, &VBO);
+
 
 		glGenTextures(1, &atlas);
 		glBindTexture(GL_TEXTURE_2D, atlas);
@@ -708,6 +771,19 @@ namespace ms
 		return placeholder;
 	}
 
+	void GraphicsGL::bind_context_vao()
+	{
+#if defined(PLATFORM_IOS) || defined(OPENSTORY_GL_CORE)
+		// Called after the window's context is made current. A VAO created on
+		// another context is not valid here -- shaders, buffers and textures are
+		// shared by glfwCreateWindow, vertex array objects are not -- so leaving
+		// the inherited name bound leaves VAO 0 bound in practice, and a core
+		// profile rejects every draw with GL_INVALID_OPERATION.
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+#endif
+	}
+
 	void GraphicsGL::reinit()
 	{
 		int32_t new_width = Constants::Constants::get().get_viewwidth();
@@ -735,7 +811,26 @@ namespace ms
 
 		glBindTexture(GL_TEXTURE_2D, atlas);
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		// Minification is GL_LINEAR, magnification stays GL_NEAREST.
+		//
+		// Every sprite is stored HD_SCALE (2x) larger than it is drawn (see
+		// upload), so a sprite quad is a 2:1 minification: screen pixel i
+		// samples at atlas texel `offset.left + 2*(i - left) + 1`, which is an
+		// exact integer -- i.e. precisely on the boundary between two texels.
+		// GL_NEAREST there is a coin flip decided by the last bit of the
+		// rasterizer's interpolation, so it can pick either neighbour, and the
+		// choice changes from frame to frame as the quad moves. On hard-edged
+		// pixel art the two neighbours are identical (upscale() duplicates),
+		// so nothing shows; on soft gradients -- light rays, glows, mists --
+		// they differ and the sprite shimmers. GL_LINEAR at an exact boundary
+		// returns the average of the two, which is stable and is the correct
+		// 2:1 downsample anyway.
+		//
+		// This never bleeds between atlas neighbours: the first and last
+		// samples of a quad sit a full texel inside its own rect. Text and
+		// any bitmap too large to have been upscaled are drawn 1:1, so they
+		// take the magnification path and stay on GL_NEAREST, unchanged.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 		clearinternal();
@@ -750,6 +845,24 @@ namespace ms
 		leftovers.clear();
 		rlid = 1;
 		wasted = 0;
+
+		// Color emoji strikes are allocated out of this same general region,
+		// but they are cached in the per-font glyph maps rather than in
+		// `offsets`, so nothing re-uploads them on demand the way bitmaps are
+		// re-uploaded after a reset. Drop them, or every cached emoji keeps an
+		// atlas rect that unrelated sprites are about to overwrite and renders
+		// as garbage for the rest of the session. Monochrome glyphs live above
+		// `fontymax`, which this reset does not touch, so they are kept.
+		for (Font& font : fonts)
+		{
+			for (auto it = font.chars.begin(); it != font.chars.end(); )
+			{
+				if (it->second.color)
+					it = font.chars.erase(it);
+				else
+					++it;
+			}
+		}
 	}
 
 	void GraphicsGL::clear()
@@ -757,8 +870,19 @@ namespace ms
 		size_t used = ATLASW * border.y() + border.x() * yrange.second();
 		double usedpercent = static_cast<double>(used) / (ATLASW * ATLASH);
 
+		if (gfx_debug_enabled())
+			std::cout << "[GFXPROBE] clear() checkpoint frame=" << dbg_frame
+				<< " used=" << (usedpercent * 100.0) << "%"
+				<< " offsets=" << offsets.size()
+				<< " wasted=" << wasted
+				<< (usedpercent > 0.8 ? " -> RESETTING" : " -> keeping")
+				<< std::endl;
+
 		if (usedpercent > 0.8)
+		{
+			dbg_log_reset(ResetCause::HEURISTIC, 0, 0);
 			clearinternal();
+		}
 	}
 
 	void GraphicsGL::addbitmap(const nl::bitmap& bmp)
@@ -846,6 +970,31 @@ namespace ms
 		}
 
 		return hdbuffer.data();
+	}
+
+	// `vertical` is a crop expressed in SOURCE pixels, but upload() stores the
+	// sprite HD_SCALE times larger, so the atlas rect is in a different unit.
+	// Taking the source figure off the atlas rect trims only half as many rows
+	// as it trims off the screen rectangle the quad covers, and the sprite
+	// comes out vertically stretched (visible on the item tooltip cover, which
+	// is the main non-zero-`vertical` caller). Derive the factor from the rect
+	// itself rather than assuming HD_SCALE, because upload() skips the 2x pass
+	// for bitmaps too large to fit scaled.
+	void GraphicsGL::crop_vertical(Offset& offset, int16_t srcheight, const Range<int16_t>& vertical)
+	{
+		int scale = 1;
+
+		if (srcheight > 0)
+		{
+			int atlasheight = offset.bottom - offset.top;
+			int derived = atlasheight / srcheight;
+
+			if (derived > 1)
+				scale = derived;
+		}
+
+		offset.top = static_cast<GLshort>(offset.top + vertical.first() * scale);
+		offset.bottom = static_cast<GLshort>(offset.bottom - vertical.second() * scale);
 	}
 
 	GraphicsGL::Offset GraphicsGL::upload(size_t id, GLshort width, GLshort height, const void* data)
@@ -965,6 +1114,18 @@ namespace ms
 
 		upload_bgra(x, y, width, height, pixels);
 
+		if (gfx_debug_enabled())
+		{
+			dbg_uploads_window++;
+			dbg_texels_window += static_cast<size_t>(width) * height;
+
+			if (static_cast<size_t>(srcw) * srch > dbg_biggest_w * dbg_biggest_h)
+			{
+				dbg_biggest_w = srcw;
+				dbg_biggest_h = srch;
+			}
+		}
+
 		return offsets.emplace(
 			std::piecewise_construct,
 			std::forward_as_tuple(id),
@@ -985,8 +1146,7 @@ namespace ms
 
 		Offset offset = getoffset(bmp);
 
-		offset.top += vertical.first();
-		offset.bottom -= vertical.second();
+		crop_vertical(offset, bmp.height(), vertical);
 
 		quads.emplace_back(rect.left(), rect.right(), rect.top() + vertical.first(), rect.bottom() - vertical.second(), offset, color, angle);
 	}
@@ -1004,8 +1164,7 @@ namespace ms
 
 		Offset offset = getoffset(id, width, height, data);
 
-		offset.top += vertical.first();
-		offset.bottom -= vertical.second();
+		crop_vertical(offset, height, vertical);
 
 		quads.emplace_back(rect.left(), rect.right(), rect.top() + vertical.first(), rect.bottom() - vertical.second(), offset, color, angle);
 	}
@@ -1522,6 +1681,35 @@ namespace ms
 
 	void GraphicsGL::flush(float opacity)
 	{
+		if (gfx_debug_enabled())
+		{
+			dbg_frame++;
+
+			// One line a second at 60fps. A steady-state frame should show
+			// uploads=0: anything else means sprites are being re-uploaded,
+			// and resets>0 in a window with no map change is atlas thrash.
+			if (dbg_frame % 60 == 0)
+			{
+				std::cout << "[GFXPROBE] frame=" << dbg_frame
+					<< " quads=" << quads.size()
+					<< " additive_ranges=" << additive_ranges.size()
+					<< (additive_active ? " (range still open at flush)" : "")
+					<< " atlas_used=" << dbg_used_percent() << "%"
+					<< " uploads/60f=" << dbg_uploads_window
+					<< " texels/60f=" << dbg_texels_window
+					<< " biggest_src=" << dbg_biggest_w << "x" << dbg_biggest_h
+					<< " resets/60f=" << dbg_resets_window
+					<< " resets_total=" << dbg_resets
+					<< std::endl;
+
+				dbg_uploads_window = 0;
+				dbg_texels_window = 0;
+				dbg_biggest_w = 0;
+				dbg_biggest_h = 0;
+				dbg_resets_window = 0;
+			}
+		}
+
 		bool coverscene = opacity != 1.0f;
 
 		if (coverscene)

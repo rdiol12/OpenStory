@@ -26,15 +26,7 @@
 
 #include <vector>
 
-#ifdef PLATFORM_PS5
 #include "../../platform/shared/GLCompat.h"
-#elif defined(PLATFORM_IOS)
-#include <OpenGLES/ES3/gl.h>
-#include <OpenGLES/ES3/glext.h>
-#else
-#define GLEW_STATIC
-#include <glew.h>
-#endif
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -45,6 +37,18 @@
 
 namespace ms
 {
+	// Runtime switch for the "[GFXPROBE]" renderer traces (atlas resets, atlas
+	// occupancy, per-frame upload volume, additive-range counts). Off unless
+	// OPENSTORY_GFXDEBUG is set in the environment to anything other than "0"
+	// or the empty string, e.g.
+	//
+	//     OPENSTORY_GFXDEBUG=1 ./OpenStory 2>&1 | tee gfx.log
+	//
+	// Read once, on first use: the flag is tested on the per-bitmap upload
+	// path, so getenv() per sprite would be wasteful. Mirrors
+	// ms::key_debug_enabled() in IO/Keyboard.h.
+	bool gfx_debug_enabled();
+
 	// Graphics engine which uses OpenGL
 	class GraphicsGL : public Singleton<GraphicsGL>
 	{
@@ -53,6 +57,11 @@ namespace ms
 
 		// Initialize all resources
 		Error init();
+		// Bind a vertex array object belonging to the context that is current
+		// *now*. VAOs are container objects: glfwCreateWindow's context sharing
+		// does not share them, so the window's context needs its own or every
+		// draw fails with GL_INVALID_OPERATION on a core profile.
+		void bind_context_vao();
 		// Re-initialize after changing screen modes
 		void reinit();
 
@@ -129,6 +138,9 @@ namespace ms
 		Offset getoffset(size_t id, GLshort width, GLshort height, const void* data);
 		// Allocate atlas space and upload BGRA pixels (shared by both paths)
 		Offset upload(size_t id, GLshort width, GLshort height, const void* data);
+		// Apply a source-pixel vertical crop to an atlas rect, converting into
+		// atlas units (the rect is HD_SCALE times the source -- see upload).
+		static void crop_vertical(Offset& offset, int16_t srcheight, const Range<int16_t>& vertical);
 
 		static const int HD_SCALE = 2;
 		std::vector<uint32_t> hdbuffer;
@@ -354,6 +366,22 @@ namespace ms
 		size_t wasted;
 		Point<GLshort> border;
 		Range<GLshort> yrange;
+
+		// --- OPENSTORY_GFXDEBUG instrumentation (inert unless the env var is
+		// set; see gfx_debug_enabled above). Counters only, no GL calls.
+		size_t dbg_frame = 0;			// frames flushed since start
+		size_t dbg_resets = 0;			// clearinternal() calls, total
+		size_t dbg_resets_window = 0;	// ... since the last summary line
+		size_t dbg_uploads_window = 0;	// upload() calls since last summary
+		size_t dbg_texels_window = 0;	// atlas texels written since last summary
+		size_t dbg_biggest_w = 0;		// largest source bitmap in the window
+		size_t dbg_biggest_h = 0;
+		// Where a reset came from: the map-change heuristic in clear(), or the
+		// atlas running out of room inside upload().
+		enum class ResetCause { HEURISTIC, OVERFLOW_FULL };
+		void dbg_log_reset(ResetCause cause, GLshort w, GLshort h);
+		double dbg_used_percent() const;
+		// --- end instrumentation
 
 		// Returns the glyph for the given (font, codepoint), by value.
 		// Loads the glyph into the atlas lazily if it hasn't been cached yet.

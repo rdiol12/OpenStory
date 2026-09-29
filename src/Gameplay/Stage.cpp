@@ -94,6 +94,12 @@ namespace ms
 		mists.clear();
 		point_effects.clear();
 		reactors.clear();
+
+		// Weather is a property of the map we are leaving. The server only
+		// ever sends BLOW_WEATHER for a map that has it, never a clear on the
+		// way out, so without this the old map's snow/rain kept falling on
+		// the new one for the rest of the session.
+		weather.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -356,7 +362,13 @@ namespace ms
 				playable->send_action(KeyAction::actionbyid(action), down);
 				break;
 			case KeyType::Id::SKILL:
-				combat.use_move(action);
+				// Press only, matching ITEM and MACRO below. Firing on release
+				// too made a buff skill cast twice, and the second cast hit the
+				// cooldown the first one had just started -- which is where the
+				// "you cannot use this skill" line on key-up came from. Holding
+				// the key still repeats: GLFW_REPEAT arrives as another press.
+				if (down)
+					combat.use_move(action);
 				break;
 			case KeyType::Id::MACRO:
 				if (down)

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Template for OpenStory.app/Contents/Info.plist.
+	Configured by CMake (@ONLY) into ${CMAKE_BINARY_DIR}/OpenStoryInfo.plist and
+	installed by the MACOSX_BUNDLE_INFO_PLIST property of the OpenStoryApp target.
+	Do not edit the generated copy - edit this file.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+
+	<key>CFBundleIdentifier</key>
+	<string>@OPENSTORY_BUNDLE_ID@</string>
+	<key>CFBundleName</key>
+	<string>@MS_BUNDLE_NAME@</string>
+	<key>CFBundleDisplayName</key>
+	<string>@MS_BUNDLE_NAME@</string>
+	<key>CFBundleExecutable</key>
+	<string>@MS_BUNDLE_EXECUTABLE_NAME@</string>
+
+	<key>CFBundleShortVersionString</key>
+	<string>@OPENSTORY_BUNDLE_VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@OPENSTORY_BUNDLE_VERSION@</string>
+@MS_BUNDLE_ICON_ENTRY@
+	<key>LSMinimumSystemVersion</key>
+	<string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.role-playing-games</string>
+
+	<!-- Retina-aware OpenGL renderer: hand it the real backing scale instead of
+	     a 2x-upscaled 1x framebuffer. -->
+	<key>NSHighResolutionCapable</key>
+	<true/>
+
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright (C) 2015-2019 Daniel Allendorf, Ryan Payton. Licensed under the GNU AGPL v3.</string>
+</dict>
+</plist>

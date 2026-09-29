@@ -137,7 +137,13 @@ namespace ms
 		bool listNpc_enabled;
 		nl::node listNpc;
 		std::vector<Sprite> listNpc_sprites;
-		std::vector<MapObject*> listNpc_list;
+		// Object ids, not pointers. update_npclist() runs only on a map change,
+		// but NPCs come and go within a map (a server RemoveNpc, or MapObjects
+		// dropping an inactive object), and the owning unique_ptr dies with
+		// them -- a cached MapObject* here is then dangling for the rest of the
+		// visit. Looking the oid up through MapObjects::get() on each use costs
+		// a hash probe and simply finds nothing once the NPC is gone.
+		std::vector<int32_t> listNpc_oids;
 		std::vector<Text> listNpc_names;
 		std::vector<std::string> listNpc_full_names;
 

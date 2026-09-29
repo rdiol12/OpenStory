@@ -94,8 +94,11 @@ namespace ms
 		keysdown.clear();
 		attacking = false;
 		ladder = nullptr;
-		chair_itemid = 0;
-		chair_anim = Animation();
+		// Go through set_chair(0) rather than zeroing chair_itemid by hand:
+		// it also clears chair_anim_front and, crucially, sit_offset. Char::draw
+		// adds sit_offset unconditionally, so leaving it set after leaving a
+		// chair via a portal drew the body offset for the rest of the session.
+		set_chair(0);
 		nullstate.update_state(*this);
 	}
 
@@ -618,17 +621,16 @@ namespace ms
 
 	void Player::add_cooldown(int32_t skill_id, int32_t cooltime)
 	{
-		cooldowns[skill_id] = cooltime;
+		if (cooltime <= 0)
+			cooldowns.erase(skill_id);
+		else
+			cooldowns[skill_id] = std::chrono::steady_clock::now() + std::chrono::seconds(cooltime);
 	}
 
 	bool Player::has_cooldown(int32_t skill_id) const
 	{
 		auto iter = cooldowns.find(skill_id);
-
-		if (iter == cooldowns.end())
-			return false;
-
-		return iter->second > 0;
+		return iter != cooldowns.end() && std::chrono::steady_clock::now() < iter->second;
 	}
 
 	void Player::change_level(uint16_t level)

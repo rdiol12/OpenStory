@@ -479,6 +479,15 @@ namespace ms
 		position = pos;
 	}
 
+	// Bottom-anchored. x stays at the fixed 512 origin that UIStatusBar's
+	// layout is expressed against (see UIStatusBar::v83_at, which subtracts
+	// 512 to reach the left edge of the view) -- only the baseline moves with
+	// the viewport. UIStateGame seeds this as (512, viewheight).
+	void UIChatBar::update_screen(int16_t, int16_t new_height)
+	{
+		position = Point<int16_t>(position.x(), new_height);
+	}
+
 	void UIChatBar::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed)

@@ -35,6 +35,13 @@
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
 
+#include "../../IO/Keyboard.h"
+
+// Optional input instrumentation, gated by OPENSTORY_KEYDEBUG. See
+// ms::key_debug_enabled() in IO/Keyboard.h.
+#include <iostream>
+#include <string>
+
 namespace ms
 {
 	void ChangeChannelHandler::handle(InPacket& recv) const
@@ -90,7 +97,10 @@ namespace ms
 			player.change_look(stat, recv.read_int());
 			break;
 		case MapleStat::Id::LEVEL:
-			player.change_level(recv.read_byte());
+			// The level is an unsigned byte on the wire; reading it signed made
+			// every level from 128 up arrive negative and wrap in the uint16_t
+			// stat (128 -> 65408).
+			player.change_level(static_cast<uint8_t>(recv.read_byte()));
 			break;
 		case MapleStat::Id::JOB:
 			player.change_job(recv.read_short());
@@ -296,12 +306,49 @@ namespace ms
 	{
 		recv.skip(1);
 
+		// The packet carries the character's complete key layout, so it
+		// replaces the client's built-in defaults outright rather than merging
+		// with them.
+		UI::get().get_keyboard().clear_bindings();
+
+		// Optional trace of the layout the server just sent, gated by
+		// OPENSTORY_KEYDEBUG. See ms::key_debug_enabled() in IO/Keyboard.h.
+		const bool keydebug = key_debug_enabled();
+
+		int32_t bound = 0;
+		int32_t jump_key = -1;
+		std::string actionkeys;
+
 		for (uint8_t i = 0; i < 90; i++)
 		{
 			uint8_t type = recv.read_byte();
 			int32_t action = recv.read_int();
 
 			UI::get().add_keymapping(i, type, action);
+
+			if (keydebug && type != KeyType::Id::NONE)
+			{
+				bound++;
+
+				if (type == KeyType::Id::ACTION)
+				{
+					actionkeys += " maple" + std::to_string(i)
+						+ "=action" + std::to_string(action);
+
+					if (action == KeyAction::Id::JUMP)
+						jump_key = i;
+				}
+			}
+		}
+
+		if (keydebug)
+		{
+			std::cout << "[KEYPROBE] KEYMAP packet: " << bound << " bindings."
+				<< " ACTION keys:" << (actionkeys.empty() ? " (none)" : actionkeys)
+				<< std::endl;
+			std::cout << "[KEYPROBE] JUMP bound to maple key " << jump_key
+				<< (jump_key < 0 ? "  *** SERVER SENT NO JUMP BINDING ***" : "")
+				<< std::endl;
 		}
 	}
 

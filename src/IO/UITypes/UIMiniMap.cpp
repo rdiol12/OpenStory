@@ -968,7 +968,7 @@ namespace ms
 		listNpc_sprites.clear();
 		listNpc_names.clear();
 		listNpc_full_names.clear();
-		listNpc_list.clear();
+		listNpc_oids.clear();
 		selected = -1;
 		listNpc_offset = 0;
 
@@ -979,7 +979,7 @@ namespace ms
 
 		for (auto npc = npcs->begin(); npc != npcs->end(); ++npc)
 		{
-			listNpc_list.emplace_back(npc->second.get());
+			listNpc_oids.emplace_back(npc->first);
 
 			auto n = static_cast<Npc*>(npc->second.get());
 			std::string name = n->get_name();
@@ -1048,7 +1048,7 @@ namespace ms
 
 		Point<int16_t> listNpc_pos = position + Point<int16_t>(minimap_dims.x() + 10, 23);
 
-		for (int8_t i = 0; i + listNpc_offset < listNpc_list.size() && i < 8; i++)
+		for (int8_t i = 0; i + listNpc_offset < listNpc_oids.size() && i < 8; i++)
 		{
 			if (selected - listNpc_offset == i)
 				npc_highlight.draw(listNpc_pos);
@@ -1062,13 +1062,18 @@ namespace ms
 		if (listNpc_slider.isenabled())
 			listNpc_slider.draw(position);
 
-		if (selected >= 0)
+		if (selected >= 0 && selected < static_cast<int16_t>(listNpc_oids.size()))
 		{
-			Point<int16_t> npc_pos =
-				scale_map_pos(listNpc_list[selected]->get_position()) +
-				Point<int16_t>(map_draw_origin_x, map_draw_origin_y - npc_marker_anim.get_dimensions().y() + (type == Type::MAX ? MAX_ADJ : 0));
+			// May have despawned since the list was built; skip the marker
+			// rather than following a stale pointer.
+			if (auto npc = Stage::get().get_npcs().get_npcs()->get(listNpc_oids[selected]))
+			{
+				Point<int16_t> npc_pos =
+					scale_map_pos(npc->get_position()) +
+					Point<int16_t>(map_draw_origin_x, map_draw_origin_y - npc_marker_anim.get_dimensions().y() + (type == Type::MAX ? MAX_ADJ : 0));
 
-			selected_marker.draw(position + npc_pos, 0.5f);
+				selected_marker.draw(position + npc_pos, 0.5f);
+			}
 		}
 	}
 
@@ -1080,7 +1085,7 @@ namespace ms
 		if (selected >= 0 && selected < listNpc_names.size())
 			listNpc_names[selected].change_color(Color::Name::WHITE);
 
-		if (choice > listNpc_names.size() || choice < 0)
+		if (choice < 0 || choice >= static_cast<int16_t>(listNpc_names.size()))
 		{
 			selected = -1;
 		}
@@ -1103,9 +1108,11 @@ namespace ms
 			set_npclist_active(true);
 
 		// Find the NPC in the list by its data ID
-		for (size_t i = 0; i < listNpc_list.size(); i++)
+		MapObjects* npcs = Stage::get().get_npcs().get_npcs();
+
+		for (size_t i = 0; i < listNpc_oids.size(); i++)
 		{
-			auto npc = static_cast<Npc*>(listNpc_list[i]);
+			auto npc = static_cast<Npc*>(npcs->get(listNpc_oids[i]).get());
 
 			if (npc && npc->get_npcid() == npcid)
 			{

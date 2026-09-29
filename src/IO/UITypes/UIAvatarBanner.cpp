@@ -102,6 +102,12 @@ namespace ms
 		makeactive();
 	}
 
+	// Right-edge anchored; re-derive instead of keeping the old viewport's x.
+	void UIAvatarBanner::update_screen(int16_t new_width, int16_t)
+	{
+		position = Point<int16_t>(new_width - dimension.x() + 4, 4);
+	}
+
 	void UIAvatarBanner::draw(float inter) const
 	{
 		variant_anim.draw(DrawArgument(position), inter);

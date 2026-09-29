@@ -83,6 +83,11 @@ namespace ms
 
 		int16_t get_frame_index() const;
 
+		// Interpolated frame alpha (0-255) that draw() would apply right now.
+		// Exists for the OPENSTORY_GFXDEBUG traces: a value that moves on a
+		// single-frame animation means the frame's a0/a1 are ramping.
+		float get_opacity(float alpha) const { return opacity.get(alpha); }
+
 	private:
 		const Frame& get_frame() const;
 

@@ -51,15 +51,26 @@ namespace ms
 		{
 			opacities = { src["a0"], src["a1"] };
 		}
+		// One endpoint only means a CONSTANT alpha for this frame, not a ramp.
+		// WZ frames that want to fade declare both a0 and a1 -- across
+		// Map/Effect/Skill/Reactor that is 2156 nodes against 313 with a single
+		// endpoint, so the lone value is a static alpha the author wrote once.
+		//
+		// The old guess (a1 = 255 - a0) invented a ramp that is not in the
+		// data, and on a single-frame animation it produces a sawtooth: the
+		// frame loops back to itself every `delay` ms, so update() walks the
+		// opacity down and reset-on-wrap snaps it back, forever. That is the
+		// Ellinia light-ray flicker -- Back/shineWood.img/back/16 carries
+		// a0=235 and nothing else, which became {235, 20} pulsing at ~10 Hz.
 		else if (hasa0)
 		{
 			uint8_t a0 = src["a0"];
-			opacities = { a0, 255 - a0 };
+			opacities = { a0, a0 };
 		}
 		else if (hasa1)
 		{
 			uint8_t a1 = src["a1"];
-			opacities = { 255 - a1, a1 };
+			opacities = { a1, a1 };
 		}
 		else
 		{
@@ -71,10 +82,12 @@ namespace ms
 
 		if (hasz0 && hasz1)
 			scales = { src["z0"], src["z1"] };
+		// Same reading as a0/a1 above: a lone endpoint is a constant scale.
+		// `{ z0, 0 }` shrank the sprite to nothing over one frame.
 		else if (hasz0)
-			scales = { src["z0"], 0 };
+			scales = { src["z0"], src["z0"] };
 		else if (hasz1)
-			scales = { 100, src["z1"] };
+			scales = { src["z1"], src["z1"] };
 		else
 			scales = { 100, 100 };
 	}

@@ -17,18 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#ifdef PLATFORM_PS5
-	#include "../../platform/shared/GLCompat.h"
-#elif defined(PLATFORM_IOS)
-	#include <OpenGLES/ES3/gl.h>
-	#include <OpenGLES/ES3/glext.h>
-	#ifndef GL_BGRA
-		#define GL_BGRA GL_BGRA_EXT
-	#endif
-#else
-	#define GLEW_STATIC
-	#include <glew.h>
-#endif
+#include "../../platform/shared/GLCompat.h"
 
 #include <array>
 #include <stdint.h>
