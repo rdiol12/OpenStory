@@ -61,7 +61,7 @@ committed — no extra build step.
 
 ## Configuration
 
-Supply compatible v83 NX files in `wz/`; use the v83 UI file as `UI.nx`.
+Supply compatible v83 NX files in `wz/`.
 Create a local `Settings` file beside the client executable and set `ServerIP`
 and `ServerPort` to your Cosmic server's reachable address and login port.
 The default address is loopback and does not select a public server.
